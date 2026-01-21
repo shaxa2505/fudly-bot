@@ -612,6 +612,11 @@ async def create_webhook_app(
 
         city = city.strip() if isinstance(city, str) else city
         city = city or None
+        region = region.strip() if isinstance(region, str) else region
+        region = region or None
+        district = district.strip() if isinstance(district, str) else district
+        district = district or None
+
         normalized_city = normalize_city(city) if city else None
         normalized_region = normalize_city(region) if region else None
         normalized_district = normalize_city(district) if district else None
@@ -782,6 +787,14 @@ async def create_webhook_app(
 
         city = city.strip() if isinstance(city, str) else city
         city = city or None
+        region = region.strip() if isinstance(region, str) else region
+        region = region or None
+        district = district.strip() if isinstance(district, str) else district
+        district = district or None
+
+        city = normalize_city(city) if city else None
+        region = normalize_city(region) if region else None
+        district = normalize_city(district) if district else None
 
         logger.info(f"API /offers request: city={city}, category={category}, limit={limit}")
 
@@ -1139,6 +1152,14 @@ async def create_webhook_app(
         lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
         city = city.strip() if isinstance(city, str) else city
         city = city or None
+        region = region.strip() if isinstance(region, str) else region
+        region = region or None
+        district = district.strip() if isinstance(district, str) else district
+        district = district or None
+
+        city = normalize_city(city) if city else None
+        region = normalize_city(region) if region else None
+        district = normalize_city(district) if district else None
 
         try:
             raw_stores: list[Any] = []

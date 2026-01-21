@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="uz"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Premium Food Rescue App</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;family=Playfair+Display:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#065F46", // Deep Emerald
+                        "background-light": "#F8FAF9",
+                        "background-dark": "#0F172A",
+                        accent: "#10B981",
+                    },
+                    fontFamily: {
+                        sans: ["Plus Jakarta Sans", "sans-serif"],
+                        display: ["Playfair Display", "serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "1rem",
+                        '2xl': "1.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-primary/10">
+<div class="h-11 w-full bg-background-light dark:bg-background-dark sticky top-0 z-50 flex items-center justify-between px-6">
+<span class="text-sm font-semibold">9:41</span>
+<div class="flex gap-1.5 items-center">
+<span class="material-icons-round text-sm">signal_cellular_alt</span>
+<span class="material-icons-round text-sm">wifi</span>
+<span class="material-icons-round text-sm">battery_full</span>
+</div>
+</div>
+<header class="px-5 pt-2 pb-4 sticky top-11 z-40 bg-background-light/80 dark:bg-background-dark/80 ios-blur">
+<div class="flex items-center justify-between mb-4">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Joylashuv</span>
+<button class="flex items-center gap-1 group">
+<span class="font-bold text-lg">Kattaqo'rg'on</span>
+<span class="material-icons-round text-primary text-xl transition-transform group-active:rotate-180">expand_more</span>
+</button>
+</div>
+<button class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-slate-100 dark:border-slate-700">
+<span class="material-icons-round text-slate-600 dark:text-slate-300">notifications_none</span>
+</button>
+</div>
+<div class="relative group">
+<span class="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="w-full bg-white dark:bg-slate-800 border-none rounded-2xl py-3.5 pl-12 pr-12 shadow-sm focus:ring-2 focus:ring-primary/20 text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="Restoran yoki mahsulot qidirish..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-primary">
+<span class="material-icons-round">tune</span>
+</button>
+</div>
+</header>
+<main class="pb-32">
+<section class="px-5 mb-8">
+<div class="relative h-56 w-full rounded-3xl overflow-hidden group">
+<img alt="Surprise Bag of fresh fruits and juices" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAU9IhOyFZPsRyJyn-41a6htk1mnr4t7SFqSdLrYjD_jMUs4ZyXaSv_e_wo5C3uzp50BMRl-etLdUowiCKkpGo_SC8w0q4WxfFaw0obdWgOQG5ZzVfk3d6ixWtbDiV06ZpdTNVA_Rs9Aztl07J2bnEaNf5FsPwKWfsW_IlYcwFr82qfA5EQt4dyoP_cLMJVDIQnNBwFSKtGos6QvS0oMwj9REKQVwv5QKndxhPoQCrnaRd2QM6_fPZ-YYidcDA2TVYHP46dNrN7_8V-"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<div class="absolute bottom-6 left-6 right-6">
+<span class="inline-block px-3 py-1 bg-accent text-white text-[10px] font-bold rounded-full mb-2 uppercase tracking-wider">Kun taklifi</span>
+<h2 class="text-white text-3xl font-display mb-1">Ichimliklar To'plami</h2>
+<p class="text-white/80 text-sm font-medium">Siz uchun maxsus saralangan premium sharbatlar</p>
+</div>
+<div class="absolute bottom-6 right-6 flex gap-1.5">
+<div class="w-6 h-1.5 bg-white rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-white/40 rounded-full"></div>
+<div class="w-1.5 h-1.5 bg-white/40 rounded-full"></div>
+</div>
+</div>
+</section>
+<section class="mb-8">
+<div class="flex items-center justify-between px-5 mb-4">
+<h3 class="font-bold text-xl">Kategoriyalar</h3>
+</div>
+<div class="flex gap-4 overflow-x-auto px-5 no-scrollbar">
+<button class="flex flex-col items-center gap-2 flex-shrink-0 group">
+<div class="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 transition-transform active:scale-90">
+<span class="material-icons-round">local_fire_department</span>
+</div>
+<span class="text-xs font-bold text-primary">Barchasi</span>
+</button>
+<button class="flex flex-col items-center gap-2 flex-shrink-0 group">
+<div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 transition-transform active:scale-90">
+<span class="material-icons-round">bakery_dining</span>
+</div>
+<span class="text-xs font-semibold">Pishiriqlar</span>
+</button>
+<button class="flex flex-col items-center gap-2 flex-shrink-0 group">
+<div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 transition-transform active:scale-90">
+<span class="material-icons-round">local_mall</span>
+</div>
+<span class="text-xs font-semibold">Mahsulotlar</span>
+</button>
+<button class="flex flex-col items-center gap-2 flex-shrink-0 group">
+<div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 transition-transform active:scale-90">
+<span class="material-icons-round">restaurant</span>
+</div>
+<span class="text-xs font-semibold">Taomlar</span>
+</button>
+<button class="flex flex-col items-center gap-2 flex-shrink-0 group">
+<div class="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-100 dark:border-slate-700 transition-transform active:scale-90">
+<span class="material-icons-round">local_bar</span>
+</div>
+<span class="text-xs font-semibold">Ichimlik</span>
+</button>
+</div>
+</section>
+<section class="px-5">
+<div class="flex items-center justify-between mb-5">
+<div class="flex items-center gap-2">
+<h3 class="font-bold text-xl">Siz uchun takliflar</h3>
+<span class="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full">20+</span>
+</div>
+<button class="text-primary text-sm font-bold">Hammasi</button>
+</div>
+<div class="grid grid-cols-1 gap-6">
+<div class="bg-white dark:bg-slate-800 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.98] transition-transform">
+<div class="relative h-48 overflow-hidden">
+<img alt="Luxury Pastry Selection" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCY20rdbuWcOt6p7RzY2h-aWye2s9HP1Va_i0srslnMQOgIH5S2y8lmTOUiFB26825KigcvskJKgSqLYuVMkCNpI8LLTDxP5TvegydmshuK8eUBPKr7yYhZAAyLKYnzjdEbSPQsL59VRJdMQ5c5Ez63mPTEM2VSjOsQh4T-UENrSwtwNeR23UQ7JXVRDXBBbTlw6wo006emyQr6qq04h3DGZaS4N_Zmo9oyzivJoFRTCf7XZ39BtGP8NwVvTZGBQeTAamAx4J0ZoCJO"/>
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 ios-blur rounded-full text-[10px] font-bold flex items-center gap-1">
+<span class="material-icons-round text-primary text-xs">schedule</span>
+                                18:00 - 19:30
+                            </span>
+</div>
+<button class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 ios-blur flex items-center justify-center shadow-sm">
+<span class="material-icons-round text-rose-500 text-lg">favorite_border</span>
+</button>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h4 class="font-bold text-lg leading-tight mb-1">Le Croissant Bakery</h4>
+<p class="text-xs text-slate-500 flex items-center gap-1">
+<span class="material-icons-round text-[14px]">location_on</span>
+                                    Amir Temur ko'chasi, 42
+                                </p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-lg font-black text-primary">15 000 so'm</span>
+<span class="text-xs text-slate-400 line-through">45 000 so'm</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-700">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 bg-slate-200 overflow-hidden">
+<img alt="User" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3UZc2HEYQszoe6itr-yoCn2Q53LPS0DVtqhJ8ZqjNP_dZsp09mVyyH21nLcW2syobb4QPlAmZzoux1ZLaTcogItdeJHpvxSJnPtywPkn-1-aurRhJauAl0d3GfXBk1Src7HxvbaTPwq-m8mZiimp6ehk8c7RIdR8Ygl0UzzZv-sSo_g9IFnASXSf_9frrg1lDlkB-7kSwDn6k1D5r4GMAC9YferIIKu8rdOSnLoZyev-7ynwjNTrO9QITmd0iX8y2ysW1Papm-V6h"/>
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 bg-slate-200 overflow-hidden">
+<img alt="User" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBp4PwtDDupSQMHxhmNeGz_bPVDK8Z29hc48vBU8XOk70NijvkNw3PTGA--dtmJTxFSQmCPyiQWDnMJfqLjZr073c_6PLEQ-AxtK5sSEtabt7eVv11i7tQeH0_vs75LZ8JhJJYv0CLHcMJvHPT2Wtfc31v0ar2C3E0cvk8khQHZe7Ux3oW3EJf5nDZshXj7u4WwduzzvJyODF_6hhWd5rVVmNE3jFOXXK6I5wnvpOFDu2Mlhd8Xc0t6bh396b8eXnAdXFP4Zi9J37fp"/>
+</div>
+<div class="w-6 h-6 rounded-full border-2 border-white dark:border-slate-800 bg-slate-100 flex items-center justify-center text-[8px] font-bold">
+                                    +12
+                                </div>
+</div>
+<button class="bg-primary text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors">
+                                Savatga qo'shish
+                            </button>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-800 rounded-[2rem] overflow-hidden shadow-sm border border-slate-100 dark:border-slate-700 active:scale-[0.98] transition-transform">
+<div class="relative h-48 overflow-hidden">
+<img alt="Gourmet Burger Set" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnpeAGbjFbgOlDsf38hsT1LuLQ-TAoTEUnrzPW7KwY6yIzX8ub8gYEHyo5dP5m2bj8C2m7-NHLR_tBUZcTrPvZbvrv06dYQXi0KdOI1nVkrp9T9lgqwRCfFSVLkRQXapRjGpeFTFSyvifFP4lJrSNyjVuuWilF0SpAn5LcCd1N2cXbhaHLU2m0KFHHaR_Zmib7BzfYJrDBclDIJ8zwShy11qX5fmcLLVk7Dv7oxSkMtd4xWganJZXK17pH3YD9a5oqkGO1dkuluaSZ"/>
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="px-3 py-1.5 bg-white/90 dark:bg-slate-900/90 ios-blur rounded-full text-[10px] font-bold flex items-center gap-1">
+<span class="material-icons-round text-primary text-xs">schedule</span>
+                                21:00 - 22:00
+                            </span>
+<span class="px-3 py-1.5 bg-rose-500 text-white rounded-full text-[10px] font-bold">Kam qoldi</span>
+</div>
+<button class="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 dark:bg-slate-900/90 ios-blur flex items-center justify-center shadow-sm">
+<span class="material-icons-round text-rose-500 text-lg">favorite</span>
+</button>
+</div>
+<div class="p-5">
+<div class="flex justify-between items-start mb-3">
+<div>
+<h4 class="font-bold text-lg leading-tight mb-1">Black Star Burger</h4>
+<p class="text-xs text-slate-500 flex items-center gap-1">
+<span class="material-icons-round text-[14px]">location_on</span>
+                                    Samarqand Darvoza
+                                </p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-lg font-black text-primary">22 000 so'm</span>
+<span class="text-xs text-slate-400 line-through">60 000 so'm</span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-700">
+<div class="flex items-center gap-1 text-amber-500">
+<span class="material-icons-round text-sm">star</span>
+<span class="text-xs font-bold text-slate-700 dark:text-slate-300">4.8</span>
+<span class="text-xs text-slate-400 font-normal">(120+)</span>
+</div>
+<button class="bg-primary text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors">
+                                Savatga qo'shish
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<nav class="fixed bottom-0 inset-x-0 bg-white/80 dark:bg-slate-900/80 ios-blur border-t border-slate-100 dark:border-slate-800 px-6 pb-8 pt-3 z-50">
+<div class="flex items-center justify-between max-w-lg mx-auto">
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<div class="bg-primary/10 rounded-xl p-1.5 px-4 mb-0.5">
+<span class="material-icons-round">home</span>
+</div>
+<span class="text-[10px] font-bold">Asosiy</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-icons-round mb-1">storefront</span>
+<span class="text-[10px] font-bold">Do'konlar</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 relative" href="#">
+<span class="material-icons-round mb-1">shopping_basket</span>
+<span class="text-[10px] font-bold">Savat</span>
+<span class="absolute -top-1 right-0 w-4 h-4 bg-accent text-white text-[8px] flex items-center justify-center rounded-full font-bold border-2 border-white dark:border-slate-900">1</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500" href="#">
+<span class="material-icons-round mb-1">person_outline</span>
+<span class="text-[10px] font-bold">Profil</span>
+</a>
+</div>
+</nav>
+<div class="fixed bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-300 dark:bg-slate-700 rounded-full z-[60]"></div>
+
+</body></html>

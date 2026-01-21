@@ -1,72 +1,96 @@
 /**
- * Offer Card Skeleton - Compact marketplace placeholder
+ * Offer Card Skeleton - Home layout placeholder
  */
 
 .offer-card-skeleton {
-  background: var(--color-bg-card, #ffffff);
-  border-radius: 18px;
+  background: #FFFFFF;
+  border-radius: 32px;
+  border: 1px solid #F1F5F9;
   overflow: hidden;
-  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
 }
 
-.skeleton-media {
-  position: relative;
-  width: 100%;
-  padding-top: 100%;
-  background: var(--color-bg-card, #ffffff);
-  overflow: hidden;
+.skeleton-image {
+  height: 192px;
+  background: var(--color-bg-skeleton, #E2E8F0);
 }
 
-.skeleton-overlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 33%;
-  padding: 12px;
+.skeleton-body {
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  gap: 14px;
+  background: #FFFFFF;
+}
+
+.skeleton-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.skeleton-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-price-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.35) 55%, rgba(0, 0, 0, 0.75) 100%);
-  z-index: 2;
-}
-
-.skeleton-action {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  width: 42px;
-  height: 42px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: var(--color-bg-skeleton);
-  z-index: 3;
+  min-width: 72px;
 }
 
 .skeleton-line {
   height: 12px;
   border-radius: 8px;
-  background: var(--color-bg-skeleton);
-}
-
-.skeleton-price {
-  width: 60%;
-  height: 14px;
+  background: var(--color-bg-skeleton, #E2E8F0);
 }
 
 .skeleton-title {
-  width: 100%;
-}
-
-.skeleton-title-short {
   width: 70%;
+  height: 14px;
 }
 
-.skeleton-store {
-  width: 62%;
+.skeleton-location {
+  width: 55%;
+}
+
+.skeleton-price {
+  width: 64px;
+  height: 14px;
+}
+
+.skeleton-old-price {
+  width: 48px;
+  height: 10px;
+}
+
+.skeleton-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid #F1F5F9;
+  gap: 12px;
+}
+
+.skeleton-meta {
+  width: 84px;
+}
+
+.skeleton-button {
+  width: 120px;
+  height: 32px;
+  border-radius: 12px;
+  background: var(--color-bg-skeleton, #E2E8F0);
 }
 
 /* Shimmer animation */

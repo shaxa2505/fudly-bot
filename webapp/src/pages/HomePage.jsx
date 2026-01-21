@@ -146,6 +146,7 @@ function HomePage() {
   const offersCountLabel = hasMore && resolvedOffersTotal == null && offers.length > 0
     ? `${offersCountValue}+ ta`
     : `${offersCountValue} ta`
+  const offersCountBadge = offersCountLabel.replace(/\s*ta$/, '').trim()
   const [hasNearbyFallback, setHasNearbyFallback] = useState(false)
   const derivedCategoryCounts = useMemo(() => {
     if (!offers.length) return {}
@@ -929,18 +930,21 @@ function HomePage() {
       {/* Header */}
       <header className="header">
         <div className="header-top">
-          <div className="header-system-slot" aria-hidden="true" />
-          <button className="header-location" onClick={openAddressModal}>
-            <div className="header-location-text">
-              <span className="header-location-city">
-                <span className="header-location-city-name">{cityLabel}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-            </div>
+          <div className="header-location-block">
+            <span className="header-location-label">Joylashuv</span>
+            <button className="header-location" onClick={openAddressModal}>
+              <span className="header-location-city-name">{cityLabel}</span>
+              <svg className="header-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
+          <button className="header-notification" type="button" aria-label="Bildirishnomalar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9 17a3 3 0 006 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
-          <div className="header-system-slot" aria-hidden="true" />
         </div>
       </header>
 
@@ -956,7 +960,7 @@ function HomePage() {
               ref={searchInputRef}
               type="text"
               className="search-input"
-              placeholder="Mahsulot qidirish..."
+              placeholder="Restoran yoki mahsulot qidirish..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={handleSearchFocus}
@@ -975,6 +979,23 @@ function HomePage() {
                 x
               </button>
             )}
+            <button
+              type="button"
+              className={`search-filter-toggle ${showAdvancedFilters ? 'active' : ''}`}
+              onClick={() => {
+                window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+                setShowAdvancedFilters(prev => !prev)
+              }}
+              aria-label="Filtrlar"
+              aria-expanded={showAdvancedFilters}
+            >
+              <span className="filter-icon" aria-hidden="true">
+                <SlidersHorizontal size={16} strokeWidth={2} />
+              </span>
+              {activeFiltersCount > 0 && (
+                <span className="search-filter-count">{activeFiltersCount}</span>
+              )}
+            </button>
 
             {/* Search History Dropdown */}
             {showSearchDropdown && (
@@ -1032,23 +1053,6 @@ function HomePage() {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className={`search-filter-toggle ${showAdvancedFilters ? 'active' : ''}`}
-            onClick={() => {
-              window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-              setShowAdvancedFilters(prev => !prev)
-            }}
-            aria-label="Filtrlar"
-            aria-expanded={showAdvancedFilters}
-          >
-            <span className="filter-icon" aria-hidden="true">
-              <SlidersHorizontal size={16} strokeWidth={2} />
-            </span>
-            {activeFiltersCount > 0 && (
-              <span className="search-filter-count">{activeFiltersCount}</span>
-            )}
-          </button>
         </div>
       </div>
 
@@ -1163,6 +1167,9 @@ function HomePage() {
       }} />
 
       <div className="categories-nav-section">
+        <div className="categories-header">
+          <h3>Kategoriyalar</h3>
+        </div>
         <div
           className="category-tabs"
           ref={categoriesScrollRef}
@@ -1184,10 +1191,10 @@ function HomePage() {
                 tabIndex={activeCategory === cat.id ? 0 : -1}
                 onClick={() => handleCategorySelect(cat.id)}
               >
-                <span className="category-tab-label">
-                  <Icon size={14} strokeWidth={2} className="category-tab-icon" aria-hidden="true" />
-                  <span>{cat.name}</span>
+                <span className="category-tab-icon-wrap" aria-hidden="true">
+                  <Icon size={20} strokeWidth={2} className="category-tab-icon" />
                 </span>
+                <span className="category-tab-text">{cat.name}</span>
                 {showCount && (
                   <span className="category-tab-count">
                     {categoriesLoading ? '...' : count}
@@ -1223,10 +1230,26 @@ function HomePage() {
         className="section-header"
         data-category-id={selectedCategory === 'all' ? 'all' : selectedCategory}
       >
-        <h2 className="section-title">
-          {selectedCategory === 'all' ? 'Barcha takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
-        </h2>
-        <span className="offers-count">{offersCountLabel}</span>
+        <div className="section-header-left">
+          <h2 className="section-title">
+            {selectedCategory === 'all' ? 'Siz uchun takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
+          </h2>
+          <span className="offers-count">{offersCountBadge}</span>
+        </div>
+        <button
+          type="button"
+          className="section-link"
+          onClick={() => {
+            window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+            handleCategorySelect('all', { withHaptic: false })
+            setSearchQuery('')
+            setMinDiscount(null)
+            setPriceRange('all')
+            setSortBy('default')
+          }}
+        >
+          Hammasi
+        </button>
       </div>
 
       {/* Offers Grid */}

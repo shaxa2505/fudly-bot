@@ -4,28 +4,36 @@ import './HeroBanner.css'
 const BANNERS = [
   {
     id: 1,
-    title: 'Sut mahsulotlari',
-    image: '/images/hero/dairy.jpeg',
-    position: 'center',
-    category: 'dairy'
-  },
-  {
-    id: 2,
-    title: 'Ichimliklar',
+    title: "Ichimliklar To'plami",
+    subtitle: "Siz uchun maxsus saralangan premium sharbatlar",
+    badge: "Kun taklifi",
     image: '/images/hero/drinks.jpeg',
     position: 'center bottom',
     category: 'drinks'
   },
   {
+    id: 2,
+    title: "Pishiriqlar To'plami",
+    subtitle: "Yangi pishgan mahsulotlar har kuni",
+    badge: "Kun taklifi",
+    image: '/images/hero/dairy.jpeg',
+    position: 'center',
+    category: 'bakery'
+  },
+  {
     id: 3,
-    title: "Go'sht mahsulotlari",
+    title: "Go'sht Mahsulotlari",
+    subtitle: "Sifatli va yangi mahsulotlar",
+    badge: "Kun taklifi",
     image: '/images/hero/meat.jpeg',
     position: 'center',
     category: 'meat'
   },
   {
     id: 4,
-    title: 'Mevalar',
+    title: 'Mevalar To\'plami',
+    subtitle: "Tabiiy va foydali mahsulotlar",
+    badge: "Kun taklifi",
     image: '/images/hero/produce.jpeg',
     position: 'center',
     category: 'fruits'
@@ -128,20 +136,22 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
         <div className="hero-banner__image" aria-hidden="true" />
         <div className="hero-banner__overlay" aria-hidden="true" />
         <div className="banner-content">
+          <span className="banner-badge">{currentBanner.badge}</span>
           <h2 className="banner-title">{currentBanner.title}</h2>
+          <p className="banner-subtitle">{currentBanner.subtitle}</p>
         </div>
-      </div>
-
-      {/* Dots indicator */}
-      <div className="banner-dots">
-        {BANNERS.map((_, index) => (
-          <button
-            key={index}
-            className={`banner-dot ${index === currentIndex ? 'active' : ''}`}
-            onClick={() => handleDotClick(index)}
-            aria-label={`Banner ${index + 1}`}
-          />
-        ))}
+        <div className="banner-indicators" role="tablist" aria-label="Bannerlar">
+          {BANNERS.map((_, index) => (
+            <button
+              key={index}
+              className={`banner-indicator ${index === currentIndex ? 'active' : ''}`}
+              onClick={() => handleDotClick(index)}
+              aria-label={`Banner ${index + 1}`}
+              aria-selected={index === currentIndex}
+              role="tab"
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

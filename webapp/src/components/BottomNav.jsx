@@ -23,7 +23,7 @@ function BottomNav({ currentPage, cartCount }) {
     return 'home'
   })()
   const getIcon = (id, isActive) => {
-    const color = isActive ? '#53B175' : '#7C7C7C'
+    const color = isActive ? '#065F46' : '#94A3B8'
     const strokeW = isActive ? '2.5' : '2'
 
     switch(id) {
@@ -62,10 +62,10 @@ function BottomNav({ currentPage, cartCount }) {
   }
 
   const menuItems = [
-    { id: 'home', label: 'Bosh sahifa' },
+    { id: 'home', label: 'Asosiy' },
     { id: 'stores', label: "Do'konlar" },
     { id: 'cart', label: 'Savat', badge: cartCount },
-    { id: 'profile', label: 'Yana' },
+    { id: 'profile', label: 'Profil' },
   ]
 
   const handleNavigate = (pageId) => {
