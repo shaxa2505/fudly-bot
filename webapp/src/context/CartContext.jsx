@@ -89,9 +89,11 @@ export function CartProvider({ children }) {
             photo: rawPhoto,
             discount_price: offer.discount_price || existing?.offer?.discount_price,
             original_price: offer.original_price || existing?.offer?.original_price,
+            description: offer.description || offer.short_description || existing?.offer?.description,
             store_id: offer.store_id || existing?.offer?.store_id,
             store_name: offer.store_name || existing?.offer?.store_name,
             store_address: offer.store_address || existing?.offer?.store_address,
+            unit: offer.unit || existing?.offer?.unit,
             stock: stockLimit, // Save stock limit for later checks
           },
           quantity: Math.min(currentQty + 1, stockLimit),

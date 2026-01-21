@@ -27,9 +27,10 @@
   --color-text-muted: var(--home-text-muted);
   --color-border: var(--home-border);
   --color-border-light: #EEF2F6;
+  --font-display: "Plus Jakarta Sans", var(--font-family);
   min-height: 100vh;
   position: relative;
-  padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-xl));
+  padding-bottom: calc(var(--bottom-nav-height) + 32px + var(--safe-area-bottom));
   background: var(--home-bg);
   color: var(--home-text);
   font-family: "Plus Jakarta Sans", var(--font-family);
@@ -39,12 +40,20 @@
   scroll-behavior: smooth;
   touch-action: pan-y;
   --home-topbar-height: 44px;
-  --home-topbar-gap: 12px;
+  --home-topbar-gap: 16px;
   --home-top-inset: max(
+    12px,
     var(--safe-area-top-raw, 0px),
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--home-topbar-height)) / 2)
   );
   --home-topbar-total-height: calc(var(--home-topbar-height) + var(--home-top-inset) + var(--home-topbar-gap));
+}
+
+.home-page h1,
+.home-page h2,
+.home-page h3,
+.home-page h4 {
+  letter-spacing: 0;
 }
 
 /* Header - Fixed clean design */
@@ -88,7 +97,7 @@
 .header-location-label {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--home-text-muted);
 }
@@ -133,6 +142,8 @@
 .header-notification {
   width: 40px;
   height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   border-radius: 50%;
   border: 1px solid var(--home-border);
   background: #FFFFFF;
@@ -217,6 +228,8 @@
   top: 50%;
   width: 20px;
   height: 20px;
+  min-width: 20px;
+  min-height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -242,6 +255,7 @@
   height: 32px;
   width: 32px;
   min-width: 32px;
+  min-height: 32px;
   padding: 0;
   display: inline-flex;
   align-items: center;

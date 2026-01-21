@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, Trash2, ChevronRight, X } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, X, Plus, Minus, Store } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
 import { getCurrentUser } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
-import QuantityControl from '../components/QuantityControl'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -20,6 +19,7 @@ function CartPage({ user }) {
     cartCount,
     cartTotal,
     isEmpty,
+    addToCart,
     updateQuantity,
     removeItem,
     clearCart
@@ -33,7 +33,6 @@ function CartPage({ user }) {
   const commentInputRef = useRef(null)
   const paymentProofInputRef = useRef(null)
   const fileSelectHandlerRef = useRef(null)
-  const [focusCommentOnOpen, setFocusCommentOnOpen] = useState(false)
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(false)
@@ -62,6 +61,7 @@ function CartPage({ user }) {
   const [paymentProviders, setPaymentProviders] = useState([])
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash') // 'cash' | 'card' | 'click' | 'payme'
   const [showPaymentSheet, setShowPaymentSheet] = useState(false)
+  const [recommendedOffers, setRecommendedOffers] = useState([])
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -78,13 +78,6 @@ function CartPage({ user }) {
     }
     loadProviders()
   }, [])
-
-  useEffect(() => {
-    if (showCheckout && focusCommentOnOpen) {
-      commentInputRef.current?.focus()
-      setFocusCommentOnOpen(false)
-    }
-  }, [showCheckout, focusCommentOnOpen])
 
   // Keep phone in sync with server profile (bot registration is the single source)
   useEffect(() => {
@@ -142,19 +135,57 @@ function CartPage({ user }) {
     }
   }, [cartStoreId])
 
+  useEffect(() => {
+    if (!cartStoreId || hasMultipleStores) {
+      setRecommendedOffers([])
+      return
+    }
+
+    let isActive = true
+
+    const loadRecommendations = async () => {
+      try {
+        const offers = await api.getStoreOffers(cartStoreId)
+        if (!isActive) return
+        const cartOfferIds = new Set(cartItems.map(item => item.offer?.id))
+        const filtered = (offers || []).filter(offer => !cartOfferIds.has(offer.id))
+        setRecommendedOffers(filtered.slice(0, 8))
+      } catch (error) {
+        console.warn('Could not load recommendations:', error)
+        if (isActive) {
+          setRecommendedOffers([])
+        }
+      }
+    }
+
+    loadRecommendations()
+    return () => {
+      isActive = false
+    }
+  }, [cartStoreId, cartItems, hasMultipleStores])
+
   // Calculate totals using context values
   const subtotal = cartTotal
   const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
   const itemsCount = cartCount
+  const savingsTotal = useMemo(() => {
+    return cartItems.reduce((sum, item) => {
+      const original = Number(item.offer.original_price)
+      const discount = Number(item.offer.discount_price)
+      if (!Number.isFinite(original) || !Number.isFinite(discount)) {
+        return sum
+      }
+      if (original <= discount) {
+        return sum
+      }
+      return sum + (original - discount) * item.quantity
+    }, 0)
+  }, [cartItems])
+  const formatSum = (value) => Math.round(value || 0).toLocaleString()
+  const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
-  const deliveryFeeLabel = storeDeliveryEnabled
-    ? `${Math.round(deliveryFee).toLocaleString()} so'm`
-    : 'Mavjud emas'
-  const minOrderLabel = storeDeliveryEnabled && minOrderAmount > 0
-    ? `${Math.round(minOrderAmount).toLocaleString()} so'm`
-    : '-'
   const paymentMethodLabels = {
     cash: 'Naqd',
     card: 'Kartaga o\'tkazish',
@@ -294,21 +325,6 @@ function CartPage({ user }) {
     }
     setCheckoutStep('details')
     setShowCheckout(true)
-  }
-
-  const handleCommentShortcut = async () => {
-    if (isEmpty) return
-    if (hasMultipleStores) {
-      toast.error(multiStoreMessage)
-      return
-    }
-    const verifiedPhone = await requireVerifiedPhone()
-    if (!verifiedPhone) {
-      return
-    }
-    setCheckoutStep('details')
-    setShowCheckout(true)
-    setFocusCommentOnOpen(true)
   }
 
   // Handle file selection for payment proof
@@ -618,14 +634,26 @@ function CartPage({ user }) {
   if (isEmpty) {
     return (
       <div className="cart-page cart-page--empty">
-        <header className="cart-topbar">
-          <div className="cart-topbar-inner topbar-card">
-            <span className="cart-icon-spacer" aria-hidden="true"></span>
-            <div className="cart-topbar-title">
-              <h1>Savat</h1>
-              <span className="cart-topbar-count">0</span>
-            </div>
-            <span className="cart-icon-spacer" aria-hidden="true"></span>
+        <header className="cart-header">
+          <div className="cart-header-inner">
+            <button
+              className="cart-header-btn"
+              type="button"
+              onClick={() => navigate(-1)}
+              aria-label="Orqaga"
+            >
+              <ChevronLeft size={18} strokeWidth={2} />
+            </button>
+            <h1 className="cart-header-title">Savat</h1>
+            <button
+              className="cart-header-clear"
+              type="button"
+              onClick={handleClearCart}
+              aria-label="Savatni tozalash"
+              disabled
+            >
+              Tozalash
+            </button>
           </div>
         </header>
 
@@ -658,102 +686,38 @@ function CartPage({ user }) {
 
   return (
     <div className="cart-page">
-      <header className="cart-topbar">
-        <div className="cart-topbar-inner topbar-card">
-          <span className="cart-icon-spacer" aria-hidden="true"></span>
-          <div className="cart-topbar-title">
-            <h1>Savat</h1>
-            <span className="cart-topbar-count">{itemsCount}</span>
-          </div>
-          <button className="cart-icon-btn" onClick={handleClearCart} aria-label="Savatni tozalash">
-            <Trash2 size={18} strokeWidth={2} />
+      <header className="cart-header">
+        <div className="cart-header-inner">
+          <button
+            className="cart-header-btn"
+            type="button"
+            onClick={() => navigate(-1)}
+            aria-label="Orqaga"
+          >
+            <ChevronLeft size={18} strokeWidth={2} />
+          </button>
+          <h1 className="cart-header-title">Savat</h1>
+          <button
+            className="cart-header-clear"
+            type="button"
+            onClick={handleClearCart}
+            aria-label="Savatni tozalash"
+          >
+            Tozalash
           </button>
         </div>
       </header>
 
-      <main className="cart-content">
-        <section className="cart-hero-card">
-          <div className="cart-hero-header">
-            <div className="cart-hero-title">
-              <span className="cart-hero-eyebrow">Do'kon</span>
-              <h2>{cartStoreName || "Do'kon"}</h2>
+      <main className="cart-main">
+        <section className="cart-store-card">
+          <div className="cart-store-head">
+            <div className="cart-store-info">
+              <Store size={18} strokeWidth={2} />
+              <span>{cartStoreName || "Do'kon"}</span>
             </div>
-            <span className="cart-hero-pill">{itemsCount} ta</span>
+            <ChevronRight size={18} strokeWidth={2} className="cart-store-chevron" aria-hidden="true" />
           </div>
-          <div className="cart-hero-meta">
-            <div className="cart-hero-meta-item">
-              <span className="cart-hero-meta-label">Yetkazish</span>
-              <span className="cart-hero-meta-value">{deliveryFeeLabel}</span>
-            </div>
-            <div className="cart-hero-divider" aria-hidden="true"></div>
-            <div className="cart-hero-meta-item">
-              <span className="cart-hero-meta-label">Min buyurtma</span>
-              <span className="cart-hero-meta-value">{minOrderLabel}</span>
-            </div>
-          </div>
-        </section>
 
-        <section className="cart-toggle">
-          <button
-            type="button"
-            className={`cart-toggle-btn ${orderType === 'pickup' ? 'active' : ''}`}
-            onClick={() => setOrderType('pickup')}
-          >
-            <span className="cart-toggle-title">Olib ketish</span>
-            <span className="cart-toggle-subtitle">Bepul</span>
-          </button>
-          <button
-            type="button"
-            className={`cart-toggle-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders ? 'disabled' : ''}`}
-            onClick={() => storeDeliveryEnabled && canDelivery && hasPrepayProviders && setOrderType('delivery')}
-            disabled={!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders}
-          >
-            <span className="cart-toggle-title">Yetkazib berish</span>
-            <span className="cart-toggle-subtitle">
-              {!storeDeliveryEnabled
-                ? 'Mavjud emas'
-                : !canDelivery
-                  ? `Min: ${Math.round(minOrderAmount).toLocaleString()} so'm`
-                  : `${Math.round(deliveryFee).toLocaleString()} so'm`
-              }
-            </span>
-          </button>
-        </section>
-
-        {!canDelivery && storeDeliveryEnabled && (
-          <p className="delivery-hint cart-toggle-hint">
-            Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
-          </p>
-        )}
-        {storeDeliveryEnabled && canDelivery && !hasPrepayProviders && (
-          <p className="delivery-hint cart-toggle-hint">
-            Yetkazib berish uchun to'lov usullari mavjud emas
-          </p>
-        )}
-
-        {orderType === 'delivery' && (
-          <button
-            type="button"
-            className="cart-address-card"
-            onClick={handleCheckout}
-          >
-            <div className="cart-address-main">
-              <span className="cart-address-label">Manzil</span>
-              <span className="cart-address-value">
-                {address.trim() ? address : 'Manzil kiritilmagan'}
-              </span>
-            </div>
-            <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-        )}
-
-        <div className="cart-list-card">
-          <div className="cart-list-header">
-            <div className="cart-list-title">
-              <h2>Mahsulotlar</h2>
-              <span className="cart-list-count">{itemsCount} ta</span>
-            </div>
-          </div>
           {hasMultipleStores && (
             <div className="cart-alert" role="status">
               <p>{multiStoreMessage}</p>
@@ -762,8 +726,9 @@ function CartPage({ user }) {
               </button>
             </div>
           )}
-          <div className="cart-items">
-            {cartItems.map((item, index) => {
+
+          <div className="cart-store-items">
+            {cartItems.map((item) => {
               const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
               const rawStockLimit = item.offer.stock ?? item.offer.quantity ?? 99
               const parsedStockLimit = Number(rawStockLimit)
@@ -777,56 +742,36 @@ function CartPage({ user }) {
               const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
               const unitPrice = discountPrice ?? originalPrice ?? 0
               const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
+              const description = item.offer.description || item.offer.short_description || ''
               return (
-                <div key={item.offer.id} className="cart-item" style={{ '--item-index': index }}>
-                  <img
-                    src={photoUrl}
-                    alt={item.offer.title}
-                    className="cart-item-img"
-                    onError={(e) => {
-                      if (!e.target.dataset.fallback) {
-                        e.target.dataset.fallback = 'true'
-                        e.target.src = PLACEHOLDER_IMAGE
-                      }
-                    }}
-                  />
-                  <div className="cart-item-main">
-                    <div className="cart-item-row">
-                      <h3 className="cart-item-title">{item.offer.title}</h3>
-                      <button
-                        className="cart-item-remove"
-                        type="button"
-                        onClick={() => removeItem(item.offer.id)}
-                        aria-label="Mahsulotni o'chirish"
-                      >
-                        <X size={16} strokeWidth={2} aria-hidden="true" />
-                      </button>
-                    </div>
-                    <div className="cart-item-subrow">
+                <div key={item.offer.id} className="cart-item">
+                  <div className="cart-item-thumb">
+                    <img
+                      src={photoUrl}
+                      alt={item.offer.title}
+                      className="cart-item-image"
+                      onError={(e) => {
+                        if (!e.target.dataset.fallback) {
+                          e.target.dataset.fallback = 'true'
+                          e.target.src = PLACEHOLDER_IMAGE
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="cart-item-body">
+                    <h3 className="cart-item-title">{item.offer.title}</h3>
+                    {description && (
+                      <p className="cart-item-desc">{description}</p>
+                    )}
+                    <div className="cart-item-prices">
                       <span className="cart-item-price">
-                        {Math.round(unitPrice).toLocaleString()} so'm
+                        {formatSum(unitPrice)} so'm
                       </span>
                       {showOriginalPrice && (
-                        <span className="cart-item-price cart-item-price--old">
-                          {Math.round(originalPrice).toLocaleString()} so'm
+                        <span className="cart-item-price-old">
+                          {formatSum(originalPrice)} so'm
                         </span>
                       )}
-                      {item.offer.store_name && (
-                        <span className="cart-item-store">Do'kon: {item.offer.store_name}</span>
-                      )}
-                    </div>
-                    <div className="cart-item-actions">
-                      <QuantityControl
-                        value={item.quantity}
-                        size="sm"
-                        className="cart-qty"
-                        onDecrement={() => handleQuantityChange(item.offer.id, -1)}
-                        onIncrement={() => handleQuantityChange(item.offer.id, 1)}
-                        disableIncrement={item.quantity >= stockLimit}
-                      />
-                      <span className="cart-item-total">
-                        {Math.round(unitPrice * item.quantity).toLocaleString()} so'm
-                      </span>
                     </div>
                     {maxStock != null && item.quantity >= maxStock && (
                       <p className="cart-item-stock-warning">
@@ -834,40 +779,97 @@ function CartPage({ user }) {
                       </p>
                     )}
                   </div>
+                  <div className="cart-item-qty">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(item.offer.id, 1)}
+                      aria-label={`${item.offer.title} miqdorini oshirish`}
+                      disabled={item.quantity >= stockLimit}
+                    >
+                      <Plus size={16} strokeWidth={2} />
+                    </button>
+                    <span>{item.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(item.offer.id, -1)}
+                      aria-label={`${item.offer.title} miqdorini kamaytirish`}
+                    >
+                      <Minus size={16} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
               )
             })}
           </div>
-        </div>
-        <button
-          className="cart-note-link"
-          type="button"
-          onClick={handleCommentShortcut}
-          disabled={hasMultipleStores}
-          aria-disabled={hasMultipleStores}
-        >
-          <div className="cart-note-main">
-            <span className="cart-note-title">Izoh qoldirish</span>
-            <span className="cart-note-subtitle">Kuryer yoki do'kon uchun qo'shimcha ma'lumot</span>
-          </div>
-          <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-        </button>
+        </section>
+
+        {recommendedOffers.length > 0 && (
+          <section className="cart-reco">
+            <div className="cart-reco-header">
+              <h3>Tavsiya etamiz</h3>
+            </div>
+            <div className="cart-reco-list">
+              {recommendedOffers.slice(0, 8).map((offer) => {
+                const photoUrl = resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE
+                const price = Number(offer.discount_price ?? offer.original_price ?? 0)
+                return (
+                  <article key={offer.id} className="cart-reco-card">
+                    <div className="cart-reco-image">
+                      <img
+                        src={photoUrl}
+                        alt={offer.title}
+                        onError={(e) => {
+                          if (!e.target.dataset.fallback) {
+                            e.target.dataset.fallback = 'true'
+                            e.target.src = PLACEHOLDER_IMAGE
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="cart-reco-title">{offer.title}</p>
+                    <div className="cart-reco-footer">
+                      <span className="cart-reco-price">{formatSum(price)}</span>
+                      <button
+                        type="button"
+                        className="cart-reco-add"
+                        onClick={() => addToCart(offer)}
+                        aria-label={`${offer.title} savatga qo'shish`}
+                      >
+                        <Plus size={14} strokeWidth={2} />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
-      <div className="cart-sticky-checkout">
-        <div className="checkout-total">
-          <span className="checkout-total-label">Jami</span>
-          <span className="checkout-total-value">{Math.round(total).toLocaleString()} so'm</span>
-          <span className="checkout-total-sub">{itemsCount} ta mahsulot</span>
+      <div className="cart-summary">
+        <div className="cart-summary-card">
+          <div className="cart-summary-rows">
+            <div className="cart-summary-row">
+              <span>Mahsulotlar ({itemsCount})</span>
+              <span>{formatSum(subtotal)} so'm</span>
+            </div>
+            <div className="cart-summary-row savings">
+              <span>Tejamkorlik</span>
+              <span>{savingsLabel}</span>
+            </div>
+            <div className="cart-summary-row total">
+              <span>Umumiy</span>
+              <span>{formatSum(subtotal)} so'm</span>
+            </div>
+          </div>
+          <button
+            className="cart-summary-btn"
+            onClick={handleCheckout}
+            disabled={hasMultipleStores}
+          >
+            To'lovga o'tish
+          </button>
         </div>
-        <button
-          className="checkout-primary-btn"
-          onClick={handleCheckout}
-          disabled={hasMultipleStores}
-        >
-          <span>Davom ettirish</span>
-          <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
-        </button>
       </div>
 
       <BottomNav currentPage="cart" cartCount={itemsCount} />

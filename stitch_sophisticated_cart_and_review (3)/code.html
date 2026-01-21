@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="uz"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Savat - Premium Food Rescue</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;family=Plus+Jakarta+Sans:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#065F46", // Deep Emerald
+                        "background-light": "#F2F2F7", // iOS Grouped Background
+                        "background-dark": "#0F172A",
+                        accent: "#10B981",
+                        yandex: "#FCE000",
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                        display: ["Plus Jakarta Sans", "sans-serif"],
+                    },
+                },
+            },
+        };
+    </script>
+<style type="text/tailwindcss">
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body {
+            background-color: #F2F2F7;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-100 antialiased">
+<div class="h-11 w-full bg-white/80 dark:bg-background-dark/80 sticky top-0 z-50 flex items-center justify-between px-6 ios-blur">
+<span class="text-sm font-semibold">9:41</span>
+<div class="flex gap-1.5 items-center">
+<span class="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[18px]">wifi</span>
+<span class="material-symbols-outlined text-[18px]">battery_full</span>
+</div>
+</div>
+<nav class="sticky top-11 z-40 bg-white/80 dark:bg-background-dark/80 ios-blur border-b border-slate-200/60 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
+<button class="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800">
+<span class="material-symbols-outlined text-[20px]">arrow_back_ios_new</span>
+</button>
+<h1 class="text-base font-bold">Savat</h1>
+<button class="text-slate-400 text-sm font-medium hover:text-rose-500 transition-colors">Tozalash</button>
+</nav>
+<main class="pb-60">
+<section class="mt-4 px-4">
+<div class="bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-sm mb-4">
+<div class="px-5 py-4 flex items-center justify-between border-b border-slate-50 dark:border-slate-800">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">storefront</span>
+<h2 class="font-bold text-base">Le Croissant Bakery</h2>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">chevron_right</span>
+</div>
+<div class="divide-y divide-slate-50 dark:divide-slate-800">
+<div class="p-4 flex gap-4">
+<div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0">
+<img alt="Pastry" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCY20rdbuWcOt6p7RzY2h-aWye2s9HP1Va_i0srslnMQOgIH5S2y8lmTOUiFB26825KigcvskJKgSqLYuVMkCNpI8LLTDxP5TvegydmshuK8eUBPKr7yYhZAAyLKYnzjdEbSPQsL59VRJdMQ5c5Ez63mPTEM2VSjOsQh4T-UENrSwtwNeR23UQ7JXVRDXBBbTlw6wo006emyQr6qq04h3DGZaS4N_Zmo9oyzivJoFRTCf7XZ39BtGP8NwVvTZGBQeTAamAx4J0ZoCJO"/>
+</div>
+<div class="flex flex-col flex-1 min-w-0 py-0.5">
+<h3 class="text-[15px] font-semibold leading-tight mb-0.5 truncate">Bodomli Kruassan</h3>
+<p class="text-xs text-slate-400 line-clamp-2 leading-relaxed">Fransuzcha retsept bo'yicha pishirilgan, bodom kremi bilan.</p>
+<div class="mt-auto flex items-baseline gap-2">
+<span class="text-base font-bold">15 000 so'm</span>
+<span class="text-xs text-slate-400 line-through">45 000</span>
+</div>
+</div>
+<div class="flex flex-col items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-1 h-24">
+<button class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+<span class="text-sm font-bold">1</span>
+<button class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
+<span class="material-symbols-outlined text-[20px]">remove</span>
+</button>
+</div>
+</div>
+<div class="p-4 flex gap-4">
+<div class="w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0">
+<img alt="Juice" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAU9IhOyFZPsRyJyn-41a6htk1mnr4t7SFqSdLrYjD_jMUs4ZyXaSv_e_wo5C3uzp50BMRl-etLdUowiCKkpGo_SC8w0q4WxfFaw0obdWgOQG5ZzVfk3d6ixWtbDiV06ZpdTNVA_Rs9Aztl07J2bnEaNf5FsPwKWfsW_IlYcwFr82qfA5EQt4dyoP_cLMJVDIQnNBwFSKtGos6QvS0oMwj9REKQVwv5QKndxhPoQCrnaRd2QM6_fPZ-YYidcDA2TVYHP46dNrN7_8V-"/>
+</div>
+<div class="flex flex-col flex-1 min-w-0 py-0.5">
+<h3 class="text-[15px] font-semibold leading-tight mb-0.5 truncate">Yangi siqilgan apelsin sharbati</h3>
+<p class="text-xs text-slate-400 line-clamp-2 leading-relaxed">0.33l, shakerda tayyorlangan.</p>
+<div class="mt-auto flex items-baseline gap-2">
+<span class="text-base font-bold">12 000 so'm</span>
+<span class="text-xs text-slate-400 line-through">25 000</span>
+</div>
+</div>
+<div class="flex flex-col items-center justify-between bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-1 h-24">
+<button class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+<span class="text-sm font-bold">2</span>
+<button class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
+<span class="material-symbols-outlined text-[20px]">remove</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="mt-8 mb-4">
+<h3 class="px-5 font-bold text-lg mb-4">Tavsiya etamiz</h3>
+<div class="flex gap-4 overflow-x-auto px-5 no-scrollbar">
+<div class="flex-shrink-0 w-32 bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="w-full aspect-square rounded-xl overflow-hidden mb-2">
+<img alt="Burger" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnpeAGbjFbgOlDsf38hsT1LuLQ-TAoTEUnrzPW7KwY6yIzX8ub8gYEHyo5dP5m2bj8C2m7-NHLR_tBUZcTrPvZbvrv06dYQXi0KdOI1nVkrp9T9lgqwRCfFSVLkRQXapRjGpeFTFSyvifFP4lJrSNyjVuuWilF0SpAn5LcCd1N2cXbhaHLU2m0KFHHaR_Zmib7BzfYJrDBclDIJ8zwShy11qX5fmcLLVk7Dv7oxSkMtd4xWganJZXK17pH3YD9a5oqkGO1dkuluaSZ"/>
+</div>
+<p class="text-[11px] font-semibold leading-tight line-clamp-2 h-7 mb-1">Mini Burgerlar</p>
+<div class="flex items-center justify-between">
+<span class="text-[12px] font-bold">8 500</span>
+<button class="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+<div class="flex-shrink-0 w-32 bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="w-full aspect-square rounded-xl overflow-hidden mb-2">
+<img alt="Fruit" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3UZc2HEYQszoe6itr-yoCn2Q53LPS0DVtqhJ8ZqjNP_dZsp09mVyyH21nLcW2syobb4QPlAmZzoux1ZLaTcogItdeJHpvxSJnPtywPkn-1-aurRhJauAl0d3GfXBk1Src7HxvbaTPwq-m8mZiimp6ehk8c7RIdR8Ygl0UzzZv-sSo_g9IFnASXSf_9frrg1lDlkB-7kSwDn6k1D5r4GMAC9YferIIKu8rdOSnLoZyev-7ynwjNTrO9QITmd0iX8y2ysW1Papm-V6h"/>
+</div>
+<p class="text-[11px] font-semibold leading-tight line-clamp-2 h-7 mb-1">Meva Assorti</p>
+<div class="flex items-center justify-between">
+<span class="text-[12px] font-bold">14 000</span>
+<button class="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+<div class="flex-shrink-0 w-32 bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-sm border border-slate-100 dark:border-slate-800">
+<div class="w-full aspect-square rounded-xl overflow-hidden mb-2">
+<img alt="Salad" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBp4PwtDDupSQMHxhmNeGz_bPVDK8Z29hc48vBU8XOk70NijvkNw3PTGA--dtmJTxFSQmCPyiQWDnMJfqLjZr073c_6PLEQ-AxtK5sSEtabt7eVv11i7tQeH0_vs75LZ8JhJJYv0CLHcMJvHPT2Wtfc31v0ar2C3E0cvk8khQHZe7Ux3oW3EJf5nDZshXj7u4WwduzzvJyODF_6hhWd5rVVmNE3jFOXXK6I5wnvpOFDu2Mlhd8Xc0t6bh396b8eXnAdXFP4Zi9J37fp"/>
+</div>
+<p class="text-[11px] font-semibold leading-tight line-clamp-2 h-7 mb-1">Grek Salati</p>
+<div class="flex items-center justify-between">
+<span class="text-[12px] font-bold">11 000</span>
+<button class="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<div class="fixed bottom-0 inset-x-0 z-50 p-4">
+<div class="max-w-lg mx-auto bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-[0_-8px_30px_rgb(0,0,0,0.08)] p-6 pb-8 border border-slate-100 dark:border-slate-800">
+<div class="flex flex-col gap-3 mb-6">
+<div class="flex justify-between items-center text-sm text-slate-500">
+<span>Mahsulotlar (3)</span>
+<span>39 000 so'm</span>
+</div>
+<div class="flex justify-between items-center text-sm text-primary font-medium">
+<span>Tejamkorlik</span>
+<span>-56 000 so'm</span>
+</div>
+<div class="flex justify-between items-center pt-3 border-t border-slate-50 dark:border-slate-800">
+<span class="text-lg font-bold">Umumiy</span>
+<span class="text-xl font-black">39 000 so'm</span>
+</div>
+</div>
+<button class="w-full bg-accent hover:bg-emerald-600 text-white py-5 rounded-2xl font-bold text-base transition-colors shadow-lg shadow-accent/20 active:scale-[0.98]">
+                To'lovga o'tish
+            </button>
+</div>
+</div>
+<div class="fixed bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-300 dark:bg-slate-700 rounded-full z-[60]"></div>
+
+</body></html>

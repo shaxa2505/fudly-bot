@@ -37,7 +37,6 @@ const OfferCard = memo(function OfferCard({
   const stockLimit = Number(offer.quantity ?? offer.stock ?? 0)
   const isOutOfStock = stockLimit <= 0
   const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
-  const showStoreName = Boolean(offer.store_name || offer.store)
   const storeName = offer.store_name || offer.store || ''
 
   const handleAddClick = useCallback((e) => {
@@ -69,7 +68,7 @@ const OfferCard = memo(function OfferCard({
   const priceValue = discountPrice > 0 ? discountPrice : originalPrice
   const hasOldPrice = originalPrice > priceValue && priceValue > 0
   const isLowStock = !isOutOfStock && stockLimit > 0 && stockLimit <= 5
-  const locationText = offer.store_address || offer.address || storeName
+  const locationText = offer.store_address || offer.address || offer.district || offer.region || ''
 
   const formatTime = (value) => {
     if (!value) return ''
@@ -84,6 +83,19 @@ const OfferCard = memo(function OfferCard({
   const timeUntil = formatTime(offer.available_until)
   const timeRange = timeFrom && timeUntil ? `${timeFrom} - ${timeUntil}` : ''
   const titleText = offer.title || storeName || 'Mahsulot'
+  const ratingValue = Number(offer.rating ?? offer.rating_avg ?? offer.store_rating ?? 0)
+  const ratingCount = Number(offer.reviews_count ?? offer.review_count ?? offer.total_reviews ?? 0)
+  const showRating = Number.isFinite(ratingValue) && ratingValue > 0
+  const ratingText = showRating ? ratingValue.toFixed(1) : ''
+  const ratingCountLabel = ratingCount > 0
+    ? `(${ratingCount}${ratingCount >= 100 ? '+' : ''})`
+    : ''
+  const showStoreName = Boolean(
+    storeName &&
+    storeName !== titleText &&
+    !showRating &&
+    !locationText
+  )
 
   const handleFavoriteClick = useCallback((e) => {
     e.stopPropagation()
@@ -171,8 +183,20 @@ const OfferCard = memo(function OfferCard({
           </div>
           <div className="offer-footer">
             <div className="offer-meta-left">
-              {showStoreName && storeName !== titleText && (
-                <span className="offer-store">{storeName}</span>
+              {showRating ? (
+                <div className="offer-rating" aria-label={`Reyting ${ratingText}`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 3.5l2.47 5 5.52.8-4 3.9.94 5.5L12 16.7l-4.93 2.6.94-5.5-4-3.9 5.52-.8L12 3.5z"/>
+                  </svg>
+                  <span className="offer-rating-value">{ratingText}</span>
+                  {ratingCountLabel && (
+                    <span className="offer-rating-count">{ratingCountLabel}</span>
+                  )}
+                </div>
+              ) : (
+                showStoreName && (
+                  <span className="offer-store">{storeName}</span>
+                )
               )}
             </div>
             <div className="offer-action">

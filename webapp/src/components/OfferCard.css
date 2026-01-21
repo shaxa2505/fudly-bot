@@ -145,6 +145,8 @@
   right: 16px;
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(226, 232, 240, 0.8);
@@ -200,6 +202,7 @@
   font-weight: 700;
   color: #0F172A;
   line-height: 1.2;
+  letter-spacing: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -262,6 +265,24 @@
   font-weight: 600;
 }
 
+.offer-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #F59E0B;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.offer-rating-value {
+  color: #0F172A;
+}
+
+.offer-rating-count {
+  color: #94A3B8;
+  font-weight: 500;
+}
+
 .offer-store {
   white-space: nowrap;
   overflow: hidden;
@@ -280,6 +301,8 @@
   border: none;
   border-radius: 12px;
   padding: 8px 18px;
+  min-height: 32px;
+  min-width: 0;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -322,6 +345,8 @@
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 999px;
   display: grid;
   place-items: center;
