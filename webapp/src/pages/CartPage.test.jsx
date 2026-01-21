@@ -75,7 +75,7 @@ describe('CartPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: "To'lovga o'tish" }))
 
-    expect(await screen.findByLabelText(/Telefon raqam/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: "Yetkazib berish manzili" })).toBeInTheDocument()
 
     await waitFor(() => {
       expect(apiMocks.getStore).toHaveBeenCalledWith(5)

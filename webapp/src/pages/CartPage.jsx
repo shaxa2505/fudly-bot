@@ -149,6 +149,8 @@ function CartPage({ user }) {
   // Calculate totals using context values
   const subtotal = cartTotal
   const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
+  const serviceFee = 0
+  const checkoutTotal = total + serviceFee
   const itemsCount = cartCount
   const savingsTotal = useMemo(() => {
     return cartItems.reduce((sum, item) => {
@@ -190,7 +192,7 @@ function CartPage({ user }) {
   const paymentOptions = [
     {
       id: 'card',
-      label: cardSuffix ? `Uzcard •••• ${cardSuffix}` : 'Uzcard',
+      label: cardSuffix ? `Uzcard **** ${cardSuffix}` : 'Uzcard',
       icon: 'card',
       disabled: !isProviderAvailable('card'),
     },
@@ -213,6 +215,12 @@ function CartPage({ user }) {
       disabled: deliveryRequiresPrepay,
     },
   ]
+  const paymentIconLabels = {
+    card: 'UZ',
+    click: 'Click',
+    payme: 'Pay',
+    cash: 'Naqd',
+  }
 
   useEffect(() => {
     if (!deliveryRequiresPrepay) return
@@ -874,175 +882,212 @@ function CartPage({ user }) {
       {showCheckout && (
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
-            <div className="sheet-handle" aria-hidden="true"></div>
-            <div className="modal-header checkout-header">
-              <div className="modal-header-main">
-                <div className="checkout-title-group">
-                  <span className="checkout-title-eyebrow">Buyurtma</span>
-                  <h2>{checkoutTitle}</h2>
-                </div>
-                <button className="modal-close" onClick={closeCheckout} aria-label="Yopish">
-                  <X size={16} strokeWidth={2} />
-                </button>
-              </div>
-              <div className="modal-steps">
-                <div className={`modal-step ${checkoutStep === 'details' ? 'active' : 'done'}`}>
-                  <span className="modal-step-dot" aria-hidden="true"></span>
-                  <span>Ma'lumotlar</span>
-                </div>
-                <div className={`modal-step ${checkoutStep === 'payment' ? 'active' : ''}`}>
-                  <span className="modal-step-dot" aria-hidden="true"></span>
-                  <span>To'lov</span>
-                </div>
-              </div>
+            <div className="checkout-topbar">
+              <button className="checkout-back" onClick={closeCheckout} aria-label="Назад">
+                <ChevronLeft size={18} strokeWidth={2} />
+              </button>
+              <h2 className="checkout-title">{checkoutTitle}</h2>
+              <span className="checkout-spacer" aria-hidden="true"></span>
             </div>
 
-            <div className="modal-body">
+            <div className="modal-body checkout-body">
               {/* Step 1: Order Details */}
               {checkoutStep === 'details' && (
-                <>
-                  {/* Order Type Selection */}
-                  <section className="checkout-section order-type-section">
-                    <div className="section-head">
-                      <p className="section-label">Yetkazish turi</p>
-                      <span className={`section-pill ${orderType === 'delivery' ? 'section-pill--accent' : ''}`}>
-                        {orderType === 'delivery' ? 'Yetkazish' : 'Olib ketish'}
-                      </span>
-                    </div>
-                    <div className="order-type-options">
+                <div className="checkout-layout">
+                  <section className="checkout-block">
+                    <div className="checkout-block-header">
+                      <h3>Yetkazib berish manzili</h3>
                       <button
-                        className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
-                        onClick={() => setOrderType('pickup')}
+                        type="button"
+                        className="checkout-block-action"
+                        onClick={() => addressInputRef.current?.focus()}
                       >
-                        <span className="order-type-icon" aria-hidden="true"></span>
-                        <span className="order-type-text">Olib ketish</span>
-                        <span className="order-type-desc">Bepul</span>
-                      </button>
-
-                      <button
-                        className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''} ${!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders ? 'disabled' : ''}`}
-                        onClick={() => storeDeliveryEnabled && canDelivery && hasPrepayProviders && setOrderType('delivery')}
-                        disabled={!storeDeliveryEnabled || !canDelivery || !hasPrepayProviders}
-                      >
-                        <span className="order-type-icon" aria-hidden="true"></span>
-                        <span className="order-type-text">Yetkazib berish</span>
-                        <span className="order-type-desc">
-                          {!storeDeliveryEnabled
-                            ? 'Mavjud emas'
-                            : !canDelivery
-                              ? `Min: ${Math.round(minOrderAmount).toLocaleString()} so'm`
-                              : `${Math.round(deliveryFee).toLocaleString()} so'm`
-                          }
-                        </span>
+                        O'zgartirish
                       </button>
                     </div>
+                    <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
+                      <div className="checkout-map">
+                        <img
+                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqNdr_LfQSh5ufgPTxOVDNmMdJyNl2Fg4V1Aig_N2HlthOdRDUo4RjOmtTo9KL2wx2QeSPQ0qv09bVl4iKOAsB3fwLjjJQpdT7ZjPKvTIlDWwrCDp9ZzEaN5_JqFau5_ZPG8h40wJK-D7niWEHbTi1cPNFrHYJts1TLftoeks9BgK5_MXf0cWkNHZGzqXNOqM-U4PPubAbORK2bd5St0P7tPptZ2RU_dNXF_TjZUr5hOVuJFRxfcmfNEr7kSkGIfKYs9WaFvxV_3bO"
+                          alt="Map"
+                        />
+                        <div className="checkout-map-pin" aria-hidden="true"></div>
+                      </div>
+                      <div className="checkout-address-body">
+                        <input
+                          ref={addressInputRef}
+                          className="checkout-address-title"
+                          placeholder="Manzilni kiriting"
+                          value={address}
+                          onChange={e => setAddress(e.target.value)}
+                          onKeyDown={blurOnEnter}
+                          disabled={orderType !== 'delivery'}
+                        />
+                        <div className="checkout-address-meta">
+                          <label className="checkout-address-col">
+                            <span>Kiraverish</span>
+                            <input
+                              className="checkout-meta-input"
+                              placeholder="-"
+                              value={entrance}
+                              onChange={e => updateAddressMeta('entrance', e.target.value)}
+                              disabled={orderType !== 'delivery'}
+                            />
+                          </label>
+                          <label className="checkout-address-col">
+                            <span>Qavat</span>
+                            <input
+                              className="checkout-meta-input"
+                              inputMode="numeric"
+                              placeholder="-"
+                              value={floor}
+                              onChange={e => updateAddressMeta('floor', e.target.value)}
+                              disabled={orderType !== 'delivery'}
+                            />
+                          </label>
+                          <label className="checkout-address-col">
+                            <span>Xonadon</span>
+                            <input
+                              className="checkout-meta-input"
+                              inputMode="numeric"
+                              placeholder="-"
+                              value={apartment}
+                              onChange={e => updateAddressMeta('apartment', e.target.value)}
+                              disabled={orderType !== 'delivery'}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
 
-                    {!canDelivery && storeDeliveryEnabled && (
-                      <p className="delivery-hint">
+                    <input
+                      className="checkout-input"
+                      placeholder="Kuryer uchun izoh (masalan: domofon ishlamayapti)"
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      onKeyDown={blurOnEnter}
+                      ref={commentInputRef}
+                    />
+                    {!canonicalPhone && (
+                      <input
+                        className="checkout-input"
+                        type="tel"
+                        placeholder="+998 90 123 45 67"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                      />
+                    )}
+                    {orderType === 'delivery' && !storeDeliveryEnabled && (
+                      <p className="checkout-hint">Yetkazib berish mavjud emas</p>
+                    )}
+                    {orderType === 'delivery' && storeDeliveryEnabled && !canDelivery && (
+                      <p className="checkout-hint">
                         Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
                       </p>
                     )}
-                    {storeDeliveryEnabled && canDelivery && !hasPrepayProviders && (
-                      <p className="delivery-hint">
+                    {orderType === 'delivery' && storeDeliveryEnabled && canDelivery && !hasPrepayProviders && (
+                      <p className="checkout-hint">
                         Yetkazib berish uchun to'lov usullari mavjud emas
                       </p>
                     )}
                   </section>
 
-                  <section className="checkout-section">
-                    <div className="section-head">
-                      <p className="section-label">Kontakt</p>
-                      {canonicalPhone && (
-                        <span className="section-pill section-pill--success">Tasdiqlangan</span>
-                      )}
-                    </div>
-                    <label className="form-label">
-                      Telefon raqam *
-                      <input
-                        type="tel"
-                        className="form-input"
-                        placeholder="+998 90 123 45 67"
-                        value={canonicalPhone || phone}
-                        onChange={e => setPhone(e.target.value)}
-                        readOnly={!!canonicalPhone}
-                        disabled={!!canonicalPhone}
-                      />
-                      {!canonicalPhone && !phone.trim() && (
-                        <div className="form-hint">
-                          Telefon raqamini kiriting yoki botda tasdiqlang.
-                        </div>
-                      )}
-                    </label>
-                  </section>
-
-                  {orderType === 'delivery' && (
-                    <section className="checkout-section">
-                      <p className="section-label">Manzil</p>
-                      <label className="form-label">
-                        Yetkazib berish manzili *
-                        <textarea
-                          className="form-textarea"
-                          placeholder="Shahar, ko'cha, uy raqami, mo'ljal..."
-                          value={address}
-                          onChange={e => setAddress(e.target.value)}
-                          onKeyDown={blurOnEnter}
-                        />
-                      </label>
-                    </section>
-                  )}
-
-                  <section className="checkout-section">
-                    <p className="section-label">Izoh</p>
-                    <label className="form-label">
-                      Izoh (kuryerga)
-                      <textarea
-                        className="form-textarea"
-                        placeholder="Qo'shimcha ma'lumot..."
-                        value={comment}
-                        onChange={e => setComment(e.target.value)}
-                        onKeyDown={blurOnEnter}
-                        ref={commentInputRef}
-                      />
-                    </label>
-                  </section>
-
-                  <section className="checkout-section">
-                    <p className="section-label">To'lov</p>
-                    <button
-                      type="button"
-                      className="checkout-row checkout-row-button"
-                      onClick={() => setShowPaymentSheet(true)}
-                    >
-                      <div className="checkout-row-left">
-                        <span className="checkout-row-title">To'lov</span>
-                        <span className="checkout-row-subtitle">{paymentMethodLabels[selectedPaymentMethod]}</span>
-                      </div>
-                      <ChevronRight size={18} />
-                    </button>
-
-                    <div className="order-summary">
-                      <div className="summary-line">
-                        <span>Mahsulotlar:</span>
-                        <span>{Math.round(subtotal).toLocaleString()} so'm</span>
-                      </div>
-                      {orderType === 'delivery' && (
-                        <div className="summary-line">
-                          <span>Yetkazib berish:</span>
-                          <span>{Math.round(deliveryFee).toLocaleString()} so'm</span>
-                        </div>
-                      )}
-                      <div className="summary-line total">
-                        <span><strong>Jami:</strong></span>
-                        <span><strong>{Math.round(total).toLocaleString()} so'm</strong></span>
-                      </div>
-                      {orderType === 'delivery' && (
-                        <div className="prepay-hint">
-                          <strong>Yetkazib berish faqat oldindan to'lov bilan.</strong> Kartaga o'tkazishda chekni yuklash majburiy.
-                        </div>
-                      )}
+                  <section className="checkout-block">
+                    <h3>Yetkazib berish vaqti</h3>
+                    <div className="checkout-time-scroll">
+                      {deliveryOptions.map(option => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={`checkout-time-card ${deliverySlot === option.id ? 'active' : ''}`}
+                          onClick={() => setDeliverySlot(option.id)}
+                          disabled={orderType !== 'delivery'}
+                        >
+                          <span className="checkout-time-label">{option.label}</span>
+                          <span className="checkout-time-value">{option.time}</span>
+                        </button>
+                      ))}
                     </div>
                   </section>
-                </>
+
+                  <section className="checkout-block">
+                    <h3>To'lov turi</h3>
+                    <div className="checkout-payment-list">
+                      {paymentOptions.map(option => {
+                        const isActive = selectedPaymentMethod === option.id
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`checkout-payment-option${isActive ? ' active' : ''}${option.disabled ? ' disabled' : ''}`}
+                            onClick={() => {
+                              if (option.disabled) return
+                              selectPaymentMethod(option.id)
+                            }}
+                            disabled={option.disabled}
+                          >
+                            <div className="checkout-payment-info">
+                              <div className={`checkout-payment-icon checkout-payment-icon--${option.id}`}>
+                                <span>{paymentIconLabels[option.id] || option.label}</span>
+                              </div>
+                              <span className="checkout-payment-label">{option.label}</span>
+                            </div>
+                            <span className={`checkout-payment-radio${isActive ? ' active' : ''}`} aria-hidden="true"></span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
+
+                  <section className="checkout-block checkout-block--last">
+                    <h3>Sizning buyurtmangiz</h3>
+                    <div className="checkout-order-items">
+                      {cartItems.map(item => {
+                        const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
+                        const rawOriginalPrice = item.offer.original_price
+                        const rawDiscountPrice = item.offer.discount_price
+                        const parsedOriginalPrice = rawOriginalPrice == null ? NaN : Number(rawOriginalPrice)
+                        const parsedDiscountPrice = rawDiscountPrice == null ? NaN : Number(rawDiscountPrice)
+                        const originalPrice = Number.isFinite(parsedOriginalPrice) ? parsedOriginalPrice : null
+                        const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
+                        const unitPrice = discountPrice ?? originalPrice ?? 0
+                        const lineTotal = unitPrice * item.quantity
+                        return (
+                          <div key={item.offer.id} className="checkout-order-item">
+                            <div className="checkout-order-info">
+                              <img src={photoUrl} alt={item.offer.title} />
+                              <div>
+                                <p className="checkout-order-title">{item.offer.title}</p>
+                                <p className="checkout-order-qty">{item.quantity} dona</p>
+                              </div>
+                            </div>
+                            <span className="checkout-order-price">{formatSum(lineTotal)} so'm</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="checkout-summary">
+                      <div className="checkout-summary-row">
+                        <span>Mahsulotlar</span>
+                        <span>{formatSum(subtotal)} so'm</span>
+                      </div>
+                      {orderType === 'delivery' && (
+                        <div className="checkout-summary-row">
+                          <span>Yetkazib berish</span>
+                          <span>{formatSum(deliveryFee)} so'm</span>
+                        </div>
+                      )}
+                      <div className="checkout-summary-row">
+                        <span>Xizmat haqi</span>
+                        <span>{formatSum(serviceFee)} so'm</span>
+                      </div>
+                      <div className="checkout-summary-row total">
+                        <span>Jami</span>
+                        <span>{formatSum(checkoutTotal)} so'm</span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
               )}
 
               {/* Step 2: Payment (for delivery) */}
@@ -1126,43 +1171,37 @@ function CartPage({ user }) {
               )}
             </div>
 
-            <div className="modal-footer">
-              {checkoutStep === 'details' && (
-                <>
-                  <div className="checkout-footer-total">
-                    <span>Jami</span>
-                    <strong>{Math.round(total).toLocaleString()} so'm</strong>
-                  </div>
-                  <button
-                    className="checkout-footer-btn"
-                    onClick={proceedToPayment}
-                    disabled={orderLoading || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
-                  >
-                    {orderLoading ? '...' : selectedPaymentMethod === 'card' ? 'To\'lovga o\'tish' : 'Buyurtma berish'}
-                  </button>
-                </>
-              )}
+            {checkoutStep === 'details' && (
+              <div className="checkout-footer">
+                <button
+                  className="checkout-confirm"
+                  onClick={proceedToPayment}
+                  disabled={orderLoading || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
+                >
+                  <span>Buyurtmani tasdiqlash</span>
+                  <span className="checkout-confirm-total">{formatSum(checkoutTotal)} so'm</span>
+                </button>
+              </div>
+            )}
 
-              {checkoutStep === 'payment' && (
-                <>
-                  <button
-                    className="cancel-btn"
-                    onClick={() => setCheckoutStep('details')}
-                    disabled={orderLoading}
-                  >
-                    Bekor qilish
-                  </button>
-                  <button
-                    className="confirm-btn"
-                    onClick={placeOrder}
-                    disabled={orderLoading || !paymentProof}
-                  >
-                    {orderLoading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
-                  </button>
-                </>
-              )}
-
-            </div>
+            {checkoutStep === 'payment' && (
+              <div className="modal-footer payment-footer">
+                <button
+                  className="cancel-btn"
+                  onClick={() => setCheckoutStep('details')}
+                  disabled={orderLoading}
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  className="confirm-btn"
+                  onClick={placeOrder}
+                  disabled={orderLoading || !paymentProof}
+                >
+                  {orderLoading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
