@@ -13,7 +13,7 @@ from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboar
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.api.webapp.common import get_current_user
+from app.api.webapp.common import get_current_user, get_optional_user
 from app.core.utils import normalize_city
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus
 
@@ -350,12 +350,12 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
 @router.get("")
 async def get_user_orders(
     db=Depends(get_db),
-    user: dict = Depends(get_current_user),
+    user: dict | None = Depends(get_optional_user),
 ):
     """Get user's orders from unified orders table (pickup + delivery)."""
-    user_id = int(user.get("id") or 0)
+    user_id = int(user.get("id") or 0) if isinstance(user, dict) else 0
     if user_id <= 0:
-        raise HTTPException(status_code=401, detail="Authentication required")
+        return []
 
     orders: list[dict[str, Any]] = []
     raw_orders: list[Any] = []

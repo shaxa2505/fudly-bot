@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, ChevronDown, MoreHorizontal, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -724,31 +724,19 @@ function CartPage({ user }) {
               className="cart-header-back"
               type="button"
               onClick={() => navigate(-1)}
-              aria-label="Назад"
+              aria-label="Orqaga"
             >
               <ChevronLeft size={18} strokeWidth={2} />
-              <span>Назад</span>
             </button>
             <h1 className="cart-header-title">Savat</h1>
-            <div className="cart-header-actions">
-              <button
-                className="cart-header-chip"
-                type="button"
-                aria-label="Pastga ochish"
-                disabled
-              >
-                <ChevronDown size={18} strokeWidth={2} />
-              </button>
-              <button
-                className="cart-header-chip"
-                type="button"
-                onClick={handleClearCart}
-                aria-label="Savatni tozalash"
-                disabled
-              >
-                <MoreHorizontal size={18} strokeWidth={2} />
-              </button>
-            </div>
+            <button
+              className="cart-header-clear"
+              type="button"
+              onClick={handleClearCart}
+              disabled
+            >
+              Tozalash
+            </button>
           </div>
         </header>
 
@@ -787,29 +775,18 @@ function CartPage({ user }) {
             className="cart-header-back"
             type="button"
             onClick={() => navigate(-1)}
-            aria-label="Назад"
+            aria-label="Orqaga"
           >
             <ChevronLeft size={18} strokeWidth={2} />
-            <span>Назад</span>
           </button>
           <h1 className="cart-header-title">Savat</h1>
-          <div className="cart-header-actions">
-            <button
-              className="cart-header-chip"
-              type="button"
-              aria-label="Pastga ochish"
-            >
-              <ChevronDown size={18} strokeWidth={2} />
-            </button>
-            <button
-              className="cart-header-chip"
-              type="button"
-              onClick={handleClearCart}
-              aria-label="Savatni tozalash"
-            >
-              <MoreHorizontal size={18} strokeWidth={2} />
-            </button>
-          </div>
+          <button
+            className="cart-header-clear"
+            type="button"
+            onClick={handleClearCart}
+          >
+            Tozalash
+          </button>
         </div>
       </header>
 

@@ -321,6 +321,21 @@ async def get_current_user(
     return validated.get("user")
 
 
+async def get_optional_user(
+    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
+) -> dict[str, Any] | None:
+    """Dependency to optionally validate Telegram initData and extract user."""
+    if not x_telegram_init_data:
+        return None
+
+    bot_token = settings.bot_token
+    validated = validate_init_data(x_telegram_init_data, bot_token)
+    if not validated:
+        return None
+
+    return validated.get("user")
+
+
 # =============================================================================
 # Database dependency (will be injected from main app)
 # =============================================================================
@@ -397,6 +412,7 @@ __all__ = [
     "CATEGORIES",
     "validate_init_data",
     "get_current_user",
+    "get_optional_user",
     "set_db_instance",
     "get_db",
     "get_offer_service",

@@ -6,6 +6,7 @@ from .common import (
     FavoriteRequest,
     StoreResponse,
     get_current_user,
+    get_optional_user,
     get_db,
     get_val,
     is_offer_active,
@@ -53,11 +54,11 @@ def _resolve_store_id(request: FavoriteRequest, db: object) -> int:
 
 
 @router.get("/favorites", response_model=list[StoreResponse])
-async def get_favorites(db=Depends(get_db), user: dict = Depends(get_current_user)):
+async def get_favorites(db=Depends(get_db), user: dict | None = Depends(get_optional_user)):
     """Get user's favorite stores."""
     try:
-        user_id = user.get("id", 0)
-        if user_id == 0:
+        user_id = user.get("id", 0) if isinstance(user, dict) else 0
+        if user_id <= 0:
             return []
 
         stores: list[StoreResponse] = []

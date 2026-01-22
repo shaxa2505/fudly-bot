@@ -402,8 +402,18 @@ const api = {
     return data
   },
 
+  async addFavoriteStore(storeId) {
+    const { data } = await client.post('/favorites/add', { store_id: storeId })
+    return data
+  },
+
   async removeFavorite(offerId) {
     const { data } = await client.post('/favorites/remove', { offer_id: offerId })
+    return data
+  },
+
+  async removeFavoriteStore(storeId) {
+    const { data } = await client.post('/favorites/remove', { store_id: storeId })
     return data
   },
 
