@@ -43,9 +43,9 @@ CITY_TRANSLITERATION = {
     "gulistan": ["Гулистан", "Guliston"],
     "chirchiq": ["Чирчик", "Chirchik"],
     "chirchik": ["Чирчик", "Chirchiq"],
-    "kattaqo'rg'on": ["Каттакурган", "Kattakurgan", "Kattaqurgan"],
-    "kattakurgan": ["Каттакурган", "Kattaqo'rg'on", "Kattaqurgan"],
-    "kattaqurgan": ["Каттакурган", "Kattaqo'rg'on", "Kattakurgan"],
+    "kattaqo'rg'on": ["Каттакурган", "Kattakurgan", "Kattaqurgan", "Каттақўргон"],
+    "kattakurgan": ["Каттакурган", "Kattaqo'rg'on", "Kattaqurgan", "Каттақўргон"],
+    "kattaqurgan": ["Каттакурган", "Kattaqo'rg'on", "Kattakurgan", "Каттақўргон"],
     "olmaliq": ["Алмалык", "Olmaliq"],
     "angren": ["Ангрен"],
     "bekobod": ["Бекабад", "Bekabad"],
@@ -75,7 +75,7 @@ CITY_TRANSLITERATION = {
     "термез": ["Termiz", "Termez"],
     "гулистан": ["Guliston", "Gulistan"],
     "чирчик": ["Chirchiq", "Chirchik"],
-    "каттакурган": ["Kattaqo'rg'on", "Kattakurgan", "Kattaqurgan"],
+    "каттакурган": ["Kattaqo'rg'on", "Kattakurgan", "Kattaqurgan", "Каттақўргон"],
     "алмалык": ["Olmaliq"],
     "ангрен": ["Angren"],
     "бекабад": ["Bekobod", "Bekabad"],
@@ -194,22 +194,37 @@ class OfferMixin:
         slug_value = canonicalize_geo_slug(value)
         slug_column = f"{column}_slug"
         columns = self._get_store_slug_columns()
+        variants = variants_fn(value)
 
         if slug_value and slug_column in columns:
-            condition = f"{prefix}{slug_column} = %s"
-            params: list[Any] = [slug_value]
-            variants = variants_fn(value)
+            slug_values: list[str] = [slug_value]
+            if variants:
+                for variant in variants:
+                    variant_slug = canonicalize_geo_slug(variant)
+                    if variant_slug and variant_slug not in slug_values:
+                        slug_values.append(variant_slug)
+
+            params: list[Any] = []
+            conditions: list[str] = []
+            if slug_values:
+                slug_conditions = " OR ".join(
+                    [f"{prefix}{slug_column} = %s" for _ in slug_values]
+                )
+                conditions.append(f"({slug_conditions})")
+                params.extend(slug_values)
+
             if variants:
                 ilike_conditions = " OR ".join(
                     [f"{prefix}{column} ILIKE %s" for _ in variants]
                 )
-                condition = (
-                    f"({condition} OR ({prefix}{slug_column} IS NULL AND ({ilike_conditions})))"
-                )
+                conditions.append(f"({ilike_conditions})")
                 params.extend([f"%{v}%" for v in variants])
-            return condition, params
 
-        variants = variants_fn(value)
+            if not conditions:
+                return "", []
+
+            return f"({' OR '.join(conditions)})", params
+
         if not variants:
             return "", []
         ilike_conditions = " OR ".join(

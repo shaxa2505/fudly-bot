@@ -39,10 +39,10 @@
   scrollbar-gutter: stable;
   scroll-behavior: smooth;
   touch-action: pan-y;
-  --home-topbar-height: 44px;
-  --home-topbar-gap: 16px;
+  --home-topbar-height: 40px;
+  --home-topbar-gap: 10px;
   --home-top-inset: max(
-    12px,
+    8px,
     var(--safe-area-top-raw, 0px),
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--home-topbar-height)) / 2)
   );
@@ -90,7 +90,7 @@
 .header-location-block {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
   align-items: center;
   text-align: center;
@@ -104,6 +104,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--home-text-muted);
+  line-height: 1;
 }
 
 .header-location {
@@ -113,11 +114,12 @@
   gap: 6px;
   background: transparent;
   border: none;
-  padding: 0;
+  padding: 0 16px 0 0;
   margin: 0;
   cursor: pointer;
   text-align: center;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
 }
 
 .header-location:active {
@@ -142,6 +144,10 @@
 
 .header-location-caret {
   color: var(--home-primary);
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .header-notification {

@@ -244,6 +244,16 @@
   line-height: 1;
 }
 
+.offer-store {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .offer-old-price {
   font-size: 10px;
   color: #94A3B8;

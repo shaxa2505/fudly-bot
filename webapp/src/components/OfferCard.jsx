@@ -36,7 +36,12 @@ const OfferCard = memo(function OfferCard({
   const stockLimit = Number(offer.quantity ?? offer.stock ?? 0)
   const isOutOfStock = stockLimit <= 0
   const isMaxReached = !isOutOfStock && cartQuantity >= stockLimit
-  const storeName = offer.store_name || offer.store || ''
+  const storeName =
+    offer.store_name ||
+    offer.store ||
+    offer.store_title ||
+    offer.storeTitle ||
+    ''
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -87,7 +92,14 @@ const OfferCard = memo(function OfferCard({
     const rangeMatch = rawPickup.match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/)
     timeRange = rangeMatch ? `${rangeMatch[1]} - ${rangeMatch[2]}` : rawPickup
   }
-  const titleText = storeName || offer.title || 'Mahsulot'
+  const productTitle =
+    offer.title ||
+    offer.product_name ||
+    offer.productTitle ||
+    offer.product ||
+    'Mahsulot'
+  const titleText = productTitle
+  const showStoreName = Boolean(storeName && storeName !== titleText)
   const ratingValue = Number(
     offer.store_rating ??
     offer.rating ??
@@ -188,6 +200,9 @@ const OfferCard = memo(function OfferCard({
         )}
         <div className="offer-footer">
           <div className="offer-price-block">
+            {showStoreName && (
+              <span className="offer-store" title={storeName}>{storeName}</span>
+            )}
             {oldPriceLabel && (
               <span className="offer-old-price">{oldPriceLabel}</span>
             )}

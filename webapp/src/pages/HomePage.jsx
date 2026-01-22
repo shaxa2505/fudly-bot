@@ -438,6 +438,7 @@ function HomePage() {
   const loadOffers = useCallback(async (reset = false, options = {}) => {
     const { searchOverride, force = false } = options
     const searchValue = typeof searchOverride === 'string' ? searchOverride : searchQuery
+    const trimmedSearchValue = searchValue.trim()
     if (loadingRef.current) {
       if (reset) {
         queuedResetRef.current = { searchOverride, force }
@@ -473,13 +474,13 @@ function HomePage() {
         params.district = location.district
       }
 
-      if (selectedCategory && selectedCategory !== 'all') {
+      if (!trimmedSearchValue && selectedCategory && selectedCategory !== 'all') {
         params.category = selectedCategory
       }
 
       // Добавляем поиск только если есть запрос
-      if (searchValue.trim()) {
-        params.search = searchValue.trim()
+      if (trimmedSearchValue) {
+        params.search = trimmedSearchValue
       }
 
       // Добавляем фильтр по скидке
