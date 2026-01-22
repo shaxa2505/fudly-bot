@@ -2247,6 +2247,7 @@
   overflow: hidden;
   touch-action: none;
   cursor: grab;
+  isolation: isolate;
 }
 
 .checkout-map-canvas {
@@ -2268,7 +2269,8 @@
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid #E6E8EF;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
-  z-index: 2;
+  z-index: 20;
+  pointer-events: auto;
 }
 
 .checkout-map-search svg {
@@ -2308,7 +2310,8 @@
   border-radius: 12px;
   border: 1px solid #E6E8EF;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
-  z-index: 2;
+  z-index: 30;
+  pointer-events: auto;
 }
 
 .checkout-map-search-item {
@@ -2347,7 +2350,8 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
-  z-index: 2;
+  z-index: 20;
+  pointer-events: auto;
   cursor: pointer;
 }
 
@@ -2404,6 +2408,7 @@
   text-align: center;
   padding: 8px 10px;
   pointer-events: none;
+  z-index: 10;
 }
 
 .checkout-map-status.error {

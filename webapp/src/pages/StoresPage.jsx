@@ -514,8 +514,9 @@ function StoresPage() {
                   ? `${store.open_time} - ${store.close_time}`
                   : '')
               const pickupLabel = store.delivery_enabled ? 'Yetkazib berish' : 'Olib ketish'
-              const showSchedule = !store.delivery_enabled && hoursLabel
+              const showSchedule = store.delivery_enabled === false && hoursLabel
               const { current: currentPrice, original: originalPrice } = getStorePrices(store)
+              const priceTone = showSchedule ? 'is-dark' : ''
               const priceLabel = currentPrice != null
                 ? `${Math.round(currentPrice).toLocaleString()} so'm`
                 : ''
@@ -593,7 +594,7 @@ function StoresPage() {
                           <span className="sp-store-price-old">{originalLabel}</span>
                         )}
                         {currentPrice != null ? (
-                          <span className="sp-store-price-current">{priceLabel}</span>
+                          <span className={`sp-store-price-current ${priceTone}`}>{priceLabel}</span>
                         ) : (
                           <span className="sp-store-price-placeholder">-- ---</span>
                         )}

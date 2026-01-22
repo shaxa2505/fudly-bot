@@ -469,6 +469,7 @@ function CartPage({ user }) {
     }
     setMapSearchOpen(false)
     setMapSearchResults([])
+    mapUserEditingRef.current = false
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
     if (checkoutMapInstanceRef.current) {
       checkoutMapInstanceRef.current.setView([lat, lon], 16)
@@ -476,11 +477,13 @@ function CartPage({ user }) {
     if (checkoutMapMarkerRef.current) {
       checkoutMapMarkerRef.current.setLatLng([lat, lon])
     }
-    updateAddressFromCoords(lat, lon)
+    updateAddressFromCoords(lat, lon, { force: true })
   }
 
   const handleLocateMe = () => {
     setMapError('')
+    setMapSearchOpen(false)
+    mapUserEditingRef.current = false
     getCurrentLocation()
       .then(({ latitude, longitude }) => {
         if (checkoutMapInstanceRef.current) {
@@ -489,7 +492,7 @@ function CartPage({ user }) {
         if (checkoutMapMarkerRef.current) {
           checkoutMapMarkerRef.current.setLatLng([latitude, longitude])
         }
-        updateAddressFromCoords(latitude, longitude)
+        updateAddressFromCoords(latitude, longitude, { force: true })
       })
       .catch(() => {
         setMapError('Geolokatsiyani aniqlab bo\'lmadi')

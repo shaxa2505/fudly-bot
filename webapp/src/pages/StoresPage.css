@@ -445,6 +445,10 @@
   color: var(--sp-primary);
 }
 
+.sp-store-price-current.is-dark {
+  color: #0F172A;
+}
+
 .sp-store-price-placeholder {
   font-size: 14px;
   font-weight: 700;
