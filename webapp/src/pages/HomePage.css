@@ -98,6 +98,7 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
+  padding-top: 6px;
   width: max-content;
 }
 
@@ -108,7 +109,7 @@
   text-transform: uppercase;
   color: var(--home-text-muted);
   line-height: 1;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .header-location {
