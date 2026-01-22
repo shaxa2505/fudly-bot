@@ -374,11 +374,15 @@ class SearchMixin:
 
         where_clause = " AND ".join(where_parts)
         sql = f"""
-            SELECT DISTINCT o.title
-            FROM offers o
-            JOIN stores s ON o.store_id = s.store_id
-            WHERE {where_clause}
-            ORDER BY o.created_at DESC
+            SELECT title
+            FROM (
+                SELECT DISTINCT ON (o.title) o.title, o.created_at
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE {where_clause}
+                ORDER BY o.title, o.created_at DESC
+            ) latest
+            ORDER BY latest.created_at DESC
             LIMIT %s
         """
         with self.get_connection() as conn:

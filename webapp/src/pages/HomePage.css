@@ -75,9 +75,9 @@
 
 .header-top {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
   height: var(--home-topbar-height);
   min-height: var(--home-topbar-height);
   padding: 0;
@@ -90,12 +90,15 @@
 .header-location-block {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 2px;
   min-width: 0;
   align-items: center;
   text-align: center;
   margin: 0 auto;
   max-width: calc(100% - 160px);
+  padding-top: 2px;
+  grid-column: 2;
+  justify-self: center;
 }
 
 .header-location-label {
@@ -114,13 +117,11 @@
   gap: 6px;
   background: transparent;
   border: none;
-  padding: 0 14px 0 0;
+  padding: 0;
   margin: 0;
-  margin-top: -2px;
   cursor: pointer;
   text-align: center;
   -webkit-tap-highlight-color: transparent;
-  position: relative;
 }
 
 .header-location:active {
@@ -145,10 +146,6 @@
 
 .header-location-caret {
   color: var(--home-primary);
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .header-notification {

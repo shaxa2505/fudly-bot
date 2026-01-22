@@ -54,6 +54,7 @@ function CartPage({ user }) {
 
   // Delivery type: 'pickup' or 'delivery'
   const [orderType, setOrderType] = useState('pickup')
+  const [orderTypeTouched, setOrderTypeTouched] = useState(false)
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
@@ -435,6 +436,7 @@ function CartPage({ user }) {
     if (!storeDeliveryEnabled) return 'pickup'
     return subtotal >= AUTO_DELIVERY_THRESHOLD ? 'delivery' : 'pickup'
   }, [storeDeliveryEnabled, subtotal])
+  const deliveryOptionDisabled = !storeDeliveryEnabled || subtotal < AUTO_DELIVERY_THRESHOLD
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
@@ -498,10 +500,16 @@ function CartPage({ user }) {
   }, [deliveryRequiresPrepay, hasOnlineProviders, hasCardProvider, paymentProviders, selectedPaymentMethod])
 
   useEffect(() => {
+    if (!storeDeliveryEnabled && orderType === 'delivery') {
+      setOrderType('pickup')
+      setOrderTypeTouched(false)
+      return
+    }
+    if (orderTypeTouched) return
     if (orderType !== autoOrderType) {
       setOrderType(autoOrderType)
     }
-  }, [autoOrderType, orderType])
+  }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled])
 
   const clearPaymentProof = () => {
     setPaymentProof(null)
@@ -524,6 +532,7 @@ function CartPage({ user }) {
     if (orderLoading) return
     setShowCheckout(false)
     setShowPaymentSheet(false)
+    setOrderTypeTouched(false)
   }
 
   // Open the file picker synchronously on user click (iOS Safari safe).
@@ -615,6 +624,7 @@ function CartPage({ user }) {
       return
     }
     setOrderType(autoOrderType)
+    setOrderTypeTouched(false)
     setCheckoutStep('details')
     setShowCheckout(true)
   }
@@ -1211,6 +1221,45 @@ function CartPage({ user }) {
               {/* Step 1: Order Details */}
               {checkoutStep === 'details' && (
                 <div className="checkout-layout">
+                  <section className="checkout-block">
+                    <h3>Buyurtma turi</h3>
+                    <div className="order-type-options">
+                      <button
+                        type="button"
+                        className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
+                        onClick={() => {
+                          setOrderType('pickup')
+                          setOrderTypeTouched(true)
+                        }}
+                      >
+                        <span className="order-type-icon" aria-hidden="true"></span>
+                        <span className="order-type-text">O'zi olib ketish</span>
+                        <span className="order-type-desc">Do'kondan olib ketasiz</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`order-type-btn ${orderType === 'delivery' ? 'active' : ''}${deliveryOptionDisabled ? ' disabled' : ''}`}
+                        onClick={() => {
+                          if (deliveryOptionDisabled) return
+                          setOrderType('delivery')
+                          setOrderTypeTouched(true)
+                        }}
+                        disabled={deliveryOptionDisabled}
+                      >
+                        <span className="order-type-icon" aria-hidden="true"></span>
+                        <span className="order-type-text">Yetkazib berish</span>
+                        <span className="order-type-desc">Kuryer orqali</span>
+                      </button>
+                    </div>
+                    {!storeDeliveryEnabled && (
+                      <p className="checkout-hint">Yetkazib berish mavjud emas</p>
+                    )}
+                    {storeDeliveryEnabled && subtotal < AUTO_DELIVERY_THRESHOLD && (
+                      <p className="checkout-hint">
+                        Yetkazib berish {formatSum(AUTO_DELIVERY_THRESHOLD)} so'mdan boshlab
+                      </p>
+                    )}
+                  </section>
                   <section className="checkout-block">
                     <div className="checkout-block-header">
                       <h3>Yetkazib berish manzili</h3>
