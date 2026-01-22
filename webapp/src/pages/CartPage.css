@@ -2363,21 +2363,23 @@
   opacity: 0.7;
 }
 
-.checkout-map-pin {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+.checkout-map-marker {
+  background: transparent;
+  border: none;
+}
+
+.checkout-map-marker span {
+  display: block;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--cart-primary);
   border: 4px solid #FFFFFF;
   box-shadow: 0 8px 18px rgba(15, 118, 110, 0.25);
-  pointer-events: none;
+  position: relative;
 }
 
-.checkout-map-pin::after {
+.checkout-map-marker span::after {
   content: '';
   position: absolute;
   left: 50%;

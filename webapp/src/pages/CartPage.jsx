@@ -307,6 +307,18 @@ function CartPage({ user }) {
 
     checkoutMapInstanceRef.current = map
 
+    const markerIcon = L.divIcon({
+      className: 'checkout-map-marker',
+      html: '<span></span>',
+      iconSize: [36, 36],
+      iconAnchor: [18, 34],
+    })
+    const marker = L.marker([startLat, startLon], {
+      draggable: true,
+      icon: markerIcon,
+    }).addTo(map)
+    checkoutMapMarkerRef.current = marker
+
     const scheduleResolve = (lat, lon) => {
       if (mapResolveTimeoutRef.current) {
         clearTimeout(mapResolveTimeoutRef.current)
@@ -317,13 +329,31 @@ function CartPage({ user }) {
     }
 
     const handleMoveEnd = () => {
+      if (markerDraggingRef.current) return
       const center = map.getCenter()
+      if (checkoutMapMarkerRef.current) {
+        checkoutMapMarkerRef.current.setLatLng(center)
+      }
       scheduleResolve(center.lat, center.lng)
     }
 
     map.on('moveend', handleMoveEnd)
     map.on('click', (event) => {
+      if (checkoutMapMarkerRef.current) {
+        checkoutMapMarkerRef.current.setLatLng(event.latlng)
+      }
       map.panTo(event.latlng)
+      scheduleResolve(event.latlng.lat, event.latlng.lng)
+    })
+
+    marker.on('dragstart', () => {
+      markerDraggingRef.current = true
+    })
+    marker.on('dragend', () => {
+      markerDraggingRef.current = false
+      const pos = marker.getLatLng()
+      map.panTo(pos)
+      scheduleResolve(pos.lat, pos.lng)
     })
 
     if (savedCoords && !address.trim()) {
@@ -334,6 +364,9 @@ function CartPage({ user }) {
       getCurrentLocation()
         .then(({ latitude, longitude }) => {
           map.setView([latitude, longitude], 16)
+          if (checkoutMapMarkerRef.current) {
+            checkoutMapMarkerRef.current.setLatLng([latitude, longitude])
+          }
           scheduleResolve(latitude, longitude)
         })
         .catch(() => {
@@ -348,6 +381,9 @@ function CartPage({ user }) {
     return () => {
       map.off('moveend', handleMoveEnd)
       map.off('click')
+      marker.off('dragstart')
+      marker.off('dragend')
+      markerDraggingRef.current = false
       if (mapResolveTimeoutRef.current) {
         clearTimeout(mapResolveTimeoutRef.current)
         mapResolveTimeoutRef.current = null
@@ -376,6 +412,9 @@ function CartPage({ user }) {
     if (checkoutMapInstanceRef.current) {
       checkoutMapInstanceRef.current.setView([lat, lon], 16)
     }
+    if (checkoutMapMarkerRef.current) {
+      checkoutMapMarkerRef.current.setLatLng([lat, lon])
+    }
     updateAddressFromCoords(lat, lon)
   }
 
@@ -385,6 +424,9 @@ function CartPage({ user }) {
       .then(({ latitude, longitude }) => {
         if (checkoutMapInstanceRef.current) {
           checkoutMapInstanceRef.current.setView([latitude, longitude], 16)
+        }
+        if (checkoutMapMarkerRef.current) {
+          checkoutMapMarkerRef.current.setLatLng([latitude, longitude])
         }
         updateAddressFromCoords(latitude, longitude)
       })
@@ -1378,9 +1420,10 @@ function CartPage({ user }) {
                       <button
                         type="button"
                         className="checkout-block-action"
-                        onClick={() => addressInputRef.current?.focus()}
+                        onClick={handleLocateMe}
+                        disabled={!mapEnabled}
                       >
-                        O'zgartirish
+                        Avtoaniqlash
                       </button>
                     </div>
                     <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
@@ -1456,7 +1499,6 @@ function CartPage({ user }) {
                         >
                           <LocateFixed size={16} strokeWidth={2} />
                         </button>
-                        <div className="checkout-map-pin" aria-hidden="true"></div>
                         {mapEnabled && !mapLoaded && !mapError && (
                           <div className="checkout-map-status">
                             Xarita yuklanmoqda...
