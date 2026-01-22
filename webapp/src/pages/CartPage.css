@@ -1693,6 +1693,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  transform: translate(6px, 3px);
 }
 
 .cart-header-title {
@@ -1912,7 +1913,7 @@
   gap: 6px;
   background: #F5F5F7;
   border-radius: 18px;
-  padding: 8px 4px;
+  padding: 6px 4px 12px;
   height: 104px;
   width: 40px;
   box-sizing: border-box;
@@ -1930,6 +1931,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  line-height: 0;
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 

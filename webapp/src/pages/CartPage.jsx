@@ -213,6 +213,7 @@ function CartPage({ user }) {
     }, 0)
   }, [cartItems])
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
+  const originalTotal = subtotal + savingsTotal
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
   const deliveryOptions = [
     { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },
@@ -956,7 +957,7 @@ function CartPage({ user }) {
           <div className="cart-summary-rows">
             <div className="cart-summary-row">
               <span>Mahsulotlar ({itemsCount})</span>
-              <span>{formatSum(subtotal)} so'm</span>
+              <span>{formatSum(originalTotal)} so'm</span>
             </div>
             <div className="cart-summary-row savings">
               <span>Tejamkorlik</span>
