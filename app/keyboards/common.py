@@ -139,6 +139,8 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
         "drinks": "Напитки" if lang == "ru" else "Ichimliklar",
         "snacks": "Снеки" if lang == "ru" else "Gaz. ovqatlar",
         "frozen": "Замороженное" if lang == "ru" else "Muzlatilgan",
+        "sweets": "Сладости" if lang == "ru" else "Shirinliklar",
+        "other": "Другое" if lang == "ru" else "Boshqa",
     }
 
     for cat_id, cat_name in categories.items():
@@ -152,12 +154,13 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Quick discount selection keyboard."""
     builder = InlineKeyboardBuilder()
-    discounts = [10, 20, 30, 40, 50, 60, 70]
+    discounts = [0, 10, 20, 30, 40, 50, 60, 70]
     for d in discounts:
-        builder.button(text=f"{d}%", callback_data=f"discount_{d}")
+        label = "Без скидки" if d == 0 and lang == "ru" else ("Chegirmasiz" if d == 0 else f"{d}%")
+        builder.button(text=label, callback_data=f"discount_{d}")
     builder.button(text="Другая" if lang == "ru" else "Boshqa", callback_data="discount_custom")
     builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
-    builder.adjust(4, 3, 2)
+    builder.adjust(3, 3, 3, 1)
     return builder.as_markup()
 
 
@@ -165,12 +168,16 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
     """Quick quantity selection keyboard."""
     builder = InlineKeyboardBuilder()
 
-    if unit == "кг":
+    if unit in ("кг", "л"):
         # For kg - show decimal quantities
         quantities = [0.5, 1, 2, 3, 5, 10]
         for q in quantities:
             label = f"{q}" if q == int(q) else f"{q}"
             builder.button(text=label, callback_data=f"quantity_{q}")
+    elif unit in ("г", "мл"):
+        quantities = [100, 200, 500, 1000]
+        for q in quantities:
+            builder.button(text=str(q), callback_data=f"quantity_{q}")
     else:
         # For pieces - show integer quantities
         quantities = [5, 10, 20, 50, 100, 200]
@@ -184,17 +191,16 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
 
 
 def unit_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
-    """Unit type selection keyboard (pieces or kg)."""
+    """Unit type selection keyboard (pieces, kg, etc.)."""
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text="Штуки (шт)" if lang == "ru" else "Dona (dona)", callback_data="unit_type_шт"
-    )
-    builder.button(
-        text="Килограммы (кг)" if lang == "ru" else "Kilogramm (kg)",
-        callback_data="unit_type_кг",
-    )
+    builder.button(text="Штуки (шт)" if lang == "ru" else "Dona (dona)", callback_data="unit_type_шт")
+    builder.button(text="Упаковки (уп)" if lang == "ru" else "Qadoq (up)", callback_data="unit_type_уп")
+    builder.button(text="Килограммы (кг)" if lang == "ru" else "Kilogramm (kg)", callback_data="unit_type_кг")
+    builder.button(text="Граммы (г)" if lang == "ru" else "Gramm (g)", callback_data="unit_type_г")
+    builder.button(text="Литры (л)" if lang == "ru" else "Litr (l)", callback_data="unit_type_л")
+    builder.button(text="Миллилитры (мл)" if lang == "ru" else "Millilitr (ml)", callback_data="unit_type_мл")
     builder.button(text=get_text(lang, "back"), callback_data="create_back_discount")
-    builder.adjust(1)
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
 
@@ -218,9 +224,10 @@ def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
         date = (today + timedelta(days=days)).strftime("%d.%m")
         builder.button(text=f"{label} ({date})", callback_data=f"expiry_{days}")
 
+    builder.button(text="Без срока" if lang == "ru" else "Muddatsiz", callback_data="expiry_none")
     builder.button(text="Другая дата" if lang == "ru" else "Boshqa sana", callback_data="expiry_custom")
     builder.button(text=get_text(lang, "back"), callback_data="create_back_quantity")
-    builder.adjust(2, 2, 2, 2)
+    builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
 
 

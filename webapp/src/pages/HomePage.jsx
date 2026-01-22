@@ -768,29 +768,42 @@ function HomePage() {
     if (location.address || location.coordinates) return
     if (location.source === 'manual') return
 
-    if (navigator.geolocation) {
+    if (!navigator.geolocation && !window.Telegram?.WebApp?.requestLocation) return
+
+    let isActive = true
+    const resolveAutoLocation = async () => {
       setIsLocating(true)
       setGeoAttempt('start')
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          reverseGeocodeAuto(latitude, longitude)
-          setGeoAttempt('ok')
-        },
-        (error) => {
-          console.log('Auto-geolocation denied or failed:', error.message)
-          if (error.code === error.PERMISSION_DENIED) {
-            setGeoAttempt('denied')
-          } else {
-            setGeoAttempt('fail')
-          }
-          setIsLocating(false)
-          if (error.code === error.PERMISSION_DENIED) {
-            setShowAddressModal(true)
-          }
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-      )
+      try {
+        const coords = await getPreferredLocation({
+          preferTelegram: true,
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+          minAccuracy: GEO_ACCURACY_METERS,
+          retryOnLowAccuracy: true,
+          highAccuracyTimeout: 15000,
+          highAccuracyMaximumAge: 0,
+        })
+        if (!isActive) return
+        const ok = await reverseGeocodeAuto(coords.latitude, coords.longitude)
+        setGeoAttempt(ok ? 'ok' : 'fail')
+      } catch (error) {
+        if (!isActive) return
+        console.log('Auto-geolocation denied or failed:', error?.message || error)
+        if (error?.code === error.PERMISSION_DENIED) {
+          setGeoAttempt('denied')
+          setShowAddressModal(true)
+        } else {
+          setGeoAttempt('fail')
+        }
+        setIsLocating(false)
+      }
+    }
+
+    resolveAutoLocation()
+    return () => {
+      isActive = false
     }
   }, [])
 
@@ -801,9 +814,11 @@ function HomePage() {
       if (!data) throw new Error('Geo lookup failed')
       setLocation(buildLocationFromReverseGeocode(data, lat, lon))
       setLocationError('')
+      return true
     } catch (error) {
       console.error('Reverse geocode error', error)
       setLocationError('Manzilni aniqlab bo\'lmadi')
+      return false
     } finally {
       setIsLocating(false)
     }
@@ -862,42 +877,51 @@ function HomePage() {
       if (!data) throw new Error('Geo lookup failed')
       setLocation(buildLocationFromReverseGeocode(data, lat, lon))
       setLocationError('')
-      setShowAddressModal(false) // Закрываем модалку после успешного определения
+      setShowAddressModal(false)
+      return true // Закрываем модалку после успешного определения
     } catch (error) {
       console.error('Reverse geocode error', error)
       setLocationError('Manzilni aniqlab bo\'lmadi')
+      return false
     } finally {
       setIsLocating(false)
     }
   }
 
   const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
+    if (!navigator.geolocation && !window.Telegram?.WebApp?.requestLocation) {
       setLocationError('Qurilmada geolokatsiya qo\'llab-quvvatlanmaydi')
       return
     }
     setIsLocating(true)
     setGeoAttempt('start')
     setLocationError('')
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords
-        reverseGeocode(latitude, longitude)
-      },
-      (error) => {
+    getPreferredLocation({
+      preferTelegram: true,
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+      minAccuracy: GEO_ACCURACY_METERS,
+      retryOnLowAccuracy: true,
+      highAccuracyTimeout: 20000,
+      highAccuracyMaximumAge: 0,
+    })
+      .then(async ({ latitude, longitude }) => {
+        const ok = await reverseGeocode(latitude, longitude)
+        setGeoAttempt(ok ? 'ok' : 'fail')
+      })
+      .catch((error) => {
         console.error('Geolocation error', error)
-        if (error.code === error.PERMISSION_DENIED) {
+        if (error?.code === error.PERMISSION_DENIED) {
           setLocationError('Geolokatsiyaga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering.')
-        } else if (error.code === error.TIMEOUT) {
+        } else if (error?.code === error.TIMEOUT) {
           setLocationError('Joylashuvni aniqlash vaqti tugadi. Qayta urinib ko\'ring.')
         } else {
           setLocationError('Geolokatsiyani olish imkonsiz')
         }
-        setGeoAttempt(error.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
+        setGeoAttempt(error?.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
         setIsLocating(false)
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    )
+      })
   }
 
   const openAddressModal = () => {

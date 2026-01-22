@@ -45,6 +45,7 @@ def main_menu_seller(
     """Simplified partner menu: Add, Products, Orders, Today, Bulk Import, Profile, Web Panel."""
     builder = ReplyKeyboardBuilder()
     builder.button(text=get_text(lang, "add_item"))
+    builder.button(text=get_text(lang, "quick_add"))
     builder.button(text=get_text(lang, "my_items"))
     builder.button(text=get_text(lang, "orders"))
     builder.button(text=get_text(lang, "today_stats"))
@@ -57,7 +58,10 @@ def main_menu_seller(
         url = _with_signed_uid(webapp_url, user_id)
         builder.button(text="🖥 Веб-панель", web_app=WebAppInfo(url=url))
 
-    builder.adjust(2, 2, 2, 1 if webapp_url else 2)
+    if webapp_url:
+        builder.adjust(2, 2, 2, 2)
+    else:
+        builder.adjust(2, 2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
 

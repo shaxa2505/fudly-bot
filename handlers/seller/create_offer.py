@@ -1,6 +1,7 @@
 """Seller offer creation handlers - step-by-step process with quick buttons."""
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -20,7 +21,7 @@ from app.keyboards import (
 from database_protocol import DatabaseProtocol
 from handlers.common.states import CreateOffer
 from handlers.common.utils import is_main_menu_button
-from localization import get_text
+from localization import get_text, normalize_category
 from logging_config import logger
 
 # Module-level dependencies
@@ -48,6 +49,7 @@ CATEGORY_NAMES = {
         "drinks": "Напитки",
         "snacks": "Снеки",
         "frozen": "Замороженное",
+        "sweets": "Сладости",
         "other": "Другое",
     },
     "uz": {
@@ -59,9 +61,51 @@ CATEGORY_NAMES = {
         "drinks": "Ichimliklar",
         "snacks": "Gaz. ovqatlar",
         "frozen": "Muzlatilgan",
+        "sweets": "Shirinliklar",
         "other": "Boshqa",
     },
 }
+
+ALLOWED_CATEGORIES = {
+    "bakery",
+    "dairy",
+    "meat",
+    "fruits",
+    "vegetables",
+    "drinks",
+    "snacks",
+    "frozen",
+    "sweets",
+    "other",
+}
+
+UNIT_ALIASES = {
+    "шт": "шт",
+    "штука": "шт",
+    "штук": "шт",
+    "dona": "шт",
+    "pcs": "шт",
+    "piece": "шт",
+    "уп": "уп",
+    "упак": "уп",
+    "упаковка": "уп",
+    "qadoq": "уп",
+    "кг": "кг",
+    "kg": "кг",
+    "килограмм": "кг",
+    "г": "г",
+    "гр": "г",
+    "g": "г",
+    "gram": "г",
+    "л": "л",
+    "l": "л",
+    "литр": "л",
+    "ml": "мл",
+    "мл": "мл",
+    "milliliter": "мл",
+}
+
+DECIMAL_UNITS = {"кг", "л"}
 
 
 def get_category_name(category: str, lang: str) -> str:
@@ -74,6 +118,7 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
     steps = [
         ("Категория", "Kategoriya", data.get("category")),
         ("Название", "Nomi", data.get("title")),
+        ("Описание", "Tavsif", data.get("description")),
         ("Цена", "Narx", data.get("original_price")),
         ("Скидка", "Chegirma", data.get("discount_percent")),
         ("Единица", "Birlik", data.get("unit")),
@@ -89,22 +134,23 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
             # Completed step
             if i == 1 and value:  # Category
                 display_value = get_category_name(value, lang)
-            elif i == 3 and value:  # Price
-                display_value = f"{int(value):,} сум"
-            elif i == 4 and value:  # Discount
+            elif i == 4 and value:  # Price
+                display_value = f"{int(value):,} ???"
+            elif i == 5 and value:  # Discount
                 display_value = f"{value}%"
-            elif i == 5 and value:  # Unit
+            elif i == 6 and value:  # Unit
                 display_value = value
-            elif i == 6 and value:  # Quantity
-                unit = data.get("unit", "шт")
+            elif i == 7 and value:  # Quantity
+                unit = data.get("unit", "??")
                 display_value = f"{value} {unit}"
+            elif i == 8 and value is None:  # Expiry optional
+                display_value = "??? ?????" if lang == "ru" else "Muddatsiz"
             elif value:
                 display_value = str(value)[:20]
             else:
                 display_value = "-"
             lines.append(f"[x] {name}: <b>{display_value}</b>")
-        elif i == current_step:
-            # Current step
+        elif i == current_step:            # Current step
             lines.append(f"[>] <b>{name}</b>")
         else:
             # Future step

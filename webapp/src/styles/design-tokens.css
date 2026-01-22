@@ -62,8 +62,9 @@
   /* ===== TYPOGRAPHY ===== */
 
   /* Font Family */
-  --font-family: 'Sora', 'Manrope', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Fraunces', 'Sora', 'Times New Roman', serif;
+  --font-family: 'Plus Jakarta Sans', 'Sora', 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Sora', 'Times New Roman', serif;
+  --font-body: var(--font-family);
 
   /* Font Sizes (1.25 ratio type scale) */
   --font-2xs: 10px;

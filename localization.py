@@ -46,6 +46,7 @@ TEXTS = {
         "select_category_in_store": "Выберите категорию:",
         # Партнёр - меню
         "add_item": "➕ Добавить",
+        "quick_add": "⚡ Быстро",
         "my_items": "📦 Товары",
         "orders": "🧾 Заказы партнёра",
         "today_stats": "📊 Статистика",
@@ -601,6 +602,7 @@ Bo'limni tanlang.""",
         "select_category_in_store": "Toifani tanlang:",
         # Hamkor - yangi qisqa nomlar
         "add_item": "➕ Qo'shish",
+        "quick_add": "⚡ Tez",
         "my_items": "📦 Mahsulotlar",
         "orders": "🧾 Hamkor buyurtmalari",
         "today_stats": "📊 Statistika",
@@ -1193,6 +1195,8 @@ def get_product_categories(lang: str) -> list[str]:
             "Напитки",
             "Снеки",
             "Замороженное",
+            "Сладости",
+            "Другое",
         ]
     else:
         return [
@@ -1204,6 +1208,8 @@ def get_product_categories(lang: str) -> list[str]:
             "Ichimliklar",
             "Gaz. ovqatlar",
             "Muzlatilgan",
+            "Shirinliklar",
+            "Boshqa",
         ]
 
 
@@ -1220,6 +1226,7 @@ def normalize_category(category: str) -> str:
         "Напитки": "drinks",
         "Снеки": "snacks",
         "Замороженное": "frozen",
+        "Сладости": "sweets",
         # Узбекский
         "Pishiriq": "bakery",
         "Sut mahsulotlari": "dairy",
@@ -1229,6 +1236,7 @@ def normalize_category(category: str) -> str:
         "Ichimliklar": "drinks",
         "Gaz. ovqatlar": "snacks",
         "Muzlatilgan": "frozen",
+        "Shirinliklar": "sweets",
         # Старые названия (для совместимости)
         "Хлеб": "bakery",
         "Non": "bakery",

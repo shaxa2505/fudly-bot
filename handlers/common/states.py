@@ -72,20 +72,24 @@ class RegisterStore(StatesGroup):
 
 class CreateOffer(StatesGroup):
     """
-    Offer creation flow (8 steps).
+    Offer creation flow (9 steps + quick add).
 
-    Flow: Add Offer → category → title → price → discount → unit → quantity → expiry → photo → done
+    Flow: Add Offer → [store] → category → title → description → price → discount → unit → quantity → expiry → photo → done
+    Quick: Add Offer (quick) → [store] → quick_input → done
     """
 
     # Main flow states
+    store = State()  # Optional: Select store when multiple are available
     category = State()  # Step 1: Select category
     title = State()  # Step 2: Enter title
-    original_price = State()  # Step 3: Enter original price
-    discount_price = State()  # Step 4: Enter/select discount
-    unit_type = State()  # Step 5: Select unit type (шт/кг)
-    quantity = State()  # Step 6: Enter quantity
-    expiry_date = State()  # Step 7: Select expiry date
-    photo = State()  # Step 8: Upload photo (optional)
+    description = State()  # Step 3: Optional description
+    original_price = State()  # Step 4: Enter original price
+    discount_price = State()  # Step 5: Enter/select discount
+    unit_type = State()  # Step 6: Select unit type (шт/кг/л/...)
+    quantity = State()  # Step 7: Enter quantity
+    expiry_date = State()  # Step 8: Select expiry date
+    photo = State()  # Step 9: Upload photo (optional)
+    quick_input = State()  # Quick add input (one line or caption)
 
 
 class EditOffer(StatesGroup):

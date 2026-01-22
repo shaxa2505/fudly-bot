@@ -222,10 +222,21 @@ def offers_category_filter(
     builder = InlineKeyboardBuilder()
 
     # English category IDs for database - order matches get_product_categories
-    category_ids = ["bakery", "dairy", "meat", "fruits", "vegetables", "drinks", "snacks", "frozen"]
+    category_ids = [
+        "bakery",
+        "dairy",
+        "meat",
+        "fruits",
+        "vegetables",
+        "drinks",
+        "snacks",
+        "frozen",
+        "sweets",
+        "other",
+    ]
 
     # Эмодзи для категорий - совпадают с партнёрскими
-    category_emojis = ["🥖", "🥛", "🥩", "🍎", "🥬", "🥤", "🍿", "🧊"]
+    category_emojis = ["🥖", "🥛", "🥩", "🍎", "🥬", "🥤", "🍿", "🧊", "🍬", "📦"]
     categories = get_product_categories(lang)
 
     # "All offers" button на всю ширину
@@ -253,7 +264,7 @@ def offers_category_filter(
     if include_back:
         builder.button(text=get_text(lang, "back"), callback_data=back_callback or "hot_entry_back")
 
-    rows = [1, 2, 2, 2, 2]
+    rows = [1, 2, 2, 2, 2, 2]
     if include_back:
         rows.append(1)
     builder.adjust(*rows)

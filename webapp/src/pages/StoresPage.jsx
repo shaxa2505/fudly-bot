@@ -164,7 +164,7 @@ function StoresPage() {
   const [loading, setLoading] = useState(true)
   const [favoritesLoading, setFavoritesLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
   const [selectedStore, setSelectedStore] = useState(null)
   const [storeOffers, setStoreOffers] = useState([])
@@ -206,12 +206,6 @@ function StoresPage() {
     if (location.coordinates?.lat == null || location.coordinates?.lon == null) return
     setUserLocation({ latitude: location.coordinates.lat, longitude: location.coordinates.lon })
   }, [location.coordinates?.lat, location.coordinates?.lon, userLocation])
-
-  useEffect(() => {
-    if (searchOpen) {
-      searchInputRef.current?.focus()
-    }
-  }, [searchOpen])
 
   useEffect(() => {
     const handleLocationUpdate = (event) => {
@@ -440,84 +434,85 @@ function StoresPage() {
   return (
     <div className="sp">
       <header className="sp-header">
-        <div className="sp-header-inner">
-          <div className="sp-header-top">
-            <div className="sp-location">
-              <span className="sp-location-label">Yetkazish manzili</span>
-              <button className="sp-location-btn" type="button" onClick={requestLocation}>
-                <span>{cityLatin || 'Tanlanmagan'}</span>
-                <svg className="sp-location-caret" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-            <button
-              className="sp-search-btn"
-              type="button"
-              aria-label="Qidiruv"
-              onClick={() => setSearchOpen((prev) => !prev)}
-            >
-              <Search size={18} strokeWidth={2} />
-            </button>
-          </div>
-          <div className="sp-view-toggle" role="tablist" aria-label="Ko'rinish">
-            <button
-              className={`sp-view-pill ${viewMode === 'list' ? 'active' : ''}`}
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'list'}
-              onClick={() => setViewMode('list')}
-            >
-              Ro'yxat
-            </button>
-            <button
-              className={`sp-view-pill ${viewMode === 'map' ? 'active' : ''}`}
-              type="button"
-              role="tab"
-              aria-selected={viewMode === 'map'}
-              onClick={() => setViewMode('map')}
-            >
-              Xarita
+        <div className="sp-header-top">
+          <div className="sp-header-title">
+            <span className="sp-location-label">Yetkazish manzili</span>
+            <button className="sp-location-btn" type="button" onClick={requestLocation}>
+              <span className="sp-location-city-name">{cityLatin || 'Tanlanmagan'}</span>
+              <svg className="sp-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </button>
           </div>
         </div>
-
-        {searchOpen && (
-          <div className="sp-searchbar">
-            <div className="sp-search-input">
-              <Search size={16} strokeWidth={2} />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Do'kon qidirish..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={blurOnEnter}
-              />
-              {searchQuery && (
-                <button type="button" onClick={() => setSearchQuery('')} aria-label="Qidiruvni tozalash">
-                  ?
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="sp-chip-row" role="tablist" aria-label="Filtrlar">
-          {FILTER_CHIPS.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              className={`sp-chip ${activeFilter === chip.id ? 'active' : ''}`}
-              onClick={() => handleFilterSelect(chip.id)}
-              disabled={chip.id === 'nearby' && locationLoading}
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
-        <div className="sp-divider" />
       </header>
+
+      <div className={`sp-subheader ${searchFocused ? 'search-active' : ''}`}>
+        <div className="sp-header-search">
+          <div className="sp-search-field">
+            <Search size={20} strokeWidth={2} className="sp-search-icon" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="sp-search-input"
+              placeholder="Do'kon qidirish..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onKeyDown={blurOnEnter}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="sp-search-clear"
+                onClick={() => setSearchQuery('')}
+                aria-label="Qidiruvni tozalash"
+              >
+                ?
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="sp-view-toggle-wrap">
+        <div className="sp-view-toggle" role="tablist" aria-label="Ko'rinish">
+          <button
+            className={`sp-view-pill ${viewMode === 'list' ? 'active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+          >
+            Ro'yxat
+          </button>
+          <button
+            className={`sp-view-pill ${viewMode === 'map' ? 'active' : ''}`}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'map'}
+            onClick={() => setViewMode('map')}
+          >
+            Xarita
+          </button>
+        </div>
+      </div>
+
+      <div className="sp-chip-row" role="tablist" aria-label="Filtrlar">
+        {FILTER_CHIPS.map((chip) => (
+          <button
+            key={chip.id}
+            type="button"
+            className={`sp-chip ${activeFilter === chip.id ? 'active' : ''}`}
+            onClick={() => handleFilterSelect(chip.id)}
+            disabled={chip.id === 'nearby' && locationLoading}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+      <div className="sp-divider" />
 
       <main className="sp-main">
         {viewMode === 'map' ? (
