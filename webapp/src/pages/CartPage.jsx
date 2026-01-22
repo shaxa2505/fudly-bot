@@ -361,6 +361,7 @@ function CartPage({ user }) {
       zoom: startZoom,
       zoomControl: false,
       attributionControl: false,
+      tap: false,
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -387,7 +388,7 @@ function CartPage({ user }) {
       }
       mapResolveTimeoutRef.current = setTimeout(() => {
         mapUserEditingRef.current = false
-        updateAddressFromCoords(lat, lon)
+        updateAddressFromCoords(lat, lon, { force: true })
       }, 300)
     }
 
@@ -422,14 +423,12 @@ function CartPage({ user }) {
 
     marker.on('dragstart', () => {
       markerDraggingRef.current = true
-      map.dragging.disable()
     })
     marker.on('dragend', () => {
       markerDraggingRef.current = false
-      map.dragging.enable()
       const pos = marker.getLatLng()
       map.panTo(pos)
-      scheduleResolve(pos.lat, pos.lng)
+      updateAddressFromCoords(pos.lat, pos.lng, { force: true })
     })
 
     if (savedCoords && !address.trim()) {

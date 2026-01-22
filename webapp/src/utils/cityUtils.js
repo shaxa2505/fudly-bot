@@ -137,12 +137,13 @@ export const normalizeLocationName = (value) => {
 }
 
 export const buildLocationFromReverseGeocode = (data, lat, lon) => {
+  const addressData = data?.address || {}
   const city = normalizeLocationName(
-    data?.address?.city || data?.address?.town || data?.address?.village || ''
+    addressData.city || addressData.town || addressData.village || ''
   )
-  const state = normalizeLocationName(data?.address?.state || data?.address?.region || '')
+  const state = normalizeLocationName(addressData.state || addressData.region || '')
   const district = normalizeLocationName(
-    data?.address?.county || data?.address?.city_district || data?.address?.suburb || ''
+    addressData.county || addressData.city_district || addressData.suburb || ''
   )
   const primaryCity = city || state || ''
   const normalizedCity = primaryCity
@@ -151,9 +152,41 @@ export const buildLocationFromReverseGeocode = (data, lat, lon) => {
       : `${primaryCity}, O'zbekiston`)
     : ''
 
+  const houseNumber = addressData.house_number || addressData.building || addressData.unit || ''
+  const road =
+    addressData.road ||
+    addressData.residential ||
+    addressData.pedestrian ||
+    addressData.footway ||
+    addressData.cycleway ||
+    addressData.path ||
+    ''
+  const neighbourhood = addressData.neighbourhood || addressData.suburb || ''
+  const placeName =
+    data?.name ||
+    addressData.amenity ||
+    addressData.shop ||
+    addressData.tourism ||
+    addressData.leisure ||
+    ''
+  const cityName = addressData.city || addressData.town || addressData.village || addressData.county || ''
+  const derivedParts = []
+
+  if (placeName) derivedParts.push(placeName)
+  if (road) {
+    derivedParts.push(houseNumber ? `${road} ${houseNumber}` : road)
+  } else if (houseNumber) {
+    derivedParts.push(houseNumber)
+  }
+  if (neighbourhood && neighbourhood !== cityName) derivedParts.push(neighbourhood)
+  if (cityName) derivedParts.push(cityName)
+
+  const derivedAddress = derivedParts.filter(Boolean).join(', ')
+  const displayAddress = derivedAddress || data?.display_name || ''
+
   return {
     city: normalizedCity,
-    address: data?.display_name || '',
+    address: displayAddress,
     coordinates: lat != null && lon != null ? { lat, lon } : null,
     region: state,
     district,
