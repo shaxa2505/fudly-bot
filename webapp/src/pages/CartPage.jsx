@@ -85,6 +85,7 @@ function CartPage({ user }) {
   const mapResolveTimeoutRef = useRef(null)
   const mapSearchCloseTimeoutRef = useRef(null)
   const mapResolveSeqRef = useRef(0)
+  const mapResolveFailSafeRef = useRef(null)
   const mapUserEditingRef = useRef(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
@@ -125,34 +126,54 @@ function CartPage({ user }) {
     const requestId = ++mapResolveSeqRef.current
     setMapResolving(true)
     setMapError('')
+
+    if (mapResolveFailSafeRef.current) {
+      clearTimeout(mapResolveFailSafeRef.current)
+    }
+    mapResolveFailSafeRef.current = setTimeout(() => {
+      if (mapResolveSeqRef.current === requestId) {
+        setMapResolving(false)
+      }
+    }, 8000)
+
+    const fetchNominatim = async () => {
+      const params = new URLSearchParams({
+        format: 'jsonv2',
+        lat: String(lat),
+        lon: String(lon),
+        zoom: '18',
+        addressdetails: '1',
+        'accept-language': 'uz',
+      })
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`)
+      if (!response.ok) return null
+      return response.json()
+    }
+
+    const fetchApi = async () => {
+      try {
+        return await api.reverseGeocode(lat, lon, 'uz')
+      } catch (error) {
+        console.error('Reverse geocode error:', error)
+        return null
+      }
+    }
+
     let resolved = null
 
     try {
-      const data = await api.reverseGeocode(lat, lon, 'uz')
-      if (data) {
-        resolved = buildLocationFromReverseGeocode(data, lat, lon)
+      const nominatimData = await fetchNominatim()
+      if (nominatimData) {
+        resolved = buildLocationFromReverseGeocode(nominatimData, lat, lon)
       }
     } catch (error) {
-      console.error('Reverse geocode error:', error)
+      console.warn('Nominatim reverse error:', error)
     }
 
     if (!resolved?.address) {
-      try {
-        const params = new URLSearchParams({
-          format: 'jsonv2',
-          lat: String(lat),
-          lon: String(lon),
-          zoom: '18',
-          addressdetails: '1',
-          'accept-language': 'uz',
-        })
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`)
-        if (response.ok) {
-          const data = await response.json()
-          resolved = buildLocationFromReverseGeocode(data, lat, lon)
-        }
-      } catch (error) {
-        console.warn('Nominatim reverse error:', error)
+      const apiData = await fetchApi()
+      if (apiData) {
+        resolved = buildLocationFromReverseGeocode(apiData, lat, lon)
       }
     }
 
@@ -169,6 +190,11 @@ function CartPage({ user }) {
     } else {
       setMapError('Manzilni aniqlab bo\'lmadi')
       saveCoordsFallback(lat, lon)
+    }
+
+    if (mapResolveFailSafeRef.current) {
+      clearTimeout(mapResolveFailSafeRef.current)
+      mapResolveFailSafeRef.current = null
     }
     setMapResolving(false)
   }, [saveCoordsFallback])
@@ -360,6 +386,7 @@ function CartPage({ user }) {
         clearTimeout(mapResolveTimeoutRef.current)
       }
       mapResolveTimeoutRef.current = setTimeout(() => {
+        mapUserEditingRef.current = false
         updateAddressFromCoords(lat, lon)
       }, 300)
     }
@@ -439,6 +466,10 @@ function CartPage({ user }) {
       if (mapResolveTimeoutRef.current) {
         clearTimeout(mapResolveTimeoutRef.current)
         mapResolveTimeoutRef.current = null
+      }
+      if (mapResolveFailSafeRef.current) {
+        clearTimeout(mapResolveFailSafeRef.current)
+        mapResolveFailSafeRef.current = null
       }
     }
   }, [

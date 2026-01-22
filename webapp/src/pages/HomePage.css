@@ -96,9 +96,8 @@
   max-width: calc(100% - 160px);
   position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  padding-top: 2px;
+  top: 0;
+  transform: translateX(-50%) translateY(4px);
   width: max-content;
 }
 
