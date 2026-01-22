@@ -85,6 +85,13 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
         or get_val(offer, "address")
         or (get_val(store_fallback, "address") if store_fallback else None)
     )
+    store_rating = float(
+        get_val(offer, "store_rating")
+        or get_val(offer, "avg_rating")
+        or get_val(offer, "rating")
+        or (get_val(store_fallback, "rating") if store_fallback else 0)
+        or 0
+    )
     delivery_enabled = bool(
         get_val(offer, "delivery_enabled", get_val(store_fallback, "delivery_enabled", False))
     )
@@ -111,11 +118,14 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
         store_id=store_id,
         store_name=store_name,
         store_address=store_address,
+        store_rating=store_rating,
         delivery_enabled=delivery_enabled,
         delivery_price=delivery_price,
         min_order_amount=min_order_amount,
         photo=photo,
         expiry_date=expiry_date,
+        available_from=get_val(offer, "available_from"),
+        available_until=get_val(offer, "available_until"),
     )
 
 
@@ -450,6 +460,13 @@ async def get_offers(
             try:
                 original_price_sums = normalize_price(get_val(offer, "original_price", 0))
                 discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+                store_rating = float(
+                    get_val(offer, "store_rating")
+                    or get_val(offer, "avg_rating")
+                    or get_val(offer, "rating")
+                    or (get_val(store_fallback, "rating") if store_fallback else 0)
+                    or 0
+                )
 
                 offers.append(
                     OfferResponse(
@@ -471,6 +488,7 @@ async def get_offers(
                         store_address=get_val(offer, "store_address")
                         or get_val(offer, "address")
                         or (get_val(store_fallback, "address") if store_fallback else None),
+                        store_rating=store_rating,
                         delivery_enabled=bool(
                             get_val(
                                 offer,
@@ -488,6 +506,8 @@ async def get_offers(
                         expiry_date=str(get_val(offer, "expiry_date", ""))
                         if get_val(offer, "expiry_date")
                         else None,
+                        available_from=get_val(offer, "available_from"),
+                        available_until=get_val(offer, "available_until"),
                     )
                 )
             except Exception as e:  # pragma: no cover - defensive
@@ -579,6 +599,13 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
 
         original_price_sums = normalize_price(get_val(offer, "original_price", 0))
         discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+        store_rating = float(
+            get_val(offer, "store_rating")
+            or get_val(offer, "avg_rating")
+            or get_val(offer, "rating")
+            or (get_val(store_fallback, "rating") if store_fallback else 0)
+            or 0
+        )
 
         return OfferResponse(
             id=int(get_val(offer, "id", 0) or get_val(offer, "offer_id", 0) or 0),
@@ -599,6 +626,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             store_address=get_val(offer, "store_address")
             or get_val(offer, "address")
             or (get_val(store_fallback, "address") if store_fallback else None),
+            store_rating=store_rating,
             delivery_enabled=bool(
                 get_val(offer, "delivery_enabled", get_val(store_fallback, "delivery_enabled", False))
             ),
@@ -610,6 +638,8 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             expiry_date=str(get_val(offer, "expiry_date", ""))
             if get_val(offer, "expiry_date")
             else None,
+            available_from=get_val(offer, "available_from"),
+            available_until=get_val(offer, "available_until"),
         )
 
     except HTTPException:

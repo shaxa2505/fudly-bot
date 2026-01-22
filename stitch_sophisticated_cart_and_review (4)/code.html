@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="uz"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Yandex Style Checkout</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --yandex-green: #065F46;
+            --yandex-bg: #FFFFFF;
+            --yandex-divider: #F2F2F2;
+            --yandex-text-main: #212121;
+            --yandex-text-secondary: #828282;
+            --yandex-card-bg: #F5F5F7;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--yandex-bg);
+            color: var(--yandex-text-main);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased">
+<div class="h-12 w-full bg-white sticky top-0 z-50 flex items-center justify-between px-6">
+<span class="text-sm font-bold">9:41</span>
+<div class="flex gap-1.5 items-center">
+<span class="material-symbols-outlined text-[18px]">signal_cellular_alt</span>
+<span class="material-symbols-outlined text-[18px]">wifi</span>
+<span class="material-symbols-outlined text-[18px]">battery_very_low</span>
+</div>
+</div>
+<header class="flex items-center px-4 py-2 sticky top-12 z-40 bg-white/90 ios-blur">
+<button class="w-10 h-10 flex items-center justify-start">
+<span class="material-symbols-outlined text-2xl">arrow_back_ios</span>
+</button>
+<h1 class="text-lg font-bold flex-1 text-center pr-10">Buyurtmani rasmiylashtirish</h1>
+</header>
+<main class="pb-40">
+<section class="px-4 py-6 border-b-[8px] border-[var(--yandex-divider)]">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-xl font-bold">Yetkazib berish manzili</h2>
+<button class="text-[var(--yandex-green)] text-sm font-semibold">O'zgartirish</button>
+</div>
+<div class="rounded-2xl overflow-hidden mb-4 border border-gray-100">
+<div class="h-32 bg-gray-200 relative">
+<img alt="Map View" class="w-full h-full object-cover opacity-60" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqNdr_LfQSh5ufgPTxOVDNmMdJyNl2Fg4V1Aig_N2HlthOdRDUo4RjOmtTo9KL2wx2QeSPQ0qv09bVl4iKOAsB3fwLjjJQpdT7ZjPKvTIlDWwrCDp9ZzEaN5_JqFau5_ZPG8h40wJK-D7niWEHbTi1cPNFrHYJts1TLftoeks9BgK5_MXf0cWkNHZGzqXNOqM-U4PPubAbORK2bd5St0P7tPptZ2RU_dNXF_TjZUr5hOVuJFRxfcmfNEr7kSkGIfKYs9WaFvxV_3bO"/>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-8 h-8 bg-[var(--yandex-green)] rounded-full border-4 border-white shadow-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-sm">location_on</span>
+</div>
+</div>
+</div>
+<div class="p-4 bg-white">
+<p class="font-bold text-base mb-1">Amir Temur ko'chasi, 42</p>
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="text-[10px] text-[var(--yandex-text-secondary)] uppercase font-bold tracking-tight">Kiraverish</span>
+<span class="text-sm font-medium">2-blok</span>
+</div>
+<div class="flex flex-col border-l border-gray-200 pl-4">
+<span class="text-[10px] text-[var(--yandex-text-secondary)] uppercase font-bold tracking-tight">Qavat</span>
+<span class="text-sm font-medium">4</span>
+</div>
+<div class="flex flex-col border-l border-gray-200 pl-4">
+<span class="text-[10px] text-[var(--yandex-text-secondary)] uppercase font-bold tracking-tight">Xonadon</span>
+<span class="text-sm font-medium">128</span>
+</div>
+</div>
+</div>
+</div>
+<input class="w-full bg-[var(--yandex-card-bg)] border-none rounded-xl py-3 px-4 text-sm placeholder:text-gray-400 focus:ring-1 focus:ring-[var(--yandex-green)]" placeholder="Kuryer uchun izoh (masalan: domofon ishlamayapti)" type="text"/>
+</section>
+<section class="px-4 py-6 border-b-[8px] border-[var(--yandex-divider)]">
+<h2 class="text-xl font-bold mb-4">Yetkazib berish vaqti</h2>
+<div class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+<button class="flex-shrink-0 bg-[var(--yandex-green)] text-white px-5 py-3 rounded-2xl flex flex-col items-start min-w-[140px]">
+<span class="text-xs font-medium opacity-80">Tezda</span>
+<span class="text-sm font-bold">25-35 daqiqa</span>
+</button>
+<button class="flex-shrink-0 bg-[var(--yandex-card-bg)] text-[var(--yandex-text-main)] px-5 py-3 rounded-2xl flex flex-col items-start min-w-[140px] border border-transparent">
+<span class="text-xs font-medium text-[var(--yandex-text-secondary)]">Bugun</span>
+<span class="text-sm font-bold">18:00 - 18:30</span>
+</button>
+<button class="flex-shrink-0 bg-[var(--yandex-card-bg)] text-[var(--yandex-text-main)] px-5 py-3 rounded-2xl flex flex-col items-start min-w-[140px] border border-transparent">
+<span class="text-xs font-medium text-[var(--yandex-text-secondary)]">Bugun</span>
+<span class="text-sm font-bold">19:00 - 19:30</span>
+</button>
+</div>
+</section>
+<section class="px-4 py-6 border-b-[8px] border-[var(--yandex-divider)]">
+<h2 class="text-xl font-bold mb-4">To'lov turi</h2>
+<div class="space-y-3">
+<label class="flex items-center justify-between p-4 bg-[var(--yandex-card-bg)] rounded-2xl border-2 border-[var(--yandex-green)]">
+<div class="flex items-center gap-3">
+<div class="w-10 h-6 bg-white rounded border border-gray-100 flex items-center justify-center overflow-hidden">
+<img alt="Uzcard" class="h-3" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBagAxkC5NXXH91pCCI371to_CVLtpOZu4zsfzhj9LV0I3d7r8mVdVVLJYMeOwPyYoq2xuoacoG0JJyPF33OWhgbwd_hs0vJmELQWpNi8whWDq6YBilvLF_GDlEpQ9pAw7Vsua9uELPgvT6pock__d2-JPFqjLL49wYQXfqWns9--dju8ZZ2_kMoXID3mEcPxi-VcPeRmRdLnC4UebxiikEiQdKCl3l_cdKVkMdSSaaaRnrAW_Wh4tVTYRncZo_L7RNF-XZJpaN61Lg"/>
+</div>
+<span class="font-semibold text-sm">Uzcard • 4589</span>
+</div>
+<div class="w-5 h-5 rounded-full bg-[var(--yandex-green)] flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[14px] font-bold">check</span>
+</div>
+<input checked="" class="hidden" name="payment" type="radio"/>
+</label>
+<label class="flex items-center justify-between p-4 bg-[var(--yandex-card-bg)] rounded-2xl border-2 border-transparent">
+<div class="flex items-center gap-3">
+<div class="w-10 h-6 bg-black rounded flex items-center justify-center">
+<span class="text-white text-[10px] font-bold">Apple Pay</span>
+</div>
+<span class="font-semibold text-sm">Apple Pay</span>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+<input class="hidden" name="payment" type="radio"/>
+</label>
+<label class="flex items-center justify-between p-4 bg-[var(--yandex-card-bg)] rounded-2xl border-2 border-transparent">
+<div class="flex items-center gap-3">
+<div class="w-10 h-6 bg-white rounded border border-gray-100 flex items-center justify-center">
+<span class="material-symbols-outlined text-gray-400">payments</span>
+</div>
+<span class="font-semibold text-sm">Naqd pul</span>
+</div>
+<div class="w-5 h-5 rounded-full border-2 border-gray-300"></div>
+<input class="hidden" name="payment" type="radio"/>
+</label>
+</div>
+</section>
+<section class="px-4 py-6">
+<h2 class="text-xl font-bold mb-4">Sizning buyurtmangiz</h2>
+<div class="space-y-4">
+<div class="flex justify-between items-start">
+<div class="flex gap-3">
+<img alt="Item" class="w-12 h-12 rounded-xl object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCY20rdbuWcOt6p7RzY2h-aWye2s9HP1Va_i0srslnMQOgIH5S2y8lmTOUiFB26825KigcvskJKgSqLYuVMkCNpI8LLTDxP5TvegydmshuK8eUBPKr7yYhZAAyLKYnzjdEbSPQsL59VRJdMQ5c5Ez63mPTEM2VSjOsQh4T-UENrSwtwNeR23UQ7JXVRDXBBbTlw6wo006emyQr6qq04h3DGZaS4N_Zmo9oyzivJoFRTCf7XZ39BtGP8NwVvTZGBQeTAamAx4J0ZoCJO"/>
+<div>
+<p class="text-sm font-semibold">Le Croissant Surprise Bag</p>
+<p class="text-xs text-[var(--yandex-text-secondary)]">1 dona</p>
+</div>
+</div>
+<span class="text-sm font-bold">15 000 so'm</span>
+</div>
+<div class="pt-4 space-y-2 border-t border-gray-100">
+<div class="flex justify-between text-sm text-[var(--yandex-text-secondary)]">
+<span>Mahsulotlar</span>
+<span>15 000 so'm</span>
+</div>
+<div class="flex justify-between text-sm text-[var(--yandex-text-secondary)]">
+<span>Yetkazib berish</span>
+<span>12 000 so'm</span>
+</div>
+<div class="flex justify-between text-sm text-[var(--yandex-text-secondary)]">
+<span>Xizmat haqi</span>
+<span>2 000 so'm</span>
+</div>
+<div class="flex justify-between text-lg font-bold pt-2 text-[var(--yandex-text-main)]">
+<span>Jami</span>
+<span>29 000 so'm</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<div class="fixed bottom-0 inset-x-0 bg-white/90 ios-blur border-t border-gray-100 p-4 pb-10 z-50">
+<div class="max-w-lg mx-auto">
+<button class="w-full bg-[var(--yandex-green)] text-white py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+            Buyurtmani tasdiqlash
+            <span class="text-white/60 font-medium">• 29 000 so'm</span>
+</button>
+</div>
+</div>
+<div class="fixed bottom-2 left-1/2 -translate-x-1/2 w-32 h-1.5 bg-black/10 rounded-full z-[60]"></div>
+
+</body></html>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, ChevronDown, MoreHorizontal, X, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -19,6 +19,7 @@ function CartPage({ user }) {
     cartCount,
     cartTotal,
     isEmpty,
+    addToCart,
     updateQuantity,
     removeItem,
     clearCart
@@ -69,6 +70,7 @@ function CartPage({ user }) {
       return {}
     }
   })
+  const [storeOffers, setStoreOffers] = useState([])
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -111,6 +113,23 @@ function CartPage({ user }) {
   const cartStoreId = cartStoreIds[0] || null
   const hasMultipleStores = cartStoreIds.length > 1
   const multiStoreMessage = "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
+  const storeName =
+    cartItems[0]?.offer?.store_name ||
+    cartItems[0]?.offer?.store?.name ||
+    "Do'kon"
+  const recommendedOffers = useMemo(() => {
+    if (!storeOffers.length) return []
+    const cartOfferIds = new Set(
+      cartItems.map(item => String(item.offer?.id)).filter(Boolean)
+    )
+    return storeOffers
+      .filter(offer => {
+        const offerId = offer?.id || offer?.offer_id
+        if (!offerId) return false
+        return !cartOfferIds.has(String(offerId))
+      })
+      .slice(0, 3)
+  }, [storeOffers, cartItems])
   // Check if stores in cart support delivery
   useEffect(() => {
     let isActive = true
@@ -141,6 +160,34 @@ function CartPage({ user }) {
     }
 
     checkDeliveryAvailability()
+    return () => {
+      isActive = false
+    }
+  }, [cartStoreId])
+
+  useEffect(() => {
+    let isActive = true
+    const loadStoreOffers = async () => {
+      if (!cartStoreId) {
+        setStoreOffers([])
+        return
+      }
+      try {
+        const offers = await api.getStoreOffers(cartStoreId)
+        if (!isActive) return
+        const normalized = Array.isArray(offers)
+          ? offers
+          : (offers?.offers || offers?.items || [])
+        setStoreOffers(normalized.filter(Boolean))
+      } catch (error) {
+        console.warn('Could not fetch store offers:', error)
+        if (isActive) {
+          setStoreOffers([])
+        }
+      }
+    }
+
+    loadStoreOffers()
     return () => {
       isActive = false
     }
@@ -677,31 +724,19 @@ function CartPage({ user }) {
               className="cart-header-back"
               type="button"
               onClick={() => navigate(-1)}
-              aria-label="Назад"
+              aria-label="Orqaga"
             >
               <ChevronLeft size={18} strokeWidth={2} />
-              <span>Назад</span>
             </button>
             <h1 className="cart-header-title">Savat</h1>
-            <div className="cart-header-actions">
-              <button
-                className="cart-header-chip"
-                type="button"
-                aria-label="Pastga ochish"
-                disabled
-              >
-                <ChevronDown size={18} strokeWidth={2} />
-              </button>
-              <button
-                className="cart-header-chip"
-                type="button"
-                onClick={handleClearCart}
-                aria-label="Savatni tozalash"
-                disabled
-              >
-                <MoreHorizontal size={18} strokeWidth={2} />
-              </button>
-            </div>
+            <button
+              className="cart-header-clear"
+              type="button"
+              onClick={handleClearCart}
+              disabled
+            >
+              Tozalash
+            </button>
           </div>
         </header>
 
@@ -740,29 +775,18 @@ function CartPage({ user }) {
             className="cart-header-back"
             type="button"
             onClick={() => navigate(-1)}
-            aria-label="Назад"
+            aria-label="Orqaga"
           >
             <ChevronLeft size={18} strokeWidth={2} />
-            <span>Назад</span>
           </button>
           <h1 className="cart-header-title">Savat</h1>
-          <div className="cart-header-actions">
-            <button
-              className="cart-header-chip"
-              type="button"
-              aria-label="Pastga ochish"
-            >
-              <ChevronDown size={18} strokeWidth={2} />
-            </button>
-            <button
-              className="cart-header-chip"
-              type="button"
-              onClick={handleClearCart}
-              aria-label="Savatni tozalash"
-            >
-              <MoreHorizontal size={18} strokeWidth={2} />
-            </button>
-          </div>
+          <button
+            className="cart-header-clear"
+            type="button"
+            onClick={handleClearCart}
+          >
+            Tozalash
+          </button>
         </div>
       </header>
 
@@ -776,78 +800,165 @@ function CartPage({ user }) {
           </div>
         )}
 
-        <div className="cart-items">
-          {cartItems.map((item) => {
-            const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
-            const rawStockLimit = item.offer.stock ?? item.offer.quantity ?? 99
-            const parsedStockLimit = Number(rawStockLimit)
-            const stockLimit = Number.isFinite(parsedStockLimit) ? parsedStockLimit : 99
-            const maxStock = item.offer.stock ?? item.offer.quantity
-            const rawOriginalPrice = item.offer.original_price
-            const rawDiscountPrice = item.offer.discount_price
-            const parsedOriginalPrice = rawOriginalPrice == null ? NaN : Number(rawOriginalPrice)
-            const parsedDiscountPrice = rawDiscountPrice == null ? NaN : Number(rawDiscountPrice)
-            const originalPrice = Number.isFinite(parsedOriginalPrice) ? parsedOriginalPrice : null
-            const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
-            const unitPrice = discountPrice ?? originalPrice ?? 0
-            const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
-            const subtitle = item.offer.description || item.offer.short_description || item.offer.store_name || item.offer.title
-            return (
-              <article key={item.offer.id} className="cart-item-card">
-                <div className="cart-item-thumb">
-                  <img
-                    src={photoUrl}
-                    alt={item.offer.title}
-                    className="cart-item-image"
-                    onError={(e) => {
-                      if (!e.target.dataset.fallback) {
-                        e.target.dataset.fallback = 'true'
-                        e.target.src = PLACEHOLDER_IMAGE
-                      }
-                    }}
+        <section className="cart-store-card">
+          <div className="cart-store-header">
+            <div className="cart-store-title">
+              <span className="cart-store-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                  <path
+                    d="M3.5 10.5L5 4h14l1.5 6.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
-                </div>
-                <div className="cart-item-body">
-                  <h3 className="cart-item-title">{item.offer.title}</h3>
-                  <p className="cart-item-subtitle">{subtitle}</p>
-                  <div className="cart-item-prices">
-                    <span className="cart-item-price">
-                      {formatSum(unitPrice)} so'm
-                    </span>
-                    {showOriginalPrice && (
-                      <span className="cart-item-price-old">
-                        {formatSum(originalPrice)} so'm
+                  <path
+                    d="M4 10.5h16v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9 20v-6h6v6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M7 10.5v2M12 10.5v2M17 10.5v2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+              <h2 className="cart-store-name">{storeName}</h2>
+            </div>
+            <ChevronRight size={16} strokeWidth={2} className="cart-store-arrow" aria-hidden="true" />
+          </div>
+          <div className="cart-store-items">
+            {cartItems.map((item) => {
+              const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
+              const rawStockLimit = item.offer.stock ?? item.offer.quantity ?? 99
+              const parsedStockLimit = Number(rawStockLimit)
+              const stockLimit = Number.isFinite(parsedStockLimit) ? parsedStockLimit : 99
+              const maxStock = item.offer.stock ?? item.offer.quantity
+              const rawOriginalPrice = item.offer.original_price
+              const rawDiscountPrice = item.offer.discount_price
+              const parsedOriginalPrice = rawOriginalPrice == null ? NaN : Number(rawOriginalPrice)
+              const parsedDiscountPrice = rawDiscountPrice == null ? NaN : Number(rawDiscountPrice)
+              const originalPrice = Number.isFinite(parsedOriginalPrice) ? parsedOriginalPrice : null
+              const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
+              const unitPrice = discountPrice ?? originalPrice ?? 0
+              const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
+              const subtitle = item.offer.description || item.offer.short_description || item.offer.store_address || ''
+              return (
+                <div key={item.offer.id} className="cart-item-row">
+                  <div className="cart-item-thumb">
+                    <img
+                      src={photoUrl}
+                      alt={item.offer.title}
+                      className="cart-item-image"
+                      onError={(e) => {
+                        if (!e.target.dataset.fallback) {
+                          e.target.dataset.fallback = 'true'
+                          e.target.src = PLACEHOLDER_IMAGE
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="cart-item-body">
+                    <h3 className="cart-item-title">{item.offer.title}</h3>
+                    {subtitle && (
+                      <p className="cart-item-subtitle">{subtitle}</p>
+                    )}
+                    <div className="cart-item-prices">
+                      <span className="cart-item-price">
+                        {formatSum(unitPrice)} so'm
                       </span>
+                      {showOriginalPrice && (
+                        <span className="cart-item-price-old">
+                          {formatSum(originalPrice)}
+                        </span>
+                      )}
+                    </div>
+                    {maxStock != null && item.quantity >= maxStock && (
+                      <p className="cart-item-stock-warning">
+                        Maksimum: {maxStock} {getUnitLabel(item.offer.unit)}
+                      </p>
                     )}
                   </div>
-                  {maxStock != null && item.quantity >= maxStock && (
-                    <p className="cart-item-stock-warning">
-                      Maksimum: {maxStock} {getUnitLabel(item.offer.unit)}
-                    </p>
-                  )}
+                  <div className="cart-item-qty">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(item.offer.id, 1)}
+                      aria-label={`${item.offer.title} miqdorini oshirish`}
+                      disabled={item.quantity >= stockLimit}
+                    >
+                      <Plus size={18} strokeWidth={2} />
+                    </button>
+                    <span className="cart-item-qty-value">{item.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(item.offer.id, -1)}
+                      aria-label={`${item.offer.title} miqdorini kamaytirish`}
+                    >
+                      <Minus size={18} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
-                <div className="cart-item-qty">
-                  <button
-                    type="button"
-                    onClick={() => handleQuantityChange(item.offer.id, 1)}
-                    aria-label={`${item.offer.title} miqdorini oshirish`}
-                    disabled={item.quantity >= stockLimit}
-                  >
-                    <Plus size={16} strokeWidth={2} />
-                  </button>
-                  <span className="cart-item-qty-value">{item.quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleQuantityChange(item.offer.id, -1)}
-                    aria-label={`${item.offer.title} miqdorini kamaytirish`}
-                  >
-                    <Minus size={16} strokeWidth={2} />
-                  </button>
-                </div>
-              </article>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {recommendedOffers.length > 0 && (
+          <section className="cart-recommendations">
+            <h3 className="cart-recommendations-title">Tavsiya etamiz</h3>
+            <div className="cart-recommendations-list">
+              {recommendedOffers.map((offer) => {
+                const offerId = offer?.id || offer?.offer_id
+                if (!offerId) return null
+                const normalizedOffer = offer.id ? offer : { ...offer, id: offerId }
+                const photoUrl = resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE
+                const price = Number(offer.discount_price ?? offer.original_price ?? 0)
+                return (
+                  <article key={offerId} className="cart-recommendation-card">
+                    <div className="cart-recommendation-thumb">
+                      <img
+                        src={photoUrl}
+                        alt={offer.title || 'Offer'}
+                        onError={(e) => {
+                          if (!e.target.dataset.fallback) {
+                            e.target.dataset.fallback = 'true'
+                            e.target.src = PLACEHOLDER_IMAGE
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="cart-recommendation-title">{offer.title || 'Mahsulot'}</p>
+                    <div className="cart-recommendation-meta">
+                      <span className="cart-recommendation-price">{formatSum(price)}</span>
+                      <button
+                        type="button"
+                        className="cart-recommendation-add"
+                        onClick={() => addToCart(normalizedOffer)}
+                        aria-label={`${offer.title || 'Mahsulot'} savatga qo'shish`}
+                      >
+                        <Plus size={14} strokeWidth={2} />
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
       <div className="cart-summary">
@@ -883,7 +994,7 @@ function CartPage({ user }) {
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="checkout-topbar">
-              <button className="checkout-back" onClick={closeCheckout} aria-label="Назад">
+              <button className="checkout-back" onClick={closeCheckout} aria-label="Orqaga">
                 <ChevronLeft size={18} strokeWidth={2} />
               </button>
               <h2 className="checkout-title">{checkoutTitle}</h2>

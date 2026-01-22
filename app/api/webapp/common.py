@@ -120,11 +120,14 @@ class OfferResponse(BaseModel):
     store_id: int
     store_name: str
     store_address: str | None = None
+    store_rating: float = 0.0
     delivery_enabled: bool = False
     delivery_price: float | None = None
     min_order_amount: float | None = None
     photo: str | None = None
     expiry_date: str | None = None
+    available_from: str | None = None
+    available_until: str | None = None
 
 
 class OfferListResponse(BaseModel):

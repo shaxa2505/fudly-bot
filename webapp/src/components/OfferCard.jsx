@@ -68,15 +68,35 @@ const OfferCard = memo(function OfferCard({
     const raw = String(value).trim()
     if (!raw) return ''
     const timePart = raw.includes('T') ? raw.split('T')[1] : raw
-    const match = timePart.match(/\\d{2}:\\d{2}/)
+    const match = timePart.match(/\d{2}:\d{2}/)
     return match ? match[0] : timePart
   }
 
-  const timeFrom = formatTime(offer.available_from)
-  const timeUntil = formatTime(offer.available_until)
-  const timeRange = timeFrom && timeUntil ? `${timeFrom} - ${timeUntil}` : ''
+  const pickupStart = offer.available_from ?? offer.pickup_time_start ?? offer.pickup_from ?? offer.pickup_start
+  const pickupEnd = offer.available_until ?? offer.pickup_time_end ?? offer.pickup_until ?? offer.pickup_end
+  const timeFrom = formatTime(pickupStart)
+  const timeUntil = formatTime(pickupEnd)
+  let timeRange = ''
+  if (timeFrom && timeUntil) {
+    timeRange = `${timeFrom} - ${timeUntil}`
+  } else if (timeFrom || timeUntil) {
+    timeRange = timeFrom || timeUntil
+  }
+  if (!timeRange && offer.pickup_time) {
+    const rawPickup = String(offer.pickup_time).trim()
+    const rangeMatch = rawPickup.match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/)
+    timeRange = rangeMatch ? `${rangeMatch[1]} - ${rangeMatch[2]}` : rawPickup
+  }
   const titleText = storeName || offer.title || 'Mahsulot'
-  const ratingValue = Number(offer.rating ?? offer.rating_avg ?? offer.store_rating ?? 0)
+  const ratingValue = Number(
+    offer.store_rating ??
+    offer.rating ??
+    offer.rating_avg ??
+    offer.store_rating_avg ??
+    offer.avg_rating ??
+    offer.store_avg_rating ??
+    0
+  )
   const showRating = Number.isFinite(ratingValue) && ratingValue > 0
   const ratingText = showRating ? ratingValue.toFixed(1) : ''
   const showRatingLocation = Boolean(showRating && locationText)
