@@ -146,6 +146,8 @@ class StoreResponse(BaseModel):
     city: str | None = None
     region: str | None = None
     district: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     business_type: str
     rating: float = 0.0
     offers_count: int = 0

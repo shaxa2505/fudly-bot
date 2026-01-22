@@ -1,13 +1,104 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .common import LocationRequest, StoreResponse, get_db, get_val, logger, normalize_price
+from app.core.geocoding import geocode_store_address, geocoding_enabled
 from app.core.utils import normalize_city
 
 router = APIRouter()
+
+_MAX_GEOCODE_PER_REQUEST = max(0, int(os.getenv("FUDLY_STORE_GEOCODE_LIMIT", "8") or 0))
+
+
+def _parse_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip().replace(",", ".")
+        if not cleaned:
+            return None
+        value = cleaned
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_coords(store: Any) -> tuple[float | None, float | None]:
+    lat = _parse_float(
+        get_val(store, "latitude")
+        or get_val(store, "lat")
+        or get_val(store, "coord_lat")
+        or get_val(store, "coordLat")
+        or get_val(store, "y")
+    )
+    lon = _parse_float(
+        get_val(store, "longitude")
+        or get_val(store, "lon")
+        or get_val(store, "lng")
+        or get_val(store, "long")
+        or get_val(store, "coord_lon")
+        or get_val(store, "coordLon")
+        or get_val(store, "x")
+    )
+    return lat, lon
+
+
+def _is_missing_coord(value: float | None) -> bool:
+    return value is None or value == 0.0
+
+
+async def _resolve_missing_coords(raw_stores: list[Any], db) -> None:
+    if not geocoding_enabled() or _MAX_GEOCODE_PER_REQUEST <= 0:
+        return
+
+    candidates: list[Any] = []
+    for store in raw_stores:
+        lat, lon = _extract_coords(store)
+        if _is_missing_coord(lat) or _is_missing_coord(lon):
+            candidates.append(store)
+
+    if not candidates:
+        return
+
+    for store in candidates[:_MAX_GEOCODE_PER_REQUEST]:
+        address = get_val(store, "address")
+        city = get_val(store, "city")
+        if not address and not city:
+            continue
+
+        result = await geocode_store_address(address, city)
+        if not result:
+            continue
+
+        lat = result.get("latitude")
+        lon = result.get("longitude")
+        if lat is None or lon is None:
+            continue
+
+        if isinstance(store, dict):
+            store["latitude"] = lat
+            store["longitude"] = lon
+        else:
+            setattr(store, "latitude", lat)
+            setattr(store, "longitude", lon)
+
+        store_id = int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0)
+        if store_id and hasattr(db, "update_store_location"):
+            try:
+                db.update_store_location(
+                    store_id,
+                    lat,
+                    lon,
+                    region=result.get("region"),
+                    district=result.get("district"),
+                )
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Failed to persist store coords: %s", exc)
 
 
 @router.get("/stores", response_model=list[StoreResponse])
@@ -20,6 +111,7 @@ async def get_stores(
     latitude: float | None = Query(None, description="Latitude (alias)"),
     longitude: float | None = Query(None, description="Longitude (alias)"),
     business_type: str | None = Query(None, description="Business type filter"),
+    resolve_coords: bool = Query(False, description="Resolve missing coordinates via geocoding"),
     db=Depends(get_db),
 ):
     """Get list of stores."""
@@ -93,8 +185,12 @@ async def get_stores(
         if not raw_stores:
             raw_stores = []
 
+        if resolve_coords and raw_stores:
+            await _resolve_missing_coords(raw_stores, db)
+
         stores: list[StoreResponse] = []
         for store in raw_stores:
+            lat_val, lon_val = _extract_coords(store)
             stores.append(
                 StoreResponse(
                     id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
@@ -103,6 +199,8 @@ async def get_stores(
                     city=get_val(store, "city"),
                     region=get_val(store, "region"),
                     district=get_val(store, "district"),
+                    latitude=lat_val,
+                    longitude=lon_val,
                     business_type=get_val(store, "business_type")
                     or get_val(store, "category")
                     or "supermarket",
