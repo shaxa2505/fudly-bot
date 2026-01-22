@@ -12,6 +12,10 @@ import { getCurrentLocation } from '../utils/geolocation'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
+const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
+const DEFAULT_MAP_CENTER = { lat: 41.2995, lon: 69.2401 }
+const AUTO_DELIVERY_THRESHOLD = 30000
+
 function CartPage({ user }) {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -79,8 +83,6 @@ function CartPage({ user }) {
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
   const [mapResolving, setMapResolving] = useState(false)
-  const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
-  const DEFAULT_MAP_CENTER = { lat: 41.2995, lon: 69.2401 }
 
   const getSavedCoordinates = useCallback(() => {
     try {
@@ -182,7 +184,7 @@ function CartPage({ user }) {
     return () => {
       isActive = false
     }
-  }, [LEAFLET_CDN, mapEnabled])
+  }, [mapEnabled])
 
   useEffect(() => {
     if (!mapEnabled) {
@@ -275,8 +277,6 @@ function CartPage({ user }) {
     mapEnabled,
     mapLoaded,
     address,
-    DEFAULT_MAP_CENTER.lat,
-    DEFAULT_MAP_CENTER.lon,
     getSavedCoordinates,
     getCurrentLocation,
     updateAddressFromCoords,
@@ -405,7 +405,6 @@ function CartPage({ user }) {
 
   // Calculate totals using context values
   const subtotal = cartTotal
-  const AUTO_DELIVERY_THRESHOLD = 30000
   const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
   const serviceFee = 0
   const checkoutTotal = total + serviceFee
@@ -435,7 +434,7 @@ function CartPage({ user }) {
   const autoOrderType = useMemo(() => {
     if (!storeDeliveryEnabled) return 'pickup'
     return subtotal >= AUTO_DELIVERY_THRESHOLD ? 'delivery' : 'pickup'
-  }, [AUTO_DELIVERY_THRESHOLD, storeDeliveryEnabled, subtotal])
+  }, [storeDeliveryEnabled, subtotal])
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
@@ -1227,17 +1226,17 @@ function CartPage({ user }) {
                       <div className="checkout-map">
                         <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
                         <div className="checkout-map-pin" aria-hidden="true"></div>
-                        {!mapLoaded && !mapError && (
+                        {mapEnabled && !mapLoaded && !mapError && (
                           <div className="checkout-map-status">
                             Xarita yuklanmoqda...
                           </div>
                         )}
-                        {mapResolving && (
+                        {mapEnabled && mapResolving && (
                           <div className="checkout-map-status">
                             Manzil aniqlanmoqda...
                           </div>
                         )}
-                        {mapError && (
+                        {mapEnabled && mapError && (
                           <div className="checkout-map-status error">
                             {mapError}
                           </div>
