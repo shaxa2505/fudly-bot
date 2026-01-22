@@ -12,9 +12,6 @@ import {
   ShoppingBag,
   Bell,
   Search,
-  MapPin,
-  Phone,
-  Clock,
 } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -49,24 +46,66 @@ const BUSINESS_META = {
 }
 
 
-const getEtaLabel = (distance) => {
-  if (distance == null) return ''
-  if (distance <= 1) return '15-20 daq'
-  if (distance <= 2.5) return '20-30 daq'
-  if (distance <= 4) return '25-35 daq'
-  if (distance <= 6) return '35-45 daq'
-  return '45-60 daq'
-}
-
 const getStoreStatus = (store) => {
   const offers = Number(store?.offers_count || 0)
-  if (!offers) {
-    return { label: 'Hozir yopiq', tone: 'closed' }
-  }
-  if (offers <= 3) {
+  if (!offers) return null
+  if (offers <= 2) {
     return { label: 'Tez tugayapti', tone: 'low' }
   }
-  return { label: 'Ochiq', tone: 'open' }
+  return { label: 'Ochiq', tone: 'open', showIcon: true }
+}
+
+const toPriceNumber = (value) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return null
+  return numeric
+}
+
+const pickStorePrice = (store, keys) => {
+  for (const key of keys) {
+    const value = toPriceNumber(store?.[key])
+    if (value != null) return value
+  }
+  return null
+}
+
+const getStorePrices = (store) => {
+  const current = pickStorePrice(store, [
+    'min_discount_price',
+    'discount_price',
+    'min_price',
+    'offer_price',
+    'price_from',
+    'price',
+    'lowest_price',
+    'min_offer_price',
+  ])
+  const original = pickStorePrice(store, [
+    'min_original_price',
+    'original_price',
+    'price_old',
+    'old_price',
+    'max_price',
+    'price_before_discount',
+  ])
+  const normalizedOriginal = original && current && original <= current ? null : original
+  return { current, original: normalizedOriginal }
+}
+
+const getNextOpenLabel = (store, hoursLabel) => {
+  const rawStart =
+    store?.open_time ||
+    store?.opening_time ||
+    store?.opens_at ||
+    store?.open_at ||
+    ''
+  let start = rawStart
+  if (!start && hoursLabel) {
+    const [firstPart] = String(hoursLabel).split('-')
+    start = (firstPart || '').trim()
+  }
+  if (!start) return 'Ertaga'
+  return `Ertaga ${start}`
 }
 
 function StoresPage() {
@@ -442,8 +481,11 @@ function StoresPage() {
             {[...Array(3)].map((_, i) => (
               <div key={i} className="sp-store-card sp-skeleton">
                 <div className="sp-skel-media"></div>
-                <div className="sp-skel-line"></div>
-                <div className="sp-skel-line short"></div>
+                <div className="sp-skel-body">
+                  <div className="sp-skel-line wide"></div>
+                  <div className="sp-skel-line"></div>
+                  <div className="sp-skel-line short"></div>
+                </div>
               </div>
             ))}
           </div>
@@ -460,26 +502,27 @@ function StoresPage() {
               const meta = BUSINESS_META[store.business_type] || {}
               const Icon = meta.icon || Store
               const status = getStoreStatus(store)
-              const etaLabel = getEtaLabel(store.distance)
               const distanceLabel =
                 store.distance != null ? `${store.distance.toFixed(1)} km` : ''
               const isFavorite = favoriteIds.has(store.id)
-              const hasOffers = Number(store.offers_count || 0) > 0
-              const addressLabel = store.address || store.full_address || store.location || ''
-              const phoneLabel =
-                store.phone ||
-                store.phone_number ||
-                store.contact_phone ||
-                store.contactPhone ||
-                store.manager_phone ||
-                ''
+              const offersCount = Number(store.offers_count || 0)
+              const hasOffers = offersCount > 0
               const hoursLabel =
                 store.working_hours ||
                 store.work_time ||
                 (store.open_time && store.close_time
                   ? `${store.open_time} - ${store.close_time}`
                   : '')
-              const deliveryLabel = store.delivery_enabled ? 'Yetkazib berish' : "O'zi olib ketish"
+              const pickupLabel = store.delivery_enabled ? 'Yetkazib berish' : 'Olib ketish'
+              const showSchedule = !store.delivery_enabled && hoursLabel
+              const { current: currentPrice, original: originalPrice } = getStorePrices(store)
+              const priceLabel = currentPrice != null
+                ? `${Math.round(currentPrice).toLocaleString()} so'm`
+                : ''
+              const originalLabel = originalPrice != null
+                ? `${Math.round(originalPrice).toLocaleString()} so'm`
+                : ''
+              const nextOpenLabel = getNextOpenLabel(store, hoursLabel)
 
               return (
                 <article
@@ -507,94 +550,73 @@ function StoresPage() {
 
                     {status && (
                       <span className={`sp-store-status ${status.tone}`}>
-                        <span className="sp-store-status-dot" />
+                        {status.showIcon && (
+                          <Store size={10} strokeWidth={2} className="sp-store-status-icon" />
+                        )}
                         {status.label}
                       </span>
                     )}
-
-                    <button
-                      type="button"
-                      className={`sp-store-favorite ${isFavorite ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleFavorite(store.id)
-                      }}
-                      aria-label="Sevimlilar"
-                    >
-                      <Heart size={18} strokeWidth={2} fill={isFavorite ? 'currentColor' : 'none'} />
-                    </button>
-
-                    <div className="sp-store-avatar">
-                      {storePhotoUrl ? (
-                        <img src={storePhotoUrl} alt="" />
-                      ) : (
-                        <Icon size={20} strokeWidth={1.8} />
-                      )}
-                    </div>
                   </div>
 
                   <div className="sp-store-body">
-                    <h3 className="sp-store-title">{store.name}</h3>
+                    <div className="sp-store-top">
+                      <div>
+                        <h3 className="sp-store-title">{store.name}</h3>
+                        <div className="sp-store-meta">
+                          {store.rating > 0 && (
+                            <span className="sp-meta-item sp-store-rating">
+                              <Star size={12} fill="#F59E0B" color="#F59E0B" strokeWidth={0} />
+                              {store.rating.toFixed(1)}
+                            </span>
+                          )}
+                          {distanceLabel && <span className="sp-meta-item">{distanceLabel}</span>}
+                          {meta.label && <span className="sp-meta-item">{meta.label}</span>}
+                        </div>
+                      </div>
 
-                    <div className="sp-store-meta">
-                      {store.rating > 0 && (
-                        <span className="sp-meta-item sp-store-rating">
-                          <Star size={12} fill="#FBBF24" color="#FBBF24" strokeWidth={0} />
-                          {store.rating.toFixed(1)}
-                        </span>
-                      )}
-                      {meta.label && <span className="sp-meta-item">{meta.label}</span>}
-                      {etaLabel && <span className="sp-meta-item">{etaLabel}</span>}
-                      {distanceLabel && <span className="sp-meta-item">{distanceLabel}</span>}
-                    </div>
-
-                    <div className="sp-store-info">
-                      <span className="sp-info-item">
-                        <MapPin size={14} strokeWidth={2} />
-                        {addressLabel || "Manzil ko'rsatilmagan"}
-                      </span>
-                      {phoneLabel && (
-                        <span className="sp-info-item">
-                          <Phone size={14} strokeWidth={2} />
-                          {phoneLabel}
-                        </span>
-                      )}
-                      {hoursLabel && (
-                        <span className="sp-info-item">
-                          <Clock size={14} strokeWidth={2} />
-                          {hoursLabel}
-                        </span>
-                      )}
-                      <span className="sp-info-item">
-                        <span className="sp-info-dot" aria-hidden="true"></span>
-                        {deliveryLabel}
-                      </span>
-                    </div>
-
-                    <div className="sp-store-footer">
                       <button
                         type="button"
-                        className={`sp-store-action ${!hasOffers ? 'is-disabled' : ''}`}
+                        className={`sp-store-favorite ${isFavorite ? 'active' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (hasOffers) {
-                            loadStoreOffers(store)
-                          }
+                          toggleFavorite(store.id)
                         }}
-                        disabled={!hasOffers}
+                        aria-label="Sevimlilar"
                       >
-                        {hasOffers ? (
-                          <>
-                            <ShoppingBag size={14} strokeWidth={2} />
-                            Do'konni ko'rish
-                          </>
-                        ) : (
-                          <>
-                            <Bell size={14} strokeWidth={2} />
-                            Xabar berish
-                          </>
-                        )}
+                        <Heart size={20} strokeWidth={2} fill={isFavorite ? 'currentColor' : 'none'} />
                       </button>
+                    </div>
+
+                    <div className="sp-store-bottom">
+                      <div className="sp-store-price">
+                        {originalPrice != null && currentPrice != null && (
+                          <span className="sp-store-price-old">{originalLabel}</span>
+                        )}
+                        {currentPrice != null ? (
+                          <span className="sp-store-price-current">{priceLabel}</span>
+                        ) : (
+                          <span className="sp-store-price-placeholder">-- ---</span>
+                        )}
+                      </div>
+
+                      {hasOffers ? (
+                        showSchedule ? (
+                          <div className="sp-store-schedule">
+                            <span className="sp-store-schedule-label">{pickupLabel}</span>
+                            <span className="sp-store-schedule-time">{hoursLabel}</span>
+                          </div>
+                        ) : (
+                          <div className="sp-store-badge">
+                            <ShoppingBag size={12} strokeWidth={2} />
+                            {offersCount} ta qoldi
+                          </div>
+                        )
+                      ) : (
+                        <div className="sp-store-notify">
+                          <Bell size={12} strokeWidth={2} />
+                          {nextOpenLabel}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </article>
