@@ -27,24 +27,59 @@ function toRad(deg) {
   return deg * (Math.PI / 180);
 }
 
-/**
- * Get user's current location
- * @returns {Promise<{latitude: number, longitude: number}>}
- */
-export function getCurrentLocation() {
-  return new Promise((resolve, reject) => {
-    // Try Telegram WebApp location first
-    if (window.Telegram?.WebApp?.requestLocation) {
-      // Note: Telegram location requires bot to have location permission
-      // This is a simplified version, actual implementation may vary
-    }
+const parseLocationCandidate = (candidate) => {
+  if (!candidate) return null;
+  const source = candidate.coords || candidate;
+  const latitude = source.latitude ?? source.lat;
+  const longitude = source.longitude ?? source.lon ?? source.lng;
+  if (latitude == null || longitude == null) return null;
+  return {
+    latitude,
+    longitude,
+    accuracy: source.accuracy,
+  };
+};
 
-    // Fallback to browser geolocation
+const waitForTelegramLocation = async (telegram, timeoutMs) => {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const parsed = parseLocationCandidate(telegram?.location);
+    if (parsed) return parsed;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return null;
+};
+
+const requestTelegramLocation = async ({ timeout = 8000 } = {}) => {
+  const telegram = window.Telegram?.WebApp;
+  if (!telegram?.requestLocation) return null;
+  try {
+    const maybePromise = telegram.requestLocation();
+    const resolved = await Promise.race([
+      Promise.resolve(maybePromise),
+      new Promise((resolve) => setTimeout(() => resolve(null), timeout)),
+    ]);
+    return (
+      parseLocationCandidate(resolved) ||
+      parseLocationCandidate(telegram.location) ||
+      await waitForTelegramLocation(telegram, timeout)
+    );
+  } catch {
+    return null;
+  }
+};
+
+const requestBrowserLocation = (options = {}) => {
+  const {
+    enableHighAccuracy = true,
+    timeout = 10000,
+    maximumAge = 60000,
+  } = options;
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation not supported'));
       return;
     }
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         resolve({
@@ -54,27 +89,67 @@ export function getCurrentLocation() {
         });
       },
       (error) => {
-        let message = 'Location error';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            message = 'Location permission denied';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            message = 'Location unavailable';
-            break;
-          case error.TIMEOUT:
-            message = 'Location request timeout';
-            break;
-        }
-        reject(new Error(message));
+        reject(error);
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000, // Cache for 1 minute
+        enableHighAccuracy,
+        timeout,
+        maximumAge,
       }
     );
   });
+};
+
+/**
+ * Get user's current location
+ * @returns {Promise<{latitude: number, longitude: number}>}
+ */
+export function getCurrentLocation(options = {}) {
+  return requestBrowserLocation(options);
+}
+
+export async function getPreferredLocation(options = {}) {
+  const {
+    preferTelegram = true,
+    enableHighAccuracy = true,
+    timeout = 10000,
+    maximumAge = 60000,
+    minAccuracy,
+    retryOnLowAccuracy = false,
+    highAccuracyTimeout = 15000,
+    highAccuracyMaximumAge = 0,
+  } = options;
+
+  if (preferTelegram) {
+    const telegramLocation = await requestTelegramLocation({ timeout });
+    if (telegramLocation) return telegramLocation;
+  }
+
+  const primary = await requestBrowserLocation({
+    enableHighAccuracy,
+    timeout,
+    maximumAge,
+  });
+
+  if (
+    retryOnLowAccuracy &&
+    Number.isFinite(minAccuracy) &&
+    Number.isFinite(primary.accuracy) &&
+    primary.accuracy > minAccuracy
+  ) {
+    try {
+      const refined = await requestBrowserLocation({
+        enableHighAccuracy: true,
+        timeout: highAccuracyTimeout,
+        maximumAge: highAccuracyMaximumAge,
+      });
+      return refined;
+    } catch {
+      return primary;
+    }
+  }
+
+  return primary;
 }
 
 /**
@@ -213,6 +288,7 @@ export function saveLocation(location) {
 export default {
   calculateDistance,
   getCurrentLocation,
+  getPreferredLocation,
   watchLocation,
   stopWatchingLocation,
   addDistanceToStores,
