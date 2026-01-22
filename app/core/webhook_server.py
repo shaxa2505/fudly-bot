@@ -449,7 +449,7 @@ async def create_webhook_app(
             status=200,
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
                 "Access-Control-Allow-Headers": (
                     "Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key"
                 ),
@@ -460,7 +460,7 @@ async def create_webhook_app(
     def add_cors_headers(response: web.Response) -> web.Response:
         """Add CORS headers to response."""
         response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = (
             "Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key"
         )
@@ -2906,9 +2906,7 @@ async def create_webhook_app(
             data = await request.json()
             authenticated_user_id = _get_authenticated_user_id(request)
             if not authenticated_user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "Authentication required"}, status=401)
-                )
+                return add_cors_headers(web.json_response({"success": False}))
 
             user_id = authenticated_user_id
             offer_id = data.get("offer_id")
@@ -2934,9 +2932,7 @@ async def create_webhook_app(
         try:
             authenticated_user_id = _get_authenticated_user_id(request)
             if not authenticated_user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "Authentication required"}, status=401)
-                )
+                return add_cors_headers(web.json_response({"offers": []}))
 
             user_id = authenticated_user_id
             limit = int(request.query.get("limit", "20"))
@@ -2996,9 +2992,7 @@ async def create_webhook_app(
             data = await request.json()
             authenticated_user_id = _get_authenticated_user_id(request)
             if not authenticated_user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "Authentication required"}, status=401)
-                )
+                return add_cors_headers(web.json_response({"success": False}))
 
             user_id = authenticated_user_id
             query = data.get("query", "").strip()
@@ -3027,9 +3021,7 @@ async def create_webhook_app(
         try:
             authenticated_user_id = _get_authenticated_user_id(request)
             if not authenticated_user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "Authentication required"}, status=401)
-                )
+                return add_cors_headers(web.json_response({"history": []}))
 
             user_id = authenticated_user_id
             limit = int(request.query.get("limit", "10"))
@@ -3053,9 +3045,7 @@ async def create_webhook_app(
         try:
             authenticated_user_id = _get_authenticated_user_id(request)
             if not authenticated_user_id:
-                return add_cors_headers(
-                    web.json_response({"error": "Authentication required"}, status=401)
-                )
+                return add_cors_headers(web.json_response({"success": False}))
 
             if hasattr(db, "clear_search_history"):
                 db.clear_search_history(int(authenticated_user_id))

@@ -11,7 +11,6 @@ from .common import (
     OfferListResponse,
     OfferResponse,
     PRICE_STORAGE_UNIT,
-    get_current_user,
     get_db,
     get_val,
     is_offer_active,
@@ -246,11 +245,9 @@ async def get_offers(
     offset: int = Query(0, ge=0),
     include_meta: bool = Query(False, description="Include response metadata"),
     db=Depends(get_db),
-    user: dict = Depends(get_current_user),
 ):
     """Get list of offers with advanced filters and sorting."""
     try:
-        _ = user  # explicitly mark dependency as used
         normalized_city = normalize_city(city) if city else None
         normalized_city = normalized_city or None
         region = normalize_city(region) if region else None

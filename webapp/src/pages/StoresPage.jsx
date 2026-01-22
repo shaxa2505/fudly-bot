@@ -1,41 +1,90 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Store, ShoppingCart, Coffee as CafeIcon, Utensils, Croissant, Salad, Star } from 'lucide-react'
+import {
+  Store,
+  ShoppingCart,
+  Coffee as CafeIcon,
+  Utensils,
+  Croissant,
+  Salad,
+  Star,
+  Heart,
+  ShoppingBag,
+  Bell,
+  Search,
+} from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { getSavedLocation, getLatinCity, getCyrillicCity, saveLocation, buildLocationFromReverseGeocode } from '../utils/cityUtils'
+import {
+  getSavedLocation,
+  getLatinCity,
+  getCyrillicCity,
+  saveLocation,
+  buildLocationFromReverseGeocode,
+} from '../utils/cityUtils'
 import { getCurrentLocation, addDistanceToStores } from '../utils/geolocation'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
-import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import BottomNav from '../components/BottomNav'
 import StoreMap from '../components/StoreMap'
 import './StoresPage.css'
 
-const BUSINESS_TYPES = [
-  { id: 'all', label: 'Barchasi', icon: Store },
-  { id: 'supermarket', label: 'Supermarket', icon: ShoppingCart },
-  { id: 'cafe', label: 'Kafe', icon: CafeIcon },
-  { id: 'restaurant', label: 'Restoran', icon: Utensils },
-  { id: 'bakery', label: 'Novvoyxona', icon: Croissant },
-  { id: 'grocery', label: 'Oziq-ovqat', icon: Salad },
+const FILTER_CHIPS = [
+  { id: 'all', label: 'Hammasi' },
+  { id: 'favorites', label: 'Sevimlilar' },
+  { id: 'nearby', label: 'Yaqin-atrofda' },
+  { id: 'supermarket', label: 'Supermarket', businessType: 'supermarket' },
+  { id: 'bakery', label: 'Pishiriqlar', businessType: 'bakery' },
 ]
+
+const BUSINESS_META = {
+  supermarket: { label: 'Supermarket', icon: ShoppingCart },
+  cafe: { label: 'Kafe', icon: CafeIcon },
+  restaurant: { label: 'Restoran', icon: Utensils },
+  bakery: { label: 'Nonvoyxona', icon: Croissant },
+  grocery: { label: 'Oziq-ovqat', icon: Salad },
+}
+
+const formatCurrency = (value) => Math.round(value).toLocaleString('ru-RU')
+
+const getEtaLabel = (distance) => {
+  if (distance == null) return ''
+  if (distance <= 1) return '15-20 daq'
+  if (distance <= 2.5) return '20-30 daq'
+  if (distance <= 4) return '25-35 daq'
+  if (distance <= 6) return '35-45 daq'
+  return '45-60 daq'
+}
+
+const getStoreStatus = (store) => {
+  const offers = Number(store?.offers_count || 0)
+  if (!offers) {
+    return { label: 'Hozir yopiq', tone: 'closed' }
+  }
+  if (offers <= 3) {
+    return { label: 'Tez tugayapti', tone: 'low' }
+  }
+  return { label: 'Ochiq', tone: 'open' }
+}
 
 function StoresPage() {
   const navigate = useNavigate()
   const { cartCount } = useCart()
-  const [topbarHidden, setTopbarHidden] = useState(false)
 
   const [stores, setStores] = useState([])
+  const [favoriteStores, setFavoriteStores] = useState([])
+  const [favoriteIds, setFavoriteIds] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
+  const [favoritesLoading, setFavoritesLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedType, setSelectedType] = useState('all')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('all')
   const [selectedStore, setSelectedStore] = useState(null)
   const [storeOffers, setStoreOffers] = useState([])
   const [storeReviews, setStoreReviews] = useState({ reviews: [], average_rating: 0, total_reviews: 0 })
   const [loadingOffers, setLoadingOffers] = useState(false)
-  const [activeTab, setActiveTab] = useState('offers') // 'offers' or 'reviews'
-  const [viewMode, setViewMode] = useState('list') // 'list' or 'map'
+  const [activeTab, setActiveTab] = useState('offers')
+  const [viewMode, setViewMode] = useState('list')
   const [location, setLocation] = useState(getSavedLocation)
   const [userLocation, setUserLocation] = useState(() => {
     const saved = getSavedLocation()
@@ -50,10 +99,16 @@ function StoresPage() {
   const cityRaw = getCyrillicCity(location.city)
   const regionRaw = location.region || ''
   const districtRaw = location.district || ''
+  const activeChip = FILTER_CHIPS.find((chip) => chip.id === activeFilter)
+  const activeBusinessType = activeChip?.businessType || 'all'
 
   useEffect(() => {
     loadStores()
-  }, [selectedType, cityRaw, regionRaw, districtRaw, userLocation])
+  }, [activeFilter, cityRaw, regionRaw, districtRaw, userLocation])
+
+  useEffect(() => {
+    loadFavorites()
+  }, [])
 
   useEffect(() => {
     if (userLocation) return
@@ -62,10 +117,16 @@ function StoresPage() {
   }, [location.coordinates?.lat, location.coordinates?.lon, userLocation])
 
   useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus()
+    }
+  }, [searchOpen])
+
+  useEffect(() => {
     const handleLocationUpdate = (event) => {
       const next = event?.detail
       if (!next) return
-      setLocation(prev => {
+      setLocation((prev) => {
         const prevCoords = prev.coordinates || {}
         const nextCoords = next.coordinates || {}
         const same =
@@ -88,69 +149,49 @@ function StoresPage() {
     return () => window.removeEventListener('fudly:location', handleLocationUpdate)
   }, [])
 
-  // Hide topbar on scroll-down (Lavka-like): keep search pinned, show topbar on scroll-up.
-  useEffect(() => {
-    const scrollContainer = getScrollContainer()
-    const lastYRef = { current: getScrollTop(scrollContainer) }
-    let rafId = 0
-
-    const apply = () => {
-      rafId = 0
-      const y = getScrollTop(scrollContainer)
-      const lastY = lastYRef.current
-      const delta = y - lastY
-      lastYRef.current = y
-
-      if (y <= 8) {
-        setTopbarHidden(false)
-        return
-      }
-
-      if (delta > 10 && y > 80) {
-        setTopbarHidden(true)
-      } else if (delta < -10) {
-        setTopbarHidden(false)
-      }
+  const loadFavorites = async () => {
+    setFavoritesLoading(true)
+    try {
+      const data = await api.getFavorites()
+      const list = Array.isArray(data) ? data : []
+      setFavoriteStores(list)
+      setFavoriteIds(new Set(list.map((store) => store.id)))
+    } catch (error) {
+      console.error('Error loading favorites:', error)
+    } finally {
+      setFavoritesLoading(false)
     }
-
-    const onScroll = () => {
-      if (rafId) return
-      rafId = window.requestAnimationFrame(apply)
-    }
-
-    if (!scrollContainer) {
-      apply()
-      return () => {
-        if (rafId) window.cancelAnimationFrame(rafId)
-      }
-    }
-
-    scrollContainer.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      scrollContainer.removeEventListener('scroll', onScroll)
-      if (rafId) window.cancelAnimationFrame(rafId)
-    }
-  }, [])
+  }
 
   const loadStores = async () => {
+    if (activeFilter === 'favorites') {
+      setLoading(false)
+      return
+    }
+
+    if (activeFilter === 'nearby' && !userLocation) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
-      let params = { city: cityRaw }
+      const params = {}
+      if (cityRaw) params.city = cityRaw
       if (regionRaw) params.region = regionRaw
       if (districtRaw) params.district = districtRaw
-      if (selectedType !== 'all') {
-        params.business_type = selectedType
+      if (activeBusinessType !== 'all') {
+        params.business_type = activeBusinessType
       }
       if (userLocation?.latitude != null && userLocation?.longitude != null) {
         params.lat = userLocation.latitude
         params.lon = userLocation.longitude
       }
-      let data = await api.getStores(params)
 
+      const data = await api.getStores(params)
       setStores(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error loading stores:', error)
-      // Show user-friendly error
       if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.showAlert('Do\'konlarni yuklashda xatolik. Iltimos, qaytadan urinib ko\'ring.')
       }
@@ -172,7 +213,7 @@ function StoresPage() {
     try {
       const [offers, reviews] = await Promise.all([
         api.getStoreOffers(store.id),
-        api.getStoreReviews(store.id)
+        api.getStoreReviews(store.id),
       ])
       setStoreOffers(Array.isArray(offers) ? offers : [])
       setStoreReviews(reviews || { reviews: [], average_rating: 0, total_reviews: 0 })
@@ -236,18 +277,14 @@ function StoresPage() {
     }
   }
 
-  // Add distance to stores if user location available
-  const storesWithDistance = userLocation
-    ? addDistanceToStores(stores, userLocation)
-    : stores
-
-  const filteredStores = storesWithDistance.filter(store =>
-    store.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    store.address?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const getTypeIcon = (type) => {
-    return BUSINESS_TYPES.find(t => t.id === type)?.icon || Store
+  const handleFilterSelect = (id) => {
+    setActiveFilter(id)
+    if (id === 'nearby' && !userLocation) {
+      requestLocation()
+    }
+    if (id === 'favorites' && favoriteStores.length === 0) {
+      loadFavorites()
+    }
   }
 
   const handleOfferClick = (offer) => {
@@ -255,200 +292,306 @@ function StoresPage() {
     navigate('/product', { state: { offer } })
   }
 
+  const toggleFavorite = async (storeId) => {
+    if (!storeId) return
+    const isFavorite = favoriteIds.has(storeId)
+    try {
+      if (isFavorite) {
+        await api.removeFavoriteStore(storeId)
+      } else {
+        await api.addFavoriteStore(storeId)
+      }
+      setFavoriteIds((prev) => {
+        const next = new Set(prev)
+        if (isFavorite) {
+          next.delete(storeId)
+        } else {
+          next.add(storeId)
+        }
+        return next
+      })
+      setFavoriteStores((prev) => {
+        if (isFavorite) {
+          return prev.filter((store) => store.id !== storeId)
+        }
+        if (prev.some((store) => store.id === storeId)) {
+          return prev
+        }
+        const addedStore = stores.find((store) => store.id === storeId)
+        return addedStore ? [addedStore, ...prev] : prev
+      })
+    } catch (error) {
+      console.error('Favorite toggle error:', error)
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.showAlert('Sevimlilarni yangilab bo\'lmadi')
+      }
+    }
+  }
+
+  const baseStores = activeFilter === 'favorites' ? favoriteStores : stores
+  const filteredStores = baseStores.filter((store) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      store.name?.toLowerCase().includes(query) ||
+      store.address?.toLowerCase().includes(query)
+    )
+  })
+
+  const visibleStores = userLocation
+    ? addDistanceToStores(filteredStores, userLocation)
+    : filteredStores
+
+  const isLoading = activeFilter === 'favorites' ? favoritesLoading : loading
+
   return (
-    <div className={`sp ${topbarHidden ? 'topbar-hidden' : ''}`}>
-      {/* Topbar */}
-      <header className={`sp-topbar ${topbarHidden ? 'is-hidden' : ''}`}>
-        <div className="sp-topbar-inner">
-          <span className="sp-city">Shahar: {cityLatin || 'Tanlanmagan'}</span>
+    <div className="sp">
+      <header className="sp-header">
+        <div className="sp-header-inner">
+          <div className="sp-header-top">
+            <div className="sp-location">
+              <span className="sp-location-label">Yetkazish manzili</span>
+              <button className="sp-location-btn" type="button" onClick={requestLocation}>
+                <span>{cityLatin || 'Tanlanmagan'}</span>
+                <svg className="sp-location-caret" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+            <button
+              className="sp-search-btn"
+              type="button"
+              aria-label="Qidiruv"
+              onClick={() => setSearchOpen((prev) => !prev)}
+            >
+              <Search size={18} strokeWidth={2} />
+            </button>
+          </div>
+          <div className="sp-view-toggle" role="tablist" aria-label="Ko'rinish">
+            <button
+              className={`sp-view-pill ${viewMode === 'list' ? 'active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+            >
+              Ro'yxat
+            </button>
+            <button
+              className={`sp-view-pill ${viewMode === 'map' ? 'active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'map'}
+              onClick={() => setViewMode('map')}
+            >
+              Xarita
+            </button>
+          </div>
         </div>
+
+        {searchOpen && (
+          <div className="sp-searchbar">
+            <div className="sp-search-input">
+              <Search size={16} strokeWidth={2} />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Do'kon qidirish..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={blurOnEnter}
+              />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery('')} aria-label="Qidiruvni tozalash">
+                  ?
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="sp-chip-row" role="tablist" aria-label="Filtrlar">
+          {FILTER_CHIPS.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              className={`sp-chip ${activeFilter === chip.id ? 'active' : ''}`}
+              onClick={() => handleFilterSelect(chip.id)}
+              disabled={chip.id === 'nearby' && locationLoading}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+        <div className="sp-divider" />
       </header>
 
-      {/* Subheader */}
-      <div className="sp-subheader">
-        <div className="sp-search">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-            <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Do'kon qidirish..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={blurOnEnter}
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} aria-label="Qidiruvni tozalash">x</button>
-          )}
-        </div>
-      </div>
-
-      {/* Type Filters */}
-      <div className="sp-filters">
-        {BUSINESS_TYPES.map(type => (
-          <button
-            key={type.id}
-            className={`sp-filter ${selectedType === type.id ? 'active' : ''}`}
-            onClick={() => setSelectedType(type.id)}
-          >
-            {(() => {
-              const IconComponent = type.icon
-              return (
-                <span aria-hidden="true">
-                  <IconComponent size={18} strokeWidth={2} />
-                </span>
-              )
-            })()}
-            <span>{type.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* View Toggle & Location */}
-      <div className="sp-view-controls">
-        <div className="sp-view-toggle">
-          <button
-            className={`sp-view-btn ${viewMode === 'list' ? 'active' : ''}`}
-            onClick={() => setViewMode('list')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            Ro'yxat
-          </button>
-          <button
-            className={`sp-view-btn ${viewMode === 'map' ? 'active' : ''}`}
-            onClick={() => setViewMode('map')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M1 6l8-4 6 3 8-4v16l-8 4-6-3-8 4V6z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
-              <path d="M9 2v18M15 5v18" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            Xarita
-          </button>
-        </div>
-        <button
-          className={`sp-location-btn ${userLocation ? 'active' : ''}`}
-          onClick={requestLocation}
-          disabled={locationLoading}
-        >
-          {locationLoading ? (
-            <div className="sp-location-spinner"></div>
-          ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-              <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          )}
-          {userLocation ? 'Joylashuv: faol' : 'Joylashuv'}
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="sp-content">
+      <main className="sp-main">
         {viewMode === 'map' ? (
-          <StoreMap
-            stores={filteredStores}
-            userLocation={userLocation}
-            onStoreSelect={loadStoreOffers}
-            lang="uz"
-          />
-        ) : loading ? (
-          <div className="sp-grid">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="sp-card sp-skeleton">
-                <div className="sp-skel-icon"></div>
+          <div className="sp-map">
+            <StoreMap
+              stores={visibleStores}
+              userLocation={userLocation}
+              onStoreSelect={loadStoreOffers}
+              lang="uz"
+            />
+          </div>
+        ) : isLoading ? (
+          <div className="sp-store-list">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="sp-store-card sp-skeleton">
+                <div className="sp-skel-media"></div>
                 <div className="sp-skel-line"></div>
                 <div className="sp-skel-line short"></div>
               </div>
             ))}
           </div>
-        ) : filteredStores.length === 0 ? (
+        ) : visibleStores.length === 0 ? (
           <div className="sp-empty">
             <span>INFO</span>
             <h3>Do'konlar topilmadi</h3>
-            <p>Bu shaharda hali do'konlar yo'q</p>
+            <p>Bu hududda do'konlar mavjud emas</p>
           </div>
         ) : (
-          <div className="sp-grid">
-            {filteredStores.map((store, idx) => {
+          <div className="sp-store-list">
+            {visibleStores.map((store) => {
               const storePhotoUrl = resolveStoreImageUrl(store)
+              const meta = BUSINESS_META[store.business_type] || {}
+              const Icon = meta.icon || Store
+              const status = getStoreStatus(store)
+              const etaLabel = getEtaLabel(store.distance)
+              const distanceLabel =
+                store.distance != null ? `${store.distance.toFixed(1)} km` : ''
+              const isFavorite = favoriteIds.has(store.id)
+              const priceValue = Number(store.min_order_amount || 0)
+              const oldPriceValue = Number(store.delivery_price || 0)
+                ? priceValue + Number(store.delivery_price || 0)
+                : 0
+              const showOldPrice = oldPriceValue > priceValue && priceValue > 0
+              const hasOffers = Number(store.offers_count || 0) > 0
+
               return (
-                <div
+                <article
                   key={store.id}
-                  className="sp-card"
+                  className={`sp-store-card ${!hasOffers ? 'is-muted' : ''}`}
                   onClick={() => loadStoreOffers(store)}
-                  style={{ animationDelay: `${idx * 0.05}s` }}
                 >
-                  {/* Store Image */}
-                  <div className="sp-card-image">
-                    {storePhotoUrl && (
+                  <div className="sp-store-media">
+                    {storePhotoUrl ? (
                       <img
                         src={storePhotoUrl}
                         alt={store.name}
-                        className="sp-card-img"
+                        className="sp-store-image"
                         loading="lazy"
                         decoding="async"
                         onError={(e) => {
                           e.target.style.display = 'none'
-                          e.target.parentNode.querySelector('.sp-card-placeholder').style.display = 'flex'
                         }}
                       />
+                    ) : (
+                      <div className="sp-store-placeholder">
+                        <Icon size={32} strokeWidth={1.5} />
+                      </div>
                     )}
-                    <div className="sp-card-placeholder" style={{ display: storePhotoUrl ? 'none' : 'flex' }}>
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-                        <path d="M3 21h18M3 7v14M21 7v14M6 7V4a1 1 0 011-1h10a1 1 0 011 1v3M12 11v6M9 14h6" stroke="#bbb" strokeWidth="1.5" strokeLinecap="round"/>
-                      </svg>
+
+                    {status && (
+                      <span className={`sp-store-status ${status.tone}`}>
+                        <span className="sp-store-status-dot" />
+                        {status.label}
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      className={`sp-store-favorite ${isFavorite ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFavorite(store.id)
+                      }}
+                      aria-label="Sevimlilar"
+                    >
+                      <Heart size={18} strokeWidth={2} fill={isFavorite ? 'currentColor' : 'none'} />
+                    </button>
+
+                    <div className="sp-store-avatar">
+                      {storePhotoUrl ? (
+                        <img src={storePhotoUrl} alt="" />
+                      ) : (
+                        <Icon size={20} strokeWidth={1.8} />
+                      )}
                     </div>
-                    {store.offers_count > 0 && (
-                      <span className="sp-card-badge">{store.offers_count} ta</span>
-                    )}
                   </div>
 
-                <div className="sp-card-body">
-                  <h3 className="sp-card-name">{store.name}</h3>
+                  <div className="sp-store-body">
+                    <h3 className="sp-store-title">{store.name}</h3>
 
-                  {store.address && (
-                    <p className="sp-card-addr">Manzil: {store.address}</p>
-                  )}
+                    <div className="sp-store-meta">
+                      {store.rating > 0 && (
+                        <span className="sp-meta-item sp-store-rating">
+                          <Star size={12} fill="#FBBF24" color="#FBBF24" strokeWidth={0} />
+                          {store.rating.toFixed(1)}
+                        </span>
+                      )}
+                      {meta.label && <span className="sp-meta-item">{meta.label}</span>}
+                      {etaLabel && <span className="sp-meta-item">{etaLabel}</span>}
+                      {distanceLabel && <span className="sp-meta-item">{distanceLabel}</span>}
+                    </div>
 
-                  <div className="sp-card-footer">
-                    {store.distance != null && (
-                      <span className="sp-card-distance">
-                        Masofa: {store.distance.toFixed(1)} km
-                      </span>
-                    )}
-                    {store.rating > 0 && (
-                      <span className="sp-card-rating">
-                        Reyting: {store.rating.toFixed(1)}
-                      </span>
-                    )}
-                    {store.delivery_enabled && (
-                      <span className="sp-card-delivery">Yetkazib</span>
-                    )}
+                    <div className="sp-store-footer">
+                      <div className="sp-store-price">
+                        {showOldPrice && (
+                          <span className="sp-store-price-old">{formatCurrency(oldPriceValue)} so'm</span>
+                        )}
+                        {priceValue > 0 ? (
+                          <div className="sp-store-price-current">
+                            <span className="sp-store-price-amount">{formatCurrency(priceValue)}</span>
+                            <span className="sp-store-price-unit">so'm</span>
+                          </div>
+                        ) : (
+                          <span className="sp-store-price-placeholder">-- ---</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className={`sp-store-action ${!hasOffers ? 'is-disabled' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (hasOffers) {
+                            loadStoreOffers(store)
+                          }
+                        }}
+                        disabled={!hasOffers}
+                      >
+                        {hasOffers ? (
+                          <>
+                            <ShoppingBag size={14} strokeWidth={2} />
+                            Savatga qo'shish
+                          </>
+                        ) : (
+                          <>
+                            <Bell size={14} strokeWidth={2} />
+                            Xabar berish
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                </div>
+                </article>
               )
             })}
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Bottom Sheet Modal */}
       {selectedStore && (
         <div className="sp-overlay" onClick={closeModal}>
-          <div className="sp-sheet" onClick={e => e.stopPropagation()}>
-            {/* Drag Handle */}
+          <div className="sp-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sp-sheet-handle"></div>
 
-            {/* Header */}
             <div className="sp-sheet-header">
               <div className="sp-sheet-info">
                 {(() => {
-                  const IconComponent = getTypeIcon(selectedStore.business_type)
+                  const meta = BUSINESS_META[selectedStore.business_type] || {}
+                  const IconComponent = meta.icon || Store
                   return <IconComponent size={24} strokeWidth={2} className="sp-sheet-icon" aria-hidden="true" />
                 })()}
                 <div>
@@ -469,12 +612,11 @@ function StoresPage() {
               </div>
               <button className="sp-sheet-close" onClick={closeModal}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
 
-            {/* Tabs */}
             <div className="sp-sheet-tabs">
               <button
                 className={`sp-sheet-tab ${activeTab === 'offers' ? 'active' : ''}`}
@@ -490,7 +632,6 @@ function StoresPage() {
               </button>
             </div>
 
-            {/* Body */}
             <div className="sp-sheet-body">
               {loadingOffers ? (
                 <div className="sp-sheet-loading">
@@ -510,9 +651,8 @@ function StoresPage() {
                       <span>({storeOffers.length})</span>
                     </h3>
                     <div className="sp-offers">
-                      {storeOffers.map(offer => {
+                      {storeOffers.map((offer) => {
                         const imgUrl = resolveOfferImageUrl(offer)
-                        // Calculate discount percent if not provided
                         let discountPercent = 0
                         if (offer.discount_percent) {
                           discountPercent = Math.round(offer.discount_percent)
@@ -527,53 +667,52 @@ function StoresPage() {
                             onClick={() => handleOfferClick(offer)}
                           >
                             <div className="sp-offer-img">
-                            {imgUrl ? (
-                              <img
-                                src={imgUrl}
-                                alt=""
-                                loading="lazy"
-                                decoding="async"
-                                onError={(e) => {
-                                  e.target.style.display = 'none'
-                                  e.target.nextSibling.style.display = 'flex'
-                                }}
-                              />
-                            ) : null}
-                            <div className="sp-offer-placeholder" style={{ display: imgUrl ? 'none' : 'flex' }}>
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#ccc" strokeWidth="1.5"/>
-                                <circle cx="8.5" cy="8.5" r="1.5" fill="#ccc"/>
-                                <path d="M21 15l-5-5L5 21" stroke="#ccc" strokeWidth="1.5"/>
-                              </svg>
+                              {imgUrl ? (
+                                <img
+                                  src={imgUrl}
+                                  alt=""
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    e.target.style.display = 'none'
+                                    e.target.nextSibling.style.display = 'flex'
+                                  }}
+                                />
+                              ) : null}
+                              <div className="sp-offer-placeholder" style={{ display: imgUrl ? 'none' : 'flex' }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="#ccc" strokeWidth="1.5" />
+                                  <circle cx="8.5" cy="8.5" r="1.5" fill="#ccc" />
+                                  <path d="M21 15l-5-5L5 21" stroke="#ccc" strokeWidth="1.5" />
+                                </svg>
+                              </div>
                             </div>
-                          </div>
-                          <div className="sp-offer-info">
-                            <h4>{offer.title}</h4>
-                            <div className="sp-offer-price">
-                              <span className="sp-offer-current">
-                                {Math.round(offer.discount_price).toLocaleString()} so'm
-                              </span>
-                              {offer.original_price > offer.discount_price && (
-                                <span className="sp-offer-old">
-                                  {Math.round(offer.original_price).toLocaleString()}
+                            <div className="sp-offer-info">
+                              <h4>{offer.title}</h4>
+                              <div className="sp-offer-price">
+                                <span className="sp-offer-current">
+                                  {Math.round(offer.discount_price).toLocaleString()} so'm
                                 </span>
-                              )}
-                              {discountPercent > 0 && (
-                                <span className="sp-offer-badge">-{discountPercent}%</span>
-                              )}
+                                {offer.original_price > offer.discount_price && (
+                                  <span className="sp-offer-old">
+                                    {Math.round(offer.original_price).toLocaleString()}
+                                  </span>
+                                )}
+                                {discountPercent > 0 && (
+                                  <span className="sp-offer-badge">-{discountPercent}%</span>
+                                )}
+                              </div>
                             </div>
+                            <svg className="sp-offer-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                              <path d="M9 18l6-6-6-6" stroke="#999" strokeWidth="2" strokeLinecap="round" />
+                            </svg>
                           </div>
-                          <svg className="sp-offer-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none">
-                            <path d="M9 18l6-6-6-6" stroke="#999" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
+                        )
+                      })}
+                    </div>
+                  </>
                 )
               ) : (
-                // Reviews tab
                 storeReviews.reviews.length === 0 ? (
                   <div className="sp-sheet-empty">
                     <Star size={48} color="#FFB800" strokeWidth={2} aria-hidden="true" />
@@ -606,7 +745,6 @@ function StoresPage() {
               )}
             </div>
 
-            {/* Footer */}
             {storeOffers.length > 0 && (
               <div className="sp-sheet-footer">
                 <button
@@ -618,7 +756,7 @@ function StoresPage() {
                 >
                   Barcha mahsulotlarni ko'rish
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
               </div>
