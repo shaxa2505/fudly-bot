@@ -108,7 +108,7 @@
   padding: 4px 8px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.9);
-  color: #1F2937;
+  color: #1E293B;
   font-size: 10px;
   font-weight: 700;
   backdrop-filter: blur(12px);
@@ -216,7 +216,7 @@
 }
 
 .offer-rating-row svg {
-  color: #F59E0B;
+  color: #FBBF24;
 }
 
 .offer-rating-location {
