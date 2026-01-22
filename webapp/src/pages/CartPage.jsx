@@ -1387,7 +1387,6 @@ function CartPage({ user }) {
                             className="checkout-map-search-input"
                             placeholder="Manzilni qidiring"
                             value={mapQuery}
-                            ref={addressInputRef}
                             onChange={(event) => {
                               const nextValue = event.target.value
                               setMapQuery(nextValue)
@@ -1420,7 +1419,7 @@ function CartPage({ user }) {
                         {mapEnabled && mapSearchOpen && mapQuery.trim().length >= 3 && (
                           <div
                             className="checkout-map-search-results"
-                            onMouseDown={(event) => event.preventDefault()}
+                            onPointerDown={(event) => event.preventDefault()}
                           >
                             {mapSearchResults.length === 0 && !mapSearchLoading && (
                               <button
@@ -1471,10 +1470,33 @@ function CartPage({ user }) {
                       </div>
                       <div className="checkout-address-body">
                         <input
+                          ref={addressInputRef}
                           className="checkout-address-title"
                           placeholder="Manzilni kiriting"
                           value={address}
-                          onChange={e => setAddress(e.target.value)}
+                          onChange={(event) => {
+                            const nextValue = event.target.value
+                            setAddress(nextValue)
+                            setMapQuery(nextValue)
+                            if (!mapSearchOpen) {
+                              setMapSearchOpen(true)
+                            }
+                          }}
+                          onFocus={() => {
+                            if (mapSearchCloseTimeoutRef.current) {
+                              clearTimeout(mapSearchCloseTimeoutRef.current)
+                              mapSearchCloseTimeoutRef.current = null
+                            }
+                            setMapSearchOpen(true)
+                          }}
+                          onBlur={() => {
+                            if (mapSearchCloseTimeoutRef.current) {
+                              clearTimeout(mapSearchCloseTimeoutRef.current)
+                            }
+                            mapSearchCloseTimeoutRef.current = setTimeout(() => {
+                              setMapSearchOpen(false)
+                            }, 180)
+                          }}
                           onKeyDown={blurOnEnter}
                           disabled={orderType !== 'delivery'}
                         />

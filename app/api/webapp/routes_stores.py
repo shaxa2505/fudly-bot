@@ -60,13 +60,21 @@ async def get_stores(
             scopes.append((None, None, None))
 
         seen: set[tuple[str | None, str | None, str | None]] = set()
+        seen_ids: set[int] = set()
         for scope in scopes:
             if scope in seen:
                 continue
             seen.add(scope)
-            raw_stores = _fetch_scoped_stores(*scope)
-            if raw_stores:
-                break
+            scoped_stores = _fetch_scoped_stores(*scope) or []
+            if not scoped_stores:
+                continue
+            for store in scoped_stores:
+                store_id = int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0)
+                if store_id and store_id in seen_ids:
+                    continue
+                if store_id:
+                    seen_ids.add(store_id)
+                raw_stores.append(store)
 
         if (
             not raw_stores

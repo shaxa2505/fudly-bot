@@ -260,16 +260,22 @@ class StoreMixin:
                 if condition:
                     query += f" AND {condition}"
                     params.extend(condition_params)
+            location_variants = (
+                self._get_location_variants
+                if hasattr(self, "_get_location_variants")
+                else self._get_city_variants
+            )
+
             if region:
                 condition, condition_params = self._build_location_filter(
-                    region, "region", "s", self._get_city_variants
+                    region, "region", "s", location_variants
                 )
                 if condition:
                     query += f" AND {condition}"
                     params.extend(condition_params)
             if district:
                 condition, condition_params = self._build_location_filter(
-                    district, "district", "s", self._get_city_variants
+                    district, "district", "s", location_variants
                 )
                 if condition:
                     query += f" AND {condition}"
