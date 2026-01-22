@@ -19,6 +19,7 @@ import {
   getSavedLocation,
   getLatinCity,
   getCyrillicCity,
+  normalizeLocationName,
   saveLocation,
   buildLocationFromReverseGeocode,
 } from '../utils/cityUtils'
@@ -43,6 +44,51 @@ const BUSINESS_META = {
   restaurant: { label: 'Restoran', icon: Utensils },
   bakery: { label: 'Nonvoyxona', icon: Croissant },
   grocery: { label: 'Oziq-ovqat', icon: Salad },
+}
+
+const CITY_CENTERS = {
+  toshkent: { lat: 41.3111, lon: 69.2797 },
+  tashkent: { lat: 41.3111, lon: 69.2797 },
+  samarqand: { lat: 39.6542, lon: 66.9597 },
+  samarkand: { lat: 39.6542, lon: 66.9597 },
+  buxoro: { lat: 39.7670, lon: 64.4230 },
+  bukhara: { lat: 39.7670, lon: 64.4230 },
+  "farg'ona": { lat: 40.3894, lon: 71.7843 },
+  fargona: { lat: 40.3894, lon: 71.7843 },
+  fergana: { lat: 40.3894, lon: 71.7843 },
+  andijon: { lat: 40.7821, lon: 72.3442 },
+  andijan: { lat: 40.7821, lon: 72.3442 },
+  namangan: { lat: 40.9983, lon: 71.6726 },
+  navoiy: { lat: 40.1039, lon: 65.3688 },
+  navoi: { lat: 40.1039, lon: 65.3688 },
+  qarshi: { lat: 38.8606, lon: 65.7891 },
+  karshi: { lat: 38.8606, lon: 65.7891 },
+  nukus: { lat: 42.4531, lon: 59.6103 },
+  urganch: { lat: 41.5506, lon: 60.6319 },
+  urgench: { lat: 41.5506, lon: 60.6319 },
+  jizzax: { lat: 40.1269, lon: 67.8283 },
+  jizzakh: { lat: 40.1269, lon: 67.8283 },
+  termiz: { lat: 37.2242, lon: 67.2783 },
+  termez: { lat: 37.2242, lon: 67.2783 },
+  guliston: { lat: 40.4897, lon: 68.7840 },
+  gulistan: { lat: 40.4897, lon: 68.7840 },
+  chirchiq: { lat: 41.4689, lon: 69.5822 },
+  chirchik: { lat: 41.4689, lon: 69.5822 },
+  "kattaqo'rg'on": { lat: 39.8983, lon: 66.2565 },
+  kattakurgan: { lat: 39.8983, lon: 66.2565 },
+  kattaqurgan: { lat: 39.8983, lon: 66.2565 },
+  olmaliq: { lat: 40.8460, lon: 69.5995 },
+  angren: { lat: 41.0169, lon: 70.1436 },
+  bekobod: { lat: 40.2204, lon: 69.2701 },
+  bekabad: { lat: 40.2204, lon: 69.2701 },
+  shahrisabz: { lat: 39.0578, lon: 66.8345 },
+  "marg'ilon": { lat: 40.4724, lon: 71.7246 },
+  margilan: { lat: 40.4724, lon: 71.7246 },
+  "qo'qon": { lat: 40.5286, lon: 70.9421 },
+  qoqon: { lat: 40.5286, lon: 70.9421 },
+  kokand: { lat: 40.5286, lon: 70.9421 },
+  xiva: { lat: 41.3783, lon: 60.3639 },
+  khiva: { lat: 41.3783, lon: 60.3639 },
 }
 
 
@@ -142,6 +188,10 @@ function StoresPage() {
   const districtRaw = location.district || ''
   const activeChip = FILTER_CHIPS.find((chip) => chip.id === activeFilter)
   const activeBusinessType = activeChip?.businessType || 'all'
+  const normalizedCityKey = normalizeLocationName(cityLatin).toLowerCase()
+  const fallbackCenter = location?.coordinates?.lat != null && location?.coordinates?.lon != null
+    ? { lat: location.coordinates.lat, lon: location.coordinates.lon }
+    : CITY_CENTERS[normalizedCityKey] || null
 
   useEffect(() => {
     loadStores()
@@ -475,6 +525,10 @@ function StoresPage() {
             <StoreMap
               stores={visibleStores}
               userLocation={userLocation}
+              fallbackCenter={fallbackCenter}
+              cityLabel={cityLatin}
+              onRequestLocation={requestLocation}
+              locationLoading={locationLoading}
               onStoreSelect={loadStoreOffers}
               lang="uz"
             />
