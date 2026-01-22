@@ -18,6 +18,46 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
   const [error, setError] = useState(null);
 
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
+  const toNumber = (value) => {
+    if (value == null) return null;
+    const raw = typeof value === 'string'
+      ? value.replace(',', '.').trim()
+      : value;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const resolveCoords = (store) => {
+    if (!store) return null;
+    const lat = toNumber(
+      store.latitude ??
+      store.lat ??
+      store.coordinates?.lat ??
+      store.location?.lat ??
+      store.geo?.lat ??
+      store.coord_lat ??
+      store.coordLat ??
+      store.y
+    );
+    const lon = toNumber(
+      store.longitude ??
+      store.lon ??
+      store.lng ??
+      store.long ??
+      store.coordinates?.lon ??
+      store.location?.lon ??
+      store.geo?.lon ??
+      store.coord_lon ??
+      store.coordLon ??
+      store.x
+    );
+    if (lat == null || lon == null) return null;
+    return { lat, lon };
+  };
+  const normalizedStores = stores.map((store) => {
+    const coords = resolveCoords(store);
+    if (!coords) return store;
+    return { ...store, latitude: coords.lat, longitude: coords.lon };
+  });
 
   // Load Leaflet from CDN
   useEffect(() => {
@@ -91,8 +131,8 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     }
 
     // Add store markers
-    stores.forEach((store) => {
-      if (!store.latitude || !store.longitude) return;
+    normalizedStores.forEach((store) => {
+      if (store.latitude == null || store.longitude == null) return;
 
       const storeIcon = L.divIcon({
         className: 'store-marker',
@@ -128,8 +168,8 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     };
 
     // Fit bounds if we have stores
-    if (stores.length > 0) {
-      const validStores = stores.filter(s => s.latitude && s.longitude);
+    if (normalizedStores.length > 0) {
+      const validStores = normalizedStores.filter(s => s.latitude != null && s.longitude != null);
       if (validStores.length > 0) {
         const bounds = L.latLngBounds(
           validStores.map(s => [s.latitude, s.longitude])
@@ -144,7 +184,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     return () => {
       window.selectStore = undefined;
     };
-  }, [mapLoaded, stores, userLocation, onStoreSelect, t]);
+  }, [mapLoaded, normalizedStores, stores, userLocation, onStoreSelect, t]);
 
   // Update markers when stores change
   useEffect(() => {
@@ -161,8 +201,8 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     });
 
     // Add new store markers
-    stores.forEach((store) => {
-      if (!store.latitude || !store.longitude) return;
+    normalizedStores.forEach((store) => {
+      if (store.latitude == null || store.longitude == null) return;
 
       const storeIcon = L.divIcon({
         className: 'store-marker',
@@ -188,10 +228,10 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
         .addTo(map)
         .bindPopup(popupContent);
     });
-  }, [stores]);
+  }, [normalizedStores]);
 
   // Count stores with coordinates
-  const storesWithCoords = stores.filter(s => s.latitude && s.longitude);
+  const storesWithCoords = normalizedStores.filter(s => s.latitude != null && s.longitude != null);
 
   if (error) {
     return (
@@ -226,12 +266,12 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
             <h3>{t('Ближайшие магазины', 'Yaqin do\'konlar')} ({stores.length})</h3>
           </div>
           <div className="store-list-scroll">
-            {stores.slice(0, 5).map((store) => (
+            {normalizedStores.slice(0, 5).map((store) => (
               <div
                 key={store.id}
                 className="store-list-item"
                 onClick={() => {
-                  if (mapInstance.current && store.latitude && store.longitude) {
+                  if (mapInstance.current && store.latitude != null && store.longitude != null) {
                     mapInstance.current.flyTo([store.latitude, store.longitude], 15);
                   }
                   if (onStoreSelect) onStoreSelect(store);

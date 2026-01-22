@@ -12,6 +12,9 @@ import {
   ShoppingBag,
   Bell,
   Search,
+  MapPin,
+  Phone,
+  Clock,
 } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -45,7 +48,6 @@ const BUSINESS_META = {
   grocery: { label: 'Oziq-ovqat', icon: Salad },
 }
 
-const formatCurrency = (value) => Math.round(value).toLocaleString('ru-RU')
 
 const getEtaLabel = (distance) => {
   if (distance == null) return ''
@@ -462,12 +464,22 @@ function StoresPage() {
               const distanceLabel =
                 store.distance != null ? `${store.distance.toFixed(1)} km` : ''
               const isFavorite = favoriteIds.has(store.id)
-              const priceValue = Number(store.min_order_amount || 0)
-              const oldPriceValue = Number(store.delivery_price || 0)
-                ? priceValue + Number(store.delivery_price || 0)
-                : 0
-              const showOldPrice = oldPriceValue > priceValue && priceValue > 0
               const hasOffers = Number(store.offers_count || 0) > 0
+              const addressLabel = store.address || store.full_address || store.location || ''
+              const phoneLabel =
+                store.phone ||
+                store.phone_number ||
+                store.contact_phone ||
+                store.contactPhone ||
+                store.manager_phone ||
+                ''
+              const hoursLabel =
+                store.working_hours ||
+                store.work_time ||
+                (store.open_time && store.close_time
+                  ? `${store.open_time} - ${store.close_time}`
+                  : '')
+              const deliveryLabel = store.delivery_enabled ? 'Yetkazib berish' : "O'zi olib ketish"
 
               return (
                 <article
@@ -536,20 +548,30 @@ function StoresPage() {
                       {distanceLabel && <span className="sp-meta-item">{distanceLabel}</span>}
                     </div>
 
+                    <div className="sp-store-info">
+                      <span className="sp-info-item">
+                        <MapPin size={14} strokeWidth={2} />
+                        {addressLabel || "Manzil ko'rsatilmagan"}
+                      </span>
+                      {phoneLabel && (
+                        <span className="sp-info-item">
+                          <Phone size={14} strokeWidth={2} />
+                          {phoneLabel}
+                        </span>
+                      )}
+                      {hoursLabel && (
+                        <span className="sp-info-item">
+                          <Clock size={14} strokeWidth={2} />
+                          {hoursLabel}
+                        </span>
+                      )}
+                      <span className="sp-info-item">
+                        <span className="sp-info-dot" aria-hidden="true"></span>
+                        {deliveryLabel}
+                      </span>
+                    </div>
+
                     <div className="sp-store-footer">
-                      <div className="sp-store-price">
-                        {showOldPrice && (
-                          <span className="sp-store-price-old">{formatCurrency(oldPriceValue)} so'm</span>
-                        )}
-                        {priceValue > 0 ? (
-                          <div className="sp-store-price-current">
-                            <span className="sp-store-price-amount">{formatCurrency(priceValue)}</span>
-                            <span className="sp-store-price-unit">so'm</span>
-                          </div>
-                        ) : (
-                          <span className="sp-store-price-placeholder">-- ---</span>
-                        )}
-                      </div>
                       <button
                         type="button"
                         className={`sp-store-action ${!hasOffers ? 'is-disabled' : ''}`}
@@ -564,7 +586,7 @@ function StoresPage() {
                         {hasOffers ? (
                           <>
                             <ShoppingBag size={14} strokeWidth={2} />
-                            Savatga qo'shish
+                            Do'konni ko'rish
                           </>
                         ) : (
                           <>
