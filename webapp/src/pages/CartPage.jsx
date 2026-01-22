@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, Trash2, Plus, Minus } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -720,23 +720,18 @@ function CartPage({ user }) {
       <div className="cart-page cart-page--empty">
         <header className="cart-header">
           <div className="cart-header-inner">
-            <button
-              className="cart-header-back"
-              type="button"
-              onClick={() => navigate(-1)}
-              aria-label="Orqaga"
-            >
-              <ChevronLeft size={18} strokeWidth={2} />
-            </button>
-            <h1 className="cart-header-title">Savat</h1>
-            <button
-              className="cart-header-clear"
-              type="button"
-              onClick={handleClearCart}
-              disabled
-            >
-              Tozalash
-            </button>
+            <div className="cart-header-center">
+              <h1 className="cart-header-title">Savat</h1>
+              <button
+                className="cart-header-clear"
+                type="button"
+                onClick={handleClearCart}
+                aria-label="Savatni tozalash"
+                disabled
+              >
+                <Trash2 size={18} strokeWidth={1.8} />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -771,22 +766,17 @@ function CartPage({ user }) {
     <div className="cart-page">
       <header className="cart-header">
         <div className="cart-header-inner">
-          <button
-            className="cart-header-back"
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label="Orqaga"
-          >
-            <ChevronLeft size={18} strokeWidth={2} />
-          </button>
-          <h1 className="cart-header-title">Savat</h1>
-          <button
-            className="cart-header-clear"
-            type="button"
-            onClick={handleClearCart}
-          >
-            Tozalash
-          </button>
+          <div className="cart-header-center">
+            <h1 className="cart-header-title">Savat</h1>
+            <button
+              className="cart-header-clear"
+              type="button"
+              onClick={handleClearCart}
+              aria-label="Savatni tozalash"
+            >
+              <Trash2 size={18} strokeWidth={1.8} />
+            </button>
+          </div>
         </div>
       </header>
 

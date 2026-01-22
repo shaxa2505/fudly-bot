@@ -96,8 +96,10 @@ export const CITY_TRANSLATIONS = {
 }
 
 const CYRILLIC_RE = /[\u0400-\u04FF]/
+const APOSTROPHE_RE = /[\u2018\u2019\u02BB\u02BC\u2032\u2035\u00B4\u0060]/g
 
 const hasCyrillic = (value) => CYRILLIC_RE.test(String(value || ''))
+const normalizeApostrophes = (value) => String(value || '').replace(APOSTROPHE_RE, "'")
 
 const LOCATION_SUFFIXES = [
   'shahri',
@@ -124,7 +126,7 @@ const LOCATION_SUFFIXES = [
 
 export const normalizeLocationName = (value) => {
   if (!value) return ''
-  let cleaned = String(value).trim()
+  let cleaned = normalizeApostrophes(String(value).trim())
   cleaned = cleaned.replace(/\s*\([^)]*\)/g, '')
   const suffixPattern = new RegExp(`\\s+(?:${LOCATION_SUFFIXES.join('|')})\\b`, 'gi')
   cleaned = cleaned.replace(suffixPattern, '')

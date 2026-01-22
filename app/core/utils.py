@@ -82,6 +82,7 @@ _CITY_SUFFIX_RE = re.compile(
     r"|город|г\.|район|районы|область|области|обл\.|шахри|шахар|тумани|туман|вилояти|вилоят)\b",
     re.IGNORECASE,
 )
+_APOSTROPHE_RE = re.compile(r"[\u2018\u2019\u02BB\u02BC\u2032\u2035\u00B4\u0060]")
 
 
 def _contains_cyrillic(text: str) -> bool:
@@ -317,6 +318,7 @@ def normalize_city(city: str) -> str:
     if not isinstance(city, str):
         city = str(city)
     city_clean = " ".join(city.strip().split())
+    city_clean = _APOSTROPHE_RE.sub("'", city_clean)
     city_clean = city_clean.split(",")[0]
     city_clean = re.sub(r"\s*\([^)]*\)", "", city_clean)
     city_clean = _CITY_SUFFIX_RE.sub("", city_clean).strip(" ,")
