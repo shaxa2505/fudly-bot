@@ -86,7 +86,7 @@
   box-shadow: none;
 }
 
-.header-location-block {
+.header-title {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -98,10 +98,13 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
+  padding-top: 2px;
   width: max-content;
 }
 
 .header-location-label {
+  display: block;
+  text-align: center;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -109,7 +112,6 @@
   color: var(--home-text-muted);
   line-height: 1;
   margin-top: 0;
-  transform: translateY(2px);
 }
 
 .header-location {

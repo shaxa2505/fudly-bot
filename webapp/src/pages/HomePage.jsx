@@ -956,7 +956,7 @@ function HomePage() {
       {/* Header */}
       <header className="header">
         <div className="header-top">
-          <div className="header-location-block">
+          <div className="header-title">
             <span className="header-location-label">Manzil</span>
             <button className="header-location" onClick={openAddressModal}>
               <span className="header-location-city-name">{cityLabel}</span>
