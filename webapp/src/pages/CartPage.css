@@ -2300,6 +2300,7 @@
   right: 10px;
   max-height: 160px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background: #FFFFFF;
   border-radius: 12px;
   border: 1px solid #E6E8EF;

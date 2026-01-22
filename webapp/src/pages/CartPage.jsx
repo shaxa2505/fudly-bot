@@ -138,7 +138,10 @@ function CartPage({ user }) {
   const mapEnabled = showCheckout && orderType === 'delivery'
 
   useEffect(() => {
-    if (!mapEnabled) return
+    if (!mapEnabled) {
+      setMapSearchOpen(false)
+      return
+    }
     setMapError('')
     setMapResolving(false)
   }, [mapEnabled])
@@ -635,6 +638,7 @@ function CartPage({ user }) {
     setShowCheckout(false)
     setShowPaymentSheet(false)
     setOrderTypeTouched(false)
+    setMapSearchOpen(false)
   }
 
   // Open the file picker synchronously on user click (iOS Safari safe).
@@ -727,6 +731,7 @@ function CartPage({ user }) {
     }
     setOrderType(autoOrderType)
     setOrderTypeTouched(false)
+    setMapSearchOpen(false)
     setCheckoutStep('details')
     setShowCheckout(true)
   }
@@ -1382,6 +1387,7 @@ function CartPage({ user }) {
                             className="checkout-map-search-input"
                             placeholder="Manzilni qidiring"
                             value={mapQuery}
+                            ref={addressInputRef}
                             onChange={(event) => {
                               const nextValue = event.target.value
                               setMapQuery(nextValue)
@@ -1407,11 +1413,11 @@ function CartPage({ user }) {
                             }}
                             disabled={!mapEnabled}
                           />
-                          {mapSearchLoading && mapSearchOpen && (
+                          {mapSearchLoading && mapSearchOpen && mapEnabled && (
                             <span className="checkout-map-search-loading">Izlanmoqda...</span>
                           )}
                         </div>
-                        {mapSearchOpen && mapQuery.trim().length >= 3 && (
+                        {mapEnabled && mapSearchOpen && mapQuery.trim().length >= 3 && (
                           <div
                             className="checkout-map-search-results"
                             onMouseDown={(event) => event.preventDefault()}
@@ -1465,7 +1471,6 @@ function CartPage({ user }) {
                       </div>
                       <div className="checkout-address-body">
                         <input
-                          ref={addressInputRef}
                           className="checkout-address-title"
                           placeholder="Manzilni kiriting"
                           value={address}
