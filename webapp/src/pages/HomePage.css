@@ -39,10 +39,10 @@
   scrollbar-gutter: stable;
   scroll-behavior: smooth;
   touch-action: pan-y;
-  --home-topbar-height: 40px;
-  --home-topbar-gap: 10px;
+  --home-topbar-height: 36px;
+  --home-topbar-gap: 6px;
   --home-top-inset: max(
-    8px,
+    6px,
     var(--safe-area-top-raw, 0px),
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--home-topbar-height)) / 2)
   );
@@ -95,7 +95,7 @@
   align-items: center;
   text-align: center;
   margin: 0 auto;
-  max-width: calc(100% - 120px);
+  max-width: calc(100% - 160px);
 }
 
 .header-location-label {
@@ -114,8 +114,9 @@
   gap: 6px;
   background: transparent;
   border: none;
-  padding: 0 16px 0 0;
+  padding: 0 14px 0 0;
   margin: 0;
+  margin-top: -2px;
   cursor: pointer;
   text-align: center;
   -webkit-tap-highlight-color: transparent;

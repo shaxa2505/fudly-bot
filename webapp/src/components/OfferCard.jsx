@@ -42,6 +42,8 @@ const OfferCard = memo(function OfferCard({
     offer.store_title ||
     offer.storeTitle ||
     ''
+  const normalizeText = (value) => String(value || '').trim()
+  const storeNameNormalized = normalizeText(storeName).toLowerCase()
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -92,14 +94,25 @@ const OfferCard = memo(function OfferCard({
     const rangeMatch = rawPickup.match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/)
     timeRange = rangeMatch ? `${rangeMatch[1]} - ${rangeMatch[2]}` : rawPickup
   }
-  const productTitle =
-    offer.title ||
-    offer.product_name ||
-    offer.productTitle ||
-    offer.product ||
-    'Mahsulot'
+  const titleCandidates = [
+    offer.title,
+    offer.product_name,
+    offer.productTitle,
+    offer.product,
+    offer.item_name,
+    offer.itemTitle,
+    offer.item,
+    offer.name,
+    offer.description,
+  ]
+  const productTitle = titleCandidates.find((candidate) => {
+    const normalized = normalizeText(candidate)
+    if (!normalized) return false
+    if (storeNameNormalized && normalized.toLowerCase() === storeNameNormalized) return false
+    return true
+  }) || 'Mahsulot'
   const titleText = productTitle
-  const showStoreName = Boolean(storeName && storeName !== titleText)
+  const showStoreName = Boolean(storeNameNormalized && storeNameNormalized !== normalizeText(titleText).toLowerCase())
   const ratingValue = Number(
     offer.store_rating ??
     offer.rating ??

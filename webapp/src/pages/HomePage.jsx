@@ -509,18 +509,43 @@ function HomePage() {
         params.sort_by = 'urgent'
       }
 
-      const data = await api.getOffers(params, { force })
-      const items = Array.isArray(data?.items)
+      let data = await api.getOffers(params, { force })
+      let items = Array.isArray(data?.items)
         ? data.items
         : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
       let total = Number.isFinite(data?.total) ? data.total : null
       if (total === 0 && items.length > 0) {
         total = null
       }
-      const hasMoreResult = typeof data?.has_more === 'boolean'
+      let hasMoreResult = typeof data?.has_more === 'boolean'
         ? data.has_more
         : items.length === OFFERS_LIMIT
-      const nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
+      let nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
+
+      if (
+        trimmedSearchValue &&
+        items.length === 0 &&
+        (params.city || params.region || params.district || params.lat || params.lon)
+      ) {
+        const fallbackParams = { ...params }
+        delete fallbackParams.city
+        delete fallbackParams.region
+        delete fallbackParams.district
+        delete fallbackParams.lat
+        delete fallbackParams.lon
+        data = await api.getOffers(fallbackParams, { force: true })
+        items = Array.isArray(data?.items)
+          ? data.items
+          : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
+        total = Number.isFinite(data?.total) ? data.total : null
+        if (total === 0 && items.length > 0) {
+          total = null
+        }
+        hasMoreResult = typeof data?.has_more === 'boolean'
+          ? data.has_more
+          : items.length === OFFERS_LIMIT
+        nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
+      }
 
       if (requestId !== latestRequestRef.current) {
         return

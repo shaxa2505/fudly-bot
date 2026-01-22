@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, ChevronLeft, Trash2, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
 import { getCurrentUser } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
+import { buildLocationFromReverseGeocode, saveLocation } from '../utils/cityUtils'
+import { getCurrentLocation } from '../utils/geolocation'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -71,6 +73,214 @@ function CartPage({ user }) {
     }
   })
   const [storeOffers, setStoreOffers] = useState([])
+  const checkoutMapRef = useRef(null)
+  const checkoutMapInstanceRef = useRef(null)
+  const mapResolveTimeoutRef = useRef(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState('')
+  const [mapResolving, setMapResolving] = useState(false)
+  const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
+  const DEFAULT_MAP_CENTER = { lat: 41.2995, lon: 69.2401 }
+
+  const getSavedCoordinates = useCallback(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('fudly_location') || '{}')
+      const coords = saved?.coordinates
+      if (coords?.lat != null && coords?.lon != null) {
+        return { lat: coords.lat, lon: coords.lon }
+      }
+    } catch {
+      return null
+    }
+    return null
+  }, [])
+
+  const saveCoordsFallback = useCallback((lat, lon) => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('fudly_location') || '{}')
+      saveLocation({
+        ...saved,
+        coordinates: { lat, lon },
+        source: saved?.source || 'geo',
+      })
+    } catch {
+      saveLocation({ coordinates: { lat, lon }, source: 'geo' })
+    }
+  }, [])
+
+  const updateAddressFromCoords = useCallback(async (lat, lon) => {
+    setMapResolving(true)
+    setMapError('')
+    try {
+      const data = await api.reverseGeocode(lat, lon, 'uz')
+      const resolved = buildLocationFromReverseGeocode(data, lat, lon)
+      if (resolved?.address) {
+        setAddress(resolved.address)
+      }
+      saveLocation(resolved)
+    } catch (error) {
+      console.error('Reverse geocode error:', error)
+      setMapError('Manzilni aniqlab bo\'lmadi')
+      saveCoordsFallback(lat, lon)
+    } finally {
+      setMapResolving(false)
+    }
+  }, [saveCoordsFallback])
+
+  const mapEnabled = showCheckout && orderType === 'delivery'
+
+  useEffect(() => {
+    if (!mapEnabled) return
+    setMapError('')
+    setMapResolving(false)
+  }, [mapEnabled])
+
+  useEffect(() => {
+    if (!mapEnabled) return
+    if (window.L) {
+      setMapLoaded(true)
+      return
+    }
+
+    let isActive = true
+    const cssHref = `${LEAFLET_CDN}/leaflet.css`
+    if (!document.querySelector(`link[href="${cssHref}"]`)) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = cssHref
+      document.head.appendChild(link)
+    }
+
+    const scriptSrc = `${LEAFLET_CDN}/leaflet.js`
+    const existingScript = document.querySelector(`script[src="${scriptSrc}"]`)
+    const handleLoad = () => {
+      if (!isActive) return
+      setMapLoaded(true)
+    }
+    const handleError = () => {
+      if (!isActive) return
+      setMapError('Xarita yuklanmadi')
+    }
+
+    if (existingScript) {
+      existingScript.addEventListener('load', handleLoad)
+      existingScript.addEventListener('error', handleError)
+      return () => {
+        isActive = false
+        existingScript.removeEventListener('load', handleLoad)
+        existingScript.removeEventListener('error', handleError)
+      }
+    }
+
+    const script = document.createElement('script')
+    script.src = scriptSrc
+    script.async = true
+    script.onload = handleLoad
+    script.onerror = handleError
+    document.body.appendChild(script)
+
+    return () => {
+      isActive = false
+    }
+  }, [LEAFLET_CDN, mapEnabled])
+
+  useEffect(() => {
+    if (!mapEnabled) {
+      if (checkoutMapInstanceRef.current) {
+        checkoutMapInstanceRef.current.remove()
+        checkoutMapInstanceRef.current = null
+      }
+      if (mapResolveTimeoutRef.current) {
+        clearTimeout(mapResolveTimeoutRef.current)
+        mapResolveTimeoutRef.current = null
+      }
+      return
+    }
+
+    if (!mapLoaded || !checkoutMapRef.current || checkoutMapInstanceRef.current) {
+      if (checkoutMapInstanceRef.current) {
+        checkoutMapInstanceRef.current.invalidateSize()
+      }
+      return
+    }
+
+    const L = window.L
+    if (!L) return
+
+    const savedCoords = getSavedCoordinates()
+    const startLat = savedCoords?.lat ?? DEFAULT_MAP_CENTER.lat
+    const startLon = savedCoords?.lon ?? DEFAULT_MAP_CENTER.lon
+    const startZoom = savedCoords ? 16 : 12
+
+    const map = L.map(checkoutMapRef.current, {
+      center: [startLat, startLon],
+      zoom: startZoom,
+      zoomControl: false,
+      attributionControl: false,
+    })
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map)
+
+    checkoutMapInstanceRef.current = map
+
+    const scheduleResolve = (lat, lon) => {
+      if (mapResolveTimeoutRef.current) {
+        clearTimeout(mapResolveTimeoutRef.current)
+      }
+      mapResolveTimeoutRef.current = setTimeout(() => {
+        updateAddressFromCoords(lat, lon)
+      }, 300)
+    }
+
+    const handleMoveEnd = () => {
+      const center = map.getCenter()
+      scheduleResolve(center.lat, center.lng)
+    }
+
+    map.on('moveend', handleMoveEnd)
+    map.on('click', (event) => {
+      map.panTo(event.latlng)
+    })
+
+    if (savedCoords && !address.trim()) {
+      scheduleResolve(savedCoords.lat, savedCoords.lon)
+    }
+
+    if (!savedCoords) {
+      getCurrentLocation()
+        .then(({ latitude, longitude }) => {
+          map.setView([latitude, longitude], 16)
+          scheduleResolve(latitude, longitude)
+        })
+        .catch(() => {
+          setMapError('Geolokatsiyani aniqlab bo\'lmadi')
+        })
+    }
+
+    requestAnimationFrame(() => {
+      map.invalidateSize()
+    })
+
+    return () => {
+      map.off('moveend', handleMoveEnd)
+      map.off('click')
+      if (mapResolveTimeoutRef.current) {
+        clearTimeout(mapResolveTimeoutRef.current)
+        mapResolveTimeoutRef.current = null
+      }
+    }
+  }, [
+    mapEnabled,
+    mapLoaded,
+    address,
+    DEFAULT_MAP_CENTER.lat,
+    DEFAULT_MAP_CENTER.lon,
+    getSavedCoordinates,
+    getCurrentLocation,
+    updateAddressFromCoords,
+  ])
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -195,6 +405,7 @@ function CartPage({ user }) {
 
   // Calculate totals using context values
   const subtotal = cartTotal
+  const AUTO_DELIVERY_THRESHOLD = 30000
   const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
   const serviceFee = 0
   const checkoutTotal = total + serviceFee
@@ -221,6 +432,10 @@ function CartPage({ user }) {
     { id: 'slot-2', label: 'Bugun', time: '19:00 - 19:30' },
   ]
   const deliverySlotLabel = deliveryOptions.find(option => option.id === deliverySlot)?.time || ''
+  const autoOrderType = useMemo(() => {
+    if (!storeDeliveryEnabled) return 'pickup'
+    return subtotal >= AUTO_DELIVERY_THRESHOLD ? 'delivery' : 'pickup'
+  }, [AUTO_DELIVERY_THRESHOLD, storeDeliveryEnabled, subtotal])
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
@@ -282,6 +497,12 @@ function CartPage({ user }) {
       setSelectedPaymentMethod('card')
     }
   }, [deliveryRequiresPrepay, hasOnlineProviders, hasCardProvider, paymentProviders, selectedPaymentMethod])
+
+  useEffect(() => {
+    if (orderType !== autoOrderType) {
+      setOrderType(autoOrderType)
+    }
+  }, [autoOrderType, orderType])
 
   const clearPaymentProof = () => {
     setPaymentProof(null)
@@ -394,8 +615,7 @@ function CartPage({ user }) {
     if (!verifiedPhone) {
       return
     }
-    const shouldDelivery = storeDeliveryEnabled && canDelivery && hasPrepayProviders
-    setOrderType(shouldDelivery ? 'delivery' : 'pickup')
+    setOrderType(autoOrderType)
     setCheckoutStep('details')
     setShowCheckout(true)
   }
@@ -985,11 +1205,7 @@ function CartPage({ user }) {
         <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
           <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="checkout-topbar">
-              <button className="checkout-back" onClick={closeCheckout} aria-label="Orqaga">
-                <ChevronLeft size={18} strokeWidth={2} />
-              </button>
               <h2 className="checkout-title">{checkoutTitle}</h2>
-              <span className="checkout-spacer" aria-hidden="true"></span>
             </div>
 
             <div className="modal-body checkout-body">
@@ -1009,11 +1225,23 @@ function CartPage({ user }) {
                     </div>
                     <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
                       <div className="checkout-map">
-                        <img
-                          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqNdr_LfQSh5ufgPTxOVDNmMdJyNl2Fg4V1Aig_N2HlthOdRDUo4RjOmtTo9KL2wx2QeSPQ0qv09bVl4iKOAsB3fwLjjJQpdT7ZjPKvTIlDWwrCDp9ZzEaN5_JqFau5_ZPG8h40wJK-D7niWEHbTi1cPNFrHYJts1TLftoeks9BgK5_MXf0cWkNHZGzqXNOqM-U4PPubAbORK2bd5St0P7tPptZ2RU_dNXF_TjZUr5hOVuJFRxfcmfNEr7kSkGIfKYs9WaFvxV_3bO"
-                          alt="Map"
-                        />
+                        <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
                         <div className="checkout-map-pin" aria-hidden="true"></div>
+                        {!mapLoaded && !mapError && (
+                          <div className="checkout-map-status">
+                            Xarita yuklanmoqda...
+                          </div>
+                        )}
+                        {mapResolving && (
+                          <div className="checkout-map-status">
+                            Manzil aniqlanmoqda...
+                          </div>
+                        )}
+                        {mapError && (
+                          <div className="checkout-map-status error">
+                            {mapError}
+                          </div>
+                        )}
                       </div>
                       <div className="checkout-address-body">
                         <input
