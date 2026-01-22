@@ -110,6 +110,7 @@
   text-transform: uppercase;
   color: var(--home-text-muted);
   line-height: 1;
+  transform: translateY(2px);
 }
 
 .header-location {
