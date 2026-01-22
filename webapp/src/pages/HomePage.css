@@ -77,7 +77,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   height: var(--home-topbar-height);
   min-height: var(--home-topbar-height);
   padding: 0;
@@ -92,6 +92,10 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  align-items: center;
+  text-align: center;
+  margin: 0 auto;
+  max-width: calc(100% - 120px);
 }
 
 .header-location-label {
@@ -105,13 +109,14 @@
 .header-location {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   background: transparent;
   border: none;
   padding: 0;
   margin: 0;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -126,7 +131,7 @@
 }
 
 .header-location-city-name {
-  max-width: 60vw;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
