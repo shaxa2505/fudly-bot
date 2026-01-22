@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, Search, LocateFixed } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -81,9 +81,14 @@ function CartPage({ user }) {
   const checkoutMapRef = useRef(null)
   const checkoutMapInstanceRef = useRef(null)
   const mapResolveTimeoutRef = useRef(null)
+  const mapSearchCloseTimeoutRef = useRef(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
   const [mapResolving, setMapResolving] = useState(false)
+  const [mapQuery, setMapQuery] = useState('')
+  const [mapSearchResults, setMapSearchResults] = useState([])
+  const [mapSearchLoading, setMapSearchLoading] = useState(false)
+  const [mapSearchOpen, setMapSearchOpen] = useState(false)
 
   const getSavedCoordinates = useCallback(() => {
     try {
@@ -137,6 +142,68 @@ function CartPage({ user }) {
     setMapError('')
     setMapResolving(false)
   }, [mapEnabled])
+
+  useEffect(() => {
+    if (mapSearchOpen) return
+    setMapQuery(address || '')
+  }, [address, mapSearchOpen])
+
+  useEffect(() => {
+    if (!mapEnabled || !mapSearchOpen) {
+      setMapSearchResults([])
+      setMapSearchLoading(false)
+      return
+    }
+
+    const query = mapQuery.trim()
+    if (query.length < 3) {
+      setMapSearchResults([])
+      setMapSearchLoading(false)
+      return
+    }
+
+    let isActive = true
+    const controller = new AbortController()
+    const timeout = setTimeout(async () => {
+      setMapSearchLoading(true)
+      try {
+        const params = new URLSearchParams({
+          format: 'jsonv2',
+          q: query,
+          limit: '6',
+          addressdetails: '1',
+          'accept-language': 'uz',
+        })
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+          signal: controller.signal,
+          headers: { 'Accept-Language': 'uz' },
+        })
+        if (!response.ok) {
+          throw new Error('Search failed')
+        }
+        const data = await response.json()
+        if (!isActive) return
+        setMapSearchResults(Array.isArray(data) ? data : [])
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.warn('Map search error:', error)
+        }
+        if (isActive) {
+          setMapSearchResults([])
+        }
+      } finally {
+        if (isActive) {
+          setMapSearchLoading(false)
+        }
+      }
+    }, 350)
+
+    return () => {
+      isActive = false
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [mapEnabled, mapQuery, mapSearchOpen])
 
   useEffect(() => {
     if (!mapEnabled) return
@@ -196,6 +263,10 @@ function CartPage({ user }) {
       if (mapResolveTimeoutRef.current) {
         clearTimeout(mapResolveTimeoutRef.current)
         mapResolveTimeoutRef.current = null
+      }
+      if (mapSearchCloseTimeoutRef.current) {
+        clearTimeout(mapSearchCloseTimeoutRef.current)
+        mapSearchCloseTimeoutRef.current = null
       }
       return
     }
@@ -282,6 +353,37 @@ function CartPage({ user }) {
     getCurrentLocation,
     updateAddressFromCoords,
   ])
+
+  const handleMapResultSelect = (result) => {
+    const lat = Number(result?.lat)
+    const lon = Number(result?.lon)
+    const label = result?.display_name || ''
+    if (label) {
+      setAddress(label)
+      setMapQuery(label)
+    }
+    setMapSearchOpen(false)
+    setMapSearchResults([])
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
+    if (checkoutMapInstanceRef.current) {
+      checkoutMapInstanceRef.current.setView([lat, lon], 16)
+    }
+    updateAddressFromCoords(lat, lon)
+  }
+
+  const handleLocateMe = () => {
+    setMapError('')
+    getCurrentLocation()
+      .then(({ latitude, longitude }) => {
+        if (checkoutMapInstanceRef.current) {
+          checkoutMapInstanceRef.current.setView([latitude, longitude], 16)
+        }
+        updateAddressFromCoords(latitude, longitude)
+      })
+      .catch(() => {
+        setMapError('Geolokatsiyani aniqlab bo\'lmadi')
+      })
+  }
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
@@ -1274,6 +1376,76 @@ function CartPage({ user }) {
                     <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
                       <div className="checkout-map">
                         <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
+                        <div className="checkout-map-search">
+                          <Search size={16} strokeWidth={2} aria-hidden="true" />
+                          <input
+                            className="checkout-map-search-input"
+                            placeholder="Manzilni qidiring"
+                            value={mapQuery}
+                            onChange={(event) => {
+                              const nextValue = event.target.value
+                              setMapQuery(nextValue)
+                              setAddress(nextValue)
+                              if (!mapSearchOpen) {
+                                setMapSearchOpen(true)
+                              }
+                            }}
+                            onFocus={() => {
+                              if (mapSearchCloseTimeoutRef.current) {
+                                clearTimeout(mapSearchCloseTimeoutRef.current)
+                                mapSearchCloseTimeoutRef.current = null
+                              }
+                              setMapSearchOpen(true)
+                            }}
+                            onBlur={() => {
+                              if (mapSearchCloseTimeoutRef.current) {
+                                clearTimeout(mapSearchCloseTimeoutRef.current)
+                              }
+                              mapSearchCloseTimeoutRef.current = setTimeout(() => {
+                                setMapSearchOpen(false)
+                              }, 180)
+                            }}
+                            disabled={!mapEnabled}
+                          />
+                          {mapSearchLoading && mapSearchOpen && (
+                            <span className="checkout-map-search-loading">Izlanmoqda...</span>
+                          )}
+                        </div>
+                        {mapSearchOpen && mapQuery.trim().length >= 3 && (
+                          <div
+                            className="checkout-map-search-results"
+                            onMouseDown={(event) => event.preventDefault()}
+                          >
+                            {mapSearchResults.length === 0 && !mapSearchLoading && (
+                              <button
+                                type="button"
+                                className="checkout-map-search-item empty"
+                                disabled
+                              >
+                                Manzil topilmadi
+                              </button>
+                            )}
+                            {mapSearchResults.map((result) => (
+                              <button
+                                key={`${result.place_id}-${result.lat}-${result.lon}`}
+                                type="button"
+                                className="checkout-map-search-item"
+                                onClick={() => handleMapResultSelect(result)}
+                              >
+                                {result.display_name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className="checkout-map-locate"
+                          onClick={handleLocateMe}
+                          disabled={!mapEnabled}
+                          aria-label="Mening joylashuvim"
+                        >
+                          <LocateFixed size={16} strokeWidth={2} />
+                        </button>
                         <div className="checkout-map-pin" aria-hidden="true"></div>
                         {mapEnabled && !mapLoaded && !mapError && (
                           <div className="checkout-map-status">

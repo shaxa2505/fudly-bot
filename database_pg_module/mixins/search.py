@@ -286,6 +286,7 @@ class SearchMixin:
             AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
             AND (
                 LOWER(o.title) LIKE '%%' || LOWER(%s) || '%%' OR
+                LOWER(o.description) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(s.name) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(s.category) LIKE '%%' || LOWER(%s) || '%%' OR
                 TRANSLATE(LOWER(o.title), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
@@ -293,7 +294,7 @@ class SearchMixin:
             ORDER BY relevance DESC, o.created_at DESC
             LIMIT %s OFFSET %s
         """
-        params.extend([query, query, query, query])
+        params.extend([query, query, query, query, query])
         params.extend([limit, offset])
 
         with self.get_connection() as conn:

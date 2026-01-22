@@ -2135,8 +2135,8 @@
   }
 
   .cart-item-qty {
-    height: 104px;
-    width: 40px;
+    height: 112px;
+    width: 48px;
   }
 }
 
@@ -2250,6 +2250,106 @@
 .checkout-map-canvas {
   width: 100%;
   height: 100%;
+}
+
+.checkout-map-search {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid #E6E8EF;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  z-index: 2;
+}
+
+.checkout-map-search svg {
+  color: #94A3B8;
+}
+
+.checkout-map-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0F172A;
+  outline: none;
+  min-width: 0;
+}
+
+.checkout-map-search-input::placeholder {
+  color: #94A3B8;
+}
+
+.checkout-map-search-loading {
+  font-size: 10px;
+  color: #94A3B8;
+  white-space: nowrap;
+}
+
+.checkout-map-search-results {
+  position: absolute;
+  top: 54px;
+  left: 10px;
+  right: 10px;
+  max-height: 160px;
+  overflow-y: auto;
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #E6E8EF;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
+  z-index: 2;
+}
+
+.checkout-map-search-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0F172A;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #F1F5F9;
+  cursor: pointer;
+}
+
+.checkout-map-search-item:last-child {
+  border-bottom: none;
+}
+
+.checkout-map-search-item.empty {
+  color: #94A3B8;
+  cursor: default;
+}
+
+.checkout-map-locate {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0F172A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  z-index: 2;
+  cursor: pointer;
+}
+
+.checkout-map-locate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .checkout-map img {
