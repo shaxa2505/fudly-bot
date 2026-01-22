@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './StoreMap.css';
 
 /**
@@ -11,9 +11,21 @@ import './StoreMap.css';
 // Leaflet map loaded from CDN
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist';
 
-function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz' }) {
+function StoreMap({
+  stores = [],
+  userLocation = null,
+  fallbackCenter = null,
+  cityLabel = '',
+  locationLoading = false,
+  onRequestLocation,
+  onStoreSelect,
+  lang = 'uz',
+}) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
+  const storeLayerRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const userMovedRef = useRef(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [error, setError] = useState(null);
 
@@ -58,6 +70,14 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     if (!coords) return store;
     return { ...store, latitude: coords.lat, longitude: coords.lon };
   });
+  const normalizedFallback = useMemo(() => {
+    if (!fallbackCenter) return null;
+    const lat = toNumber(fallbackCenter.lat ?? fallbackCenter.latitude);
+    const lon = toNumber(fallbackCenter.lon ?? fallbackCenter.longitude);
+    if (lat == null || lon == null) return null;
+    return { lat, lon };
+  }, [fallbackCenter]);
+  const locationHint = cityLabel ? ` (${cityLabel})` : '';
 
   // Load Leaflet from CDN
   useEffect(() => {
@@ -99,7 +119,9 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     const defaultCenter = [41.2995, 69.2401];
     const center = userLocation
       ? [userLocation.latitude, userLocation.longitude]
-      : defaultCenter;
+      : normalizedFallback
+        ? [normalizedFallback.lat, normalizedFallback.lon]
+        : defaultCenter;
 
     // Create map
     const map = L.map(mapRef.current, {
@@ -115,95 +137,33 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
     }).addTo(map);
 
     mapInstance.current = map;
+    storeLayerRef.current = L.layerGroup().addTo(map);
+    userMovedRef.current = false;
 
-    // Add user marker if location available
-    if (userLocation) {
-      const userIcon = L.divIcon({
-        className: 'user-marker',
-        html: '<div class="user-marker-inner">YOU</div>',
-        iconSize: [30, 30],
-        iconAnchor: [15, 30],
-      });
-
-      L.marker([userLocation.latitude, userLocation.longitude], { icon: userIcon })
-        .addTo(map)
-        .bindPopup(t('Ваше местоположение', 'Sizning joylashuvingiz'));
-    }
-
-    // Add store markers
-    normalizedStores.forEach((store) => {
-      if (store.latitude == null || store.longitude == null) return;
-
-      const storeIcon = L.divIcon({
-        className: 'store-marker',
-        html: `<div class="store-marker-inner">SHOP</div>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-      });
-
-      const distance = store.distance
-        ? `${store.distance.toFixed(1)} ${t('км', 'km')}`
-        : '';
-
-      const popupContent = `
-        <div class="store-popup">
-          <strong>${store.name}</strong>
-          <p>${store.address || ''}</p>
-          ${distance ? `<p class="distance">Masofa: ${distance}</p>` : ''}
-          <button class="popup-btn" onclick="window.selectStore(${store.id})">${t('Выбрать', 'Tanlash')}</button>
-        </div>
-      `;
-
-      L.marker([store.latitude, store.longitude], { icon: storeIcon })
-        .addTo(map)
-        .bindPopup(popupContent);
+    map.on('movestart', () => {
+      userMovedRef.current = true;
     });
 
-    // Global function for popup button
-    window.selectStore = (storeId) => {
-      if (onStoreSelect) {
-        const store = stores.find(s => s.id === storeId);
-        if (store) onStoreSelect(store);
-      }
-    };
+    setTimeout(() => {
+      map.invalidateSize(true);
+    }, 0);
+  }, [mapLoaded, normalizedFallback, userLocation]);
 
-    // Fit bounds if we have stores
-    if (normalizedStores.length > 0) {
-      const validStores = normalizedStores.filter(s => s.latitude != null && s.longitude != null);
-      if (validStores.length > 0) {
-        const bounds = L.latLngBounds(
-          validStores.map(s => [s.latitude, s.longitude])
-        );
-        if (userLocation) {
-          bounds.extend([userLocation.latitude, userLocation.longitude]);
-        }
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }
-
-    return () => {
-      window.selectStore = undefined;
-    };
-  }, [mapLoaded, normalizedStores, stores, userLocation, onStoreSelect, t]);
-
-  // Update markers when stores change
+  // Update store markers when stores change
   useEffect(() => {
-    if (!mapInstance.current || !mapLoaded) return;
+    if (!mapInstance.current || !mapLoaded || !storeLayerRef.current) return;
 
     const L = window.L;
     const map = mapInstance.current;
+    const layer = storeLayerRef.current;
 
-    // Clear existing store markers
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Marker && layer.options.icon?.options?.className === 'store-marker') {
-        map.removeLayer(layer);
-      }
-    });
+    layer.clearLayers();
 
-    // Add new store markers
-    normalizedStores.forEach((store) => {
-      if (store.latitude == null || store.longitude == null) return;
+    const validStores = normalizedStores.filter(
+      (store) => store.latitude != null && store.longitude != null
+    );
 
+    validStores.forEach((store) => {
       const storeIcon = L.divIcon({
         className: 'store-marker',
         html: `<div class="store-marker-inner">SHOP</div>`,
@@ -212,7 +172,7 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
       });
 
       const distance = store.distance
-        ? `${store.distance.toFixed(1)} ${t('км', 'km')}`
+        ? `${store.distance.toFixed(1)} ${t('km', 'km')}`
         : '';
 
       const popupContent = `
@@ -220,15 +180,71 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
           <strong>${store.name}</strong>
           <p>${store.address || ''}</p>
           ${distance ? `<p class="distance">Masofa: ${distance}</p>` : ''}
-          <button class="popup-btn" onclick="window.selectStore(${store.id})">${t('Выбрать', 'Tanlash')}</button>
         </div>
       `;
 
-      L.marker([store.latitude, store.longitude], { icon: storeIcon })
-        .addTo(map)
+      const marker = L.marker([store.latitude, store.longitude], { icon: storeIcon })
+        .addTo(layer)
         .bindPopup(popupContent);
+
+      marker.on('click', () => {
+        if (onStoreSelect) {
+          onStoreSelect(store);
+        }
+      });
     });
-  }, [normalizedStores]);
+
+    if (!userMovedRef.current && validStores.length > 0) {
+      const bounds = L.latLngBounds(validStores.map((s) => [s.latitude, s.longitude]));
+      if (userLocation?.latitude != null && userLocation?.longitude != null) {
+        bounds.extend([userLocation.latitude, userLocation.longitude]);
+      }
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [normalizedStores, mapLoaded, onStoreSelect, t, userLocation]);
+
+  // Update user marker when location changes
+  useEffect(() => {
+    if (!mapInstance.current || !mapLoaded) return;
+    const L = window.L;
+    const map = mapInstance.current;
+
+    if (!userLocation?.latitude || !userLocation?.longitude) {
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const userIcon = L.divIcon({
+      className: 'user-marker',
+      html: '<div class="user-marker-inner">YOU</div>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+    });
+
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = L.marker([userLocation.latitude, userLocation.longitude], { icon: userIcon })
+        .addTo(map)
+        .bindPopup(t('Your location', 'Sizning joylashuvingiz'));
+    } else {
+      userMarkerRef.current.setLatLng([userLocation.latitude, userLocation.longitude]);
+    }
+
+    userMovedRef.current = false;
+    map.flyTo([userLocation.latitude, userLocation.longitude], 14, { duration: 0.6 });
+  }, [mapLoaded, userLocation, t]);
+
+  // Update map center for fallback city
+  useEffect(() => {
+    if (!mapInstance.current || !mapLoaded) return;
+    if (userLocation?.latitude != null && userLocation?.longitude != null) return;
+    if (!normalizedFallback) return;
+    if (userMovedRef.current) return;
+
+    mapInstance.current.flyTo([normalizedFallback.lat, normalizedFallback.lon], 12, { duration: 0.6 });
+  }, [mapLoaded, normalizedFallback, userLocation]);
 
   // Count stores with coordinates
   const storesWithCoords = normalizedStores.filter(s => s.latitude != null && s.longitude != null);
@@ -243,6 +259,18 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
 
   return (
     <div className="store-map-container">
+      {onRequestLocation && (
+        <button
+          className="store-map-locate"
+          type="button"
+          onClick={onRequestLocation}
+          disabled={locationLoading}
+          aria-label={t('Определить мое местоположение', "Joylashuvni aniqlash")}
+          title={t('Определить мое местоположение', "Joylashuvni aniqlash")}
+        >
+          {locationLoading ? '...' : 'GPS'}
+        </button>
+      )}
       {!mapLoaded && (
         <div className="map-loading">
           <div className="map-spinner"></div>
@@ -254,8 +282,18 @@ function StoreMap({ stores = [], userLocation = null, onStoreSelect, lang = 'uz'
       {/* No stores with coordinates message */}
       {mapLoaded && storesWithCoords.length === 0 && stores.length > 0 && (
         <div className="store-map-no-coords">
-          <p>{t('Магазины не указали координаты', 'Do\'konlar koordinatalarini ko\'rsatmagan')}</p>
-          <p className="store-map-hint">{t('Используйте список для просмотра', 'Ro\'yxatdan foydalaning')}</p>
+          <p>{t('Магазины не указали координаты', `Do'konlar koordinatalarini ko'rsatmagan${locationHint}`)}</p>
+          <p className="store-map-hint">{t('Используйте список для просмотра', "Ro'yxatdan foydalaning")}</p>
+          {onRequestLocation && !userLocation && (
+            <button
+              type="button"
+              className="store-map-cta"
+              onClick={onRequestLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? t('Поиск...', 'Aniqlanmoqda...') : t('Найти меня', 'Joylashuvni aniqlash')}
+            </button>
+          )}
         </div>
       )}
 

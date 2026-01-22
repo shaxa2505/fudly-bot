@@ -24,6 +24,10 @@ async def _fetch_reverse_geocode(lat: float, lon: float, lang: str) -> dict[str,
         "lat": lat,
         "lon": lon,
         "accept-language": lang,
+        "zoom": 18,
+        "addressdetails": 1,
+        "namedetails": 1,
+        "extratags": 1,
     }
     headers = {
         "User-Agent": "FudlyApp/1.0 (webapp reverse geocode)",

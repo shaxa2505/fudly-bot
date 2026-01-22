@@ -81,6 +81,7 @@ function CartPage({ user }) {
   const checkoutMapRef = useRef(null)
   const checkoutMapInstanceRef = useRef(null)
   const checkoutMapMarkerRef = useRef(null)
+  const addressRef = useRef(address)
   const markerDraggingRef = useRef(false)
   const mapResolveTimeoutRef = useRef(null)
   const mapSearchCloseTimeoutRef = useRef(null)
@@ -136,20 +137,6 @@ function CartPage({ user }) {
       }
     }, 8000)
 
-    const fetchNominatim = async () => {
-      const params = new URLSearchParams({
-        format: 'jsonv2',
-        lat: String(lat),
-        lon: String(lon),
-        zoom: '18',
-        addressdetails: '1',
-        'accept-language': 'uz',
-      })
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`)
-      if (!response.ok) return null
-      return response.json()
-    }
-
     const fetchApi = async () => {
       try {
         return await api.reverseGeocode(lat, lon, 'uz')
@@ -162,18 +149,33 @@ function CartPage({ user }) {
     let resolved = null
 
     try {
-      const nominatimData = await fetchNominatim()
-      if (nominatimData) {
-        resolved = buildLocationFromReverseGeocode(nominatimData, lat, lon)
-      }
-    } catch (error) {
-      console.warn('Nominatim reverse error:', error)
-    }
-
-    if (!resolved?.address) {
       const apiData = await fetchApi()
       if (apiData) {
         resolved = buildLocationFromReverseGeocode(apiData, lat, lon)
+      }
+    } catch (error) {
+      console.warn('API reverse error:', error)
+    }
+
+    if (!resolved?.address) {
+      try {
+        const params = new URLSearchParams({
+          format: 'jsonv2',
+          lat: String(lat),
+          lon: String(lon),
+          zoom: '18',
+          addressdetails: '1',
+          'accept-language': 'uz',
+        })
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`)
+        if (response.ok) {
+          const nominatimData = await response.json()
+          if (nominatimData) {
+            resolved = buildLocationFromReverseGeocode(nominatimData, lat, lon)
+          }
+        }
+      } catch (error) {
+        console.warn('Nominatim reverse error:', error)
       }
     }
 
@@ -209,6 +211,10 @@ function CartPage({ user }) {
     setMapError('')
     setMapResolving(false)
   }, [mapEnabled])
+
+  useEffect(() => {
+    addressRef.current = address
+  }, [address])
 
   useEffect(() => {
     if (mapSearchOpen) return
@@ -431,7 +437,8 @@ function CartPage({ user }) {
       updateAddressFromCoords(pos.lat, pos.lng, { force: true })
     })
 
-    if (savedCoords && !address.trim()) {
+    const hasAddress = addressRef.current?.trim()
+    if (savedCoords && !hasAddress) {
       scheduleResolve(savedCoords.lat, savedCoords.lon)
     }
 
@@ -474,7 +481,6 @@ function CartPage({ user }) {
   }, [
     mapEnabled,
     mapLoaded,
-    address,
     getSavedCoordinates,
     getCurrentLocation,
     updateAddressFromCoords,
