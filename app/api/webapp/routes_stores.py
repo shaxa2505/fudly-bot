@@ -225,7 +225,11 @@ async def get_stores(
 
 
 @router.get("/stores/{store_id}", response_model=StoreResponse)
-async def get_store(store_id: int, db=Depends(get_db)):
+async def get_store(
+    store_id: int,
+    resolve_coords: bool = Query(False, description="Resolve missing coordinates via geocoding"),
+    db=Depends(get_db),
+):
     """Get store details by ID."""
     try:
         store = db.get_store(store_id) if hasattr(db, "get_store") else None
@@ -246,6 +250,11 @@ async def get_store(store_id: int, db=Depends(get_db)):
             except Exception:  # pragma: no cover - defensive
                 rating = 0.0
 
+        if resolve_coords:
+            await _resolve_missing_coords([store], db)
+
+        lat_val, lon_val = _extract_coords(store)
+
         return StoreResponse(
             id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
             name=get_val(store, "name", ""),
@@ -253,6 +262,8 @@ async def get_store(store_id: int, db=Depends(get_db)):
             city=get_val(store, "city"),
             region=get_val(store, "region"),
             district=get_val(store, "district"),
+            latitude=lat_val,
+            longitude=lon_val,
             business_type=get_val(store, "business_type") or get_val(store, "category") or "supermarket",
             rating=rating,
             offers_count=offers_count,
@@ -334,6 +345,7 @@ async def get_nearby_stores(
 
         for store in raw_stores:
             distance = get_val(store, "distance_km")
+            lat_val, lon_val = _extract_coords(store)
             store_data = StoreResponse(
                 id=int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0),
                 name=get_val(store, "name", ""),
@@ -341,6 +353,8 @@ async def get_nearby_stores(
                 city=get_val(store, "city"),
                 region=get_val(store, "region"),
                 district=get_val(store, "district"),
+                latitude=lat_val,
+                longitude=lon_val,
                 business_type=get_val(store, "business_type")
                 or get_val(store, "category")
                 or "supermarket",

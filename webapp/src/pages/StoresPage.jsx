@@ -145,7 +145,7 @@ function StoresPage() {
 
   useEffect(() => {
     loadStores()
-  }, [activeFilter, cityRaw, regionRaw, districtRaw, userLocation])
+  }, [activeFilter, cityRaw, regionRaw, districtRaw, userLocation, viewMode])
 
   useEffect(() => {
     loadFavorites()
@@ -227,6 +227,9 @@ function StoresPage() {
       if (userLocation?.latitude != null && userLocation?.longitude != null) {
         params.lat = userLocation.latitude
         params.lon = userLocation.longitude
+      }
+      if (viewMode === 'map') {
+        params.resolve_coords = true
       }
 
       const data = await api.getStores(params)
