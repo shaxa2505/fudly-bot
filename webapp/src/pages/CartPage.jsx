@@ -80,6 +80,8 @@ function CartPage({ user }) {
   const [storeOffers, setStoreOffers] = useState([])
   const checkoutMapRef = useRef(null)
   const checkoutMapInstanceRef = useRef(null)
+  const checkoutMapMarkerRef = useRef(null)
+  const markerDraggingRef = useRef(false)
   const mapResolveTimeoutRef = useRef(null)
   const mapSearchCloseTimeoutRef = useRef(null)
   const [mapLoaded, setMapLoaded] = useState(false)
@@ -262,6 +264,9 @@ function CartPage({ user }) {
       if (checkoutMapInstanceRef.current) {
         checkoutMapInstanceRef.current.remove()
         checkoutMapInstanceRef.current = null
+      }
+      if (checkoutMapMarkerRef.current) {
+        checkoutMapMarkerRef.current = null
       }
       if (mapResolveTimeoutRef.current) {
         clearTimeout(mapResolveTimeoutRef.current)

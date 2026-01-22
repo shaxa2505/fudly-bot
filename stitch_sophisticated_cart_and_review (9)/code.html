@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="uz"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Stores List - Premium Food Rescue</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&amp;family=Playfair+Display:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#065F46", // Deep Emerald
+                        "background-light": "#F8FAF9",
+                        "background-dark": "#0F172A",
+                        accent: "#10B981",
+                    },
+                    fontFamily: {
+                        sans: ["Plus Jakarta Sans", "sans-serif"],
+                        display: ["Playfair Display", "serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "1rem",
+                        '2xl': "1.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        body {
+            min-height: max(884px, 100dvh);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-sans text-slate-900 dark:text-slate-100 antialiased selection:bg-primary/10">
+<div class="h-11 w-full bg-background-light dark:bg-background-dark sticky top-0 z-50 flex items-center justify-between px-6">
+<span class="text-sm font-semibold">9:41</span>
+<div class="flex gap-1.5 items-center">
+<span class="material-icons-round text-sm">signal_cellular_alt</span>
+<span class="material-icons-round text-sm">wifi</span>
+<span class="material-icons-round text-sm">battery_full</span>
+</div>
+</div>
+<header class="px-5 pt-2 pb-2 sticky top-11 z-40 bg-background-light/95 dark:bg-background-dark/95 ios-blur border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-between mb-4">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Joylashuv</span>
+<button class="flex items-center gap-1 group">
+<span class="font-bold text-lg">Kattaqo'rg'on</span>
+<span class="material-icons-round text-primary text-xl transition-transform group-active:rotate-180">expand_more</span>
+</button>
+</div>
+<button class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-slate-100 dark:border-slate-700 active:scale-95 transition-transform">
+<span class="material-icons-round text-slate-600 dark:text-slate-300">notifications_none</span>
+</button>
+</div>
+<div class="relative group mb-4">
+<span class="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="w-full bg-white dark:bg-slate-800 border-none rounded-2xl py-3.5 pl-12 pr-12 shadow-sm focus:ring-2 focus:ring-primary/20 text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-shadow" placeholder="Do'kon yoki mahsulot qidirish..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-primary active:scale-90 transition-transform">
+<span class="material-icons-round">tune</span>
+</button>
+</div>
+<div class="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl flex relative shadow-inner">
+<button class="flex-1 py-2 text-sm font-bold text-slate-900 dark:text-white bg-white dark:bg-slate-700 shadow-sm rounded-xl transition-all active:scale-[0.98]">
+            Ro'yxat
+        </button>
+<button class="flex-1 py-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            Xarita
+        </button>
+</div>
+</header>
+<main class="pb-32 px-5 pt-4">
+<div class="flex gap-3 overflow-x-auto no-scrollbar mb-5 pb-1">
+<button class="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-primary/25 whitespace-nowrap">
+            Hammasi
+        </button>
+<button class="bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap">
+            Sevimlilar
+        </button>
+<button class="bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap">
+            Yaqin-atrofda
+        </button>
+<button class="bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-100 dark:border-slate-700 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap">
+            Supermarket
+        </button>
+</div>
+<div class="flex flex-col gap-4">
+<div class="group bg-white dark:bg-slate-800 p-2.5 rounded-[1.25rem] shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-stretch active:scale-[0.99] transition-all duration-200">
+<div class="relative w-28 h-28 shrink-0">
+<img alt="Bakery Store Front" class="w-full h-full object-cover rounded-xl shadow-inner group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCY20rdbuWcOt6p7RzY2h-aWye2s9HP1Va_i0srslnMQOgIH5S2y8lmTOUiFB26825KigcvskJKgSqLYuVMkCNpI8LLTDxP5TvegydmshuK8eUBPKr7yYhZAAyLKYnzjdEbSPQsL59VRJdMQ5c5Ez63mPTEM2VSjOsQh4T-UENrSwtwNeR23UQ7JXVRDXBBbTlw6wo006emyQr6qq04h3DGZaS4N_Zmo9oyzivJoFRTCf7XZ39BtGP8NwVvTZGBQeTAamAx4J0ZoCJO"/>
+<div class="absolute top-1.5 left-1.5">
+<span class="px-2 py-0.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-md text-[10px] font-bold text-slate-800 dark:text-white shadow-sm flex items-center gap-1 border border-white/20">
+<span class="material-icons-round text-primary text-[10px]">storefront</span> Ochiq
+                    </span>
+</div>
+</div>
+<div class="flex-1 flex flex-col justify-between py-0.5 pr-1">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-display font-bold text-lg text-slate-900 dark:text-white leading-tight mb-0.5">Le Croissant</h4>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+<span class="flex items-center gap-0.5 text-amber-500 font-bold"><span class="material-icons-round text-[12px]">star</span> 4.9</span>
+<span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+<span>0.8 km</span>
+<span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+<span>Nonvoyxona</span>
+</div>
+</div>
+<button class="w-8 h-8 -mr-1 -mt-1 flex items-center justify-center text-slate-300 hover:text-rose-500 active:scale-90 transition-transform">
+<span class="material-icons-round text-xl">favorite_border</span>
+</button>
+</div>
+<div class="flex items-end justify-between mt-2">
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-400 line-through font-medium">45 000 so'm</span>
+<span class="text-base font-extrabold text-primary dark:text-emerald-400">15 000 so'm</span>
+</div>
+<div class="flex flex-col items-end">
+<div class="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1">
+<span class="material-icons-round text-[12px]">shopping_bag</span> 3 ta qoldi
+                        </div>
+</div>
+</div>
+</div>
+</div>
+<div class="group bg-white dark:bg-slate-800 p-2.5 rounded-[1.25rem] shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-stretch active:scale-[0.99] transition-all duration-200">
+<div class="relative w-28 h-28 shrink-0">
+<img alt="Burger Joint" class="w-full h-full object-cover rounded-xl shadow-inner group-hover:scale-105 transition-transform duration-500" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnpeAGbjFbgOlDsf38hsT1LuLQ-TAoTEUnrzPW7KwY6yIzX8ub8gYEHyo5dP5m2bj8C2m7-NHLR_tBUZcTrPvZbvrv06dYQXi0KdOI1nVkrp9T9lgqwRCfFSVLkRQXapRjGpeFTFSyvifFP4lJrSNyjVuuWilF0SpAn5LcCd1N2cXbhaHLU2m0KFHHaR_Zmib7BzfYJrDBclDIJ8zwShy11qX5fmcLLVk7Dv7oxSkMtd4xWganJZXK17pH3YD9a5oqkGO1dkuluaSZ"/>
+<div class="absolute top-1.5 left-1.5">
+<span class="px-2 py-0.5 bg-rose-500 text-white rounded-md text-[10px] font-bold shadow-md shadow-rose-500/20 border border-rose-400">
+                        Tez tugayapti
+                    </span>
+</div>
+</div>
+<div class="flex-1 flex flex-col justify-between py-0.5 pr-1">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-display font-bold text-lg text-slate-900 dark:text-white leading-tight mb-0.5">Black Star Burger</h4>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+<span class="flex items-center gap-0.5 text-amber-500 font-bold"><span class="material-icons-round text-[12px]">star</span> 4.8</span>
+<span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+<span>2.4 km</span>
+<span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+<span>Fast Food</span>
+</div>
+</div>
+<button class="w-8 h-8 -mr-1 -mt-1 flex items-center justify-center text-rose-500 active:scale-90 transition-transform">
+<span class="material-icons-round text-xl">favorite</span>
+</button>
+</div>
+<div class="flex items-end justify-between mt-2">
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-400 line-through font-medium">60 000 so'm</span>
+<span class="text-base font-extrabold text-slate-900 dark:text-white">22 000 so'm</span>
+</div>
+<div class="flex flex-col items-end gap-0.5">
+<span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Olib ketish</span>
+<span class="text-xs font-bold text-slate-800 dark:text-slate-200">21:00 - 22:00</span>
+</div>
+</div>
+</div>
+</div>
+<div class="group bg-white dark:bg-slate-800 p-2.5 rounded-[1.25rem] shadow-sm border border-slate-100 dark:border-slate-700 flex gap-4 items-stretch opacity-75 grayscale-[20%]">
+<div class="relative w-28 h-28 shrink-0">
+<img alt="Fresh Juice" class="w-full h-full object-cover rounded-xl shadow-inner" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAU9IhOyFZPsRyJyn-41a6htk1mnr4t7SFqSdLrYjD_jMUs4ZyXaSv_e_wo5C3uzp50BMRl-etLdUowiCKkpGo_SC8w0q4WxfFaw0obdWgOQG5ZzVfk3d6ixWtbDiV06ZpdTNVA_Rs9Aztl07J2bnEaNf5FsPwKWfsW_IlYcwFr82qfA5EQt4dyoP_cLMJVDIQnNBwFSKtGos6QvS0oMwj9REKQVwv5QKndxhPoQCrnaRd2QM6_fPZ-YYidcDA2TVYHP46dNrN7_8V-"/>
+<div class="absolute inset-0 bg-white/10 dark:bg-black/10 backdrop-blur-[1px] rounded-xl"></div>
+</div>
+<div class="flex-1 flex flex-col justify-between py-0.5 pr-1">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-display font-bold text-lg text-slate-700 dark:text-slate-300 leading-tight mb-0.5">Vitamin Bar</h4>
+<div class="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+<span class="flex items-center gap-0.5 text-amber-500/70 font-bold"><span class="material-icons-round text-[12px]">star</span> 4.5</span>
+<span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+<span>1.2 km</span>
+<span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+<span>Ichimliklar</span>
+</div>
+</div>
+<button class="w-8 h-8 -mr-1 -mt-1 flex items-center justify-center text-slate-300 hover:text-rose-500 active:scale-90 transition-transform">
+<span class="material-icons-round text-xl">favorite_border</span>
+</button>
+</div>
+<div class="flex items-end justify-between mt-2">
+<div class="flex flex-col">
+<span class="text-base font-extrabold text-slate-400 dark:text-slate-500">-- ---</span>
+</div>
+<div class="flex flex-col items-end">
+<button class="bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 px-2 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 active:scale-95 transition-transform">
+<span class="material-icons-round text-[12px]">notifications</span> Ertaga 10:00
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<nav class="fixed bottom-0 inset-x-0 bg-white/80 dark:bg-slate-900/80 ios-blur border-t border-slate-100 dark:border-slate-800 px-6 pb-8 pt-3 z-50">
+<div class="flex items-center justify-between max-w-lg mx-auto">
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 transition-colors" href="#">
+<span class="material-icons-round mb-1">home</span>
+<span class="text-[10px] font-bold">Asosiy</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-primary" href="#">
+<div class="bg-primary/10 rounded-xl p-1.5 px-4 mb-0.5">
+<span class="material-icons-round">storefront</span>
+</div>
+<span class="text-[10px] font-bold">Do'konlar</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 relative hover:text-slate-600 transition-colors" href="#">
+<span class="material-icons-round mb-1">shopping_basket</span>
+<span class="text-[10px] font-bold">Savat</span>
+<span class="absolute -top-1 right-0 w-4 h-4 bg-accent text-white text-[8px] flex items-center justify-center rounded-full font-bold border-2 border-white dark:border-slate-900">1</span>
+</a>
+<a class="flex flex-col items-center gap-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 transition-colors" href="#">
+<span class="material-icons-round mb-1">person_outline</span>
+<span class="text-[10px] font-bold">Profil</span>
+</a>
+</div>
+</nav>
+<div class="fixed bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-300 dark:bg-slate-700 rounded-full z-[60]"></div>
+
+</body></html>
