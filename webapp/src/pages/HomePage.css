@@ -30,7 +30,7 @@
   --font-display: "Plus Jakarta Sans", var(--font-family);
   min-height: 100vh;
   position: relative;
-  padding-bottom: calc(var(--bottom-nav-height) + 32px + var(--safe-area-bottom));
+  padding-bottom: calc(var(--bottom-nav-height) + 12px + var(--safe-area-bottom));
   background: var(--home-bg);
   color: var(--home-text);
   font-family: "Plus Jakarta Sans", var(--font-family);

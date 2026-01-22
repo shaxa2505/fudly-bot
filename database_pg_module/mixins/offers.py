@@ -400,7 +400,7 @@ class OfferMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             base = [
-                "SELECT o.*, s.city FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'",
+                "SELECT o.*, s.city, s.rating as store_rating FROM offers o JOIN stores s ON o.store_id = s.store_id WHERE o.status = 'active'",
                 "AND COALESCE(o.stock_quantity, o.quantity) > 0",
             ]
             params = []
@@ -437,7 +437,7 @@ class OfferMixin:
             cursor = conn.cursor(row_factory=dict_row)
 
             query = """
-                SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category,
+                SELECT o.*, s.name as store_name, s.address, s.city, s.rating as store_rating, s.category as store_category,
                        s.delivery_enabled, s.delivery_price, s.min_order_amount,
                        CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
                 FROM offers o
@@ -665,7 +665,7 @@ class OfferMixin:
             )
             query = f"""
                 SELECT * FROM (
-                    SELECT o.*, s.name as store_name, s.address, s.city, s.category as store_category,
+                    SELECT o.*, s.name as store_name, s.address, s.city, s.rating as store_rating, s.category as store_category,
                            s.delivery_enabled, s.delivery_price, s.min_order_amount,
                            CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent,
                            {distance_expr} as distance_km
@@ -745,7 +745,7 @@ class OfferMixin:
                 # Partner panel: show ALL products except deleted (inactive)
                 cursor.execute(
                     """
-                    SELECT o.*, s.name, s.address, s.city,
+                    SELECT o.*, s.name, s.address, s.city, s.rating as store_rating,
                            s.delivery_enabled, s.delivery_price, s.min_order_amount,
                            s.category as store_category, o.category as category
                     FROM offers o
@@ -759,7 +759,7 @@ class OfferMixin:
                 # Customer view: only active products with stock and not expired
                 cursor.execute(
                     """
-                    SELECT o.*, s.name, s.address, s.city,
+                    SELECT o.*, s.name, s.address, s.city, s.rating as store_rating,
                            s.delivery_enabled, s.delivery_price, s.min_order_amount,
                            s.category as store_category, o.category as category
                     FROM offers o
@@ -785,7 +785,7 @@ class OfferMixin:
             params.append(limit)
             cursor.execute(
                 f"""
-                SELECT o.*, s.name, s.address, s.city, s.category,
+                SELECT o.*, s.name, s.address, s.city, s.rating as store_rating, s.category,
                        CAST((o.original_price - o.discount_price) * 100.0 / o.original_price AS INTEGER) as discount_percent
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
@@ -819,7 +819,7 @@ class OfferMixin:
             if not categories:
                 return []
             query = """
-                SELECT o.*, s.name as store_name, s.address, s.city,
+                SELECT o.*, s.name as store_name, s.address, s.city, s.rating as store_rating,
                        s.delivery_enabled, s.delivery_price, s.min_order_amount,
                        CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
                 FROM offers o

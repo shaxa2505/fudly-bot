@@ -4,6 +4,7 @@ import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
 import api, { saveTelegramInitData } from './api/client'
 import { getSavedLocation, saveLocation, buildLocationFromReverseGeocode } from './utils/cityUtils'
+import { getScrollContainer } from './utils/scrollContainer'
 import HomePage from './pages/HomePage'
 import PageLoader, { LoadingScreen } from './components/PageLoader'
 import './App.css'
@@ -109,6 +110,20 @@ function AppContent() {
       tg.offEvent?.('contentSafeAreaChanged', handleViewportChange)
     }
   }, [])
+
+  useEffect(() => {
+    const container = getScrollContainer()
+    if (!container) return
+    if (
+      container === document.body ||
+      container === document.documentElement ||
+      container === document.scrollingElement
+    ) {
+      window.scrollTo(0, 0)
+    } else {
+      container.scrollTop = 0
+    }
+  }, [location.pathname])
 
   useEffect(() => {
     const stored = getSavedLocation()

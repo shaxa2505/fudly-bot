@@ -197,7 +197,7 @@ class SearchMixin:
                     o.original_price, o.discount_price, o.quantity,
                     o.available_from, o.available_until, o.expiry_date,
                     o.status, o.photo_id as photo, o.created_at, o.unit,
-                    s.name as store_name, s.address, s.category as store_category,
+                    s.name as store_name, s.address, s.rating as store_rating, s.category as store_category,
                     CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent,
                     s.delivery_enabled, s.delivery_price, s.min_order_amount,
                     ts_rank_cd(o.search_vector, to_tsquery('russian', %s)) as relevance
@@ -222,7 +222,7 @@ class SearchMixin:
                 o.original_price, o.discount_price, o.quantity,
                 o.available_from, o.available_until, o.expiry_date,
                 o.status, o.photo_id as photo, o.created_at, o.unit,
-                s.name as store_name, s.address, s.category as store_category,
+                s.name as store_name, s.address, s.rating as store_rating, s.category as store_category,
                 CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent,
                 s.delivery_enabled, s.delivery_price, s.min_order_amount,
                 (

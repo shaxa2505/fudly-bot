@@ -13,7 +13,7 @@
   border-top: 1px solid #F1F5F9;
   border-radius: 0;
   z-index: var(--z-fixed);
-  padding: 12px 24px max(32px, var(--safe-area-bottom));
+  padding: 10px 24px max(16px, var(--safe-area-bottom));
   min-height: 0;
   box-shadow: none;
   backdrop-filter: blur(20px);

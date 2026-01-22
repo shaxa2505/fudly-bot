@@ -699,6 +699,12 @@ async def get_flash_deals(
                 if is_high_discount or is_expiring_soon:
                     original_price_sums = normalize_price(get_val(offer, "original_price", 0))
                     discount_price_sums = normalize_price(get_val(offer, "discount_price", 0))
+                    store_rating = float(
+                        get_val(offer, "store_rating")
+                        or get_val(offer, "avg_rating")
+                        or get_val(offer, "rating")
+                        or 0
+                    )
 
                     offers.append(
                         OfferResponse(
@@ -714,8 +720,11 @@ async def get_flash_deals(
                             store_id=int(get_val(offer, "store_id", 0) or 0),
                             store_name=get_val(offer, "store_name") or get_val(offer, "name") or "",
                             store_address=get_val(offer, "store_address") or get_val(offer, "address"),
+                            store_rating=store_rating,
                             photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                             expiry_date=str(expiry_str) if expiry_str else None,
+                            available_from=get_val(offer, "available_from"),
+                            available_until=get_val(offer, "available_until"),
                         )
                     )
             except Exception as e:  # pragma: no cover - defensive
