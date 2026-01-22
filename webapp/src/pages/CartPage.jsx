@@ -212,7 +212,7 @@ function CartPage({ user }) {
       return sum + (original - discount) * item.quantity
     }, 0)
   }, [cartItems])
-  const formatSum = (value) => Math.round(value || 0).toLocaleString()
+  const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
   const deliveryOptions = [
     { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },

@@ -8,6 +8,10 @@ const apiMocks = vi.hoisted(() => ({
   getStoreOffers: vi.fn(),
   getStoreReviews: vi.fn(),
   getPhotoUrl: vi.fn(),
+  getFavorites: vi.fn(),
+  addFavoriteStore: vi.fn(),
+  removeFavoriteStore: vi.fn(),
+  reverseGeocode: vi.fn(),
 }))
 
 const geoMocks = vi.hoisted(() => ({
@@ -33,6 +37,10 @@ vi.mock('../api/client', () => ({
     getStoreOffers: apiMocks.getStoreOffers,
     getStoreReviews: apiMocks.getStoreReviews,
     getPhotoUrl: apiMocks.getPhotoUrl,
+    getFavorites: apiMocks.getFavorites,
+    addFavoriteStore: apiMocks.addFavoriteStore,
+    removeFavoriteStore: apiMocks.removeFavoriteStore,
+    reverseGeocode: apiMocks.reverseGeocode,
   },
 }))
 
@@ -59,6 +67,10 @@ describe('StoresPage', () => {
     apiMocks.getStoreOffers.mockReset()
     apiMocks.getStoreReviews.mockReset()
     apiMocks.getPhotoUrl.mockReset()
+    apiMocks.getFavorites.mockReset()
+    apiMocks.addFavoriteStore.mockReset()
+    apiMocks.removeFavoriteStore.mockReset()
+    apiMocks.reverseGeocode.mockReset()
     geoMocks.getCurrentLocation.mockReset()
     geoMocks.addDistanceToStores.mockReset()
     geoMocks.saveLocation.mockReset()
@@ -66,6 +78,10 @@ describe('StoresPage', () => {
     geoMocks.addDistanceToStores.mockImplementation(stores => stores)
     geoMocks.getSavedLocation.mockReturnValue(null)
     apiMocks.getPhotoUrl.mockReturnValue('')
+    apiMocks.getFavorites.mockResolvedValue([])
+    apiMocks.addFavoriteStore.mockResolvedValue({ status: 'ok' })
+    apiMocks.removeFavoriteStore.mockResolvedValue({ status: 'ok' })
+    apiMocks.reverseGeocode.mockResolvedValue(null)
     localStorage.setItem(
       'fudly_location',
       JSON.stringify({ city: "Toshkent, O'zbekiston", region: '', district: '' })

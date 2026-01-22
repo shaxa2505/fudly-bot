@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import time
-from datetime import date, datetime, time
+from datetime import date, datetime, time as dt_time
 from typing import Any
 from urllib.parse import parse_qsl, unquote
 
@@ -126,8 +126,8 @@ class OfferResponse(BaseModel):
     min_order_amount: float | None = None
     photo: str | None = None
     expiry_date: str | None = None
-    available_from: time | None = None
-    available_until: time | None = None
+    available_from: dt_time | None = None
+    available_until: dt_time | None = None
 
 
 class OfferListResponse(BaseModel):
