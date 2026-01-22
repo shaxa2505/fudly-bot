@@ -3,6 +3,7 @@ import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Ap
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
+import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
@@ -35,6 +36,7 @@ const OFFERS_LIMIT = 20
 const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
 const GEO_STATUS_KEY = 'fudly_geo_status'
 const GEO_COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24h to avoid repeated prompts
+const GEO_ACCURACY_METERS = 200
 let homePageCache = null
 
 const normalizeCategoryId = (value) => {

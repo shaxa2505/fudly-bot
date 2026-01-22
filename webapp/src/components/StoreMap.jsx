@@ -194,11 +194,8 @@ function StoreMap({
       });
     });
 
-    if (!userMovedRef.current && validStores.length > 0) {
+    if (!userMovedRef.current && validStores.length > 0 && !userLocation) {
       const bounds = L.latLngBounds(validStores.map((s) => [s.latitude, s.longitude]));
-      if (userLocation?.latitude != null && userLocation?.longitude != null) {
-        bounds.extend([userLocation.latitude, userLocation.longitude]);
-      }
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [normalizedStores, mapLoaded, onStoreSelect, t, userLocation]);

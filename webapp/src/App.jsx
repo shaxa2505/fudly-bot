@@ -4,6 +4,7 @@ import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
 import api, { saveTelegramInitData } from './api/client'
 import { getSavedLocation, saveLocation, buildLocationFromReverseGeocode } from './utils/cityUtils'
+import { getPreferredLocation } from './utils/geolocation'
 import { getScrollContainer } from './utils/scrollContainer'
 import HomePage from './pages/HomePage'
 import PageLoader, { LoadingScreen } from './components/PageLoader'
@@ -23,6 +24,7 @@ const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
 const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
 const GEO_STATUS_KEY = 'fudly_geo_status'
 const GEO_COOLDOWN_MS = 24 * 60 * 60 * 1000
+const GEO_ACCURACY_METERS = 200
 
 // Main app content with routing
 function AppContent() {
@@ -136,7 +138,7 @@ function AppContent() {
       return
     }
 
-    if (!navigator.geolocation) {
+    if (!navigator.geolocation && !window.Telegram?.WebApp?.requestLocation) {
       return
     }
 
@@ -148,28 +150,32 @@ function AppContent() {
     }
 
     markAttempt('start')
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords
-        try {
-          const data = await api.reverseGeocode(latitude, longitude, 'uz')
-          if (data) {
-            const resolved = buildLocationFromReverseGeocode(data, latitude, longitude)
-            saveLocation(resolved)
-            markAttempt('ok')
-          } else {
-            markAttempt('fail')
-          }
-        } catch (error) {
-          console.error('Reverse geocode error:', error)
+    const resolveAutoLocation = async () => {
+      try {
+        const coords = await getPreferredLocation({
+          preferTelegram: true,
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000,
+          minAccuracy: GEO_ACCURACY_METERS,
+          retryOnLowAccuracy: true,
+          highAccuracyTimeout: 15000,
+          highAccuracyMaximumAge: 0,
+        })
+        const data = await api.reverseGeocode(coords.latitude, coords.longitude, 'uz')
+        if (data) {
+          const resolved = buildLocationFromReverseGeocode(data, coords.latitude, coords.longitude)
+          saveLocation(resolved)
+          markAttempt('ok')
+        } else {
           markAttempt('fail')
         }
-      },
-      (error) => {
-        markAttempt(error.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
-    )
+      } catch (error) {
+        markAttempt(error?.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
+      }
+    }
+
+    resolveAutoLocation()
   }, [])
 
   useEffect(() => {
