@@ -900,7 +900,7 @@ function CartPage({ user }) {
                       aria-label={`${item.offer.title} miqdorini oshirish`}
                       disabled={item.quantity >= stockLimit}
                     >
-                      <Plus size={18} strokeWidth={2} />
+                      <Plus size={20} strokeWidth={2} />
                     </button>
                     <span className="cart-item-qty-value">{item.quantity}</span>
                     <button
@@ -908,7 +908,7 @@ function CartPage({ user }) {
                       onClick={() => handleQuantityChange(item.offer.id, -1)}
                       aria-label={`${item.offer.title} miqdorini kamaytirish`}
                     >
-                      <Minus size={18} strokeWidth={2} />
+                      <Minus size={20} strokeWidth={2} />
                     </button>
                   </div>
                 </div>
