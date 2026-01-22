@@ -96,7 +96,7 @@
   max-width: calc(100% - 160px);
   position: absolute;
   left: 50%;
-  top: calc(50% + 6px);
+  top: 50%;
   transform: translate(-50%, -50%);
   width: max-content;
 }
@@ -109,6 +109,7 @@
   color: var(--home-text-muted);
   line-height: 1;
   margin-top: 0;
+  transform: translateY(2px);
 }
 
 .header-location {

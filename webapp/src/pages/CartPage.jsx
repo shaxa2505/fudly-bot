@@ -84,6 +84,8 @@ function CartPage({ user }) {
   const markerDraggingRef = useRef(false)
   const mapResolveTimeoutRef = useRef(null)
   const mapSearchCloseTimeoutRef = useRef(null)
+  const mapResolveSeqRef = useRef(0)
+  const mapUserEditingRef = useRef(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError] = useState('')
   const [mapResolving, setMapResolving] = useState(false)
@@ -118,23 +120,57 @@ function CartPage({ user }) {
     }
   }, [])
 
-  const updateAddressFromCoords = useCallback(async (lat, lon) => {
+  const updateAddressFromCoords = useCallback(async (lat, lon, options = {}) => {
+    const { force = false } = options
+    const requestId = ++mapResolveSeqRef.current
     setMapResolving(true)
     setMapError('')
+    let resolved = null
+
     try {
       const data = await api.reverseGeocode(lat, lon, 'uz')
-      const resolved = buildLocationFromReverseGeocode(data, lat, lon)
-      if (resolved?.address) {
-        setAddress(resolved.address)
+      if (data) {
+        resolved = buildLocationFromReverseGeocode(data, lat, lon)
       }
-      saveLocation(resolved)
     } catch (error) {
       console.error('Reverse geocode error:', error)
+    }
+
+    if (!resolved?.address) {
+      try {
+        const params = new URLSearchParams({
+          format: 'jsonv2',
+          lat: String(lat),
+          lon: String(lon),
+          zoom: '18',
+          addressdetails: '1',
+          'accept-language': 'uz',
+        })
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`)
+        if (response.ok) {
+          const data = await response.json()
+          resolved = buildLocationFromReverseGeocode(data, lat, lon)
+        }
+      } catch (error) {
+        console.warn('Nominatim reverse error:', error)
+      }
+    }
+
+    if (requestId !== mapResolveSeqRef.current) {
+      return
+    }
+
+    if (resolved?.address) {
+      setAddress(resolved.address)
+      if (!mapUserEditingRef.current || force) {
+        setMapQuery(resolved.address)
+      }
+      saveLocation(resolved)
+    } else {
       setMapError('Manzilni aniqlab bo\'lmadi')
       saveCoordsFallback(lat, lon)
-    } finally {
-      setMapResolving(false)
     }
+    setMapResolving(false)
   }, [saveCoordsFallback])
 
   const mapEnabled = showCheckout && orderType === 'delivery'
@@ -328,6 +364,14 @@ function CartPage({ user }) {
       }, 300)
     }
 
+    const handleMove = () => {
+      if (markerDraggingRef.current) return
+      const center = map.getCenter()
+      if (checkoutMapMarkerRef.current) {
+        checkoutMapMarkerRef.current.setLatLng(center)
+      }
+    }
+
     const handleMoveEnd = () => {
       if (markerDraggingRef.current) return
       const center = map.getCenter()
@@ -337,7 +381,10 @@ function CartPage({ user }) {
       scheduleResolve(center.lat, center.lng)
     }
 
+    map.on('move', handleMove)
     map.on('moveend', handleMoveEnd)
+    map.on('dragend', handleMoveEnd)
+    map.on('zoomend', handleMoveEnd)
     map.on('click', (event) => {
       if (checkoutMapMarkerRef.current) {
         checkoutMapMarkerRef.current.setLatLng(event.latlng)
@@ -348,9 +395,11 @@ function CartPage({ user }) {
 
     marker.on('dragstart', () => {
       markerDraggingRef.current = true
+      map.dragging.disable()
     })
     marker.on('dragend', () => {
       markerDraggingRef.current = false
+      map.dragging.enable()
       const pos = marker.getLatLng()
       map.panTo(pos)
       scheduleResolve(pos.lat, pos.lng)
@@ -379,7 +428,10 @@ function CartPage({ user }) {
     })
 
     return () => {
+      map.off('move', handleMove)
       map.off('moveend', handleMoveEnd)
+      map.off('dragend', handleMoveEnd)
+      map.off('zoomend', handleMoveEnd)
       map.off('click')
       marker.off('dragstart')
       marker.off('dragend')
@@ -397,6 +449,15 @@ function CartPage({ user }) {
     getCurrentLocation,
     updateAddressFromCoords,
   ])
+
+  useEffect(() => {
+    if (!mapEnabled || !checkoutMapInstanceRef.current) return
+    const map = checkoutMapInstanceRef.current
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+    }, 180)
+    return () => clearTimeout(timer)
+  }, [mapEnabled, showCheckout])
 
   const handleMapResultSelect = (result) => {
     const lat = Number(result?.lat)
@@ -1448,6 +1509,7 @@ function CartPage({ user }) {
                                 clearTimeout(mapSearchCloseTimeoutRef.current)
                                 mapSearchCloseTimeoutRef.current = null
                               }
+                              mapUserEditingRef.current = true
                               setMapSearchOpen(true)
                             }}
                             onBlur={() => {
@@ -1457,6 +1519,7 @@ function CartPage({ user }) {
                               mapSearchCloseTimeoutRef.current = setTimeout(() => {
                                 setMapSearchOpen(false)
                               }, 180)
+                              mapUserEditingRef.current = false
                             }}
                             disabled={!mapEnabled}
                           />
@@ -1534,6 +1597,7 @@ function CartPage({ user }) {
                               clearTimeout(mapSearchCloseTimeoutRef.current)
                               mapSearchCloseTimeoutRef.current = null
                             }
+                            mapUserEditingRef.current = true
                             setMapSearchOpen(true)
                           }}
                           onBlur={() => {
@@ -1543,6 +1607,7 @@ function CartPage({ user }) {
                             mapSearchCloseTimeoutRef.current = setTimeout(() => {
                               setMapSearchOpen(false)
                             }, 180)
+                            mapUserEditingRef.current = false
                           }}
                           onKeyDown={blurOnEnter}
                           disabled={orderType !== 'delivery'}
