@@ -111,6 +111,7 @@ class PaymentMixin:
     def upsert_click_transaction(
         self,
         click_trans_id: int,
+        click_paydoc_id: str | None = None,
         merchant_trans_id: str,
         merchant_prepare_id: str | None = None,
         service_id: str | None = None,
@@ -125,11 +126,12 @@ class PaymentMixin:
             cursor.execute(
                 """
                 INSERT INTO click_transactions (
-                    click_trans_id, merchant_trans_id, merchant_prepare_id,
+                    click_trans_id, click_paydoc_id, merchant_trans_id, merchant_prepare_id,
                     service_id, amount, status, error_code, error_note
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (click_trans_id) DO UPDATE SET
+                    click_paydoc_id = COALESCE(EXCLUDED.click_paydoc_id, click_transactions.click_paydoc_id),
                     merchant_trans_id = EXCLUDED.merchant_trans_id,
                     merchant_prepare_id = COALESCE(EXCLUDED.merchant_prepare_id, click_transactions.merchant_prepare_id),
                     service_id = COALESCE(EXCLUDED.service_id, click_transactions.service_id),
@@ -141,6 +143,7 @@ class PaymentMixin:
                 """,
                 (
                     int(click_trans_id),
+                    click_paydoc_id,
                     str(merchant_trans_id),
                     merchant_prepare_id,
                     service_id,

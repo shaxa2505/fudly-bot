@@ -3184,8 +3184,17 @@ async def create_webhook_app(
             if order_user_id_int != authenticated_user_id:
                 return add_cors_headers(web.json_response({"error": "Access denied"}, status=403))
 
-            if not store_id:
-                store_id = order.get("store_id")
+            order_store_id = order.get("store_id")
+            if store_id:
+                try:
+                    store_id_int = int(store_id)
+                except Exception:
+                    store_id_int = None
+                if store_id_int is None or (order_store_id is not None and store_id_int != int(order_store_id)):
+                    return add_cors_headers(
+                        web.json_response({"error": "Invalid store_id for order"}, status=400)
+                    )
+            store_id = order_store_id
 
             if not amount:
                 amount = order.get("total_price")
@@ -3215,7 +3224,7 @@ async def create_webhook_app(
                         )
                     )
             elif provider == "card":
-                if payment_status in ("proof_submitted", "completed"):
+                if payment_status in ("proof_submitted", "confirmed", "completed"):
                     return add_cors_headers(
                         web.json_response({"error": "Payment already submitted"}, status=400)
                     )
@@ -3341,6 +3350,7 @@ async def create_webhook_app(
                 payment_service.set_database(db)
 
             click_trans_id = _get_value("click_trans_id", "")
+            click_paydoc_id = _get_value("click_paydoc_id", "")
             service_id = _get_value("service_id", "")
             merchant_trans_id = _get_value("merchant_trans_id", "")
             amount = _get_value("amount", "0")
@@ -3356,6 +3366,7 @@ async def create_webhook_app(
             if action == "0":  # Prepare
                 result = await payment_service.process_click_prepare(
                     click_trans_id=click_trans_id,
+                    click_paydoc_id=click_paydoc_id,
                     merchant_trans_id=merchant_trans_id,
                     amount=amount,
                     action=action,
@@ -3366,6 +3377,7 @@ async def create_webhook_app(
             else:  # Complete
                 result = await payment_service.process_click_complete(
                     click_trans_id=click_trans_id,
+                    click_paydoc_id=click_paydoc_id,
                     merchant_trans_id=merchant_trans_id,
                     merchant_prepare_id=_get_value("merchant_prepare_id", ""),
                     amount=amount,

@@ -764,6 +764,7 @@ class PaymentService:
     async def process_click_prepare(
         self,
         click_trans_id: str,
+        click_paydoc_id: str | None,
         merchant_trans_id: str,
         amount: Any,
         action: str,
@@ -898,6 +899,7 @@ class PaymentService:
             try:
                 self._db.upsert_click_transaction(
                     click_trans_id=int(click_trans_id),
+                    click_paydoc_id=str(click_paydoc_id) if click_paydoc_id else None,
                     merchant_trans_id=str(merchant_trans_id),
                     merchant_prepare_id=str(merchant_trans_id),
                     service_id=str(expected_service_id),
@@ -918,6 +920,7 @@ class PaymentService:
     async def process_click_complete(
         self,
         click_trans_id: str,
+        click_paydoc_id: str | None,
         merchant_trans_id: str,
         merchant_prepare_id: str,
         amount: Any,
@@ -994,6 +997,18 @@ class PaymentService:
                 error_note="Incorrect parameter amount",
             )
 
+        order_status = str(
+            order.get("order_status") if isinstance(order, dict) else getattr(order, "order_status", "")
+        ).lower()
+        if order_status in ("cancelled", "rejected"):
+            return self._click_response(
+                click_trans_id=click_trans_id,
+                merchant_trans_id=merchant_trans_id,
+                merchant_confirm_id=merchant_trans_id,
+                error=-9,
+                error_note="Transaction cancelled",
+            )
+
         tx = None
         if self._db and hasattr(self._db, "get_click_transaction"):
             try:
@@ -1023,6 +1038,7 @@ class PaymentService:
                 try:
                     self._db.upsert_click_transaction(
                         click_trans_id=int(click_trans_id),
+                        click_paydoc_id=str(click_paydoc_id) if click_paydoc_id else None,
                         merchant_trans_id=str(merchant_trans_id),
                         merchant_prepare_id=str(merchant_prepare_id),
                         service_id=str(expected_service_id),
@@ -1066,6 +1082,7 @@ class PaymentService:
                 try:
                     self._db.upsert_click_transaction(
                         click_trans_id=int(click_trans_id),
+                        click_paydoc_id=str(click_paydoc_id) if click_paydoc_id else None,
                         merchant_trans_id=str(merchant_trans_id),
                         merchant_prepare_id=str(merchant_prepare_id),
                         service_id=str(expected_service_id),
@@ -1119,6 +1136,7 @@ class PaymentService:
             try:
                 self._db.upsert_click_transaction(
                     click_trans_id=int(click_trans_id),
+                    click_paydoc_id=str(click_paydoc_id) if click_paydoc_id else None,
                     merchant_trans_id=str(merchant_trans_id),
                     merchant_prepare_id=str(merchant_prepare_id),
                     service_id=str(expected_service_id),
@@ -1131,10 +1149,13 @@ class PaymentService:
         # Fire-and-forget fiscalization (do not block Click callback)
         if order_id:
             try:
+                fiscal_payment_id = (
+                    str(click_paydoc_id) if click_paydoc_id else str(click_trans_id)
+                )
                 asyncio.create_task(
                     self.submit_click_fiscal_items(
                         order_id=int(order_id),
-                        payment_id=str(click_trans_id),
+                        payment_id=fiscal_payment_id,
                         service_id=expected_service_id,
                     )
                 )

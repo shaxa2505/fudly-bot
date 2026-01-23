@@ -661,6 +661,7 @@ class SchemaMixin:
                 CREATE TABLE IF NOT EXISTS click_transactions (
                     id SERIAL PRIMARY KEY,
                     click_trans_id BIGINT UNIQUE NOT NULL,
+                    click_paydoc_id TEXT,
                     merchant_trans_id TEXT,
                     merchant_prepare_id TEXT,
                     service_id TEXT,
@@ -673,6 +674,14 @@ class SchemaMixin:
                 )
                 """
             )
+
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE click_transactions ADD COLUMN IF NOT EXISTS click_paydoc_id TEXT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for click_transactions click_paydoc_id: {e}")
 
             # Store admins table (multiple admins per store)
             cursor.execute(

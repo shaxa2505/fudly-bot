@@ -1,7 +1,5 @@
-import json
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlencode
 from urllib.request import Request, urlopen
 
 TARGET_URL = os.getenv(
@@ -9,94 +7,34 @@ TARGET_URL = os.getenv(
     "https://fudly-bot-production.up.railway.app/api/v1/payment/click/callback",
 )
 
-KEY_ORDER = [
-    "click_trans_id",
-    "merchant_trans_id",
-    "merchant_prepare_id",
-    "merchant_confirm_id",
-    "error",
-    "error_note",
-]
-
-
-def _normalize_response(raw_bytes: bytes, content_type: str, action: str | None) -> bytes:
-    text = raw_bytes.decode("utf-8", errors="replace").strip()
-    data = None
-
-    if "application/json" in content_type:
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            data = None
-    elif "application/x-www-form-urlencoded" in content_type:
-        data = {k: v[0] if v else "" for k, v in parse_qs(text).items()}
-
-    if data is None:
-        try:
-            data = json.loads(text)
-        except json.JSONDecodeError:
-            data = None
-
-    if isinstance(data, dict):
-        if str(action) == "0":
-            keys = [
-                "click_trans_id",
-                "merchant_trans_id",
-                "merchant_prepare_id",
-                "error",
-                "error_note",
-            ]
-        elif str(action) == "1":
-            keys = [
-                "click_trans_id",
-                "merchant_trans_id",
-                "merchant_confirm_id",
-                "error",
-                "error_note",
-            ]
-        else:
-            keys = KEY_ORDER
-
-        lines = [f"{k}={data.get(k, '')}" for k in keys]
-        payload = "\r\n".join(lines) + "\r\n"
-        return payload.encode("cp1251", errors="replace")
-
-    # Fallback: return plain text as-is with CRLF line endings
-    return text.encode("cp1251", errors="replace")
-
-
 class ClickProxyHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0") or "0")
             body = self.rfile.read(length)
-            parsed = parse_qs(body.decode("utf-8", errors="replace"))
-            action = None
-            if "action" in parsed and parsed["action"]:
-                action = parsed["action"][0]
 
             req = Request(TARGET_URL, data=body, method="POST")
             req.add_header(
                 "Content-Type",
                 self.headers.get("Content-Type", "application/x-www-form-urlencoded"),
             )
-            req.add_header("Accept", "*/*")
+            req.add_header("Accept", "application/json")
 
             with urlopen(req, timeout=15) as resp:
                 raw = resp.read()
-                content_type = resp.headers.get("Content-Type", "")
+                content_type = resp.headers.get("Content-Type", "application/json")
 
-            payload = _normalize_response(raw, content_type.lower(), action)
+            payload = raw
 
             self.send_response(200)
-            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
         except Exception as exc:
-            body = f"error=-1\r\nerror_note={exc}\r\n".encode("utf-8")
+            body = f'{{"error":-1,"error_note":"{exc}"}}'.encode("utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

@@ -1934,6 +1934,9 @@ class UnifiedOrderService:
                 seller_message_id = getattr(order, "seller_message_id", None)
                 current_status = getattr(order, "order_status", None)
 
+            if str(current_status or "").lower() in ("cancelled", "rejected"):
+                return False
+
             if hasattr(self.db, "update_payment_status"):
                 self.db.update_payment_status(order_id, PaymentStatus.CONFIRMED)
 
