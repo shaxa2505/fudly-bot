@@ -501,6 +501,16 @@ class DatabaseProtocol(Protocol):
     ) -> bool:
         ...
 
+    def update_order_click_payment_id(self, order_id: int, click_payment_id: int) -> None:
+        """Store Click payment ID on an order."""
+        ...
+
+    def update_order_click_fiscal_data(
+        self, order_id: int, status: str, qr_url: str | None = None
+    ) -> None:
+        """Update Click fiscalization status and QR URL."""
+        ...
+
     def get_order(self, order_id: int) -> tuple[Any, ...] | None:
         ...
 
@@ -551,7 +561,6 @@ class DatabaseProtocol(Protocol):
 
     def disable_store_payment_integration(self, store_id: int, provider: str) -> bool:
         ...
-
 
 
 

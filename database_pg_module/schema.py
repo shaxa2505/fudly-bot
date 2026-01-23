@@ -414,6 +414,9 @@ class SchemaMixin:
                     payment_method TEXT DEFAULT 'cash',
                     payment_status TEXT DEFAULT 'not_required',
                     payment_proof_photo_id TEXT,
+                    click_payment_id BIGINT,
+                    click_fiscal_status TEXT,
+                    click_fiscal_qr_url TEXT,
                     order_status TEXT DEFAULT 'pending',
                     cancel_reason VARCHAR(50),
                     cancel_comment TEXT,
@@ -447,6 +450,14 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for orders delivery structured columns: {e}")
+
+            if run_runtime_migrations:
+                try:
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS click_payment_id BIGINT")
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS click_fiscal_status TEXT")
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS click_fiscal_qr_url TEXT")
+                except Exception as e:
+                    logger.warning(f"Migration for orders click fiscal columns: {e}")
 
             # Migration: Add cart_items column to orders table for multi-item orders
             if run_runtime_migrations:

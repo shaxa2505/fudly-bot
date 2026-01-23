@@ -359,6 +359,35 @@ class OrderMixin:
                     (status, order_id),
                 )
 
+    def update_order_click_payment_id(self, order_id: int, click_payment_id: int) -> None:
+        """Store Click payment ID on an order."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE orders SET click_payment_id = %s
+                WHERE order_id = %s
+                """,
+                (click_payment_id, order_id),
+            )
+
+    def update_order_click_fiscal_data(
+        self,
+        order_id: int,
+        status: str,
+        qr_url: str | None = None,
+    ) -> None:
+        """Update Click fiscalization status and QR URL."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE orders SET click_fiscal_status = %s, click_fiscal_qr_url = %s
+                WHERE order_id = %s
+                """,
+                (status, qr_url, order_id),
+            )
+
     # ===================== Uzum transactions =====================
 
     def create_uzum_transaction(

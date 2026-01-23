@@ -18,12 +18,17 @@ To enable platform payments, set environment variables:
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
 import os
+import time
 from datetime import datetime
 from enum import Enum
 from typing import Any
 from urllib.parse import urlencode
+
+import aiohttp
 
 try:
     from logging_config import logger
@@ -101,6 +106,225 @@ class PaymentService:
     def payme_enabled(self) -> bool:
         """Check if platform-level Payme integration is configured."""
         return all([self.payme_merchant_id, self.payme_secret_key])
+
+    def _normalize_to_tiyin(self, amount: float | int) -> int:
+        price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
+        if price_unit == "kopeks":
+            return int(amount)
+        return int(round(float(amount) * 100))
+
+    def _get_click_fiscal_defaults(self) -> dict[str, Any]:
+        return {
+            "ikpu": os.getenv("CLICK_FISCAL_IKPU"),
+            "unit_code": int(os.getenv("CLICK_FISCAL_UNIT_CODE", "0") or 0),
+            "package_code": os.getenv("CLICK_FISCAL_PACKAGE_CODE"),
+            "vat_percent": int(os.getenv("CLICK_FISCAL_VAT_PERCENT", "0") or 0),
+        }
+
+    def _get_click_credentials_for_order(
+        self, order_id: int, store_id: int | None = None
+    ) -> StorePaymentCredentials | None:
+        if store_id:
+            creds = self.get_store_credentials(store_id, "click")
+            if creds:
+                return creds
+        if self._db and order_id and not store_id:
+            try:
+                order = self._db.get_order(order_id)
+                if order:
+                    store_id = order.get("store_id")
+                    if store_id:
+                        creds = self.get_store_credentials(store_id, "click")
+                        if creds:
+                            return creds
+            except Exception as exc:
+                logger.warning(f"Click credentials lookup failed for order {order_id}: {exc}")
+        if self.click_enabled:
+            return StorePaymentCredentials(
+                provider="click",
+                merchant_id=str(self.click_merchant_id),
+                secret_key=str(self.click_secret_key),
+                service_id=str(self.click_service_id),
+            )
+        return None
+
+    def _build_click_fiscal_items(self, order: dict, offer: dict | None = None) -> list[dict]:
+        defaults = self._get_click_fiscal_defaults()
+        if not defaults["ikpu"] or not defaults["unit_code"] or not defaults["package_code"]:
+            raise ValueError("Missing CLICK_FISCAL_IKPU, CLICK_FISCAL_UNIT_CODE, or CLICK_FISCAL_PACKAGE_CODE")
+
+        items: list[dict] = []
+        cart_items = order.get("cart_items")
+        if cart_items and isinstance(cart_items, str):
+            try:
+                cart_items = json.loads(cart_items)
+            except json.JSONDecodeError:
+                cart_items = None
+
+        if cart_items:
+            for item in cart_items:
+                title = item.get("title") or "Товар"
+                unit_label = item.get("unit") or "шт"
+                quantity = int(item.get("quantity", 1))
+                unit_price = float(item.get("price", 0))
+                total_price = unit_price * quantity
+                items.append(
+                    {
+                        "Name": f"{title} {unit_label}",
+                        "SPIC": str(defaults["ikpu"]),
+                        "Units": defaults["unit_code"],
+                        "PackageCode": defaults["package_code"],
+                        "GoodPrice": self._normalize_to_tiyin(unit_price),
+                        "Price": self._normalize_to_tiyin(total_price),
+                        "Amount": quantity,
+                        "VAT": 0,
+                        "VATPercent": defaults["vat_percent"],
+                    }
+                )
+            return items
+
+        title = offer.get("title") if offer else "Товар"
+        unit_label = (offer or {}).get("unit") or "шт"
+        quantity = int(order.get("quantity", 1) or 1)
+        unit_price = float((offer or {}).get("discount_price", 0) or 0)
+        total_price = unit_price * quantity
+        items.append(
+            {
+                "Name": f"{title} {unit_label}",
+                "SPIC": str(defaults["ikpu"]),
+                "Units": defaults["unit_code"],
+                "PackageCode": defaults["package_code"],
+                "GoodPrice": self._normalize_to_tiyin(unit_price),
+                "Price": self._normalize_to_tiyin(total_price),
+                "Amount": quantity,
+                "VAT": 0,
+                "VATPercent": defaults["vat_percent"],
+            }
+        )
+        return items
+
+    def _build_click_fiscal_auth(self, merchant_id: str, secret_key: str) -> str:
+        timestamp = int(time.time())
+        mode = os.getenv("CLICK_FISCAL_AUTH_MODE", "secret_timestamp")
+        if mode == "secret":
+            payload = secret_key
+        elif mode == "merchant_secret_timestamp":
+            payload = f"{merchant_id}{secret_key}{timestamp}"
+        else:
+            payload = f"{secret_key}{timestamp}"
+        signature = hashlib.sha1(payload.encode()).hexdigest()
+        return f"{merchant_id}:{signature}:{timestamp}"
+
+    async def _submit_click_fiscal_items(
+        self, creds: StorePaymentCredentials, payment_id: int, items: list[dict]
+    ) -> dict:
+        if not creds.service_id:
+            raise ValueError("Missing Click service_id for fiscalization")
+
+        payload = {
+            "service_id": int(creds.service_id),
+            "payment_id": int(payment_id),
+            "items": items,
+            "received_ecash": sum(item.get("Price", 0) for item in items),
+            "received_cash": 0,
+            "received_card": 0,
+        }
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Auth": self._build_click_fiscal_auth(creds.merchant_id, creds.secret_key),
+        }
+        url = f"{self.click_api_url}/payment/ofd_data/submit_items"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                return await response.json()
+
+    async def _submit_click_fiscal_qrcode(
+        self, creds: StorePaymentCredentials, payment_id: int, qrcode: str
+    ) -> dict:
+        if not creds.service_id:
+            raise ValueError("Missing Click service_id for fiscalization")
+
+        payload = {
+            "service_id": int(creds.service_id),
+            "payment_id": int(payment_id),
+            "qrcode": qrcode,
+        }
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Auth": self._build_click_fiscal_auth(creds.merchant_id, creds.secret_key),
+        }
+        url = f"{self.click_api_url}/payment/ofd_data/submit_qrcode"
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                return await response.json()
+
+    async def _get_click_fiscal_data(
+        self, creds: StorePaymentCredentials, payment_id: int
+    ) -> dict:
+        if not creds.service_id:
+            raise ValueError("Missing Click service_id for fiscalization")
+
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Auth": self._build_click_fiscal_auth(creds.merchant_id, creds.secret_key),
+        }
+        url = f"{self.click_api_url}/payment/ofd_data/{creds.service_id}/{payment_id}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                return await response.json()
+
+    async def _fiscalize_click_order(self, order_id: int, payment_id: int) -> None:
+        if os.getenv("CLICK_FISCAL_ENABLED", "0") != "1":
+            return
+
+        if not self._db:
+            return
+
+        order = self._db.get_order(order_id)
+        if not order:
+            return
+
+        creds = self._get_click_credentials_for_order(order_id, order.get("store_id"))
+        if not creds:
+            logger.warning("Click fiscalization skipped: missing credentials")
+            return
+
+        offer = None
+        if order.get("offer_id"):
+            offer = self._db.get_offer(order.get("offer_id"))
+
+        try:
+            items = self._build_click_fiscal_items(order, offer)
+        except Exception as exc:
+            logger.warning(f"Click fiscalization items error for order {order_id}: {exc}")
+            if hasattr(self._db, "update_order_click_fiscal_data"):
+                self._db.update_order_click_fiscal_data(order_id, "items_error")
+            return
+
+        result = await self._submit_click_fiscal_items(creds, payment_id, items)
+        error_code = result.get("error_code", 0)
+        status = "items_submitted" if error_code == 0 else "items_failed"
+        if hasattr(self._db, "update_order_click_fiscal_data"):
+            self._db.update_order_click_fiscal_data(order_id, status)
+
+        if error_code != 0:
+            logger.warning(f"Click fiscalization failed for order {order_id}: {result}")
+            return
+
+        if order.get("click_fiscal_qr_url"):
+            qr_result = await self._submit_click_fiscal_qrcode(
+                creds, payment_id, order.get("click_fiscal_qr_url")
+            )
+            if qr_result.get("error_code", 0) == 0:
+                if hasattr(self._db, "update_order_click_fiscal_data"):
+                    self._db.update_order_click_fiscal_data(
+                        order_id, "qr_submitted", order.get("click_fiscal_qr_url")
+                    )
+            else:
+                logger.warning(f"Click fiscal QR submit failed for order {order_id}: {qr_result}")
 
     def get_store_credentials(
         self, store_id: int | None, provider: str
@@ -264,6 +488,7 @@ class PaymentService:
     async def process_click_prepare(
         self,
         click_trans_id: str,
+        service_id: str,
         merchant_trans_id: str,
         amount: float,
         action: str,
@@ -275,17 +500,42 @@ class PaymentService:
 
         Returns response dict for Click.
         """
+        store_id = None
+        expected_service_id = self.click_service_id
+        if self._db and merchant_trans_id:
+            try:
+                order_id = int(merchant_trans_id)
+                order = self._db.get_order(order_id)
+                store_id = order.get("store_id") if order else None
+            except (TypeError, ValueError) as exc:
+                logger.warning(f"Click prepare: invalid merchant_trans_id {merchant_trans_id}: {exc}")
+        if store_id:
+            creds = self.get_store_credentials(store_id, "click")
+            if creds and creds.service_id:
+                expected_service_id = creds.service_id
+
+        if expected_service_id and service_id != expected_service_id:
+            return {"error": -1, "error_note": "Invalid service_id"}
+
         # Verify signature
         if not self.verify_click_signature(
             click_trans_id,
-            self.click_service_id,
+            service_id,
             merchant_trans_id,
-            str(int(amount)),
+            str(int(float(amount))),
             action,
             sign_time,
             sign_string,
+            store_id=store_id,
         ):
             return {"error": -1, "error_note": "Invalid signature"}
+
+        if self._db and merchant_trans_id and hasattr(self._db, "update_order_click_payment_id"):
+            try:
+                order_id = int(merchant_trans_id)
+                self._db.update_order_click_payment_id(order_id, int(click_trans_id))
+            except (TypeError, ValueError) as exc:
+                logger.warning(f"Click prepare: failed to store payment id: {exc}")
 
         # Here you would validate the order exists and amount matches
         # For now, return success
@@ -300,6 +550,7 @@ class PaymentService:
     async def process_click_complete(
         self,
         click_trans_id: str,
+        service_id: str,
         merchant_trans_id: str,
         merchant_prepare_id: str,
         amount: float,
@@ -313,17 +564,42 @@ class PaymentService:
 
         Returns response dict for Click.
         """
+        store_id = None
+        expected_service_id = self.click_service_id
+        if self._db and merchant_trans_id:
+            try:
+                order_id = int(merchant_trans_id)
+                order = self._db.get_order(order_id)
+                store_id = order.get("store_id") if order else None
+            except (TypeError, ValueError) as exc:
+                logger.warning(f"Click complete: invalid merchant_trans_id {merchant_trans_id}: {exc}")
+        if store_id:
+            creds = self.get_store_credentials(store_id, "click")
+            if creds and creds.service_id:
+                expected_service_id = creds.service_id
+
+        if expected_service_id and service_id != expected_service_id:
+            return {"error": -1, "error_note": "Invalid service_id"}
+
         # Verify signature
         if not self.verify_click_signature(
             click_trans_id,
-            self.click_service_id,
+            service_id,
             merchant_trans_id,
-            str(int(amount)),
+            str(int(float(amount))),
             action,
             sign_time,
             sign_string,
+            store_id=store_id,
         ):
             return {"error": -1, "error_note": "Invalid signature"}
+
+        if self._db and merchant_trans_id and hasattr(self._db, "update_order_click_payment_id"):
+            try:
+                order_id = int(merchant_trans_id)
+                self._db.update_order_click_payment_id(order_id, int(click_trans_id))
+            except (TypeError, ValueError) as exc:
+                logger.warning(f"Click complete: failed to store payment id: {exc}")
 
         if error != 0:
             # Payment failed or cancelled
@@ -354,6 +630,13 @@ class PaymentService:
                         await order_service.confirm_payment(order_id)
                     elif hasattr(self._db, "update_payment_status"):
                         self._db.update_payment_status(order_id, "confirmed")
+                    if self._db:
+                        try:
+                            payment_id = int(click_trans_id)
+                        except (TypeError, ValueError):
+                            payment_id = None
+                        if payment_id:
+                            asyncio.create_task(self._fiscalize_click_order(order_id, payment_id))
                 except Exception as e:
                     logger.warning(f"Failed to confirm payment for order #{order_id}: {e}")
 

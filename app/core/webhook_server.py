@@ -3304,46 +3304,72 @@ async def create_webhook_app(
             logger.error(f"API create payment error: {e}")
             return add_cors_headers(web.json_response({"error": str(e)}, status=500))
 
+    async def _handle_click_callback(request: web.Request, default_action: str | None = None) -> dict:
+        data = await request.post()
+
+        if default_action and not data.get("action"):
+            data = data.copy()
+            data["action"] = default_action
+
+        payment_service = get_payment_service()
+
+        click_trans_id = data.get("click_trans_id", "")
+        service_id = data.get("service_id", "")
+        merchant_trans_id = data.get("merchant_trans_id", "")
+        amount = float(data.get("amount", 0))
+        action = data.get("action", "")
+        sign_time = data.get("sign_time", "")
+        sign_string = data.get("sign_string", "")
+        error = int(data.get("error", 0))
+
+        if action == "0":  # Prepare
+            return await payment_service.process_click_prepare(
+                click_trans_id=click_trans_id,
+                service_id=service_id,
+                merchant_trans_id=merchant_trans_id,
+                amount=amount,
+                action=action,
+                sign_time=sign_time,
+                sign_string=sign_string,
+            )
+
+        return await payment_service.process_click_complete(
+            click_trans_id=click_trans_id,
+            service_id=service_id,
+            merchant_trans_id=merchant_trans_id,
+            merchant_prepare_id=data.get("merchant_prepare_id", ""),
+            amount=amount,
+            action=action,
+            sign_time=sign_time,
+            sign_string=sign_string,
+            error=error,
+        )
+
     async def api_click_callback(request: web.Request) -> web.Response:
         """POST /api/v1/payment/click/callback - Click payment callback."""
         try:
-            data = await request.post()
-
-            payment_service = get_payment_service()
-
-            click_trans_id = data.get("click_trans_id", "")
-            service_id = data.get("service_id", "")
-            merchant_trans_id = data.get("merchant_trans_id", "")
-            amount = float(data.get("amount", 0))
-            action = data.get("action", "")
-            sign_time = data.get("sign_time", "")
-            sign_string = data.get("sign_string", "")
-            error = int(data.get("error", 0))
-
-            if action == "0":  # Prepare
-                result = await payment_service.process_click_prepare(
-                    click_trans_id=click_trans_id,
-                    merchant_trans_id=merchant_trans_id,
-                    amount=amount,
-                    action=action,
-                    sign_time=sign_time,
-                    sign_string=sign_string,
-                )
-            else:  # Complete
-                result = await payment_service.process_click_complete(
-                    click_trans_id=click_trans_id,
-                    merchant_trans_id=merchant_trans_id,
-                    merchant_prepare_id=data.get("merchant_prepare_id", ""),
-                    amount=amount,
-                    action=action,
-                    sign_time=sign_time,
-                    sign_string=sign_string,
-                    error=error,
-                )
-
+            result = await _handle_click_callback(request)
             return web.json_response(result)
         except Exception as e:
             logger.error(f"Click callback error: {e}")
+            return web.json_response({"error": -1, "error_note": str(e)})
+
+    async def api_click_prepare(request: web.Request) -> web.Response:
+        """POST /api/v1/payment/click/prepare - Click prepare callback."""
+        try:
+            result = await _handle_click_callback(request, default_action="0")
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Click prepare error: {e}")
+            return web.json_response({"error": -1, "error_note": str(e)})
+
+    async def api_click_complete(request: web.Request) -> web.Response:
+        """POST /api/v1/payment/click/complete - Click complete callback."""
+        try:
+            result = await _handle_click_callback(request, default_action="1")
+            return web.json_response(result)
+        except Exception as e:
+            logger.error(f"Click complete error: {e}")
             return web.json_response({"error": -1, "error_note": str(e)})
 
     async def api_payme_callback(request: web.Request) -> web.Response:
@@ -3405,6 +3431,8 @@ async def create_webhook_app(
     app.router.add_options("/api/v1/payment/create", cors_preflight)
     app.router.add_post("/api/v1/payment/create", api_create_payment)
     app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
+    app.router.add_post("/api/v1/payment/click/prepare", api_click_prepare)
+    app.router.add_post("/api/v1/payment/click/complete", api_click_complete)
     app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
     fastapi_handler = None
