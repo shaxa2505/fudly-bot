@@ -624,6 +624,7 @@ class OrderMixin:
 
                 # Create order with cart_items
                 cart_items_json = json.dumps(cart_items, ensure_ascii=False)
+                total_quantity = sum(int(item.get("quantity", 1)) for item in cart_items)
 
                 payment_method_norm = self._normalize_payment_method(payment_method)
                 payment_status = self._initial_payment_status(payment_method_norm)
@@ -649,7 +650,7 @@ class OrderMixin:
                             pickup_code,
                             order_type,
                             cart_items_json,
-                            len(cart_items),
+                            total_quantity,
                         ),
                     )
                 except Exception as e:
@@ -675,7 +676,7 @@ class OrderMixin:
                             payment_status,
                             pickup_code,
                             cart_items_json,
-                            len(cart_items),
+                            total_quantity,
                         ),
                     )
                 order_id = cursor.fetchone()[0]

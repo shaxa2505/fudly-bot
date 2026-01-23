@@ -264,14 +264,14 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
         if user:
             if isinstance(user, dict):
                 customer_name = user.get("full_name") or user.get("username") or f"User {user_id}"
-                customer_phone = user.get("phone_number") or ""
+            customer_phone = user.get("phone") or ""
             else:
                 customer_name = (
                     getattr(user, "full_name", None)
                     or getattr(user, "username", None)
                     or f"User {user_id}"
                 )
-                customer_phone = getattr(user, "phone_number", "") or ""
+            customer_phone = getattr(user, "phone", "") or ""
 
         # Get store name
         store_name = "Магазин"

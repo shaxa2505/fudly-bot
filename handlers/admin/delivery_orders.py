@@ -71,10 +71,15 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
         user_id = _get_order_field(order, "user_id")
         store_id = _get_order_field(order, "store_id")
         order_status = _get_order_field(order, "order_status")
+        payment_status = _get_order_field(order, "payment_status")
 
-        if order_status not in ["awaiting_payment", "awaiting_admin_confirmation"]:
+        if payment_status not in ["proof_submitted", "awaiting_proof", "awaiting_admin_confirmation"]:
             await callback.answer(
-                get_text(lang, "admin_order_already_processed", status=order_status),
+                get_text(
+                    lang,
+                    "admin_order_already_processed",
+                    status=payment_status or order_status,
+                ),
                 show_alert=True,
             )
             return
@@ -157,10 +162,15 @@ async def admin_reject_payment(callback: types.CallbackQuery) -> None:
 
         user_id = _get_order_field(order, "user_id")
         order_status = _get_order_field(order, "order_status")
+        payment_status = _get_order_field(order, "payment_status")
 
-        if order_status not in ["awaiting_payment", "awaiting_admin_confirmation"]:
+        if payment_status not in ["proof_submitted", "awaiting_proof", "awaiting_admin_confirmation"]:
             await callback.answer(
-                get_text(lang, "admin_order_already_processed", status=order_status),
+                get_text(
+                    lang,
+                    "admin_order_already_processed",
+                    status=payment_status or order_status,
+                ),
                 show_alert=True,
             )
             return

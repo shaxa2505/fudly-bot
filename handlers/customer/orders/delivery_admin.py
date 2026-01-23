@@ -62,6 +62,10 @@ async def admin_confirm_payment(
     if not order:
         await callback.answer("❌ Buyurtma topilmadi", show_alert=True)
         return
+    payment_status = _get_order_field(order, "payment_status", 0)
+    if str(payment_status) not in ("proof_submitted", "awaiting_proof", "awaiting_admin_confirmation"):
+        await callback.answer("⚠️ To'lov allaqachon ko'rib chiqilgan", show_alert=True)
+        return
 
     skip_seller_notify = False
     order_service = get_unified_order_service()
@@ -292,6 +296,10 @@ async def admin_reject_payment(
     order = db.get_order(order_id)
     if not order:
         await callback.answer("❌", show_alert=True)
+        return
+    payment_status = _get_order_field(order, "payment_status", 0)
+    if str(payment_status) not in ("proof_submitted", "awaiting_proof", "awaiting_admin_confirmation"):
+        await callback.answer("⚠️ To'lov allaqachon ko'rib chiqilgan", show_alert=True)
         return
 
     db.update_payment_status(order_id, "rejected")
