@@ -145,12 +145,9 @@ def build_delivery_payment_keyboard(
     """Build payment method selection keyboard."""
     kb = InlineKeyboardBuilder()
 
-    # Payment options
+    # Payment options (Click only)
     click_text = "💳 Click"
-    card_text = "💳 Kartaga o'tkazma" if lang == "uz" else "💳 Перевод на карту"
-
     kb.button(text=click_text, callback_data=f"dlv_pay_click_{offer_id}")
-    kb.button(text=card_text, callback_data=f"dlv_pay_card_{offer_id}")
 
     # Back and Cancel
     back_text = "Orqaga" if lang == "uz" else "Назад"
@@ -158,5 +155,5 @@ def build_delivery_payment_keyboard(
     kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
     kb.button(text=cancel_text, callback_data="dlv_cancel")
 
-    kb.adjust(2, 2)
+    kb.adjust(1, 2)
     return kb

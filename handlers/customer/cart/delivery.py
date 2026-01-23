@@ -164,8 +164,8 @@ def register(router: Router) -> None:
 
         kb = InlineKeyboardBuilder()
         kb.button(
-            text=get_text(lang, "cart_delivery_payment_card"),
-            callback_data=f"cart_pay_card_{store_id}",
+            text=get_text(lang, "cart_delivery_payment_click"),
+            callback_data="cart_pay_click",
         )
         kb.button(
             text=get_text(lang, "cart_delivery_back_button"),

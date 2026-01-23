@@ -49,6 +49,7 @@ export default function OrderDetailsPage() {
           ...raw,
           order_id: raw.order_id || raw.booking_id,
           status: displayStatus,
+          fulfillment_status: baseStatus,
           offer_title: raw.items?.[0]?.offer_title || raw.offer_title || 'Buyurtma',
           offer_photo: resolveOrderItemImageUrl(raw.items?.[0]) || resolveOrderItemImageUrl(raw),
           store_name: raw.store_name || raw.items?.[0]?.store_name,
@@ -73,21 +74,36 @@ export default function OrderDetailsPage() {
     }
   }
 
+  const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('ru-RU')
+
   const getStatusInfo = (status) => {
     const statusMap = {
-      pending: { text: 'Kutilmoqda', color: '#FF6B35', bg: '#FFF4F0' },
+      pending: { text: 'Kutilmoqda', color: '#F97316', bg: '#FFF4EB' },
       preparing: { text: 'Tayyorlanmoqda', color: '#10B981', bg: '#ECFDF5' },
       ready: { text: 'Tayyor', color: '#8B5CF6', bg: '#FAF5FF' },
       delivering: { text: "Yo'lda", color: '#3B82F6', bg: '#EFF6FF' },
       completed: { text: 'Bajarildi', color: '#10B981', bg: '#ECFDF5' },
       cancelled: { text: 'Bekor qilindi', color: '#EF4444', bg: '#FEF2F2' },
       rejected: { text: 'Rad etildi', color: '#EF4444', bg: '#FEF2F2' },
-      awaiting_payment: { text: 'To\'lov kutilmoqda', color: '#F59E0B', bg: '#FFFBEB' },
+      awaiting_payment: { text: "To'lov kutilmoqda", color: '#F59E0B', bg: '#FFFBEB' },
       awaiting_proof: { text: 'Chek kutilmoqda', color: '#F59E0B', bg: '#FFFBEB' },
       proof_submitted: { text: 'Tekshirilmoqda', color: '#3B82F6', bg: '#EFF6FF' },
-      payment_rejected: { text: 'To\'lov rad etildi', color: '#EF4444', bg: '#FEF2F2' },
+      payment_rejected: { text: "To'lov rad etildi", color: '#EF4444', bg: '#FEF2F2' },
     }
     return statusMap[status] || { text: status, color: '#6B7280', bg: '#F3F4F6' }
+  }
+
+  const getPaymentStatusLabel = (status) => {
+    const labels = {
+      awaiting_payment: "To'lov kutilmoqda",
+      awaiting_proof: 'Chek kutilmoqda',
+      proof_submitted: 'Chek tekshirilmoqda',
+      confirmed: "To'lov tasdiqlandi",
+      rejected: "To'lov rad etildi",
+      payment_rejected: "To'lov rad etildi",
+      not_required: "To'lov talab qilinmaydi",
+    }
+    return labels[status] || null
   }
 
   const formatDate = (dateString) => {
@@ -163,7 +179,15 @@ export default function OrderDetailsPage() {
       <div className="order-details-page">
         <div className="details-header">
           <div className="topbar-card details-header-inner">
-            <h1 className="details-title">Buyurtma</h1>
+            <button className="details-back" onClick={() => navigate(-1)} aria-label="Ortga">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <div className="details-header-main">
+              <span className="details-label">Buyurtma</span>
+              <h1 className="details-title">#{orderId}</h1>
+            </div>
           </div>
         </div>
         <div className="error-container">
@@ -175,214 +199,386 @@ export default function OrderDetailsPage() {
   }
 
   const statusInfo = getStatusInfo(order.status)
+  const fulfillmentStatus = order.fulfillment_status || normalizeOrderStatus(order.order_status || order.status)
   const isDelivery = order.order_type === 'delivery' || order.delivery_address
-  const needsPayment = ['awaiting_payment', 'awaiting_proof', 'payment_rejected'].includes(order.status)
+  const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
   const canPayOnline = order.payment_method && ['click', 'payme'].includes(order.payment_method)
-  const paymentChipText =
-    order.status === 'proof_submitted'
-      ? "Chek yuborildi, tasdiqlash kutilmoqda"
-      : order.status === 'awaiting_proof'
-      ? "Chek yuborilmadi"
-      : needsPayment
-      ? "To'lov kutilmoqda"
-      : null
-  const itemsSubtotal = Array.isArray(order.items) && order.items.length > 0
+  const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
+
+  const totalPrice = Number(order.total_price || 0)
+  const hasItemBreakdown = Array.isArray(order.items) && order.items.length > 0
+  const rawItemsSubtotal = hasItemBreakdown
     ? order.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0)
     : 0
-  const totalPrice = Number(order.total_price || 0)
-  const fallbackDeliveryFee = totalPrice > itemsSubtotal ? totalPrice - itemsSubtotal : 0
-  const deliveryFee = Number(order.delivery_fee || 0) || fallbackDeliveryFee
+  const fallbackDeliveryFee = hasItemBreakdown && totalPrice > rawItemsSubtotal ? totalPrice - rawItemsSubtotal : 0
+  const deliveryFee = isDelivery ? (Number(order.delivery_fee || 0) || fallbackDeliveryFee) : 0
+  const itemsSubtotal = hasItemBreakdown ? rawItemsSubtotal : Math.max(0, totalPrice - deliveryFee)
+  const totalUnits = hasItemBreakdown
+    ? order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    : (order.quantity || 1)
+
   const paymentMethodLabels = {
     cash: 'Naqd',
     card: 'Karta',
     click: 'Click',
     payme: 'Payme',
   }
+
+  const paymentNotice = (() => {
+    switch (order.status) {
+      case 'awaiting_payment':
+        return {
+          title: "To'lovni yakunlang",
+          text: "Buyurtma tasdiqlanishi uchun to'lovni yakunlash kerak.",
+          tone: 'warning',
+          icon: '!',
+          showActions: true,
+        }
+      case 'awaiting_proof':
+        return {
+          title: 'Chek yuborish kerak',
+          text: "To'lovni tasdiqlash uchun chekni yuboring.",
+          tone: 'warning',
+          icon: '!',
+          showActions: true,
+        }
+      case 'payment_rejected':
+        return {
+          title: "To'lov rad etildi",
+          text: "Chek qayta tekshirish uchun yangi chek yuboring yoki qayta to'lang.",
+          tone: 'danger',
+          icon: '!',
+          showActions: true,
+        }
+      case 'proof_submitted':
+        return {
+          title: 'Chek tekshirilmoqda',
+          text: 'Chekingiz qabul qilindi. Tasdiqlashni kuting.',
+          tone: 'info',
+          icon: 'i',
+          showActions: false,
+        }
+      default:
+        return null
+    }
+  })()
+
+  const payButtonLabel = order.payment_method === 'click'
+    ? "Click bilan to'lash"
+    : "Payme bilan to'lash"
+
+  const showPayButton = canPayOnline && ['awaiting_payment', 'awaiting_proof', 'payment_rejected'].includes(order.status)
+  const showProofButton = ['awaiting_proof', 'payment_rejected'].includes(order.status)
+    || (!canPayOnline && order.status === 'awaiting_payment')
+  const isPayPrimary = order.status === 'awaiting_payment' && canPayOnline
+  const isProofPrimary = !isPayPrimary
+
+  const statusSteps = isDelivery
+    ? [
+        { key: 'pending', label: 'Yaratildi' },
+        { key: 'preparing', label: 'Tayyorlanmoqda' },
+        { key: 'ready', label: 'Tayyor' },
+        { key: 'delivering', label: "Yo'lda" },
+        { key: 'completed', label: 'Yakunlandi' },
+      ]
+    : [
+        { key: 'pending', label: 'Yaratildi' },
+        { key: 'preparing', label: 'Tayyorlanmoqda' },
+        { key: 'ready', label: 'Tayyor' },
+        { key: 'completed', label: 'Yakunlandi' },
+      ]
+
+  const activeStepIndex = Math.max(0, statusSteps.findIndex(step => step.key === fulfillmentStatus))
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
 
   return (
     <div className="order-details-page">
-      {/* Header */}
       <div className="details-header">
         <div className="topbar-card details-header-inner">
-          <div className="details-title-row">
-            <h1 className="details-title">Buyurtma #{orderId}</h1>
-            <div
-              className="status-badge"
-              style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}
-            >
-              {statusInfo.text}
+          <button className="details-back" onClick={() => navigate(-1)} aria-label="Ortga">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <div className="details-header-main">
+            <span className="details-label">Buyurtma</span>
+            <div className="details-title-row">
+              <h1 className="details-title">#{orderId}</h1>
             </div>
-            {paymentChipText && (
-              <div className="payment-status-chip" title={order.payment_status || ''}>
-                {paymentChipText}
-              </div>
-            )}
+            <div className="details-meta">
+              <span className="details-meta-item">{order.store_name || "Do'kon"}</span>
+              <span className="details-dot"></span>
+              <span className="details-meta-item">{formatDate(order.created_at)}</span>
+            </div>
           </div>
-          <span className="order-date">{formatDate(order.created_at)}</span>
+          <div className="details-header-side">
+            <span className="details-type-pill">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
+            <span className="status-pill" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>
+              {statusInfo.text}
+            </span>
+          </div>
         </div>
       </div>
 
-      {needsPayment && (
-        <div className="payment-banner">
-          <h3>To'lov holati</h3>
-          {order.status === 'awaiting_payment' && (
-            <p>To'lovni yakunlang. Buyurtma to'liq tasdiqlanishi uchun to'lov kerak.</p>
-          )}
-          {order.status === 'awaiting_proof' && (
-            <p>Chek yuborilishi kerak. To'lovni tasdiqlash uchun chek yuboring.</p>
-          )}
-          {order.status === 'payment_rejected' && (
-            <p>To'lov rad etildi. Yangi chek yuboring yoki onlayn to'lov qiling.</p>
-          )}
+      {isCancelled && (
+        <div className="status-note">
+          <div className="status-note-title">
+            {fulfillmentStatus === 'rejected' ? 'Buyurtma rad etildi' : 'Buyurtma bekor qilindi'}
+          </div>
+          <p className="status-note-text">Agar savollaringiz bo'lsa, qo'llab-quvvatlashga yozing.</p>
+        </div>
+      )}
 
-          <div className="payment-actions">
-            {canPayOnline && (
-              <button className="payment-btn primary" onClick={handlePayOnline}>
-                {order.payment_method === 'click' ? 'Click bilan to\'lash' : 'Payme bilan to\'lash'}
-              </button>
-            )}
-            {(order.status !== 'awaiting_payment' || !canPayOnline) && (
-              <button className="payment-btn secondary" onClick={handleUploadProof}>
-                Chekni yuborish
-              </button>
-            )}
+      {paymentNotice && (
+        <div className={`action-card tone-${paymentNotice.tone}`}>
+          <div className="action-header">
+            <div className="action-icon">{paymentNotice.icon}</div>
+            <div className="action-content">
+              <h3>{paymentNotice.title}</h3>
+              <p>{paymentNotice.text}</p>
+            </div>
+          </div>
+          {paymentNotice.showActions && (
+            <div className="action-buttons">
+              {showProofButton && (
+                <button
+                  className={`action-btn ${isProofPrimary ? 'primary' : 'ghost'}`}
+                  onClick={handleUploadProof}
+                >
+                  Chekni yuborish
+                </button>
+              )}
+              {showPayButton && (
+                <button
+                  className={`action-btn ${isPayPrimary ? 'primary' : 'ghost'}`}
+                  onClick={handlePayOnline}
+                >
+                  {payButtonLabel}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="summary-card">
+        <div className="summary-grid">
+          <div className="summary-item">
+            <span className="summary-label">Jami</span>
+            <span className="summary-value total">{formatMoney(totalPrice)} so'm</span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">Mahsulotlar</span>
+            <span className="summary-value">{totalUnits} dona</span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">Buyurtma turi</span>
+            <span className="summary-value">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">To'lov usuli</span>
+            <span className="summary-value">{paymentMethodLabels[order.payment_method] || 'Naqd'}</span>
+          </div>
+        </div>
+        {paymentStatusLabel && (
+          <div className="summary-chip">{paymentStatusLabel}</div>
+        )}
+      </div>
+
+      {!isCancelled && (
+        <div className="details-section">
+          <h2 className="section-title">Buyurtma bosqichlari</h2>
+          <div className="progress-card">
+            {statusSteps.map((step, index) => {
+              const isComplete = index <= activeStepIndex
+              const isCurrent = index === activeStepIndex
+              return (
+                <div
+                  key={step.key}
+                  className={`progress-step ${isComplete ? 'is-complete' : ''} ${isCurrent ? 'is-current' : ''}`}
+                >
+                  <div className="progress-marker">
+                    <span className="progress-dot"></span>
+                    {index < statusSteps.length - 1 && <span className="progress-line"></span>}
+                  </div>
+                  <div className="progress-content">
+                    <span className="progress-title">{step.label}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Order Items */}
       <div className="details-section">
         <h2 className="section-title">Mahsulotlar</h2>
         <div className="items-list">
           {order.items && order.items.length > 0 ? (
             order.items.map((item, idx) => {
               const itemPhoto = resolveOrderItemImageUrl(item)
+              const itemTitle = item.offer_title || item.title || 'Mahsulot'
+              const itemTotal = Number(item.price || 0) * Number(item.quantity || 0)
               return (
-              <div key={idx} className="item-card">
-                {itemPhoto && (
+                <div key={idx} className="item-card">
+                  <div className="item-thumb">
+                    {itemPhoto ? (
+                      <img
+                        src={itemPhoto}
+                        alt={itemTitle}
+                        className="item-image"
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
+                      />
+                    ) : (
+                      <div className="item-placeholder">{itemTitle.trim().charAt(0).toUpperCase()}</div>
+                    )}
+                  </div>
+                  <div className="item-body">
+                    <div className="item-row">
+                      <h3 className="item-title">{itemTitle}</h3>
+                      <span className="item-total">{formatMoney(itemTotal)} so'm</span>
+                    </div>
+                    <div className="item-sub">
+                      <span>{item.quantity} x {formatMoney(item.price)} so'm</span>
+                    </div>
+                    {item.store_name && (
+                      <div className="item-store">Do'kon: {item.store_name}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <div className="item-card">
+              <div className="item-thumb">
+                {orderPhotoUrl ? (
                   <img
-                    src={itemPhoto}
-                    alt={item.offer_title}
+                    src={orderPhotoUrl}
+                    alt={order.offer_title}
                     className="item-image"
                     onError={(e) => {
                       e.target.style.display = 'none'
                     }}
                   />
+                ) : (
+                  <div className="item-placeholder">{(order.offer_title || 'B').trim().charAt(0).toUpperCase()}</div>
                 )}
-                <div className="item-info">
-                  <h3 className="item-title">{item.offer_title}</h3>
-                  <p className="item-store">Do'kon: {item.store_name}</p>
-                  <div className="item-meta">
-                    <span className="item-quantity">{item.quantity} x {Math.round(item.price).toLocaleString()} so'm</span>
-                    <span className="item-total">{Math.round(item.quantity * item.price).toLocaleString()} so'm</span>
-                  </div>
-                </div>
               </div>
-            )})
-          ) : (
-            <div className="single-item-card">
-              {orderPhotoUrl && (
-                <img
-                  src={orderPhotoUrl}
-                  alt={order.offer_title}
-                  className="item-image"
-                  onError={(e) => {
-                    e.target.style.display = 'none'
-                  }}
-                />
-              )}
-              <div className="item-info">
-                <h3 className="item-title">{order.offer_title}</h3>
-                <p className="item-store">Do'kon: {order.store_name}</p>
-                <div className="item-meta">
-                  <span className="item-quantity">{order.quantity || 1} dona</span>
-                  <span className="item-total">{Math.round(order.total_price || 0).toLocaleString()} so'm</span>
+              <div className="item-body">
+                <div className="item-row">
+                  <h3 className="item-title">{order.offer_title}</h3>
+                  <span className="item-total">{formatMoney(totalPrice)} so'm</span>
                 </div>
+                <div className="item-sub">
+                  <span>{order.quantity || 1} dona</span>
+                </div>
+                {order.store_name && (
+                  <div className="item-store">Do'kon: {order.store_name}</div>
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Delivery Info */}
       {isDelivery && order.delivery_address && (
         <div className="details-section">
           <h2 className="section-title">Yetkazib berish</h2>
           <div className="info-card">
             <div className="info-row">
-              <span className="info-label">Manzil:</span>
+              <span className="info-label">Manzil</span>
               <span className="info-value">{order.delivery_address}</span>
             </div>
             {order.phone && (
               <div className="info-row">
-                <span className="info-label">Telefon:</span>
+                <span className="info-label">Telefon</span>
                 <span className="info-value">{order.phone}</span>
               </div>
             )}
             {order.delivery_notes && (
               <div className="info-row">
-                <span className="info-label">Izoh:</span>
+                <span className="info-label">Izoh</span>
                 <span className="info-value">{order.delivery_notes}</span>
               </div>
             )}
-            {deliveryFee > 0 && (
+          </div>
+        </div>
+      )}
+
+      {!isDelivery && order.booking_code && (
+        <div className="details-section">
+          <h2 className="section-title">Olib ketish</h2>
+          <div className="info-card">
+            <div className="info-row">
+              <span className="info-label">Kod</span>
+              <span className="info-value booking-code">{order.booking_code}</span>
+            </div>
+            {order.pickup_time && (
               <div className="info-row">
-                <span className="info-label">Yetkazib berish:</span>
-                <span className="info-value">{Math.round(deliveryFee).toLocaleString()} so'm</span>
+                <span className="info-label">Vaqt</span>
+                <span className="info-value">{formatDate(order.pickup_time)}</span>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Pickup Info */}
-      {!isDelivery && order.booking_code && (
-        <div className="details-section">
-        <h2 className="section-title">Olib ketish</h2>
+      <div className="details-section">
+        <h2 className="section-title">To'lov tafsilotlari</h2>
         <div className="info-card">
           <div className="info-row">
-              <span className="info-label">Kod:</span>
-            <span className="info-value booking-code">{order.booking_code}</span>
+            <span className="info-label">Mahsulotlar</span>
+            <span className="info-value">{formatMoney(itemsSubtotal)} so'm</span>
           </div>
-          {order.pickup_time && (
+          {deliveryFee > 0 && (
             <div className="info-row">
-                <span className="info-label">Vaqt:</span>
-              <span className="info-value">{formatDate(order.pickup_time)}</span>
+              <span className="info-label">Yetkazib berish</span>
+              <span className="info-value">{formatMoney(deliveryFee)} so'm</span>
             </div>
           )}
+          <div className="info-row">
+            <span className="info-label">To'lov usuli</span>
+            <span className="info-value">{paymentMethodLabels[order.payment_method] || 'Naqd'}</span>
+          </div>
+          {paymentStatusLabel && (
+            <div className="info-row">
+              <span className="info-label">To'lov holati</span>
+              <span className="info-value">{paymentStatusLabel}</span>
+            </div>
+          )}
+          <div className="info-row total-row">
+            <span className="info-label">Jami</span>
+            <span className="info-value total-price">{formatMoney(totalPrice)} so'm</span>
+          </div>
         </div>
       </div>
-      )}
 
-      {/* Payment Info */}
       <div className="details-section">
-        <h2 className="section-title">To'lov</h2>
+        <h2 className="section-title">Do'kon</h2>
         <div className="info-card">
-          {deliveryFee > 0 && itemsSubtotal > 0 && (
+          <div className="info-row">
+            <span className="info-label">Nomi</span>
+            <span className="info-value">{order.store_name || "Do'kon"}</span>
+          </div>
+          {order.store_address && (
             <div className="info-row">
-              <span className="info-label">Mahsulotlar:</span>
+              <span className="info-label">Manzil</span>
+              <span className="info-value">{order.store_address}</span>
+            </div>
+          )}
+          {order.store_phone && (
+            <div className="info-row">
+              <span className="info-label">Telefon</span>
               <span className="info-value">
-                {Math.round(itemsSubtotal).toLocaleString()} so'm
+                <a href={`tel:${order.store_phone}`}>{order.store_phone}</a>
               </span>
             </div>
           )}
-          <div className="info-row">
-            <span className="info-label">Usul:</span>
-            <span className="info-value">
-              {paymentMethodLabels[order.payment_method] || 'Naqd'}
-            </span>
-          </div>
-          <div className="info-row total-row">
-            <span className="info-label">Jami:</span>
-            <span className="info-value total-price">
-              {Math.round(totalPrice || 0).toLocaleString()} so'm
-            </span>
-          </div>
         </div>
       </div>
 
-      {/* Contact Support */}
       <div className="support-section">
         <p className="support-text">Savollar bormi?</p>
         <button

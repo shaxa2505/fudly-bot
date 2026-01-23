@@ -10,11 +10,10 @@ Delivery handlers are split into modules:
 """
 from aiogram import Router
 
-from . import delivery, delivery_admin, delivery_partner, history, my_orders
+from . import delivery, delivery_partner, history, my_orders
 
 router = Router(name="customer_orders")
 router.include_router(my_orders.router)  # New improved "My Orders" - first for priority
 router.include_router(history.router)
 router.include_router(delivery.router)
-router.include_router(delivery_admin.router)  # Admin payment confirmation
 router.include_router(delivery_partner.router)

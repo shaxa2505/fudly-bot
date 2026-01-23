@@ -520,11 +520,6 @@ def _register_handlers() -> None:
     admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
     admin_stats.setup(admin_service, logger)
 
-    # Setup customer payment proof upload
-    from handlers.customer import payment_proof as customer_payment_proof
-
-    customer_payment_proof.setup(db, bot)
-
     # Setup search handler
     offers_search.setup(dp, db, offer_service)
 
@@ -548,7 +543,6 @@ def _register_handlers() -> None:
 
     # 2. Customer routers
     dp.include_router(telegram_payments.router)  # Payments must be high priority
-    dp.include_router(customer_payment_proof.router)  # Payment proof upload
     dp.include_router(cart_router)  # Cart before other customer handlers
     dp.include_router(profile.router)
     dp.include_router(favorites.router)

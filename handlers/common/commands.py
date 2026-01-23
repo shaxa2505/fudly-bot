@@ -682,7 +682,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
     # Clear any active state
     await state.clear()
 
-    # Check for deep link arguments (e.g., /start pickup_CODE or upload_proof_12345)
+    # Check for deep link arguments (e.g., /start pickup_CODE)
     if message.text:
         args = message.text.split(maxsplit=1)
         logger.info(f"🔗 /start command from user {user_id}: '{message.text}'")
@@ -713,40 +713,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
                 await handle_qr_pickup(message, db, booking_code)
                 return
 
-            # Handle payment proof upload deep link
-            elif deep_link.startswith("upload_proof_"):
-                from aiogram.utils.keyboard import InlineKeyboardBuilder
-
-                try:
-                    order_id = int(deep_link.replace("upload_proof_", ""))
-
-                    # Trigger payment proof upload flow via callback
-                    kb = InlineKeyboardBuilder()
-                    kb.button(
-                        text="📸 Yuklash / Загрузить", callback_data=f"upload_proof_{order_id}"
-                    )
-
-                    lang = (
-                        db.get_user_language(user_id) if hasattr(db, "get_user_language") else "ru"
-                    )
-                    if lang == "uz":
-                        msg = (
-                            f"📦 <b>Buyurtma #{order_id}</b>\n\n"
-                            f"To'lov chekini yuklash uchun quyidagi tugmani bosing."
-                        )
-                    else:
-                        msg = (
-                            f"📦 <b>Заказ #{order_id}</b>\n\n"
-                            f"Нажмите кнопку ниже, чтобы загрузить чек об оплате."
-                        )
-
-                    await message.answer(msg, reply_markup=kb.as_markup(), parse_mode="HTML")
-                    return
-                except ValueError:
-                    logger.warning(f"Invalid upload_proof deep link: {deep_link}")
-                except Exception as e:
-                    logger.error(f"Error handling upload_proof deep link: {e}")
-
+            
     user = db.get_user_model(user_id)
 
     # NEW USER - create immediately and show welcome card with language selection

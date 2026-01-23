@@ -189,12 +189,6 @@ def build_payment_method_keyboard(
     # Click payment
     kb.button(text="💳 Click", callback_data="cart_pay_click")
 
-    # Card transfer
-    kb.button(
-        text="💳 Перевод на карту" if lang == "ru" else "💳 Kartaga o'tkazma",
-        callback_data="cart_pay_card",
-    )
-
     # Back button
     back_data = "cart_confirm_delivery" if order_type == "delivery" else "cart_confirm_pickup"
     kb.button(
@@ -202,5 +196,5 @@ def build_payment_method_keyboard(
         callback_data=back_data,
     )
 
-    kb.adjust(2, 1)
+    kb.adjust(1, 1)
     return kb

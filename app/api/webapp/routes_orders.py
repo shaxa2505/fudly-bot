@@ -195,6 +195,8 @@ async def create_order(
             idem_payload = {
                 "items": items_payload,
                 "delivery_address": order.delivery_address or "",
+                "delivery_lat": order.delivery_lat,
+                "delivery_lon": order.delivery_lon,
                 "phone": order.phone or "",
                 "comment": order.comment or "",
                 "payment_method": payment_method,
@@ -265,6 +267,9 @@ async def create_order(
                     items=order_items,
                     order_type="delivery" if is_delivery else "pickup",
                     delivery_address=order.delivery_address if is_delivery else None,
+                    delivery_lat=order.delivery_lat if is_delivery else None,
+                    delivery_lon=order.delivery_lon if is_delivery else None,
+                    comment=order.comment,
                     payment_method=payment_method,
                     notify_customer=True,
                     notify_sellers=True,

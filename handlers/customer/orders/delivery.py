@@ -24,7 +24,6 @@ from app.core.constants import OFFERS_PER_PAGE
 from app.core.utils import get_offer_field, get_store_field
 from app.keyboards import main_menu_customer
 from app.services.unified_order_service import (
-    NotificationTemplates,
     OrderItem,
     get_unified_order_service,
     init_unified_order_service,
@@ -33,9 +32,6 @@ from database_protocol import DatabaseProtocol
 from handlers.common.states import OrderDelivery
 from handlers.common.utils import (
     get_appropriate_menu as _get_appropriate_menu,
-)
-from handlers.common.utils import (
-    html_escape as _esc,
 )
 from handlers.common.utils import (
     is_main_menu_button,
@@ -490,9 +486,8 @@ async def dlv_use_saved_address(
 
     await state.update_data(address=saved_address)
 
-    # DON'T CREATE ORDER YET - wait for payment screenshot
-    # Order will be created in dlv_payment_proof after screenshot is received
-    logger.info(f"User {user_id} selected saved address, waiting for payment screenshot")
+    # Don't create order yet - wait for payment method selection (Click)
+    logger.info(f"User {user_id} selected saved address, waiting for payment selection")
 
     await state.set_state(OrderDelivery.payment_method_select)
 
@@ -642,9 +637,8 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     delivery_price = data.get("delivery_price", 0)
     user_id = message.from_user.id
 
-    # DON'T CREATE ORDER YET - wait for payment screenshot
-    # Order will be created in dlv_payment_proof after screenshot is received
-    logger.info(f"User {user_id} saved address, waiting for payment screenshot")
+    # Don't create order yet - wait for payment method selection (Click)
+    logger.info(f"User {user_id} saved address, waiting for payment selection")
 
     await state.set_state(OrderDelivery.payment_method_select)
     logger.info(f"User {message.from_user.id} moved to payment method selection state")
@@ -726,16 +720,15 @@ async def dlv_pay_click(
     logger.info(f"User {user_id} selected Click payment")
     logger.info(f"FSM data: {data}")
 
-    # If payments are disabled or provider token is missing, fallback to card flow
+    # Payments must be enabled and provider token configured
     if not ENABLE_TELEGRAM_PAYMENTS or not telegram_payments.PROVIDER_TOKEN:
-        reason = (
-            "Нужен TELEGRAM_PAYMENT_PROVIDER_TOKEN и ENABLE_TELEGRAM_PAYMENTS=1"
+        msg = (
+            "Click временно недоступен. Попробуйте позже."
             if lang != "uz"
-            else "TELEGRAM_PAYMENT_PROVIDER_TOKEN va ENABLE_TELEGRAM_PAYMENTS=1 kerak"
+            else "Click vaqtincha mavjud emas. Keyinroq urinib ko'ring."
         )
-        logger.warning("Telegram Payments disabled or token missing, fallback to card")
-        await _switch_to_card_payment_no_order(callback.message, state, data, lang, db, reason)
-        await callback.answer()
+        logger.warning("Telegram Payments disabled or token missing for Click")
+        await callback.answer(msg, show_alert=True)
         return
 
     # Ensure we have address and other required data
@@ -753,9 +746,8 @@ async def dlv_pay_click(
         if not order_service and bot:
             order_service = init_unified_order_service(db, bot)
         if not order_service:
-            logger.warning("UnifiedOrderService unavailable, fallback to card")
-            await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
-            await callback.answer()
+            logger.warning("UnifiedOrderService unavailable for Click")
+            await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
         try:
@@ -801,8 +793,7 @@ async def dlv_pay_click(
                 logger.error(
                     "Failed to create order before Telegram invoice: %s", result.error_message
                 )
-                await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
-                await callback.answer()
+                await callback.answer(get_text(lang, "system_error"), show_alert=True)
                 return
 
             order_id = result.order_ids[0]
@@ -810,8 +801,7 @@ async def dlv_pay_click(
             logger.info(f"Created order #{order_id} before sending Telegram invoice")
         except Exception as e:
             logger.error(f"Error creating order before Telegram invoice: {e}", exc_info=True)
-            await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
-            await callback.answer()
+            await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
     # Send Telegram invoice
@@ -836,8 +826,7 @@ async def dlv_pay_click(
         logger.info(f"Sent Telegram invoice for order #{order_id}")
     except Exception as e:
         logger.error(f"Failed to send Telegram invoice: {e}", exc_info=True)
-        await _switch_to_card_payment_no_order(callback.message, state, data, lang, db)
-        await callback.answer()
+        await callback.answer(get_text(lang, "system_error"), show_alert=True)
         return
 
     # Remove inline keyboard to prevent duplicate taps and clear state
@@ -859,22 +848,6 @@ async def dlv_pay_click(
         pass
 
     await callback.answer()
-
-
-async def _switch_to_card_payment_no_order(message, state, data, lang, db, reason: str | None = None):
-    """Switch to card payment when Click fails - no order created yet."""
-    msg = (
-        "Click ishlamayapti. Karta orqali to'lang."
-        if lang == "uz"
-        else "Click недоступен. Оплатите картой."
-    )
-    if reason:
-        msg += f"\n{reason}"
-    await message.answer(msg)
-
-    await state.update_data(payment_method="card")
-    await state.set_state(OrderDelivery.payment_proof)
-    await _show_card_payment_details(message, state, lang, db)
 
 
 async def _return_to_address_step(message: types.Message, state: FSMContext, data: dict, lang: str) -> None:
@@ -905,347 +878,6 @@ async def _return_to_address_step(message: types.Message, state: FSMContext, dat
             await message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
         pass
-
-@router.callback_query(F.data.startswith("dlv_pay_card_"))
-async def dlv_pay_card(
-    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
-) -> None:
-    """Process card payment - order already created after address input."""
-    if not callback.from_user:
-        await callback.answer()
-        return
-
-    user_id = callback.from_user.id
-    lang = db.get_user_language(user_id)
-    data = await state.get_data()
-    address = data.get("address")
-    if not address:
-        logger.error("? No address in state for card payment")
-        await _return_to_address_step(callback.message, state, data, lang)
-        await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
-        return
-
-
-    logger.info(f"User {user_id} selected card payment")
-    logger.info(f"FSM data keys: {list(data.keys())}")
-
-    # Order will be created when screenshot is uploaded
-    # Save payment method and show card details
-    await state.update_data(payment_method="card")
-    await state.set_state(OrderDelivery.payment_proof)
-
-    logger.info(f"User {user_id} state set to payment_proof (order will be created after screenshot)")
-
-    await callback.message.delete()
-    await _show_card_payment_details(callback.message, state, lang, db, order_id=None)
-    await callback.answer()
-
-
-async def _show_card_payment_details(
-    message: types.Message,
-    state: FSMContext,
-    lang: str,
-    db: DatabaseProtocol,
-    order_id: int | None = None,
-) -> None:
-    """Show card payment details - compact version."""
-    data = await state.get_data()
-    store_id = data.get("store_id")
-    oid = order_id or data.get("order_id")
-    logger.info(f"Showing card payment details for order #{oid} (store_id={store_id})")
-
-    # Get payment card
-    payment_card = None
-    try:
-        payment_card = db.get_payment_card(store_id)
-    except Exception:
-        pass
-
-    if not payment_card:
-        try:
-            payment_card = db.get_platform_payment_card()
-        except Exception:
-            pass
-
-    if not payment_card:
-        payment_card = {
-            "card_number": "8600 1234 5678 9012",
-            "card_holder": "FUDLY",
-        }
-
-    # Extract card details
-    if isinstance(payment_card, dict):
-        card_number = payment_card.get("card_number", "")
-        card_holder = payment_card.get("card_holder", "—")
-    elif isinstance(payment_card, (tuple, list)) and len(payment_card) > 1:
-        card_number = payment_card[1]
-        card_holder = payment_card[2] if len(payment_card) > 2 else "—"
-    else:
-        card_number = str(payment_card)
-        card_holder = "—"
-
-    # Calculate total
-    price = data.get("price", 0)
-    quantity = data.get("quantity", 1)
-    delivery_price = data.get("delivery_price", 0)
-    total = (price * quantity) + delivery_price
-
-    currency = "so'm" if lang == "uz" else "сум"
-
-    # Compact payment message
-    if lang == "uz":
-        text = (
-            f"<b>Kartaga o'tkazing</b>\n\n"
-            f"Summa: <b>{total:,} {currency}</b>\n"
-            f"Karta: <code>{card_number}</code>\n"
-            f"Qabul qiluvchi: {card_holder}\n\n"
-            f"<i>Chek skrinshotini yuboring</i>"
-        )
-    else:
-        text = (
-            f"<b>Переведите на карту</b>\n\n"
-            f"Сумма: <b>{total:,} {currency}</b>\n"
-            f"Карта: <code>{card_number}</code>\n"
-            f"Получатель: {card_holder}\n\n"
-            f"<i>Отправьте скриншот чека</i>"
-        )
-
-    # Cancel button with order_id
-    kb = InlineKeyboardBuilder()
-    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
-    oid = order_id or data.get("order_id", 0)
-    kb.button(text=cancel_text, callback_data=f"dlv_cancel_{oid}")
-
-    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
-
-
-@router.message(OrderDelivery.payment_proof, F.photo)
-async def dlv_payment_proof(
-    message: types.Message, state: FSMContext, db: DatabaseProtocol
-) -> None:
-    """Process payment screenshot - order already created, just attach photo."""
-    if not message.from_user or not bot:
-        return
-
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-    data = await state.get_data()
-    photo_id = message.photo[-1].file_id
-
-    logger.info(f"User {user_id} uploaded payment screenshot for delivery order")
-    logger.info(f"FSM data keys: {list(data.keys())}")
-
-    if data.get("payment_proof_in_progress"):
-        await message.answer(get_text(lang, "cart_payment_photo_already_received"))
-        return
-
-    await state.update_data(payment_proof_in_progress=True)
-
-    # Get data from FSM
-    offer_id = data.get("offer_id")
-    store_id = data.get("store_id")
-    quantity = data.get("quantity", 1)
-    address = data.get("address", "")
-    delivery_price = data.get("delivery_price", 0)
-
-    if not offer_id or not store_id or not address:
-        logger.error(f"User {user_id} has incomplete data in FSM: {data}")
-        msg = "Ma'lumotlar yo'qoldi." if lang == "uz" else "Данные потеряны."
-        await message.answer(msg, reply_markup=get_appropriate_menu(user_id, lang))
-        await state.clear()
-        return
-
-    # CREATE ORDER NOW (after screenshot received)
-    order_id: int | None = None
-    order_service = get_unified_order_service()
-
-    if order_service and hasattr(db, "create_cart_order"):
-        try:
-            offer = db.get_offer(offer_id)
-            store = db.get_store(store_id)
-
-            title = get_offer_field(offer, "title", "")
-            price = get_offer_field(offer, "discount_price", 0)
-            offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
-            store_name = get_store_field(store, "name", "")
-            store_address = get_store_field(store, "address", "")
-
-            order_item = OrderItem(
-                offer_id=int(offer_id),
-                store_id=int(store_id),
-                title=title,
-                price=int(price),
-                original_price=int(price),
-                quantity=int(quantity),
-                store_name=store_name,
-                store_address=store_address,
-                photo=offer_photo,
-                delivery_price=int(delivery_price),
-            )
-
-            order_type = data.get("order_type", "delivery")
-            result = await order_service.create_order(
-                user_id=user_id,
-                items=[order_item],
-                order_type=order_type,
-                delivery_address=address if order_type == "delivery" else None,
-                payment_method="card",
-                payment_proof=photo_id,
-                notify_customer=False,
-                notify_sellers=False,
-            )
-            if result.success and result.order_ids:
-                order_id = result.order_ids[0]
-                logger.info(f"Created order #{order_id} after screenshot via unified service")
-            else:
-                logger.error(f"Failed to create order via UnifiedOrderService: {result.error_message}")
-                order_id = None
-        except Exception as e:
-            logger.error(f"Error creating unified delivery order after screenshot: {e}", exc_info=True)
-            order_id = None
-
-    if not order_id:
-        msg = "Xatolik." if lang == "uz" else "Ошибка создания заказа."
-        await message.answer(msg, reply_markup=main_menu_customer(lang))
-        await state.clear()
-        return
-
-    # Get offer info for notification
-    offer = db.get_offer(offer_id) if offer_id else None
-    title = get_offer_field(offer, "title", "Товар")
-    price = get_offer_field(offer, "discount_price", 0)
-    offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
-
-    # Update payment status with photo
-    db.update_payment_status(order_id, "proof_submitted", photo_id)
-
-    logger.info(f"Attached screenshot to order #{order_id}")
-
-    await state.clear()
-
-    # Log
-    total_amount = (price * quantity) + delivery_price
-    logger.info(f"SCREENSHOT_ATTACHED: order={order_id}, user={user_id}, total={total_amount}")
-
-    # Get store info
-    store = db.get_store(store_id)
-    store_name = get_store_field(store, "name", "Магазин")
-    store_address = get_store_field(store, "address", "")
-
-    customer = db.get_user_model(user_id)
-    customer_phone = customer.phone if customer else "—"
-
-    total_products = price * quantity
-    currency = "so'm" if lang == "uz" else "сум"
-    total = total_products + delivery_price
-
-    # Build unified customer message (awaiting payment verification)
-    items_for_template = [
-        {"title": title, "price": int(price), "quantity": int(quantity)}
-    ]
-    order_type = data.get("order_type", "delivery")
-
-    customer_msg = NotificationTemplates.customer_order_created(
-        lang=lang,
-        order_ids=[str(order_id)],
-        pickup_codes=[],
-        items=items_for_template,
-        order_type=order_type,
-        delivery_address=address if order_type == "delivery" else None,
-        payment_method="card",
-        store_name=store_name,
-        store_address=store_address,
-        total=int(total_products),
-        delivery_price=int(delivery_price),
-        currency=currency,
-        awaiting_payment=True,
-    )
-
-    if lang == "uz":
-        customer_msg += "\n\nTo'lov tasdiqlanishi kutilmoqda..."
-    else:
-        customer_msg += "\n\nОжидаем подтверждения оплаты..."
-
-    # Confirm to customer - single unified message
-    sent_msg = None
-    if offer_photo:
-        try:
-            sent_msg = await message.answer_photo(
-                photo=offer_photo,
-                caption=customer_msg,
-                parse_mode="HTML",
-            )
-        except Exception:
-            sent_msg = None
-    if not sent_msg:
-        sent_msg = await message.answer(customer_msg, parse_mode="HTML")
-
-    # Save message_id for live status updates
-    if sent_msg and order_id and hasattr(db, "set_order_customer_message_id"):
-        try:
-            db.set_order_customer_message_id(order_id, sent_msg.message_id)
-            logger.info(
-                f"Saved customer_message_id={sent_msg.message_id} for order #{order_id}"
-            )
-        except Exception as e:
-            logger.warning(f"Failed to save customer_message_id: {e}")
-
-    # Notify ADMIN
-    if ADMIN_ID > 0:
-        kb = InlineKeyboardBuilder()
-        kb.button(text="Tasdiqlash", callback_data=f"admin_confirm_payment_{order_id}")
-        kb.button(text="Rad etish", callback_data=f"admin_reject_payment_{order_id}")
-        kb.adjust(2)
-
-        items_text = f"• {esc(title)} × {quantity}"
-        admin_caption = NotificationTemplates.admin_payment_review(
-            lang=lang,
-            order_id=order_id,
-            store_name=store_name,
-            items_text=items_text,
-            total_with_delivery=total,
-            currency=currency,
-            address=address,
-            customer_name=message.from_user.first_name,
-            customer_phone=customer_phone,
-        )
-
-        try:
-            await bot.send_photo(
-                chat_id=ADMIN_ID,
-                photo=photo_id,
-                caption=admin_caption,
-                parse_mode="HTML",
-                reply_markup=kb.as_markup(),
-            )
-        except Exception as e:
-            logger.error(f"Failed to notify admin: {e}")
-
-
-@router.message(OrderDelivery.payment_proof)
-async def dlv_payment_proof_invalid(
-    message: types.Message, state: FSMContext, db: DatabaseProtocol
-) -> None:
-    """Handle non-photo in payment proof state."""
-    if not message.from_user:
-        return
-
-    lang = db.get_user_language(message.from_user.id)
-    text = (message.text or "").strip()
-
-    if is_main_menu_button(text):
-        await state.clear()
-        return
-
-    if any(c in text.lower() for c in ["отмена", "bekor"]) or text.startswith("/"):
-        await state.clear()
-        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
-        await message.answer(msg, reply_markup=main_menu_customer(lang))
-        return
-
-    msg = "Chek rasmini yuboring." if lang == "uz" else "Отправьте фото чека."
-    await message.answer(msg)
-
 
 # Legacy quantity handler for manual input
 @router.message(OrderDelivery.quantity)

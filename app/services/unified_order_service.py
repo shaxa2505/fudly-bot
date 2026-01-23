@@ -291,6 +291,8 @@ class NotificationTemplates:
         items: list[dict],
         order_type: str,
         delivery_address: str | None,
+        comment: str | None,
+        map_url: str | None,
         payment_method: str,
         customer_name: str,
         customer_phone: str,
@@ -326,6 +328,10 @@ class NotificationTemplates:
 
             if is_delivery and delivery_address:
                 lines.append(f"Manzil: {_esc(delivery_address)}")
+                if comment:
+                    lines.append(f"Izoh: {_esc(comment)}")
+                if map_url:
+                    lines.append(f"Xarita: <a href=\"{html.escape(map_url)}\">Ochish</a>")
 
             lines.append("")
             lines.append("Mahsulotlar:")
@@ -377,6 +383,10 @@ class NotificationTemplates:
 
             if is_delivery and delivery_address:
                 lines.append(f"Адрес: {_esc(delivery_address)}")
+                if comment:
+                    lines.append(f"Комментарий: {_esc(comment)}")
+                if map_url:
+                    lines.append(f"Карта: <a href=\"{html.escape(map_url)}\">Открыть</a>")
 
             lines.append("")
             lines.append("Состав:")
@@ -1026,6 +1036,9 @@ class UnifiedOrderService:
         items: list[OrderItem],
         order_type: str,
         delivery_address: str | None = None,
+        delivery_lat: float | None = None,
+        delivery_lon: float | None = None,
+        comment: str | None = None,
         payment_method: str = "cash",
         payment_proof: str | None = None,
         notify_customer: bool = True,
@@ -1155,7 +1168,14 @@ class UnifiedOrderService:
         else:
             # Use order system for delivery
             result = await self._create_delivery_orders(
-                user_id, db_items, delivery_address, payment_method, order_type
+                user_id,
+                db_items,
+                delivery_address,
+                payment_method,
+                order_type,
+                delivery_lat=delivery_lat,
+                delivery_lon=delivery_lon,
+                comment=comment,
             )
 
         if not result.get("success"):
@@ -1226,6 +1246,9 @@ class UnifiedOrderService:
                 stores_orders=stores_orders,
                 order_type=order_type,
                 delivery_address=delivery_address,
+                delivery_lat=delivery_lat,
+                delivery_lon=delivery_lon,
+                comment=comment,
                 payment_method=payment_method,
                 customer_name=customer_name,
                 customer_phone=customer_phone,
@@ -1568,6 +1591,9 @@ class UnifiedOrderService:
         delivery_address: str,
         payment_method: str,
         order_type: str = "delivery",
+        delivery_lat: float | None = None,
+        delivery_lon: float | None = None,
+        comment: str | None = None,
     ) -> dict:
         """Create delivery orders."""
         try:
@@ -1596,6 +1622,9 @@ class UnifiedOrderService:
                     store_id=store_id,
                     cart_items=cart_items,
                     delivery_address=delivery_address,
+                    delivery_lat=delivery_lat,
+                    delivery_lon=delivery_lon,
+                    comment=comment,
                     delivery_price=delivery_price,
                     payment_method=payment_method,
                     order_type=order_type,
@@ -1640,6 +1669,9 @@ class UnifiedOrderService:
                 items=items,
                 order_type=order_type,
                 delivery_address=delivery_address,
+                delivery_lat=delivery_lat,
+                delivery_lon=delivery_lon,
+                comment=comment,
                 payment_method=payment_method,
             )
 
@@ -1670,6 +1702,9 @@ class UnifiedOrderService:
         stores_orders: dict[int, list[dict]],
         order_type: str,
         delivery_address: str | None,
+        delivery_lat: float | None,
+        delivery_lon: float | None,
+        comment: str | None,
         payment_method: str,
         customer_name: str,
         customer_phone: str,
@@ -1724,6 +1759,25 @@ class UnifiedOrderService:
                     seen_codes.add(code)
                     pickup_codes.append(code)
 
+                map_url = None
+                static_map_url = None
+                if is_delivery and delivery_lat is not None and delivery_lon is not None:
+                    try:
+                        lat_val = float(delivery_lat)
+                        lon_val = float(delivery_lon)
+                        map_url = (
+                            "https://www.openstreetmap.org/?mlat="
+                            f"{lat_val:.6f}&mlon={lon_val:.6f}#map=18/{lat_val:.6f}/{lon_val:.6f}"
+                        )
+                        static_map_url = (
+                            "https://staticmap.openstreetmap.de/staticmap.php"
+                            f"?center={lat_val:.6f},{lon_val:.6f}"
+                            f"&zoom=17&size=640x360&markers={lat_val:.6f},{lon_val:.6f},red-pushpin"
+                        )
+                    except (TypeError, ValueError):
+                        map_url = None
+                        static_map_url = None
+
                 seller_text = NotificationTemplates.seller_new_order(
                     lang=seller_lang,
                     order_ids=order_ids,
@@ -1731,6 +1785,8 @@ class UnifiedOrderService:
                     items=store_orders,
                     order_type=order_type,
                     delivery_address=delivery_address,
+                    comment=comment,
+                    map_url=map_url,
                     payment_method=payment_method,
                     customer_name=customer_name,
                     customer_phone=customer_phone,
@@ -1814,6 +1870,14 @@ class UnifiedOrderService:
                             parse_mode="HTML",
                             reply_markup=kb.as_markup(),
                         )
+                    if static_map_url:
+                        try:
+                            caption = "📍 Manzil xaritada" if seller_lang == "uz" else "📍 Адрес на карте"
+                            await self.bot.send_photo(owner_id, photo=static_map_url, caption=caption)
+                        except Exception as map_err:
+                            logger.warning(
+                                f"Failed to send map preview to seller {owner_id}: {map_err}"
+                            )
                     logger.info(
                         f"Sent order notification to seller {owner_id} for orders {order_ids}"
                     )

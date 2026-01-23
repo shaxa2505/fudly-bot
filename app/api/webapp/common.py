@@ -173,6 +173,8 @@ class CreateOrderRequest(BaseModel):
     items: list[OrderItem]
     user_id: int | None = None
     delivery_address: str | None = None
+    delivery_lat: float | None = None
+    delivery_lon: float | None = None
     phone: str | None = None
     comment: str | None = None
     payment_method: str | None = None
