@@ -592,6 +592,7 @@ class SchemaMixin:
                     store_id INTEGER NOT NULL,
                     provider TEXT NOT NULL,
                     merchant_id TEXT,
+                    merchant_user_id TEXT,
                     service_id TEXT,
                     secret_key TEXT,
                     is_active INTEGER DEFAULT 1,
@@ -617,6 +618,58 @@ class SchemaMixin:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (order_id) REFERENCES orders(order_id)
+                )
+                """
+            )
+
+            # Migration: add merchant_user_id to store_payment_integrations if missing
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE store_payment_integrations ADD COLUMN IF NOT EXISTS merchant_user_id TEXT"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Migration for store_payment_integrations.merchant_user_id: {e}"
+                    )
+
+            # Click fiscalization tracking
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS click_fiscalization (
+                    id SERIAL PRIMARY KEY,
+                    order_id INTEGER,
+                    payment_id TEXT NOT NULL,
+                    service_id TEXT,
+                    status TEXT DEFAULT 'pending',
+                    error_code INTEGER,
+                    error_note TEXT,
+                    request_payload JSONB,
+                    response_payload JSONB,
+                    qr_code_url TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(order_id, payment_id),
+                    FOREIGN KEY (order_id) REFERENCES orders(order_id)
+                )
+                """
+            )
+
+            # Click transactions (Prepare/Complete idempotency)
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS click_transactions (
+                    id SERIAL PRIMARY KEY,
+                    click_trans_id BIGINT UNIQUE NOT NULL,
+                    merchant_trans_id TEXT,
+                    merchant_prepare_id TEXT,
+                    service_id TEXT,
+                    amount TEXT,
+                    status TEXT DEFAULT 'prepared',
+                    error_code INTEGER,
+                    error_note TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )

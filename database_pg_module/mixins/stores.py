@@ -782,6 +782,7 @@ class StoreMixin:
         merchant_id: str,
         secret_key: str,
         service_id: str | None = None,
+        merchant_user_id: str | None = None,
     ) -> bool:
         """Set or update payment integration for a store."""
         encrypted_secret_key = secret_key
@@ -801,17 +802,18 @@ class StoreMixin:
             cursor.execute(
                 """
                 INSERT INTO store_payment_integrations
-                    (store_id, provider, merchant_id, service_id, secret_key, is_active, updated_at)
-                VALUES (%s, %s, %s, %s, %s, 1, CURRENT_TIMESTAMP)
+                    (store_id, provider, merchant_id, merchant_user_id, service_id, secret_key, is_active, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, 1, CURRENT_TIMESTAMP)
                 ON CONFLICT (store_id, provider)
                 DO UPDATE SET
                     merchant_id = EXCLUDED.merchant_id,
+                    merchant_user_id = EXCLUDED.merchant_user_id,
                     service_id = EXCLUDED.service_id,
                     secret_key = EXCLUDED.secret_key,
                     is_active = 1,
                     updated_at = CURRENT_TIMESTAMP
             """,
-                (store_id, provider, merchant_id, service_id, encrypted_secret_key),
+                (store_id, provider, merchant_id, merchant_user_id, service_id, encrypted_secret_key),
             )
             logger.info(f"Payment integration {provider} set for store {store_id}")
             return True

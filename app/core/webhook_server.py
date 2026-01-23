@@ -3310,11 +3310,13 @@ async def create_webhook_app(
             data = await request.post()
 
             payment_service = get_payment_service()
+            if hasattr(payment_service, "set_database"):
+                payment_service.set_database(db)
 
             click_trans_id = data.get("click_trans_id", "")
             service_id = data.get("service_id", "")
             merchant_trans_id = data.get("merchant_trans_id", "")
-            amount = float(data.get("amount", 0))
+            amount = data.get("amount", "0")
             action = data.get("action", "")
             sign_time = data.get("sign_time", "")
             sign_string = data.get("sign_string", "")
@@ -3328,6 +3330,7 @@ async def create_webhook_app(
                     action=action,
                     sign_time=sign_time,
                     sign_string=sign_string,
+                    service_id=service_id,
                 )
             else:  # Complete
                 result = await payment_service.process_click_complete(
@@ -3339,6 +3342,7 @@ async def create_webhook_app(
                     sign_time=sign_time,
                     sign_string=sign_string,
                     error=error,
+                    service_id=service_id,
                 )
 
             return web.json_response(result)
