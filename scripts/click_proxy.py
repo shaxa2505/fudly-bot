@@ -45,10 +45,11 @@ def _normalize_response(raw_bytes: bytes, content_type: str) -> bytes:
             if key not in ordered:
                 ordered[key] = value
         lines = [f"{k}={ordered[k]}" for k in KEY_ORDER]
-        return ("\r\n".join(lines) + "\r\n").encode("utf-8")
+        payload = "\n".join(lines)
+        return payload.encode("cp1251", errors="replace")
 
     # Fallback: return plain text as-is with CRLF line endings
-    return (text.replace("\n", "\r\n") + "\r\n").encode("utf-8")
+    return text.encode("cp1251", errors="replace")
 
 
 class ClickProxyHandler(BaseHTTPRequestHandler):
@@ -71,14 +72,14 @@ class ClickProxyHandler(BaseHTTPRequestHandler):
             payload = _normalize_response(raw, content_type.lower())
 
             self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=windows-1251")
+            self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
         except Exception as exc:
             body = f"error=-1\r\nerror_note={exc}\r\n".encode("utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=windows-1251")
+            self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
