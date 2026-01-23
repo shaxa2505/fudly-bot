@@ -792,7 +792,7 @@ class PaymentService:
                 merchant_trans_id=merchant_trans_id,
                 merchant_prepare_id=merchant_trans_id,
                 error=-5,
-                error_note="Order not found",
+                error_note="User does not exist",
             )
 
         expected_service_id, _ = self._resolve_click_credentials(order, service_id)
@@ -824,7 +824,7 @@ class PaymentService:
                 merchant_trans_id=merchant_trans_id,
                 merchant_prepare_id=merchant_trans_id,
                 error=-1,
-                error_note="Invalid signature",
+                error_note="SIGN CHECK FAILED!",
             )
 
         order_status = str(
@@ -857,7 +857,7 @@ class PaymentService:
                 merchant_trans_id=merchant_trans_id,
                 merchant_prepare_id=merchant_trans_id,
                 error=-2,
-                error_note="Incorrect amount",
+                error_note="Incorrect parameter amount",
             )
 
         tx = None
@@ -948,7 +948,7 @@ class PaymentService:
                 merchant_trans_id=merchant_trans_id,
                 merchant_confirm_id=merchant_trans_id,
                 error=-5,
-                error_note="Order not found",
+                error_note="User does not exist",
             )
 
         expected_service_id, _ = self._resolve_click_credentials(order, service_id)
@@ -981,7 +981,7 @@ class PaymentService:
                 merchant_trans_id=merchant_trans_id,
                 merchant_confirm_id=merchant_trans_id,
                 error=-1,
-                error_note="Invalid signature",
+                error_note="SIGN CHECK FAILED!",
             )
 
         order_total = order.get("total_price") if isinstance(order, dict) else getattr(order, "total_price", None)
@@ -991,7 +991,7 @@ class PaymentService:
                 merchant_trans_id=merchant_trans_id,
                 merchant_confirm_id=merchant_trans_id,
                 error=-2,
-                error_note="Incorrect amount",
+                error_note="Incorrect parameter amount",
             )
 
         tx = None
@@ -1010,6 +1010,14 @@ class PaymentService:
                     error=-9,
                     error_note="Transaction cancelled",
                 )
+            if str(merchant_prepare_id) != str(merchant_trans_id):
+                return self._click_response(
+                    click_trans_id=click_trans_id,
+                    merchant_trans_id=merchant_trans_id,
+                    merchant_confirm_id=merchant_trans_id,
+                    error=-6,
+                    error_note="Transaction does not exist",
+                )
             # Allow confirm even if Prepare wasn't recorded (e.g. retry/timeout scenarios)
             if self._db and hasattr(self._db, "upsert_click_transaction"):
                 try:
@@ -1024,6 +1032,16 @@ class PaymentService:
                 except Exception:
                     pass
             tx = {"status": "confirmed"}
+
+        stored_prepare_id = str(tx.get("merchant_prepare_id") or "")
+        if stored_prepare_id and str(merchant_prepare_id) != stored_prepare_id:
+            return self._click_response(
+                click_trans_id=click_trans_id,
+                merchant_trans_id=merchant_trans_id,
+                merchant_confirm_id=merchant_trans_id,
+                error=-6,
+                error_note="Transaction does not exist",
+            )
 
         tx_status = str(tx.get("status", "")).lower()
         if tx_status == "confirmed":

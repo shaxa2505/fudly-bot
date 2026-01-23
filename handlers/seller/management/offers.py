@@ -177,7 +177,7 @@ def _expiry_keyboard(offer_id: int, lang: str) -> InlineKeyboardBuilder:
         callback_data=f"edit_expiry_custom_{offer_id}",
     )
     builder.button(text=get_text(lang, "back"), callback_data=f"back_to_offer_{offer_id}")
-    builder.adjust(2, 2, 2, 1)
+    builder.adjust(2, 2, 1, 2, 1)
     return builder
 
 
@@ -289,7 +289,9 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
         text=f"Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
     )
     filter_kb.button(text=f"Все ({len(all_offers)})", callback_data="filter_offers_all_0")
-    filter_kb.button(text="Поиск", callback_data="search_my_offers")
+    filter_kb.button(
+        text="Поиск" if lang == "ru" else "Qidirish", callback_data="search_my_offers"
+    )
     filter_kb.adjust(2, 2, 2)
 
     await message.answer(
@@ -734,8 +736,17 @@ async def set_expiry(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
     parts = callback.data.split("_")
-    offer_id = int(parts[1])
-    days_add = int(parts[2])
+    if len(parts) < 3:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    try:
+        offer_id = int(parts[1])
+    except ValueError:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    days_part = parts[2]
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -749,18 +760,34 @@ async def set_expiry(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    new_expiry = (datetime.now() + timedelta(days=days_add)).strftime("%Y-%m-%d")
-    db.update_offer_expiry(offer_id, new_expiry)
+    if days_part == "none":
+        new_expiry = None
+        db.update_offer_expiry(offer_id, None)
+    else:
+        try:
+            days_add = int(days_part)
+        except ValueError:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        new_expiry = (datetime.now() + timedelta(days=days_add)).strftime("%Y-%m-%d")
+        db.update_offer_expiry(offer_id, new_expiry)
 
     await update_offer_message(callback, offer_id, lang)
-    await callback.answer(
-        f"{'Срок продлён до' if lang == 'ru' else 'Muddat uzaytirildi'} {new_expiry}"
-    )
+    if new_expiry:
+        await callback.answer(
+            f"{'Срок продлён до' if lang == 'ru' else 'Muddat uzaytirildi'} {new_expiry}"
+        )
+    else:
+        await callback.answer(
+            "Срок снят" if lang == "ru" else "Muddat olib tashlandi"
+        )
 
 
 @router.callback_query(F.data == "cancel_extend")
 async def cancel_extend(callback: types.CallbackQuery) -> None:
     """Cancel expiry extension."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
     await callback.answer("Отменено" if lang == "ru" else "Bekor qilindi")
     await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -1364,6 +1391,17 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
                 "UPDATE offers SET description = %s WHERE offer_id = %s",
                 (description, offer_id),
             )
+    elif edit_field == "expiry":
+        try:
+            expiry_value = _parse_expiry_input_text(message.text or "")
+        except ValueError:
+            await message.answer(
+                "Формат: ДД.ММ (например 25.12)"
+                if lang == "ru"
+                else "Format: KK.OO (masalan 25.12)"
+            )
+            return
+        db.update_offer_expiry(offer_id, expiry_value)
     else:
         await state.clear()
         await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
