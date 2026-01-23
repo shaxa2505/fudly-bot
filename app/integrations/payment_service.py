@@ -278,7 +278,7 @@ class PaymentService:
             )
         expected_sign = hashlib.md5(data.encode()).hexdigest()
 
-        return expected_sign == sign_string
+        return expected_sign == str(sign_string).lower()
 
     @staticmethod
     def _env_flag(name: str, default: bool = False) -> bool:
@@ -801,8 +801,8 @@ class PaymentService:
                 click_trans_id=click_trans_id,
                 merchant_trans_id=merchant_trans_id,
                 merchant_prepare_id=merchant_trans_id,
-                error=-7,
-                error_note="Bad request",
+                error=-8,
+                error_note="Error in request from click",
             )
 
         # Verify signature
@@ -957,8 +957,8 @@ class PaymentService:
                 click_trans_id=click_trans_id,
                 merchant_trans_id=merchant_trans_id,
                 merchant_confirm_id=merchant_trans_id,
-                error=-7,
-                error_note="Bad request",
+                error=-8,
+                error_note="Error in request from click",
             )
 
         # Verify signature (includes merchant_prepare_id)

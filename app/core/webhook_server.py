@@ -3307,20 +3307,51 @@ async def create_webhook_app(
     async def api_click_callback(request: web.Request) -> web.Response:
         """POST /api/v1/payment/click/callback - Click payment callback."""
         try:
-            data = await request.post()
+            data = None
+            try:
+                data = await request.post()
+            except Exception:
+                data = None
+
+            payload: dict[str, Any] = {}
+            if data:
+                payload = dict(data)
+            else:
+                try:
+                    json_payload = await request.json()
+                    if isinstance(json_payload, dict):
+                        payload = json_payload
+                except Exception:
+                    payload = {}
+
+            if not payload:
+                try:
+                    payload = dict(request.query)
+                except Exception:
+                    payload = {}
+
+            def _get_value(key: str, default: Any = "") -> Any:
+                value = payload.get(key, default)
+                if isinstance(value, (list, tuple)):
+                    return value[0] if value else default
+                return value
 
             payment_service = get_payment_service()
             if hasattr(payment_service, "set_database"):
                 payment_service.set_database(db)
 
-            click_trans_id = data.get("click_trans_id", "")
-            service_id = data.get("service_id", "")
-            merchant_trans_id = data.get("merchant_trans_id", "")
-            amount = data.get("amount", "0")
-            action = data.get("action", "")
-            sign_time = data.get("sign_time", "")
-            sign_string = data.get("sign_string", "")
-            error = int(data.get("error", 0))
+            click_trans_id = _get_value("click_trans_id", "")
+            service_id = _get_value("service_id", "")
+            merchant_trans_id = _get_value("merchant_trans_id", "")
+            amount = _get_value("amount", "0")
+            action = _get_value("action", "")
+            sign_time = _get_value("sign_time", "")
+            sign_string = _get_value("sign_string", "")
+            error_raw = _get_value("error", 0)
+            try:
+                error = int(error_raw or 0)
+            except (TypeError, ValueError):
+                error = 0
 
             if action == "0":  # Prepare
                 result = await payment_service.process_click_prepare(
@@ -3336,7 +3367,7 @@ async def create_webhook_app(
                 result = await payment_service.process_click_complete(
                     click_trans_id=click_trans_id,
                     merchant_trans_id=merchant_trans_id,
-                    merchant_prepare_id=data.get("merchant_prepare_id", ""),
+                    merchant_prepare_id=_get_value("merchant_prepare_id", ""),
                     amount=amount,
                     action=action,
                     sign_time=sign_time,
@@ -3345,28 +3376,7 @@ async def create_webhook_app(
                     service_id=service_id,
                 )
 
-            accept = (request.headers.get("Accept") or "").lower()
-            content_type = (request.headers.get("Content-Type") or "").lower()
-
-            if "application/json" in accept and "application/x-www-form-urlencoded" not in content_type:
-                return web.json_response(result)
-
-            response_lines = []
-            for key in (
-                "click_trans_id",
-                "merchant_trans_id",
-                "merchant_prepare_id",
-                "merchant_confirm_id",
-                "error",
-                "error_note",
-            ):
-                if key in result:
-                    response_lines.append(f"{key}={result[key]}")
-
-            return web.Response(
-                text="\n".join(response_lines),
-                content_type="text/plain",
-            )
+            return web.json_response(result)
         except Exception as e:
             logger.error(f"Click callback error: {e}")
             return web.json_response({"error": -1, "error_note": str(e)})
