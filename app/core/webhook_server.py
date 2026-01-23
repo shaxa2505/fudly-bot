@@ -3345,7 +3345,16 @@ async def create_webhook_app(
                     service_id=service_id,
                 )
 
-            return web.json_response(result)
+            accept = (request.headers.get("Accept") or "").lower()
+            if "application/json" in accept:
+                return web.json_response(result)
+
+            from urllib.parse import urlencode
+
+            return web.Response(
+                text=urlencode(result),
+                content_type="application/x-www-form-urlencoded",
+            )
         except Exception as e:
             logger.error(f"Click callback error: {e}")
             return web.json_response({"error": -1, "error_note": str(e)})
