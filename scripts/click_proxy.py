@@ -19,7 +19,7 @@ KEY_ORDER = [
 ]
 
 
-def _normalize_response(raw_bytes: bytes, content_type: str) -> bytes:
+def _normalize_response(raw_bytes: bytes, content_type: str, action: str | None) -> bytes:
     text = raw_bytes.decode("utf-8", errors="replace").strip()
     data = None
 
@@ -38,14 +38,27 @@ def _normalize_response(raw_bytes: bytes, content_type: str) -> bytes:
             data = None
 
     if isinstance(data, dict):
-        ordered = {}
-        for key in KEY_ORDER:
-            ordered[key] = data.get(key, "")
-        for key, value in data.items():
-            if key not in ordered:
-                ordered[key] = value
-        lines = [f"{k}={ordered[k]}" for k in KEY_ORDER]
-        payload = "\n".join(lines)
+        if str(action) == "0":
+            keys = [
+                "click_trans_id",
+                "merchant_trans_id",
+                "merchant_prepare_id",
+                "error",
+                "error_note",
+            ]
+        elif str(action) == "1":
+            keys = [
+                "click_trans_id",
+                "merchant_trans_id",
+                "merchant_confirm_id",
+                "error",
+                "error_note",
+            ]
+        else:
+            keys = KEY_ORDER
+
+        lines = [f"{k}={data.get(k, '')}" for k in keys]
+        payload = "\r\n".join(lines) + "\r\n"
         return payload.encode("cp1251", errors="replace")
 
     # Fallback: return plain text as-is with CRLF line endings
@@ -57,6 +70,10 @@ class ClickProxyHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0") or "0")
             body = self.rfile.read(length)
+            parsed = parse_qs(body.decode("utf-8", errors="replace"))
+            action = None
+            if "action" in parsed and parsed["action"]:
+                action = parsed["action"][0]
 
             req = Request(TARGET_URL, data=body, method="POST")
             req.add_header(
@@ -69,7 +86,7 @@ class ClickProxyHandler(BaseHTTPRequestHandler):
                 raw = resp.read()
                 content_type = resp.headers.get("Content-Type", "")
 
-            payload = _normalize_response(raw, content_type.lower())
+            payload = _normalize_response(raw, content_type.lower(), action)
 
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
