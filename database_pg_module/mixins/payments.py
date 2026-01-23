@@ -111,8 +111,8 @@ class PaymentMixin:
     def upsert_click_transaction(
         self,
         click_trans_id: int,
-        click_paydoc_id: str | None = None,
         merchant_trans_id: str,
+        click_paydoc_id: str | None = None,
         merchant_prepare_id: str | None = None,
         service_id: str | None = None,
         amount: str | None = None,

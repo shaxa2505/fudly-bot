@@ -133,8 +133,8 @@ class PaymentService:
         return None
 
     def get_available_providers(self, store_id: int = None) -> list[str]:
-        """Get list of available payment providers."""
-        providers = ["card"]  # Card is always available
+        """Get list of available payment providers (Click-only for webapp)."""
+        providers: list[str] = []
 
         # Check store-specific providers first
         if store_id and self._db:
@@ -149,14 +149,12 @@ class PaymentService:
         # Fallback to platform providers
         if self.click_enabled and "click" not in providers:
             providers.append("click")
-        if self.payme_enabled and "payme" not in providers:
-            providers.append("payme")
 
         return providers
 
     def get_available_providers_for_store(self, store_id: int) -> list[dict]:
         """Get detailed info about available providers for a store."""
-        result = [{"provider": "card", "name": "Karta orqali", "is_store_level": False}]
+        result: list[dict] = []
 
         if self._db:
             try:
@@ -178,10 +176,6 @@ class PaymentService:
         if self.click_enabled and "click" not in store_providers:
             result.append(
                 {"provider": "click", "name": "Click (platform)", "is_store_level": False}
-            )
-        if self.payme_enabled and "payme" not in store_providers:
-            result.append(
-                {"provider": "payme", "name": "Payme (platform)", "is_store_level": False}
             )
 
         return result
