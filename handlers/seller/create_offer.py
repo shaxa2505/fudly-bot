@@ -133,17 +133,22 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
         if i < current_step:
             if i == 1 and value:  # Category
                 display_value = get_category_name(value, lang)
-            elif i == 4 and value:  # Price
+            elif i == 4 and value is not None:  # Price
                 display_value = f"{int(value):,} сум"
-            elif i == 5 and value:  # Discount
+            elif i == 5 and value is not None:  # Discount (0 allowed)
                 display_value = f"{value}%"
             elif i == 6 and value:  # Unit
                 display_value = value
-            elif i == 7 and value:  # Quantity
+            elif i == 7 and value is not None:  # Quantity
                 unit = data.get("unit", "шт")
                 display_value = f"{value} {unit}"
-            elif i == 8 and value is None:  # Expiry optional
-                display_value = "Без срока" if lang == "ru" else "Muddatsiz"
+            elif i == 8:  # Expiry optional
+                if value is None and "expiry_date" in data:
+                    display_value = "Без срока" if lang == "ru" else "Muddatsiz"
+                elif value:
+                    display_value = str(value)[:20]
+                else:
+                    display_value = "-"
             elif value:
                 display_value = str(value)[:20]
             else:
@@ -157,7 +162,299 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
     return "\n".join(lines)
 
 
+NO_EXPIRY_TOKENS = {
+    "-",
+    "0",
+    "без",
+    "без срока",
+    "нет",
+    "нет срока",
+    "none",
+    "no",
+    "muddatsiz",
+    "muddati yo'q",
+    "muddati yoq",
+}
+
+
+def _parse_expiry_input(value: str) -> str | None:
+    """Parse expiry input into ISO date or None (no expiry)."""
+    if not value:
+        return None
+
+    raw = value.strip().lower()
+    if not raw or raw in NO_EXPIRY_TOKENS:
+        return None
+
+    # Days offset (e.g. 3, +3, 3д, 3 кун)
+    day_match = re.fullmatch(
+        r"\+?\s*(\d{1,3})\s*(д|дн|дня|дней|кун|kun|day|days)?",
+        raw,
+    )
+    if day_match:
+        days = int(day_match.group(1))
+        return (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+
+    normalized = raw.replace("/", ".").replace("-", ".")
+    parts = normalized.split(".")
+    today = datetime.now()
+
+    try:
+        if len(parts) == 2 and all(p.isdigit() for p in parts):
+            day, month = map(int, parts)
+            date_obj = datetime(today.year, month, day)
+            if date_obj.date() < today.date():
+                date_obj = date_obj.replace(year=today.year + 1)
+            return date_obj.strftime("%Y-%m-%d")
+        if len(parts) == 3 and all(p.isdigit() for p in parts):
+            if len(parts[0]) == 4:
+                year, month, day = map(int, parts)
+            else:
+                day, month, year = map(int, parts)
+                if year < 100:
+                    year += 2000
+            date_obj = datetime(year, month, day)
+            return date_obj.strftime("%Y-%m-%d")
+    except ValueError:
+        pass
+
+    raise ValueError("Invalid expiry format")
+
+
+def _normalize_unit_input(value: str | None) -> str | None:
+    if not value:
+        return None
+    raw = value.strip().lower().replace(".", "").replace(" ", "")
+    return UNIT_ALIASES.get(raw)
+
+
+def _normalize_category_input(value: str | None) -> str | None:
+    if not value:
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    raw_lower = raw.lower()
+    if raw_lower in ALLOWED_CATEGORIES:
+        return raw_lower
+    normalized = normalize_category(raw)
+    return normalized if normalized in ALLOWED_CATEGORIES else None
+
+
+def _parse_price_value(value: str) -> float:
+    numbers = re.findall(r"\d+(?:[.,]\d+)?", value or "")
+    if not numbers:
+        raise ValueError("Invalid price")
+    return float(numbers[0].replace(",", "."))
+
+
+def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, float]:
+    if not raw or not raw.strip():
+        return 0, original_price
+
+    if "%" in raw:
+        percent_value = _parse_price_value(raw)
+        discount_percent = int(percent_value)
+        if discount_percent < 0 or discount_percent > 99:
+            raise ValueError("Invalid discount percent")
+        discount_price = original_price * (1 - discount_percent / 100)
+        return discount_percent, discount_price
+
+    discount_price = _parse_price_value(raw)
+    if discount_price >= original_price:
+        if discount_price <= 99:
+            discount_percent = int(discount_price)
+            discount_price = original_price * (1 - discount_percent / 100)
+            return discount_percent, discount_price
+        raise ValueError("Discount price must be less than original")
+    discount_percent = int((1 - discount_price / original_price) * 100)
+    return discount_percent, discount_price
+
+
+def _parse_quantity_value(raw: str | None, unit: str) -> float:
+    if not raw or not raw.strip():
+        return 1.0 if unit in DECIMAL_UNITS else 1
+    numbers = re.findall(r"\d+(?:[.,]\d+)?", raw)
+    if not numbers:
+        raise ValueError("Invalid quantity")
+    quantity = float(numbers[0].replace(",", "."))
+    if quantity <= 0:
+        raise ValueError("Invalid quantity")
+    if unit not in DECIMAL_UNITS and quantity != int(quantity):
+        raise ValueError("Quantity must be integer")
+    return quantity
+
+
+def _quick_add_instructions(lang: str) -> str:
+    """Return quick add instructions text."""
+    if lang == "ru":
+        return (
+            "<b>⚡ Быстрое добавление</b>\n\n"
+            "Формат:\n"
+            "Название | Цена | Скидка | Кол-во | Ед | Срок | Категория | Описание\n\n"
+            "Можно отправить текстом или подписью к фото.\n"
+            "Поля после цены можно пропускать.\n"
+            "Скидка: % или цена со скидкой (30% или 35000)\n"
+            "Срок: ДД.ММ, ДД.ММ.ГГГГ, +3 или 0/без срока\n\n"
+            "Пример:\n"
+            "<code>Хлеб | 12000 | 9000 | 10 | шт | 25.12 | Выпечка | свежий</code>"
+        )
+    return (
+        "<b>⚡ Tez qo`shish</b>\n\n"
+        "Format:\n"
+        "Nomi | Narx | Chegirma | Miqdor | Birlik | Muddat | Kategoriya | Tavsif\n\n"
+        "Matn yoki surat osti (caption) bilan yuboring.\n"
+        "Narxdan keyingi maydonlar ixtiyoriy.\n"
+        "Chegirma: % yoki chegirmali narx (30% yoki 35000)\n"
+        "Muddat: KK.OO, KK.OO.YYYY, +3 yoki 0/muddatsiz\n\n"
+        "Misol:\n"
+        "<code>Non | 12000 | 9000 | 10 | dona | 25.12 | Pishiriq | yangi</code>"
+    )
+
+
+def _parse_quick_input(text: str) -> dict[str, Any]:
+    """Parse quick add input into offer data."""
+    parts = [part.strip() for part in (text or "").split("|")]
+    if len(parts) < 2:
+        raise ValueError("Not enough data")
+
+    if len(parts) > 8:
+        parts = parts[:7] + [" | ".join(parts[7:])]
+
+    title = parts[0]
+    if not title:
+        raise ValueError("Missing title")
+
+    original_price = _parse_price_value(parts[1])
+
+    discount_raw = parts[2] if len(parts) > 2 else ""
+    unit_raw = parts[4] if len(parts) > 4 else ""
+    unit = _normalize_unit_input(unit_raw) if unit_raw else "шт"
+    if unit_raw and not unit:
+        raise ValueError("Invalid unit")
+
+    quantity_raw = parts[3] if len(parts) > 3 else ""
+    quantity = _parse_quantity_value(quantity_raw, unit)
+
+    expiry_raw = parts[5] if len(parts) > 5 else ""
+    expiry_date = _parse_expiry_input(expiry_raw) if expiry_raw.strip() else None
+
+    category_raw = parts[6] if len(parts) > 6 else ""
+    category = _normalize_category_input(category_raw) if category_raw else "other"
+    if category_raw and not category:
+        raise ValueError("Invalid category")
+
+    description = parts[7].strip() if len(parts) > 7 else ""
+
+    discount_percent, discount_price = _parse_discount_value(original_price, discount_raw)
+
+    return {
+        "title": title,
+        "description": description,
+        "original_price": original_price,
+        "discount_price": discount_price,
+        "discount_percent": discount_percent,
+        "quantity": quantity,
+        "unit": unit,
+        "expiry_date": expiry_date,
+        "category": category,
+    }
+
+
 # ============ STEP 1: Start & Category ============
+
+
+async def _prompt_quick_input(target: types.Message, state: FSMContext, lang: str) -> None:
+    """Prompt for quick add input."""
+    data = await state.get_data()
+    store_name = data.get("store_name")
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+
+    header = f"<b>{store_name}</b>\n\n" if store_name else ""
+    await target.answer(
+        header + _quick_add_instructions(lang),
+        parse_mode="HTML",
+        reply_markup=builder.as_markup(),
+    )
+    await state.set_state(CreateOffer.quick_input)
+
+
+@router.message(
+    (F.text == get_text("ru", "quick_add")) | (F.text == get_text("uz", "quick_add"))
+)
+async def quick_add_start(message: types.Message, state: FSMContext) -> None:
+    """Start quick add flow."""
+    await state.clear()
+
+    if not db:
+        await message.answer("System error")
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    stores = [
+        s
+        for s in db.get_user_accessible_stores(message.from_user.id)
+        if get_store_field(s, "status") in ("active", "approved")
+    ]
+
+    if not stores:
+        await message.answer(get_text(lang, "no_approved_stores"))
+        return
+
+    if len(stores) > 1:
+        builder = InlineKeyboardBuilder()
+        for store in stores:
+            store_id = get_store_field(store, "store_id")
+            store_name = get_store_field(store, "name", "Магазин")
+            if store_id is None:
+                continue
+            builder.button(text=store_name[:30], callback_data=f"quick_store_{store_id}")
+        builder.adjust(1)
+
+        await message.answer(
+            get_text(lang, "choose_store"),
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+        await state.set_state(CreateOffer.store)
+        return
+
+    store_id = get_store_field(stores[0], "store_id")
+    store_name = get_store_field(stores[0], "name", "Магазин")
+    await state.update_data(store_id=store_id, store_name=store_name)
+    await _prompt_quick_input(message, state, lang)
+
+
+@router.callback_query(F.data.startswith("quick_store_"))
+async def quick_store_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Store selected for quick add."""
+    if not db or not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    try:
+        store_id = int(callback.data.replace("quick_store_", ""))
+    except ValueError:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    stores = [
+        s
+        for s in db.get_user_accessible_stores(callback.from_user.id)
+        if get_store_field(s, "status") in ("active", "approved")
+    ]
+    store = next((s for s in stores if get_store_field(s, "store_id") == store_id), None)
+    if not store:
+        await callback.answer(get_text(lang, "no_approved_stores"), show_alert=True)
+        return
+
+    store_name = get_store_field(store, "name", "Магазин")
+    await state.update_data(store_id=store_id, store_name=store_name)
+    await callback.answer()
+    await _prompt_quick_input(callback.message, state, lang)
 
 
 @router.message(F.text.contains("Добавить") | F.text.contains("Qo'shish"))
@@ -212,7 +509,7 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
     )
 
     step_text = (
-        "<b>Шаг 1/8:</b> Выберите категорию"
+        "<b>Шаг 1/9:</b> Выберите категорию"
         if lang == "ru"
         else "<b>1/9-qadam:</b> Kategoriyani tanlang"
     )
@@ -271,6 +568,57 @@ async def create_store_selected(callback: types.CallbackQuery, state: FSMContext
     await callback.answer()
 
 
+@router.message(CreateOffer.quick_input, F.text)
+async def quick_input_entered(message: types.Message, state: FSMContext) -> None:
+    """Process quick add input from text."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    if is_main_menu_button(message.text):
+        await state.clear()
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+
+    try:
+        offer_data = _parse_quick_input(message.text)
+    except Exception:
+        await message.answer(_quick_add_instructions(lang), parse_mode="HTML")
+        return
+
+    await state.update_data(**offer_data, photo=None)
+    await _finalize_offer(message, state, lang)
+
+
+@router.message(CreateOffer.quick_input, F.photo)
+async def quick_input_photo(message: types.Message, state: FSMContext) -> None:
+    """Process quick add input from photo caption."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    caption = message.caption or ""
+
+    if not caption.strip():
+        await message.answer(
+            _quick_add_instructions(lang),
+            parse_mode="HTML",
+        )
+        return
+
+    try:
+        offer_data = _parse_quick_input(caption)
+    except Exception:
+        await message.answer(_quick_add_instructions(lang), parse_mode="HTML")
+        return
+
+    photo_id = message.photo[-1].file_id
+    await state.update_data(**offer_data, photo=photo_id)
+    await _finalize_offer(message, state, lang)
+
+
 @router.callback_query(F.data.startswith("product_cat_"))
 async def category_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Category selected - ask for title."""
@@ -284,9 +632,11 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
     await state.update_data(category=category)
     data = await state.get_data()
 
-    # Build cancel keyboard
+    # Build back/cancel keyboard
     builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_category")
     builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.adjust(2)
 
     progress = build_progress_text({**data, "category": category}, lang, 2)
 
@@ -419,7 +769,7 @@ async def skip_description(callback: types.CallbackQuery, state: FSMContext) -> 
     await callback.answer()
 
 
-# ============ STEP 3: Price ============
+# ============ STEP 4: Price ============
 
 
 @router.message(CreateOffer.original_price, F.text)
@@ -577,7 +927,7 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
 async def _go_to_unit_step(target: types.Message, state: FSMContext, lang: str) -> None:
     """Move to unit selection step."""
     data = await state.get_data()
-    progress = build_progress_text(data, lang, 6)
+    progress = build_progress_text(data, lang, 8)
 
     discount_price = data.get("discount_price")
     price_line = ""
@@ -611,7 +961,7 @@ async def _process_discount(
     await _go_to_unit_step(target, state, lang)
 
 
-# ============ STEP 5: Unit Type ============
+# ============ STEP 6: Unit Type ============
 
 
 @router.callback_query(CreateOffer.unit_type, F.data.startswith("unit_type_"))
@@ -642,7 +992,7 @@ async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -
     await callback.answer()
 
 
-# ============ STEP 6: Quantity ============
+# ============ STEP 7: Quantity ============
 
 
 @router.callback_query(CreateOffer.quantity, F.data.startswith("quantity_"))
@@ -662,8 +1012,8 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         builder = InlineKeyboardBuilder()
         builder.button(text=get_text(lang, "back"), callback_data="create_back_unit")
 
-        example = "Пример: 2.5" if unit == "кг" else "Пример: 25"
-        example_uz = "Misol: 2.5" if unit == "кг" else "Misol: 25"
+        example = "Пример: 2.5" if unit in DECIMAL_UNITS else "Пример: 25"
+        example_uz = "Misol: 2.5" if unit in DECIMAL_UNITS else "Misol: 25"
 
         await callback.message.edit_text(
             "<b>"
@@ -676,7 +1026,7 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         await callback.answer()
         return
 
-    quantity = float(qty_data)
+    quantity = float(qty_data) if unit in DECIMAL_UNITS else int(float(qty_data))
     await _process_quantity(callback.message, state, lang, quantity)
     await callback.answer()
 
@@ -702,12 +1052,12 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         quantity = float(quantity_text)
         if quantity <= 0:
             raise ValueError("Invalid quantity")
-        # For pieces, ensure integer
-        if unit == "шт" and quantity != int(quantity):
+        # For non-decimal units, ensure integer
+        if unit not in DECIMAL_UNITS and quantity != int(quantity):
             await message.answer(
-                "Для штук введите целое число"
+                "Введите целое число для выбранной единицы"
                 if lang == "ru"
-                else "Dona uchun butun son kiriting"
+                else "Tanlangan birlik uchun butun son kiriting"
             )
             return
     except ValueError:
@@ -738,7 +1088,7 @@ async def _process_quantity(
     await state.set_state(CreateOffer.expiry_date)
 
 
-# ============ STEP 7: Expiry Date ============
+# ============ STEP 8: Expiry Date ============
 
 
 @router.callback_query(CreateOffer.expiry_date, F.data.startswith("expiry_"))
@@ -767,6 +1117,11 @@ async def expiry_selected(callback: types.CallbackQuery, state: FSMContext) -> N
         await callback.answer()
         return
 
+    if expiry_data == "none":
+        await _process_expiry(callback.message, state, lang, None)
+        await callback.answer()
+        return
+
     days = int(expiry_data)
     expiry_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
     await _process_expiry(callback.message, state, lang, expiry_date)
@@ -788,19 +1143,7 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
     lang = db.get_user_language(message.from_user.id)
 
     try:
-        date_str = message.text.strip().replace("/", ".").replace("-", ".")
-        today = datetime.now()
-
-        if len(date_str.split(".")) == 3:
-            date_obj = datetime.strptime(date_str, "%d.%m.%Y")
-        elif len(date_str.split(".")) == 2:
-            date_obj = datetime.strptime(f"{date_str}.{today.year}", "%d.%m.%Y")
-            if date_obj.date() < today.date():
-                date_obj = date_obj.replace(year=today.year + 1)
-        else:
-            raise ValueError("Invalid date format")
-
-        expiry_date = date_obj.strftime("%Y-%m-%d")
+        expiry_date = _parse_expiry_input(message.text)
     except ValueError:
         await message.answer(
             "Формат: ДД.ММ (например 25.12)"
@@ -813,13 +1156,13 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
 
 
 async def _process_expiry(
-    target: types.Message, state: FSMContext, lang: str, expiry_date: str
+    target: types.Message, state: FSMContext, lang: str, expiry_date: str | None
 ) -> None:
     """Process expiry date and move to photo step."""
     await state.update_data(expiry_date=expiry_date)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 8)
+    progress = build_progress_text(data, lang, 9)
 
     text = (
         f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -831,7 +1174,7 @@ async def _process_expiry(
     await state.set_state(CreateOffer.photo)
 
 
-# ============ STEP 8: Photo ============
+# ============ STEP 9: Photo ============
 
 
 @router.message(CreateOffer.photo, F.photo)
@@ -875,11 +1218,18 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         unit = data.get("unit", "шт")
         quantity = data["quantity"]
 
-        # Format quantity display
-        if unit == "кг":
-            qty_display = f"{quantity} кг"
-        else:
-            qty_display = f"{int(quantity)} шт"
+        def _format_qty(value: Any, unit_value: str) -> str:
+            try:
+                qty = float(value)
+                if unit_value in DECIMAL_UNITS:
+                    qty_str = f"{qty:.2f}".rstrip("0").rstrip(".")
+                else:
+                    qty_str = str(int(qty))
+            except (TypeError, ValueError):
+                qty_str = str(value)
+            return f"{qty_str} {unit_value}"
+
+        qty_display = _format_qty(quantity, unit)
 
         # Prepare times in ISO format (will be parsed by Pydantic)
         now = datetime.now()
@@ -893,26 +1243,30 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         offer_id = db.add_offer(
             store_id=data["store_id"],
             title=data["title"],
-            description=data["title"],
+            description=data.get("description") or data["title"],
             original_price=original_price_value,
             discount_price=discount_price_value,
             quantity=quantity,
             available_from=available_from.time().isoformat(),  # ISO time format
             available_until=available_until.time().isoformat(),  # ISO time format
             photo_id=data.get("photo"),  # Unified parameter name
-            expiry_date=data["expiry_date"],  # Will be parsed by Pydantic
+            expiry_date=data.get("expiry_date"),  # Will be parsed by Pydantic
             unit=unit,
             category=data.get("category", "other"),
         )
 
         discount_percent = data.get("discount_percent", 0)
 
+        expiry_display = data.get("expiry_date")
+        if not expiry_display:
+            expiry_display = "Без срока" if lang == "ru" else "Muddatsiz"
+
         success_text = (
             f"<b>{'Товар создан' if lang == 'ru' else 'Mahsulot yaratildi'}</b>\n\n"
             f"{data['title']}\n"
             f"{'Цена' if lang == 'ru' else 'Narx'}: {int(data['original_price']):,} -> {int(data['discount_price']):,} сум (-{discount_percent}%)\n"
             f"{'Количество' if lang == 'ru' else 'Miqdor'}: {qty_display}\n"
-            f"{'Срок годности' if lang == 'ru' else 'Yaroqlilik muddati'}: {data['expiry_date']}\n\n"
+            f"{'Срок годности' if lang == 'ru' else 'Yaroqlilik muddati'}: {expiry_display}\n\n"
         )
 
         # Add quick action buttons
@@ -947,6 +1301,68 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
 # ============ Navigation Callbacks ============
 
 
+@router.callback_query(F.data == "create_back_title")
+async def back_to_title(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Go back to title input."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    data = await state.get_data()
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_category")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.adjust(2)
+
+    progress = build_progress_text(data, lang, 2)
+
+    text = (
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"{progress}\n\n"
+        f"<b>{'Введите название товара:' if lang == 'ru' else 'Mahsulot nomini kiriting:'}</b>\n\n"
+        f"{'Пример: Чай Ахмад Английский 100г' if lang == 'ru' else 'Misol: Ahmad English Tea 100g'}"
+    )
+
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await state.set_state(CreateOffer.title)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "create_back_description")
+async def back_to_description(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Go back to description input."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    data = await state.get_data()
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_title")
+    builder.button(
+        text="Пропустить" if lang == "ru" else "O'tkazib yuborish",
+        callback_data="create_skip_description",
+    )
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.adjust(2, 1)
+
+    progress = build_progress_text(data, lang, 3)
+
+    text = (
+        f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
+        f"{progress}\n\n"
+        f"<b>{'Введите описание (можно пропустить):' if lang == 'ru' else 'Tavsif kiriting (o`tqazib yuborish mumkin):'}</b>\n\n"
+        f"{'Пример: свежий, 450г' if lang == 'ru' else 'Misol: yangi, 450g'}"
+    )
+
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    await state.set_state(CreateOffer.description)
+    await callback.answer()
+
+
 @router.callback_query(F.data == "create_back_category")
 async def back_to_category(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Go back to category selection."""
@@ -962,7 +1378,7 @@ async def back_to_category(callback: types.CallbackQuery, state: FSMContext) -> 
         f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
     )
     step_text = (
-        "<b>Шаг 1/8:</b> Выберите категорию"
+        "<b>Шаг 1/9:</b> Выберите категорию"
         if lang == "ru"
         else "<b>1/9-qadam:</b> Kategoriyani tanlang"
     )
@@ -987,11 +1403,11 @@ async def back_to_price(callback: types.CallbackQuery, state: FSMContext) -> Non
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_category")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_description")
     builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2)
 
-    progress = build_progress_text(data, lang, 3)
+    progress = build_progress_text(data, lang, 4)
 
     text = (
         f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -1014,7 +1430,7 @@ async def back_to_discount(callback: types.CallbackQuery, state: FSMContext) -> 
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 4)
+    progress = build_progress_text(data, lang, 5)
 
     text = (
         f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -1038,7 +1454,7 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
     data = await state.get_data()
     unit = data.get("unit", "шт")
 
-    progress = build_progress_text(data, lang, 6)
+    progress = build_progress_text(data, lang, 7)
 
     text = (
         f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -1063,7 +1479,7 @@ async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 5)
+    progress = build_progress_text(data, lang, 6)
 
     text = (
         f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -1086,7 +1502,7 @@ async def back_to_expiry(callback: types.CallbackQuery, state: FSMContext) -> No
     lang = db.get_user_language(callback.from_user.id)
     data = await state.get_data()
 
-    progress = build_progress_text(data, lang, 7)
+    progress = build_progress_text(data, lang, 8)
 
     text = (
         f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
@@ -1137,6 +1553,25 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
         await callback.answer(get_text(lang, "no_approved_stores"), show_alert=True)
         return
 
+    if len(stores) > 1:
+        builder = InlineKeyboardBuilder()
+        for store in stores:
+            store_id = get_store_field(store, "store_id")
+            store_name = get_store_field(store, "name", "Магазин")
+            if store_id is None:
+                continue
+            builder.button(text=store_name[:30], callback_data=f"create_store_{store_id}")
+        builder.adjust(1)
+
+        await callback.message.edit_text(
+            get_text(lang, "choose_store"),
+            parse_mode="HTML",
+            reply_markup=builder.as_markup(),
+        )
+        await state.set_state(CreateOffer.store)
+        await callback.answer()
+        return
+
     store_id = get_store_field(stores[0], "store_id")
     store_name = get_store_field(stores[0], "name", "Магазин")
     await state.update_data(store_id=store_id, store_name=store_name)
@@ -1146,7 +1581,7 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
         f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
     )
     step_text = (
-        "<b>Шаг 1/8:</b> Выберите категорию"
+        "<b>Шаг 1/9:</b> Выберите категорию"
         if lang == "ru"
         else "<b>1/9-qadam:</b> Kategoriyani tanlang"
     )

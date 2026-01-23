@@ -15,6 +15,29 @@ logger = logging.getLogger(__name__)
 # Telegram message limit
 TELEGRAM_MESSAGE_LIMIT = 4096
 
+# Category labels for display
+CATEGORY_LABELS = {
+    "bakery": {"ru": "Выпечка", "uz": "Pishiriq"},
+    "dairy": {"ru": "Молочные", "uz": "Sut mahsulotlari"},
+    "meat": {"ru": "Мясные", "uz": "Go'sht mahsulotlari"},
+    "fruits": {"ru": "Фрукты", "uz": "Mevalar"},
+    "vegetables": {"ru": "Овощи", "uz": "Sabzavotlar"},
+    "drinks": {"ru": "Напитки", "uz": "Ichimliklar"},
+    "snacks": {"ru": "Снеки", "uz": "Gaz. ovqatlar"},
+    "frozen": {"ru": "Замороженное", "uz": "Muzlatilgan"},
+    "sweets": {"ru": "Сладости", "uz": "Shirinliklar"},
+    "other": {"ru": "Другое", "uz": "Boshqa"},
+}
+
+UNIT_DISPLAY_UZ = {
+    "шт": "dona",
+    "уп": "up",
+    "кг": "kg",
+    "г": "g",
+    "л": "l",
+    "мл": "ml",
+}
+
 # Module-level dependencies (set by setup_dependencies)
 db: DatabaseProtocol | None = None
 bot: Any | None = None
@@ -189,6 +212,52 @@ def get_booking_field(booking: Any, field: str, default: Any = None) -> Any:
     return default
 
 
+def get_category_label(category: str | None, lang: str) -> str:
+    """Return localized category label."""
+    if not category:
+        category = "other"
+    labels = CATEGORY_LABELS.get(category, CATEGORY_LABELS["other"])
+    return labels["ru"] if lang == "ru" else labels["uz"]
+
+
+def display_unit(unit: str | None, lang: str) -> str:
+    """Return unit display label."""
+    unit_value = unit or "шт"
+    if lang == "uz":
+        return UNIT_DISPLAY_UZ.get(unit_value, unit_value)
+    return unit_value
+
+
+def format_quantity(value: Any, unit: str | None, lang: str) -> str:
+    """Format quantity with unit for display."""
+    unit_value = display_unit(unit, lang)
+    try:
+        qty = float(value)
+        if qty.is_integer():
+            qty_str = str(int(qty))
+        else:
+            qty_str = f"{qty:.2f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        qty_str = str(value) if value is not None else "0"
+    return f"{qty_str} {unit_value}"
+
+
+def normalize_expiry_value(expiry_date: Any) -> str | None:
+    """Normalize expiry date to ISO string."""
+    if not expiry_date:
+        return None
+    try:
+        from datetime import date, datetime
+
+        if isinstance(expiry_date, datetime):
+            return expiry_date.strftime("%Y-%m-%d")
+        if isinstance(expiry_date, date):
+            return expiry_date.strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return str(expiry_date)
+
+
 async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None:
     """Send single offer card with management buttons."""
     database = get_db()
@@ -202,6 +271,7 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
     status = get_offer_field(offer, "status", "active")
     photo = get_offer_field(offer, "photo")
     unit = get_offer_field(offer, "unit", "шт") or "шт"
+    category = get_offer_field(offer, "category", "other")
     available_from = get_offer_field(offer, "available_from")
     available_until = get_offer_field(offer, "available_until")
     expiry_date = get_offer_field(offer, "expiry_date")
@@ -217,15 +287,19 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
     text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n\n"
     text += f"{'Цена' if lang == 'ru' else 'Narx'}: <s>{original_price:,}</s> -> <b>{discount_price:,}</b> сум\n"
     text += f"{'Скидка' if lang == 'ru' else 'Chegirma'}: -{discount_percent}%\n"
-    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b> {unit}\n"
+    text += f"{'Категория' if lang == 'ru' else 'Kategoriya'}: {get_category_label(category, lang)}\n"
+    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{format_quantity(quantity, unit, lang)}</b>\n"
 
     if available_from and available_until:
         text += f"{'Время' if lang == 'ru' else 'Vaqt'}: {available_from} - {available_until}\n"
 
-    if expiry_date:
-        expiry_info = database.get_time_remaining(expiry_date)
-        if expiry_info:
-            text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_info}\n"
+    expiry_value = normalize_expiry_value(expiry_date)
+    if expiry_value:
+        expiry_info = database.get_time_remaining(expiry_value)
+        expiry_display = expiry_info or expiry_value
+    else:
+        expiry_display = "Без срока" if lang == "ru" else "Muddatsiz"
+    text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_display}\n"
 
     # Management buttons
     builder = InlineKeyboardBuilder()
@@ -233,6 +307,8 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
     if status == "active":
         builder.button(text="+1", callback_data=f"qty_add_{offer_id}")
         builder.button(text="-1", callback_data=f"qty_sub_{offer_id}")
+        builder.button(text="+5", callback_data=f"qty_add_5_{offer_id}")
+        builder.button(text="-5", callback_data=f"qty_sub_5_{offer_id}")
         builder.button(
             text="Изменить" if lang == "ru" else "Tahrirlash",
             callback_data=f"edit_offer_{offer_id}",
@@ -249,7 +325,7 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
             text="Назад" if lang == "ru" else "Orqaga",
             callback_data="back_to_offers_menu",
         )
-        builder.adjust(2, 2, 1, 1)
+        builder.adjust(4, 2, 1, 1)
     else:
         builder.button(
             text="Активировать" if lang == "ru" else "Faollashtirish",
@@ -575,6 +651,7 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
     quantity = get_offer_field(offer, "quantity", 0)
     status = get_offer_field(offer, "status", "active")
     unit = get_offer_field(offer, "unit", "шт") or "шт"
+    category = get_offer_field(offer, "category", "other")
     available_from = get_offer_field(offer, "available_from", "")
     available_until = get_offer_field(offer, "available_until", "")
     expiry_date = get_offer_field(offer, "expiry_date")
@@ -589,21 +666,27 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
     text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n\n"
     text += f"{'Цена' if lang == 'ru' else 'Narx'}: <s>{original_price:,}</s> -> <b>{discount_price:,}</b> сум\n"
     text += f"{'Скидка' if lang == 'ru' else 'Chegirma'}: -{discount_percent}%\n"
-    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{quantity}</b> {unit}\n"
+    text += f"{'Категория' if lang == 'ru' else 'Kategoriya'}: {get_category_label(category, lang)}\n"
+    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{format_quantity(quantity, unit, lang)}</b>\n"
 
     if available_from and available_until:
         text += f"{'Время' if lang == 'ru' else 'Vaqt'}: {available_from} - {available_until}\n"
 
-    if expiry_date:
-        expiry_info = database.get_time_remaining(expiry_date)
-        if expiry_info:
-            text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_info}\n"
+    expiry_value = normalize_expiry_value(expiry_date)
+    if expiry_value:
+        expiry_info = database.get_time_remaining(expiry_value)
+        expiry_display = expiry_info or expiry_value
+    else:
+        expiry_display = "Без срока" if lang == "ru" else "Muddatsiz"
+    text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_display}\n"
 
     builder = InlineKeyboardBuilder()
 
     if status == "active":
         builder.button(text="+1", callback_data=f"qty_add_{offer_id}")
         builder.button(text="-1", callback_data=f"qty_sub_{offer_id}")
+        builder.button(text="+5", callback_data=f"qty_add_5_{offer_id}")
+        builder.button(text="-5", callback_data=f"qty_sub_5_{offer_id}")
         builder.button(
             text="Изменить" if lang == "ru" else "Tahrirlash",
             callback_data=f"edit_offer_{offer_id}",
@@ -620,7 +703,7 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
             text="Назад" if lang == "ru" else "Orqaga",
             callback_data="back_to_offers_menu",
         )
-        builder.adjust(2, 2, 1, 1)
+        builder.adjust(4, 2, 1, 1)
     else:
         builder.button(
             text="Активировать" if lang == "ru" else "Faollashtirish",

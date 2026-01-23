@@ -1002,13 +1002,28 @@ class PaymentService:
                 tx = None
 
         if not tx:
-            return self._click_response(
-                click_trans_id=click_trans_id,
-                merchant_trans_id=merchant_trans_id,
-                merchant_confirm_id=merchant_trans_id,
-                error=-6,
-                error_note="Transaction does not exist",
-            )
+            if error != 0:
+                return self._click_response(
+                    click_trans_id=click_trans_id,
+                    merchant_trans_id=merchant_trans_id,
+                    merchant_confirm_id=merchant_trans_id,
+                    error=-9,
+                    error_note="Transaction cancelled",
+                )
+            # Allow confirm even if Prepare wasn't recorded (e.g. retry/timeout scenarios)
+            if self._db and hasattr(self._db, "upsert_click_transaction"):
+                try:
+                    self._db.upsert_click_transaction(
+                        click_trans_id=int(click_trans_id),
+                        merchant_trans_id=str(merchant_trans_id),
+                        merchant_prepare_id=str(merchant_prepare_id),
+                        service_id=str(expected_service_id),
+                        amount=str(amount),
+                        status="confirmed",
+                    )
+                except Exception:
+                    pass
+            tx = {"status": "confirmed"}
 
         tx_status = str(tx.get("status", "")).lower()
         if tx_status == "confirmed":
