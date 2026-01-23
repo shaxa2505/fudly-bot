@@ -394,6 +394,10 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         o.pickup_code,
                         o.delivery_address,
                         o.total_price,
+                        o.delivery_price,
+                        o.item_title,
+                        o.item_price,
+                        o.item_original_price,
                         o.quantity,
                         o.payment_method,
                         o.payment_status,
@@ -489,8 +493,8 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 )
         else:
             qty = int(r.get("quantity") or 1)
-            price = int(r.get("offer_price") or 0)
-            title = r.get("offer_title") or "Tovar"
+            price = int(r.get("item_price") or r.get("offer_price") or 0)
+            title = r.get("item_title") or r.get("offer_title") or "Tovar"
             photo = r.get("offer_photo") or r.get("offer_photo_id")
             items_total = price * qty
             qty_total = qty
@@ -510,7 +514,14 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
         total_price = int(r.get("total_price") or 0)
         delivery_fee = 0
         if order_type == "delivery":
-            delivery_fee = max(0, total_price - items_total)
+            delivery_fee_raw = r.get("delivery_price")
+            if delivery_fee_raw is not None:
+                try:
+                    delivery_fee = int(delivery_fee_raw)
+                except Exception:
+                    delivery_fee = 0
+            else:
+                delivery_fee = max(0, total_price - items_total)
 
         primary_item = items[0] if items else {}
         offer_title = primary_item.get("title") or primary_item.get("offer_title")

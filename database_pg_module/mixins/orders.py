@@ -223,9 +223,10 @@ class OrderMixin:
                         cursor.execute(
                             """
                             INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                              delivery_lat, delivery_lon, comment,
                                               total_price, delivery_price, item_title, item_price, item_original_price,
                                               payment_method, payment_status, order_status, pickup_code, order_type)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING order_id
                             """,
                             (
@@ -234,6 +235,9 @@ class OrderMixin:
                                 offer_id,
                                 quantity,
                                 delivery_address,
+                                delivery_lat,
+                                delivery_lon,
+                                comment,
                                 total_amount,
                                 delivery_price,
                                 item_title,
@@ -255,9 +259,10 @@ class OrderMixin:
                             cursor.execute(
                                 """
                                 INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                                  delivery_lat, delivery_lon, comment,
                                                   total_price, delivery_price, item_title, item_price, item_original_price,
                                                   payment_method, payment_status, order_status)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 RETURNING order_id
                                 """,
                                 (
@@ -266,6 +271,9 @@ class OrderMixin:
                                     offer_id,
                                     quantity,
                                     delivery_address,
+                                    delivery_lat,
+                                    delivery_lon,
+                                    comment,
                                     total_amount,
                                     delivery_price,
                                     item_title,
