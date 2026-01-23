@@ -3346,14 +3346,26 @@ async def create_webhook_app(
                 )
 
             accept = (request.headers.get("Accept") or "").lower()
-            if "application/json" in accept:
+            content_type = (request.headers.get("Content-Type") or "").lower()
+
+            if "application/json" in accept and "application/x-www-form-urlencoded" not in content_type:
                 return web.json_response(result)
 
-            from urllib.parse import urlencode
+            response_lines = []
+            for key in (
+                "click_trans_id",
+                "merchant_trans_id",
+                "merchant_prepare_id",
+                "merchant_confirm_id",
+                "error",
+                "error_note",
+            ):
+                if key in result:
+                    response_lines.append(f"{key}={result[key]}")
 
             return web.Response(
-                text=urlencode(result),
-                content_type="application/x-www-form-urlencoded",
+                text="\n".join(response_lines),
+                content_type="text/plain",
             )
         except Exception as e:
             logger.error(f"Click callback error: {e}")
