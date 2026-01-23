@@ -411,6 +411,7 @@ class SchemaMixin:
                     delivery_lat REAL,
                     delivery_lon REAL,
                     delivery_structured JSONB,
+                    delivery_price INTEGER,
                     payment_method TEXT DEFAULT 'cash',
                     payment_status TEXT DEFAULT 'not_required',
                     payment_proof_photo_id TEXT,
@@ -419,6 +420,9 @@ class SchemaMixin:
                     cancel_comment TEXT,
                     quantity INTEGER DEFAULT 1,
                     total_price REAL,
+                    item_title TEXT,
+                    item_price INTEGER,
+                    item_original_price INTEGER,
                     pickup_code TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(user_id),
@@ -444,6 +448,18 @@ class SchemaMixin:
                     cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_lon REAL")
                     cursor.execute(
                         "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_structured JSONB"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_price INTEGER"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_title TEXT"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_price INTEGER"
+                    )
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS item_original_price INTEGER"
                     )
                 except Exception as e:
                     logger.warning(f"Migration for orders delivery structured columns: {e}")

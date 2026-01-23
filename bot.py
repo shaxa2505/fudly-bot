@@ -547,7 +547,7 @@ def _register_handlers() -> None:
     dp.include_router(profile.router)
     dp.include_router(favorites.router)
     dp.include_router(customer_menu.router)
-    dp.include_router(orders_router)  # Includes delivery_admin.router internally
+    dp.include_router(orders_router)
     dp.include_router(bookings.router)
     dp.include_router(partner.router)
 

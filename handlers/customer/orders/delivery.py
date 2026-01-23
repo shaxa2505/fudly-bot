@@ -6,8 +6,7 @@ Flow: Click delivery → Single card with qty/address/payment → Confirm → Do
 - Single message updated at each step
 - Minimal notifications
 
-This module is the main entry point. Admin and partner handlers are in separate modules:
-- delivery_admin.py - Admin payment confirmation/rejection
+This module is the main entry point. Partner handlers are in a separate module:
 - delivery_partner.py - Partner order confirmation/rejection
 - delivery_ui.py - UI builders (cards, keyboards)
 """
@@ -52,7 +51,6 @@ router = Router()
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 # Toggle Telegram Payments (Click via Telegram Bot Payments)
 ENABLE_TELEGRAM_PAYMENTS = (
     os.getenv("ENABLE_TELEGRAM_PAYMENTS", "0").strip().lower() in {"1", "true", "yes"}

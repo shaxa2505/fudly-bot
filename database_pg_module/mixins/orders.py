@@ -58,6 +58,9 @@ class OrderMixin:
         quantity: int,
         order_type: str,
         delivery_address: str = None,
+        delivery_lat: float | None = None,
+        delivery_lon: float | None = None,
+        comment: str | None = None,
         delivery_price: int = 0,
         payment_method: str = None,
     ) -> int | None:
@@ -95,6 +98,9 @@ class OrderMixin:
             store_id=store_id,
             cart_items=cart_items,
             delivery_address=delivery_address if order_type_norm == "delivery" else None,
+            delivery_lat=delivery_lat if order_type_norm == "delivery" else None,
+            delivery_lon=delivery_lon if order_type_norm == "delivery" else None,
+            comment=comment,
             delivery_price=int(delivery_price or 0),
             payment_method=payment_method_norm,
             order_type=order_type_norm,
@@ -123,6 +129,9 @@ class OrderMixin:
         items: list[dict[str, Any]],
         order_type: str,
         delivery_address: str = None,
+        delivery_lat: float | None = None,
+        delivery_lon: float | None = None,
+        comment: str | None = None,
         payment_method: str = "cash",
         notify_customer: bool = True,
     ) -> dict[str, Any]:
@@ -165,6 +174,15 @@ class OrderMixin:
                 )
 
                 total_amount = int((price * quantity) + delivery_price)
+                item_title = item.get("title") or ""
+                try:
+                    item_price = int(price or 0)
+                except (TypeError, ValueError):
+                    item_price = 0
+                try:
+                    item_original_price = int(item.get("original_price") or item_price or 0)
+                except (TypeError, ValueError):
+                    item_original_price = item_price
 
                 # Generate pickup code for pickup orders
                 pickup_code = None
@@ -205,8 +223,9 @@ class OrderMixin:
                         cursor.execute(
                             """
                             INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                              total_price, payment_method, payment_status, order_status, pickup_code, order_type)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                              total_price, delivery_price, item_title, item_price, item_original_price,
+                                              payment_method, payment_status, order_status, pickup_code, order_type)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             RETURNING order_id
                             """,
                             (
@@ -216,6 +235,10 @@ class OrderMixin:
                                 quantity,
                                 delivery_address,
                                 total_amount,
+                                delivery_price,
+                                item_title,
+                                item_price,
+                                item_original_price,
                                 payment_method_norm,
                                 payment_status,
                                 "pending",
@@ -232,8 +255,9 @@ class OrderMixin:
                             cursor.execute(
                                 """
                                 INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                                  total_price, payment_method, payment_status, order_status)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                  total_price, delivery_price, item_title, item_price, item_original_price,
+                                                  payment_method, payment_status, order_status)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 RETURNING order_id
                                 """,
                                 (
@@ -243,6 +267,10 @@ class OrderMixin:
                                     quantity,
                                     delivery_address,
                                     total_amount,
+                                    delivery_price,
+                                    item_title,
+                                    item_price,
+                                    item_original_price,
                                     payment_method_norm,
                                     payment_status,
                                     "pending",
@@ -625,6 +653,22 @@ class OrderMixin:
                 # Create order with cart_items
                 cart_items_json = json.dumps(cart_items, ensure_ascii=False)
                 total_quantity = sum(int(item.get("quantity", 1)) for item in cart_items)
+                item_title = None
+                item_price = None
+                item_original_price = None
+                if len(cart_items) == 1:
+                    first_item = cart_items[0] or {}
+                    item_title = first_item.get("title")
+                    try:
+                        item_price = int(first_item.get("price") or 0)
+                    except (TypeError, ValueError):
+                        item_price = 0
+                    try:
+                        item_original_price = int(
+                            first_item.get("original_price") or item_price or 0
+                        )
+                    except (TypeError, ValueError):
+                        item_original_price = item_price
 
                 payment_method_norm = self._normalize_payment_method(payment_method)
                 payment_status = self._initial_payment_status(payment_method_norm)
@@ -634,10 +678,11 @@ class OrderMixin:
                         """
                         INSERT INTO orders (
                             user_id, store_id, delivery_address, total_price,
+                            delivery_price, item_title, item_price, item_original_price,
                             payment_method, payment_status, order_status, pickup_code,
                             order_type, cart_items, is_cart_order, quantity
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
                         RETURNING order_id
                         """,
                         (
@@ -645,6 +690,10 @@ class OrderMixin:
                             store_id,
                             delivery_address,
                             total_price,
+                            delivery_price,
+                            item_title,
+                            item_price,
+                            item_original_price,
                             payment_method_norm,
                             payment_status,
                             pickup_code,
@@ -661,10 +710,11 @@ class OrderMixin:
                         """
                         INSERT INTO orders (
                             user_id, store_id, delivery_address, total_price,
+                            delivery_price, item_title, item_price, item_original_price,
                             payment_method, payment_status, order_status, pickup_code,
                             cart_items, is_cart_order, quantity
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
                         RETURNING order_id
                         """,
                         (
@@ -672,6 +722,10 @@ class OrderMixin:
                             store_id,
                             delivery_address,
                             total_price,
+                            delivery_price,
+                            item_title,
+                            item_price,
+                            item_original_price,
                             payment_method_norm,
                             payment_status,
                             pickup_code,

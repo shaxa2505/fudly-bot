@@ -1976,6 +1976,9 @@ class UnifiedOrderService:
             if isinstance(order, dict):
                 store_id = order.get("store_id")
                 delivery_address = order.get("delivery_address")
+                delivery_lat = order.get("delivery_lat")
+                delivery_lon = order.get("delivery_lon")
+                comment = order.get("comment")
                 order_type = order.get("order_type")
                 payment_method = order.get("payment_method")
                 pickup_code = order.get("pickup_code")
@@ -1988,6 +1991,9 @@ class UnifiedOrderService:
             else:
                 store_id = getattr(order, "store_id", None)
                 delivery_address = getattr(order, "delivery_address", None)
+                delivery_lat = getattr(order, "delivery_lat", None)
+                delivery_lon = getattr(order, "delivery_lon", None)
+                comment = getattr(order, "comment", None)
                 order_type = getattr(order, "order_type", None)
                 payment_method = getattr(order, "payment_method", None)
                 pickup_code = getattr(order, "pickup_code", None)
@@ -2098,6 +2104,9 @@ class UnifiedOrderService:
                 stores_orders={int(store_id): items},
                 order_type=order_type,
                 delivery_address=delivery_address,
+                delivery_lat=delivery_lat,
+                delivery_lon=delivery_lon,
+                comment=comment,
                 payment_method=PaymentStatus.normalize_method(payment_method),
                 customer_name=customer_name,
                 customer_phone=customer_phone,

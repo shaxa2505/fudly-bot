@@ -20,6 +20,7 @@ ENABLE_TELEGRAM_PAYMENTS = (
     os.getenv("ENABLE_TELEGRAM_PAYMENTS", "0").strip().lower() in {"1", "true", "yes"}
 )
 
+
 def register(router: Router) -> None:
     """Register payment-related handlers for cart orders."""
 
