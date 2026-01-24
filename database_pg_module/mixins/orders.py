@@ -220,6 +220,8 @@ class OrderMixin:
 
                     # Try with pickup_code + order_type first, fallback to legacy schemas
                     try:
+                        savepoint_name = "sp_order_insert"
+                        cursor.execute(f"SAVEPOINT {savepoint_name}")
                         cursor.execute(
                             """
                             INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
@@ -250,71 +252,78 @@ class OrderMixin:
                                 order_type,
                             ),
                         )
+                        cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                     except Exception as e:
+                        cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                         message = str(e)
                         missing_pickup_or_type = "pickup_code" in message or "order_type" in message
                         missing_coords = any(
                             token in message for token in ("delivery_lat", "delivery_lon", "comment")
                         )
-                        if missing_coords and not missing_pickup_or_type:
-                            logger.warning(
-                                f"delivery_lat/lon/comment column missing, trying without: {e}"
-                            )
-                            cursor.execute(
-                                """
-                                INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                                  total_price, delivery_price, item_title, item_price, item_original_price,
-                                                  payment_method, payment_status, order_status, pickup_code, order_type)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                RETURNING order_id
-                                """,
-                                (
-                                    user_id,
-                                    store_id,
-                                    offer_id,
-                                    quantity,
-                                    delivery_address,
-                                    total_amount,
-                                    delivery_price,
-                                    item_title,
-                                    item_price,
-                                    item_original_price,
-                                    payment_method_norm,
-                                    payment_status,
-                                    "pending",
-                                    pickup_code,
-                                    order_type,
-                                ),
-                            )
-                        elif missing_pickup_or_type:
-                            logger.warning(
-                                f"pickup_code/order_type column missing, trying without: {e}"
-                            )
-                            cursor.execute(
-                                """
-                                INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                                  total_price, delivery_price, item_title, item_price, item_original_price,
-                                                  payment_method, payment_status, order_status)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                RETURNING order_id
-                                """,
-                                (
-                                    user_id,
-                                    store_id,
-                                    offer_id,
-                                    quantity,
-                                    delivery_address,
-                                    total_amount,
-                                    delivery_price,
-                                    item_title,
-                                    item_price,
-                                    item_original_price,
-                                    payment_method_norm,
-                                    payment_status,
-                                    "pending",
-                                ),
-                            )
-                        else:
+                        try:
+                            if missing_coords and not missing_pickup_or_type:
+                                logger.warning(
+                                    f"delivery_lat/lon/comment column missing, trying without: {e}"
+                                )
+                                cursor.execute(
+                                    """
+                                    INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                                      total_price, delivery_price, item_title, item_price, item_original_price,
+                                                      payment_method, payment_status, order_status, pickup_code, order_type)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    RETURNING order_id
+                                    """,
+                                    (
+                                        user_id,
+                                        store_id,
+                                        offer_id,
+                                        quantity,
+                                        delivery_address,
+                                        total_amount,
+                                        delivery_price,
+                                        item_title,
+                                        item_price,
+                                        item_original_price,
+                                        payment_method_norm,
+                                        payment_status,
+                                        "pending",
+                                        pickup_code,
+                                        order_type,
+                                    ),
+                                )
+                            elif missing_pickup_or_type:
+                                logger.warning(
+                                    f"pickup_code/order_type column missing, trying without: {e}"
+                                )
+                                cursor.execute(
+                                    """
+                                    INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                                      total_price, delivery_price, item_title, item_price, item_original_price,
+                                                      payment_method, payment_status, order_status)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    RETURNING order_id
+                                    """,
+                                    (
+                                        user_id,
+                                        store_id,
+                                        offer_id,
+                                        quantity,
+                                        delivery_address,
+                                        total_amount,
+                                        delivery_price,
+                                        item_title,
+                                        item_price,
+                                        item_original_price,
+                                        payment_method_norm,
+                                        payment_status,
+                                        "pending",
+                                    ),
+                                )
+                            else:
+                                raise
+                            cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                        except Exception:
+                            cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                             raise
 
                     result = cursor.fetchone()
@@ -715,6 +724,8 @@ class OrderMixin:
                 payment_status = self._initial_payment_status(payment_method_norm)
 
                 try:
+                    savepoint_name = "sp_order_insert"
+                    cursor.execute(f"SAVEPOINT {savepoint_name}")
                     cursor.execute(
                         """
                         INSERT INTO orders (
@@ -746,66 +757,73 @@ class OrderMixin:
                             total_quantity,
                         ),
                     )
+                    cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                 except Exception as e:
+                    cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                     message = str(e)
-                    if any(token in message for token in ("delivery_lat", "delivery_lon", "comment")) and "order_type" not in message:
-                        cursor.execute(
-                            """
-                            INSERT INTO orders (
-                                user_id, store_id, delivery_address, total_price,
-                                delivery_price, item_title, item_price, item_original_price,
-                                payment_method, payment_status, order_status, pickup_code,
-                                order_type, cart_items, is_cart_order, quantity
+                    try:
+                        if any(token in message for token in ("delivery_lat", "delivery_lon", "comment")) and "order_type" not in message:
+                            cursor.execute(
+                                """
+                                INSERT INTO orders (
+                                    user_id, store_id, delivery_address, total_price,
+                                    delivery_price, item_title, item_price, item_original_price,
+                                    payment_method, payment_status, order_status, pickup_code,
+                                    order_type, cart_items, is_cart_order, quantity
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
+                                RETURNING order_id
+                                """,
+                                (
+                                    user_id,
+                                    store_id,
+                                    delivery_address,
+                                    total_price,
+                                    delivery_price,
+                                    item_title,
+                                    item_price,
+                                    item_original_price,
+                                    payment_method_norm,
+                                    payment_status,
+                                    pickup_code,
+                                    order_type,
+                                    cart_items_json,
+                                    total_quantity,
+                                ),
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
-                            RETURNING order_id
-                            """,
-                            (
-                                user_id,
-                                store_id,
-                                delivery_address,
-                                total_price,
-                                delivery_price,
-                                item_title,
-                                item_price,
-                                item_original_price,
-                                payment_method_norm,
-                                payment_status,
-                                pickup_code,
-                                order_type,
-                                cart_items_json,
-                                total_quantity,
-                            ),
-                        )
-                    elif "order_type" in message:
-                        cursor.execute(
-                            """
-                            INSERT INTO orders (
-                                user_id, store_id, delivery_address, total_price,
-                                delivery_price, item_title, item_price, item_original_price,
-                                payment_method, payment_status, order_status, pickup_code,
-                                cart_items, is_cart_order, quantity
+                        elif "order_type" in message:
+                            cursor.execute(
+                                """
+                                INSERT INTO orders (
+                                    user_id, store_id, delivery_address, total_price,
+                                    delivery_price, item_title, item_price, item_original_price,
+                                    payment_method, payment_status, order_status, pickup_code,
+                                    cart_items, is_cart_order, quantity
+                                )
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
+                                RETURNING order_id
+                                """,
+                                (
+                                    user_id,
+                                    store_id,
+                                    delivery_address,
+                                    total_price,
+                                    delivery_price,
+                                    item_title,
+                                    item_price,
+                                    item_original_price,
+                                    payment_method_norm,
+                                    payment_status,
+                                    pickup_code,
+                                    cart_items_json,
+                                    total_quantity,
+                                ),
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
-                            RETURNING order_id
-                            """,
-                            (
-                                user_id,
-                                store_id,
-                                delivery_address,
-                                total_price,
-                                delivery_price,
-                                item_title,
-                                item_price,
-                                item_original_price,
-                                payment_method_norm,
-                                payment_status,
-                                pickup_code,
-                                cart_items_json,
-                                total_quantity,
-                            ),
-                        )
-                    else:
+                        else:
+                            raise
+                        cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+                    except Exception:
+                        cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                         raise
                 order_id = cursor.fetchone()[0]
 
