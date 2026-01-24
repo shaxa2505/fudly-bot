@@ -191,6 +191,7 @@ class OrderMixin:
                         random.choices(string.ascii_uppercase + string.digits, k=6)
                     )
 
+                order_id = None
                 try:
                     # First, check and reserve stock for this offer atomically
                     cursor.execute(
@@ -252,6 +253,8 @@ class OrderMixin:
                                 order_type,
                             ),
                         )
+                        result = cursor.fetchone()
+                        order_id = result[0] if result else None
                         cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                     except Exception as e:
                         cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
@@ -291,6 +294,8 @@ class OrderMixin:
                                         order_type,
                                     ),
                                 )
+                                result = cursor.fetchone()
+                                order_id = result[0] if result else None
                             elif missing_pickup_or_type:
                                 logger.warning(
                                     f"pickup_code/order_type column missing, trying without: {e}"
@@ -319,17 +324,15 @@ class OrderMixin:
                                         "pending",
                                     ),
                                 )
+                                result = cursor.fetchone()
+                                order_id = result[0] if result else None
                             else:
                                 raise
                             cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                         except Exception:
                             cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                             raise
-
-                    result = cursor.fetchone()
-                    if result:
-                        order_id = result[0]
-
+                    if order_id:
                         # Update offer quantity based on previously locked value
                         new_qty = available_qty - quantity
                         cursor.execute(
@@ -723,6 +726,7 @@ class OrderMixin:
                 payment_method_norm = self._normalize_payment_method(payment_method)
                 payment_status = self._initial_payment_status(payment_method_norm)
 
+                order_id = None
                 try:
                     savepoint_name = "sp_order_insert"
                     cursor.execute(f"SAVEPOINT {savepoint_name}")
@@ -757,6 +761,8 @@ class OrderMixin:
                             total_quantity,
                         ),
                     )
+                    result = cursor.fetchone()
+                    order_id = result[0] if result else None
                     cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                 except Exception as e:
                     cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
@@ -791,6 +797,8 @@ class OrderMixin:
                                     total_quantity,
                                 ),
                             )
+                            result = cursor.fetchone()
+                            order_id = result[0] if result else None
                         elif "order_type" in message:
                             cursor.execute(
                                 """
@@ -819,13 +827,16 @@ class OrderMixin:
                                     total_quantity,
                                 ),
                             )
+                            result = cursor.fetchone()
+                            order_id = result[0] if result else None
                         else:
                             raise
                         cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                     except Exception:
                         cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                         raise
-                order_id = cursor.fetchone()[0]
+                if not order_id:
+                    raise RuntimeError("order_insert_failed")
 
                 logger.info(
                     f"🛒✅ Cart order created: id={order_id}, code={pickup_code}, items={len(cart_items)}, total={total_price}"

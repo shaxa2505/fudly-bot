@@ -18,6 +18,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from database_protocol import DatabaseProtocol
+from handlers.common.utils import resolve_order_photo
 from logging_config import logger
 
 router = Router()
@@ -85,6 +86,7 @@ async def admin_confirm_payment(
     address = _get_order_field(order, "delivery_address", 7)
     customer_id = _get_order_field(order, "user_id", 1)
     payment_photo = _get_order_field(order, "payment_proof_photo_id", 10)
+    order_photo = resolve_order_photo(db, order)
     
     # Get order_type to determine if this is delivery or pickup
     order_type = _get_order_field(order, "order_type", -1)  # Index -1 means use dict only
@@ -217,11 +219,12 @@ async def admin_confirm_payment(
         partner_kb.button(text=reject_text, callback_data=f"order_reject_{order_id}")
         partner_kb.adjust(2)
 
+        photo_to_send = order_photo or payment_photo
         try:
-            if payment_photo:
+            if photo_to_send:
                 await bot.send_photo(
                     owner_id,
-                    photo=payment_photo,
+                    photo=photo_to_send,
                     caption=caption,
                     parse_mode="HTML",
                     reply_markup=partner_kb.as_markup(),
@@ -271,7 +274,19 @@ async def admin_confirm_payment(
                         pass
 
             if not edit_success:
-                sent_msg = await bot.send_message(customer_id, text, parse_mode="HTML")
+                sent_msg = None
+                if order_photo:
+                    try:
+                        sent_msg = await bot.send_photo(
+                            customer_id,
+                            photo=order_photo,
+                            caption=text,
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        sent_msg = None
+                if not sent_msg:
+                    sent_msg = await bot.send_message(customer_id, text, parse_mode="HTML")
                 if sent_msg and hasattr(db, "set_order_customer_message_id"):
                     try:
                         db.set_order_customer_message_id(order_id, sent_msg.message_id)
@@ -342,6 +357,8 @@ async def admin_reject_payment(
     except Exception:
         pass
 
+    order_photo = resolve_order_photo(db, order)
+
     # Notify customer
     if customer_id:
         cust_lang = db.get_user_language(customer_id)
@@ -380,7 +397,19 @@ async def admin_reject_payment(
                         pass
 
             if not edit_success:
-                sent_msg = await bot.send_message(customer_id, text, parse_mode="HTML")
+                sent_msg = None
+                if order_photo:
+                    try:
+                        sent_msg = await bot.send_photo(
+                            customer_id,
+                            photo=order_photo,
+                            caption=text,
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        sent_msg = None
+                if not sent_msg:
+                    sent_msg = await bot.send_message(customer_id, text, parse_mode="HTML")
                 if sent_msg and hasattr(db, "set_order_customer_message_id"):
                     try:
                         db.set_order_customer_message_id(order_id, sent_msg.message_id)

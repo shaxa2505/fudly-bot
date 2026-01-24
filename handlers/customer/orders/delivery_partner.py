@@ -21,7 +21,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from database_protocol import DatabaseProtocol
-from handlers.common.utils import html_escape as _esc
+from handlers.common.utils import html_escape as _esc, resolve_order_photo
 from logging_config import logger
 
 router = Router()
@@ -151,7 +151,7 @@ async def partner_confirm_order_batch(
         return
 
     send_live_updates = order_service.telegram_order_notifications
-    customer_notifications: dict = {}  # {customer_id: [order_infos]}
+    customer_notifications: dict[int, dict[str, Any]] = {}  # {customer_id: {orders, photo}}
 
     for order_id in order_ids:
         try:
@@ -181,7 +181,7 @@ async def partner_confirm_order_batch(
                 customer_id = _get_order_field(order, "user_id", 1)
                 if customer_id:
                     if customer_id not in customer_notifications:
-                        customer_notifications[customer_id] = []
+                        customer_notifications[customer_id] = {"orders": [], "photo": None}
     
                     offer_id = _get_order_field(order, "offer_id", 3)
                     quantity = _get_order_field(order, "quantity", 4)
@@ -191,7 +191,7 @@ async def partner_confirm_order_batch(
                     offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
                     store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
     
-                    customer_notifications[customer_id].append(
+                    customer_notifications[customer_id]["orders"].append(
                         {
                             "order_id": order_id,
                             "title": offer_title,
@@ -200,6 +200,8 @@ async def partner_confirm_order_batch(
                             "address": address,
                         }
                     )
+                    if not customer_notifications[customer_id]["photo"]:
+                        customer_notifications[customer_id]["photo"] = resolve_order_photo(db, order)
     
         except Exception as e:
             logger.error(f"Failed to confirm order {order_id}: {e}")
@@ -207,16 +209,17 @@ async def partner_confirm_order_batch(
 
     if not send_live_updates:
         # Notify customers (grouped)
-        for customer_id, orders_info in customer_notifications.items():
+        for customer_id, payload in customer_notifications.items():
             try:
                 cust_lang = db.get_user_language(customer_id)
-    
+
                 lines: list[str] = []
                 if cust_lang == "uz":
                     lines.append("🎉 <b>Barcha buyurtmalar qabul qilindi!</b>\n")
                 else:
                     lines.append("🎉 <b>Все заказы приняты!</b>\n")
     
+                orders_info = payload.get("orders", [])
                 for info in orders_info:
                     lines.append(f"📦 #{info['order_id']}")
                     lines.append(f"🏪 {_esc(info['store_name'])}")
@@ -229,7 +232,19 @@ async def partner_confirm_order_batch(
                     lines.append("🚚 <b>Доставка организуется!</b>")
     
                 customer_msg = "\n".join(lines)
-                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+                customer_photo = payload.get("photo")
+                if customer_photo:
+                    try:
+                        await bot.send_photo(
+                            customer_id,
+                            photo=customer_photo,
+                            caption=customer_msg,
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+                else:
+                    await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
     
             except Exception as e:
                 logger.error(f"Failed to notify customer {customer_id}: {e}")
@@ -275,7 +290,7 @@ async def partner_reject_order_batch(
 
     # Reject all orders and restore quantities
     rejected_count = 0
-    customer_notifications: dict = {}  # {customer_id: [store_names]}
+    customer_notifications: dict[int, dict[str, Any]] = {}  # {customer_id: {stores, photo}}
 
     order_service = get_unified_order_service()
     if not order_service:
@@ -315,10 +330,12 @@ async def partner_reject_order_batch(
                 customer_id = _get_order_field(order, "user_id", 1)
                 if customer_id:
                     if customer_id not in customer_notifications:
-                        customer_notifications[customer_id] = []
+                        customer_notifications[customer_id] = {"stores": [], "photo": None}
     
                     store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
-                    customer_notifications[customer_id].append(store_name)
+                    customer_notifications[customer_id]["stores"].append(store_name)
+                    if not customer_notifications[customer_id]["photo"]:
+                        customer_notifications[customer_id]["photo"] = resolve_order_photo(db, order)
     
             # Notify admin about rejection
             if ADMIN_ID > 0:
@@ -337,16 +354,35 @@ async def partner_reject_order_batch(
 
     if not send_live_updates:
         # Notify customers (grouped)
-        for customer_id, store_names in customer_notifications.items():
+        for customer_id, payload in customer_notifications.items():
             try:
                 cust_lang = db.get_user_language(customer_id)
-    
+
+                store_names = payload.get("stores", [])
                 if cust_lang == "uz":
-                    customer_msg = f"😔 <b>Buyurtmalar rad etildi</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Pul qaytariladi."
+                    customer_msg = (
+                        "😔 <b>Buyurtmalar rad etildi</b>\n\n"
+                        f"🏪 {', '.join(store_names)}\n\n💰 Pul qaytariladi."
+                    )
                 else:
-                    customer_msg = f"😔 <b>Заказы отклонены</b>\n\n🏪 {', '.join(store_names)}\n\n💰 Деньги будут возвращены."
-    
-                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+                    customer_msg = (
+                        "😔 <b>Заказы отклонены</b>\n\n"
+                        f"🏪 {', '.join(store_names)}\n\n💰 Деньги будут возвращены."
+                    )
+
+                customer_photo = payload.get("photo")
+                if customer_photo:
+                    try:
+                        await bot.send_photo(
+                            customer_id,
+                            photo=customer_photo,
+                            caption=customer_msg,
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+                else:
+                    await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
     
             except Exception as e:
                 logger.error(f"Failed to notify customer {customer_id}: {e}")

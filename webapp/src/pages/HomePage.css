@@ -648,7 +648,7 @@
    Filters Section - Primary + Advanced
    ============================================================================= */
 
-.filters-section {
+.home-filters-section {
   margin: var(--spacing-sm) var(--page-padding-x) var(--spacing-sm);
   padding: 0;
   background: transparent;
@@ -795,7 +795,7 @@
   transform: translateY(1px);
 }
 
-.filters-advanced {
+.home-filters-advanced {
   margin-top: 0;
   padding: 12px;
   background: #FFFFFF;
@@ -806,12 +806,12 @@
   gap: 12px;
 }
 
-.filter-group {
+.home-filter-group {
   display: grid;
   gap: 8px;
 }
 
-.filter-group-label {
+.home-filter-group-label {
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text-tertiary);
@@ -819,13 +819,13 @@
   letter-spacing: 0.06em;
 }
 
-.filter-group-row {
+.home-filter-group-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.sort-select {
+.home-sort-select {
   width: 100%;
   padding: 10px 12px;
   border-radius: 12px;
@@ -837,7 +837,7 @@
 }
 
 /* Filter Pill - Base Style */
-.filter-pill {
+.home-filter-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -858,7 +858,7 @@
   box-shadow: 0 8px 16px rgba(16, 24, 40, 0.08);
 }
 
-.filter-pill-icon {
+.home-filter-pill-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -870,55 +870,55 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.filter-pill-text {
+.home-filter-pill-text {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.1;
 }
 
-.filter-pill:active {
+.home-filter-pill:active {
   transform: scale(0.98);
 }
 
-.filter-pill.active {
+.home-filter-pill.active {
   background: var(--pill-color, var(--color-primary));
   color: #FFFFFF;
   border-color: transparent;
   box-shadow: 0 12px 20px rgba(16, 24, 40, 0.18);
 }
 
-.filter-pill.active .filter-pill-icon {
+.home-filter-pill.active .home-filter-pill-icon {
   background: rgba(255, 255, 255, 0.22);
   color: #FFFFFF;
 }
 
-.filter-pill.discount.active {
+.home-filter-pill.discount.active {
   background: var(--color-accent);
   color: #FFFFFF;
   border-color: transparent;
   box-shadow: 0 12px 20px rgba(249, 115, 22, 0.24);
 }
 
-.filter-pill.discount.active .filter-pill-text {
+.home-filter-pill.discount.active .home-filter-pill-text {
   color: #FFFFFF;
 }
 
-.filter-pill.discount.active .filter-pill-icon {
+.home-filter-pill.discount.active .home-filter-pill-icon {
   color: #FFFFFF;
 }
 
 @media (max-width: 480px) {
-  .filters-section {
+  .home-filters-section {
     margin: var(--spacing-sm) var(--spacing-md) 6px;
     padding: 0;
   }
 
-  .filter-pill {
+  .home-filter-pill {
     padding: 7px 12px;
     gap: 6px;
   }
 
-  .filter-pill-text {
+  .home-filter-pill-text {
     font-size: 12px;
   }
 }
@@ -1058,7 +1058,7 @@
   gap: 10px;
 }
 
-.filters-section + .home-section-header {
+.home-filters-section + .home-section-header {
   margin-top: 6px;
 }
 

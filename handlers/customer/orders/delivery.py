@@ -86,6 +86,28 @@ def _lang_code(user: types.User | None) -> str:
     return "uz" if code.startswith("uz") else "ru"
 
 
+def _as_markup(kb: Any) -> Any:
+    return kb.as_markup() if hasattr(kb, "as_markup") else kb
+
+
+async def _send_delivery_card(
+    message: types.Message, text: str, kb: Any, offer_photo: str | None
+) -> None:
+    markup = _as_markup(kb)
+    if offer_photo:
+        try:
+            await message.answer_photo(
+                photo=offer_photo,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
+            return
+        except Exception:
+            pass
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
 # =============================================================================
 # CUSTOMER HANDLERS
 # =============================================================================
@@ -185,7 +207,7 @@ async def start_delivery_order(
             await callback.message.delete()
         except Exception:
             pass
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await _send_delivery_card(callback.message, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -651,7 +673,8 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     )
     kb = build_delivery_payment_keyboard(lang, offer_id)
 
-    await message.answer(card_text, parse_mode="HTML", reply_markup=kb.as_markup())
+    offer_photo = data.get("offer_photo")
+    await _send_delivery_card(message, card_text, kb, offer_photo)
 
 
 @router.callback_query(F.data.startswith("dlv_back_address_"))
@@ -899,7 +922,8 @@ async def _return_to_address_step(message: types.Message, state: FSMContext, dat
         else:
             await message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
-        pass
+        offer_photo = data.get("offer_photo")
+        await _send_delivery_card(message, text, kb, offer_photo)
 
 # Legacy quantity handler for manual input
 @router.message(OrderDelivery.quantity)
@@ -965,7 +989,8 @@ async def dlv_quantity_text(
         )
         kb = build_delivery_address_keyboard(lang, offer_id, data.get("saved_address"))
 
-        await message.answer(card_text, parse_mode="HTML", reply_markup=kb.as_markup())
+        offer_photo = data.get("offer_photo")
+        await _send_delivery_card(message, card_text, kb, offer_photo)
 
     except ValueError:
         msg = "Raqam kiriting." if lang == "uz" else "Введите число."

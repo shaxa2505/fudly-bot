@@ -65,6 +65,7 @@ input[type="checkbox"]:focus-visible {
 /* Cards (clickable) */
 .offer-card:focus-visible,
 .category-card:focus-visible,
+.explore-category-card:focus-visible,
 .store-card:focus-visible {
   outline: 3px solid var(--color-primary, #53B175);
   outline-offset: 2px;
@@ -74,6 +75,8 @@ input[type="checkbox"]:focus-visible {
 /* Navigation items */
 .nav-item:focus-visible,
 .filter-pill:focus-visible,
+.category-filter-pill:focus-visible,
+.home-filter-pill:focus-visible,
 .menu-item:focus-visible {
   outline: 3px solid var(--color-primary, #53B175);
   outline-offset: 2px;
@@ -82,6 +85,7 @@ input[type="checkbox"]:focus-visible {
 
 /* Modal close buttons */
 .modal-close:focus-visible,
+.cart-modal-close:focus-visible,
 .sheet-close:focus-visible,
 [aria-label*="close"]:focus-visible,
 [aria-label*="Close"]:focus-visible {
@@ -176,6 +180,8 @@ input[type="checkbox"]:focus-visible {
 /* ===== FOCUS WITHIN (Container has focused child) ===== */
 
 .search-box:focus-within,
+.category-search-box:focus-within,
+.explore-search-box:focus-within,
 .form-group:focus-within {
   outline: 2px solid var(--color-primary, #53B175);
   outline-offset: 1px;

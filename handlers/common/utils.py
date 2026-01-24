@@ -2,6 +2,7 @@
 Common utilities, constants and middleware.
 """
 import html
+import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
@@ -12,7 +13,12 @@ from typing import Any
 from aiogram import BaseMiddleware
 
 from database_protocol import DatabaseProtocol
-from app.core.utils import CITY_UZ_TO_RU as CORE_CITY_UZ_TO_RU, normalize_city as core_normalize_city
+from app.core.utils import (
+    CITY_UZ_TO_RU as CORE_CITY_UZ_TO_RU,
+    get_offer_field as core_get_offer_field,
+    get_order_field as core_get_order_field,
+    normalize_city as core_normalize_city,
+)
 from localization import get_text
 
 logger = logging.getLogger("fudly")
@@ -28,6 +34,67 @@ def html_escape(val: Any) -> str:
 
 # Alias for backward compatibility
 _esc = html_escape
+
+
+def resolve_offer_photo(offer: Any) -> str | None:
+    """Resolve the best available offer photo (file_id)."""
+    photo = core_get_offer_field(offer, "photo")
+    if not photo:
+        photo = core_get_offer_field(offer, "photo_id")
+    return str(photo) if photo else None
+
+
+def _extract_photo_from_item(item: Any) -> str | None:
+    if isinstance(item, dict):
+        for key in ("photo", "photo_id", "offer_photo", "offer_photo_id"):
+            value = item.get(key)
+            if value:
+                return str(value)
+    return None
+
+
+def resolve_order_photo(db: DatabaseProtocol | None, order: Any, offer: Any | None = None) -> str | None:
+    """Resolve order photo from order/cart items/offer."""
+    if not order:
+        return None
+
+    for key in ("offer_photo", "offer_photo_id", "photo", "photo_id"):
+        value = core_get_order_field(order, key)
+        if value:
+            return str(value)
+
+    cart_items = core_get_order_field(order, "cart_items")
+    if cart_items:
+        try:
+            cart_items = json.loads(cart_items) if isinstance(cart_items, str) else cart_items
+        except Exception:
+            cart_items = None
+
+    if isinstance(cart_items, list):
+        for item in cart_items:
+            photo = _extract_photo_from_item(item)
+            if photo:
+                return photo
+            offer_id = item.get("offer_id") if isinstance(item, dict) else None
+            if offer_id and db and hasattr(db, "get_offer"):
+                try:
+                    offer_obj = db.get_offer(int(offer_id))
+                except Exception:
+                    offer_obj = None
+                photo = resolve_offer_photo(offer_obj)
+                if photo:
+                    return photo
+
+    if offer is None:
+        offer_id = core_get_order_field(order, "offer_id")
+        if offer_id and db and hasattr(db, "get_offer"):
+            try:
+                offer = db.get_offer(int(offer_id))
+            except Exception:
+                offer = None
+
+    return resolve_offer_photo(offer)
+
 
 # Re-export states for backward compatibility
 from handlers.common.states import (  # noqa: E402
@@ -82,6 +149,8 @@ __all__ = [
     # Safe message operations
     "safe_delete_message",
     "safe_edit_message",
+    "resolve_offer_photo",
+    "resolve_order_photo",
     # Error helpers
     "get_system_error_text",
 ]

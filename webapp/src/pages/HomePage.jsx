@@ -1103,94 +1103,94 @@ function HomePage() {
       </div>
 
       {showAdvancedFilters && (
-        <div className="filters-section">
-          <div className="filters-advanced">
-            <div className="filter-group">
-              <span className="filter-group-label">Chegirma</span>
-              <div className="filter-group-row">
+        <div className="home-filters-section">
+          <div className="home-filters-advanced">
+            <div className="home-filter-group">
+              <span className="home-filter-group-label">Chegirma</span>
+              <div className="home-filter-group-row">
                 <button
-                  className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
+                  className={`home-filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setMinDiscount(minDiscount === 20 ? null : 20)
                   }}
                 >
-                  <span className="filter-pill-icon">%</span>
-                  <span className="filter-pill-text">20%+</span>
+                  <span className="home-filter-pill-icon">%</span>
+                  <span className="home-filter-pill-text">20%+</span>
                 </button>
                 <button
-                  className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
+                  className={`home-filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setMinDiscount(minDiscount === 30 ? null : 30)
                   }}
                 >
-                  <span className="filter-pill-icon">%</span>
-                  <span className="filter-pill-text">30%+</span>
+                  <span className="home-filter-pill-icon">%</span>
+                  <span className="home-filter-pill-text">30%+</span>
                 </button>
                 <button
-                  className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
+                  className={`home-filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setMinDiscount(minDiscount === 50 ? null : 50)
                   }}
                 >
-                  <span className="filter-pill-icon">%</span>
-                  <span className="filter-pill-text">50%+</span>
+                  <span className="home-filter-pill-icon">%</span>
+                  <span className="home-filter-pill-text">50%+</span>
                 </button>
               </div>
             </div>
 
-            <div className="filter-group">
-              <span className="filter-group-label">Narx</span>
-              <div className="filter-group-row">
+            <div className="home-filter-group">
+              <span className="home-filter-group-label">Narx</span>
+              <div className="home-filter-group-row">
                 <button
-                  className={`filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
+                  className={`home-filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setPriceRange(priceRange === 'up_20' ? 'all' : 'up_20')
                   }}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">0-20k</span>
+                  <span className="home-filter-pill-icon">sum</span>
+                  <span className="home-filter-pill-text">0-20k</span>
                 </button>
                 <button
-                  className={`filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
+                  className={`home-filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setPriceRange(priceRange === '20_50' ? 'all' : '20_50')
                   }}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">20-50k</span>
+                  <span className="home-filter-pill-icon">sum</span>
+                  <span className="home-filter-pill-text">20-50k</span>
                 </button>
                 <button
-                  className={`filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
+                  className={`home-filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setPriceRange(priceRange === '50_100' ? 'all' : '50_100')
                   }}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">50-100k</span>
+                  <span className="home-filter-pill-icon">sum</span>
+                  <span className="home-filter-pill-text">50-100k</span>
                 </button>
                 <button
-                  className={`filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
+                  className={`home-filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
                   onClick={() => {
                     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
                     setPriceRange(priceRange === '100_plus' ? 'all' : '100_plus')
                   }}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">100k+</span>
+                  <span className="home-filter-pill-icon">sum</span>
+                  <span className="home-filter-pill-text">100k+</span>
                 </button>
               </div>
             </div>
 
-            <div className="filter-group">
-              <span className="filter-group-label">Tartib</span>
+            <div className="home-filter-group">
+              <span className="home-filter-group-label">Tartib</span>
               <select
-                className="sort-select"
+                className="home-sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >

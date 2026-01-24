@@ -108,7 +108,7 @@ function ExplorePage({ onNavigate }) {
           return (
             <button
               key={category.id}
-              className="category-card"
+              className="explore-category-card"
               style={{
                 background: category.color,
                 borderColor: category.borderColor

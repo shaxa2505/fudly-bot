@@ -14,7 +14,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from handlers.common.states import RateBooking
-from handlers.common.utils import html_escape as _esc
+from handlers.common.utils import html_escape as _esc, resolve_offer_photo
 from localization import get_text
 from logging_config import logger
 
@@ -147,7 +147,17 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
         )
 
         try:
-            await bot.send_message(customer_id, customer_msg)
+            offer_id = get_booking_field(booking, "offer_id")
+            offer = db.get_offer(offer_id) if offer_id else None
+            offer_photo = resolve_offer_photo(offer)
+            if offer_photo:
+                await bot.send_photo(
+                    customer_id,
+                    photo=offer_photo,
+                    caption=customer_msg,
+                )
+            else:
+                await bot.send_message(customer_id, customer_msg)
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
 
@@ -370,7 +380,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
 
     # Confirm all bookings
     confirmed_count = 0
-    customer_notifications = {}  # {customer_id: [booking_infos]}
+    customer_notifications: dict[int, dict[str, Any]] = {}  # {customer_id: {bookings, photo}}
     order_service = get_unified_order_service()
     if not order_service and bot:
         order_service = init_unified_order_service(db, bot)
@@ -412,27 +422,29 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             customer_id = get_booking_field(booking, "user_id")
             if customer_id:
                 if customer_id not in customer_notifications:
-                    customer_notifications[customer_id] = []
+                    customer_notifications[customer_id] = {"bookings": [], "photo": None}
 
                 code = get_booking_field(booking, "code")
                 code_display = format_booking_code(code, booking_id)
                 store_name = get_store_field(store, "name", "Магазин")
                 store_address = get_store_field(store, "address", "")
 
-                customer_notifications[customer_id].append(
+                customer_notifications[customer_id]["bookings"].append(
                     {
                         "code": code_display,
                         "store_name": store_name,
                         "store_address": store_address,
                     }
                 )
+                if not customer_notifications[customer_id]["photo"]:
+                    customer_notifications[customer_id]["photo"] = resolve_offer_photo(offer)
 
         except Exception as e:
             logger.error(f"Failed to confirm booking {booking_id}: {e}")
             continue
 
     # Notify customers (grouped)
-    for customer_id, bookings_info in customer_notifications.items():
+    for customer_id, payload in customer_notifications.items():
         try:
             customer_lang = db.get_user_language(customer_id)
 
@@ -449,6 +461,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             address_label = _t(customer_lang, "Адрес", "Manzil")
             code_label = _t(customer_lang, "Код", "Kod")
 
+            bookings_info = payload.get("bookings", [])
             for info in bookings_info:
                 lines.append(f"{store_label}: {_esc(info['store_name'])}")
                 if info["store_address"]:
@@ -460,7 +473,19 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             )
 
             customer_msg = "\n".join(lines)
-            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            offer_photo = payload.get("photo")
+            if offer_photo:
+                try:
+                    await bot.send_photo(
+                        customer_id,
+                        photo=offer_photo,
+                        caption=customer_msg,
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            else:
+                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
 
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
@@ -503,7 +528,7 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
 
     # Reject all bookings and restore quantities
     rejected_count = 0
-    customer_notifications = {}  # {customer_id: [store_names]}
+    customer_notifications: dict[int, dict[str, Any]] = {}  # {customer_id: {stores, photo}}
     order_service = get_unified_order_service()
     if not order_service and bot:
         order_service = init_unified_order_service(db, bot)
@@ -544,27 +569,42 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
             customer_id = get_booking_field(booking, "user_id")
             if customer_id:
                 if customer_id not in customer_notifications:
-                    customer_notifications[customer_id] = []
+                    customer_notifications[customer_id] = {"stores": [], "photo": None}
 
                 store_name = get_store_field(store, "name", "Магазин")
-                customer_notifications[customer_id].append(store_name)
+                customer_notifications[customer_id]["stores"].append(store_name)
+                if not customer_notifications[customer_id]["photo"]:
+                    customer_notifications[customer_id]["photo"] = resolve_offer_photo(offer)
 
         except Exception as e:
             logger.error(f"Failed to reject booking {booking_id}: {e}")
             continue
 
     # Notify customers (grouped)
-    for customer_id, store_names in customer_notifications.items():
+    for customer_id, payload in customer_notifications.items():
         try:
             customer_lang = db.get_user_language(customer_id)
 
+            store_names = payload.get("stores", [])
             customer_msg = _t(
                 customer_lang,
                 f"К сожалению, ваши брони в {', '.join(store_names)} отклонены.",
                 f"Afsuski, {', '.join(store_names)} bronlaringiz rad etildi.",
             )
 
-            await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            offer_photo = payload.get("photo")
+            if offer_photo:
+                try:
+                    await bot.send_photo(
+                        customer_id,
+                        photo=offer_photo,
+                        caption=customer_msg,
+                        parse_mode="HTML",
+                    )
+                except Exception:
+                    await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
+            else:
+                await bot.send_message(customer_id, customer_msg, parse_mode="HTML")
 
         except Exception as e:
             logger.error(f"Failed to notify customer {customer_id}: {e}")
