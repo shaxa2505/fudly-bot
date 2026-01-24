@@ -19,6 +19,11 @@ class ErrorBoundary extends React.Component {
     return false;
   }
 
+  static isTelegramWebApp() {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.Telegram?.WebApp);
+  }
+
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
@@ -49,6 +54,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       const debugEnabled = ErrorBoundary.isDebugEnabled();
+      const forceDetails = debugEnabled || ErrorBoundary.isTelegramWebApp();
       return (
         <div style={styles.container}>
           <div style={styles.content}>
@@ -58,7 +64,7 @@ class ErrorBoundary extends React.Component {
               Ilovada kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.
             </p>
 
-            {(process.env.NODE_ENV === 'development' || debugEnabled) && this.state.error && (
+            {(process.env.NODE_ENV === 'development' || forceDetails) && this.state.error && (
               <details style={styles.details}>
                 <summary style={styles.summary}>Xatolik tafsilotlari</summary>
                 <pre style={styles.errorText}>

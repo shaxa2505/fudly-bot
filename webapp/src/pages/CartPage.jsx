@@ -1334,13 +1334,13 @@ function CartPage({ user }) {
 
       {/* Checkout Modal */}
       {showCheckout && (
-        <div className="modal-overlay checkout-overlay" onClick={closeCheckout}>
-          <div className="modal checkout-modal" onClick={e => e.stopPropagation()}>
+        <div className="cart-modal-overlay checkout-overlay" onClick={closeCheckout}>
+          <div className="cart-modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="checkout-topbar">
               <h2 className="checkout-title">{checkoutTitle}</h2>
             </div>
 
-            <div className="modal-body checkout-body">
+            <div className="cart-modal-body checkout-body">
               {/* Step 1: Order Details */}
               {checkoutStep === 'details' && (
                 <div className="checkout-layout">
@@ -1708,8 +1708,8 @@ function CartPage({ user }) {
 
       {/* Result Modal */}
       {orderResult && (
-        <div className="modal-overlay" onClick={() => setOrderResult(null)}>
-          <div className="modal result-modal" onClick={e => e.stopPropagation()}>
+        <div className="cart-modal-overlay" onClick={() => setOrderResult(null)}>
+          <div className="cart-modal result-modal" onClick={e => e.stopPropagation()}>
             {orderResult.success ? (
               <>
                 <div className="result-icon success">OK</div>
@@ -1753,11 +1753,11 @@ function CartPage({ user }) {
 
       {/* Payment Methods Sheet */}
       {showPaymentSheet && (
-        <div className="modal-overlay payment-sheet-overlay" onClick={() => setShowPaymentSheet(false)}>
-          <div className="modal payment-sheet" onClick={e => e.stopPropagation()}>
+        <div className="cart-modal-overlay cart-payment-sheet-overlay" onClick={() => setShowPaymentSheet(false)}>
+          <div className="cart-modal cart-payment-sheet" onClick={e => e.stopPropagation()}>
             <div className="payment-sheet-header">
               <h3>To'lov usullari</h3>
-              <button className="modal-close" onClick={() => setShowPaymentSheet(false)}>x</button>
+              <button className="cart-modal-close" onClick={() => setShowPaymentSheet(false)}>x</button>
             </div>
             <div className="payment-sheet-list">
               <button
