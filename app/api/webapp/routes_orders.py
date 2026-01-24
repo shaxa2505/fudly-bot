@@ -388,8 +388,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
         if hasattr(db, "get_connection"):
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    """
+                orders_query = """
                     SELECT
                         o.order_id,
                         o.order_status,
@@ -423,9 +422,53 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                     WHERE o.user_id = %s
                     ORDER BY o.created_at DESC
                     LIMIT 100
-                    """,
-                    (int(user_id),),
-                )
+                """
+                fallback_query = """
+                    SELECT
+                        o.order_id,
+                        o.order_status,
+                        NULL AS order_type,
+                        o.pickup_code,
+                        o.delivery_address,
+                        o.total_price,
+                        NULL AS delivery_price,
+                        o.item_title,
+                        o.item_price,
+                        o.item_original_price,
+                        o.quantity,
+                        o.payment_method,
+                        o.payment_status,
+                        o.payment_proof_photo_id,
+                        o.is_cart_order,
+                        o.cart_items,
+                        o.created_at,
+                        NULL AS updated_at,
+                        o.store_id,
+                        s.name AS store_name,
+                        s.address AS store_address,
+                        s.phone AS store_phone,
+                        off.offer_id AS offer_id,
+                        off.title AS offer_title,
+                        off.discount_price AS offer_price,
+                        off.photo_id AS offer_photo_id
+                    FROM orders o
+                    LEFT JOIN stores s ON o.store_id = s.store_id
+                    LEFT JOIN offers off ON o.offer_id = off.offer_id
+                    WHERE o.user_id = %s
+                    ORDER BY o.created_at DESC
+                    LIMIT 100
+                """
+                try:
+                    cursor.execute(orders_query, (int(user_id),))
+                except Exception as e:
+                    message = str(e)
+                    if "delivery_price" in message or "order_type" in message or "updated_at" in message:
+                        logger.warning(
+                            "Orders query fallback (missing columns): %s", message
+                        )
+                        cursor.execute(fallback_query, (int(user_id),))
+                    else:
+                        raise
                 raw_orders = cursor.fetchall() or []
                 if raw_orders and not hasattr(raw_orders[0], "get"):
                     columns = [col[0] for col in cursor.description or []]
