@@ -119,6 +119,10 @@ async def create_webhook_app(
             metrics["updates_errors"] += 1
             return web.Response(status=200, text="OK")
 
+    async def webhook_get(request: web.Request) -> web.Response:
+        """Simple GET responder for webhook URL health checks."""
+        return web.Response(status=200, text="OK")
+
     health_check = build_health_check(db, metrics)
     version_info = build_version_info()
     metrics_prom = build_metrics_prom()
