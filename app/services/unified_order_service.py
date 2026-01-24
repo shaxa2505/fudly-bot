@@ -38,6 +38,7 @@ from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from PIL import Image
 
+from app.core.geocoding import geocode_store_address
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.services.notification_builder import NotificationBuilder
 from app.services.notification_unified import build_unified_order_payload
@@ -1766,22 +1767,33 @@ class UnifiedOrderService:
 
                 map_url = None
                 static_map_url = None
-                if is_delivery and delivery_lat is not None and delivery_lon is not None:
+                lat_val = None
+                lon_val = None
+                if is_delivery and (delivery_lat is not None and delivery_lon is not None):
                     try:
                         lat_val = float(delivery_lat)
                         lon_val = float(delivery_lon)
-                        map_url = (
-                            "https://www.openstreetmap.org/?mlat="
-                            f"{lat_val:.6f}&mlon={lon_val:.6f}#map=18/{lat_val:.6f}/{lon_val:.6f}"
-                        )
-                        static_map_url = (
-                            "https://staticmap.openstreetmap.de/staticmap.php"
-                            f"?center={lat_val:.6f},{lon_val:.6f}"
-                            f"&zoom=17&size=640x360&markers={lat_val:.6f},{lon_val:.6f},red-pushpin"
-                        )
                     except (TypeError, ValueError):
-                        map_url = None
-                        static_map_url = None
+                        lat_val = None
+                        lon_val = None
+                elif is_delivery and delivery_address:
+                    try:
+                        geo = await geocode_store_address(delivery_address, None)
+                        if geo:
+                            lat_val = float(geo.get("latitude"))
+                            lon_val = float(geo.get("longitude"))
+                    except Exception as geo_err:
+                        logger.warning("Delivery geocode failed: %s", geo_err)
+                if lat_val is not None and lon_val is not None:
+                    map_url = (
+                        "https://www.openstreetmap.org/?mlat="
+                        f"{lat_val:.6f}&mlon={lon_val:.6f}#map=18/{lat_val:.6f}/{lon_val:.6f}"
+                    )
+                    static_map_url = (
+                        "https://staticmap.openstreetmap.de/staticmap.php"
+                        f"?center={lat_val:.6f},{lon_val:.6f}"
+                        f"&zoom=17&size=640x360&markers={lat_val:.6f},{lon_val:.6f},red-pushpin"
+                    )
 
                 seller_text = NotificationTemplates.seller_new_order(
                     lang=seller_lang,
@@ -1851,7 +1863,12 @@ class UnifiedOrderService:
                 else:
                     kb.button(text="✅ Принять", callback_data=f"order_confirm_{first_order_id}")
                     kb.button(text="❌ Отклонить", callback_data=f"order_reject_{first_order_id}")
-                kb.adjust(2)
+                if map_url:
+                    map_text = "🗺 Xarita" if seller_lang == "uz" else "🗺 Карта"
+                    kb.button(text=map_text, url=map_url)
+                    kb.adjust(2, 1)
+                else:
+                    kb.adjust(2)
 
                 sent_msg = None
                 if telegram_enabled:
