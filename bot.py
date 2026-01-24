@@ -477,6 +477,7 @@ def _register_handlers() -> None:
     from handlers.customer.orders import my_orders as my_orders_module
     from handlers.customer.orders import orders_router
     from handlers.seller import (
+        dashboard,
         analytics,
         bulk_import,
         create_offer,
@@ -495,6 +496,7 @@ def _register_handlers() -> None:
     orders_history.setup_dependencies(db, bot, cart_storage)
     my_orders_module.setup_dependencies(db, bot, cart_storage)
     partner.setup_dependencies(db, bot, user_view_mode)
+    dashboard.setup_dependencies(db, bot)
     create_offer.setup_dependencies(db, bot)
     management.setup_dependencies(db, bot)
     analytics.setup_dependencies(db, bot)
@@ -534,6 +536,7 @@ def _register_handlers() -> None:
 
     # 1. Seller-specific routers
     dp.include_router(seller_stats.router)  # Stats before other seller handlers
+    dp.include_router(dashboard.router)
     dp.include_router(bulk_import.router)
     dp.include_router(import_products.router)
     dp.include_router(create_offer.router)

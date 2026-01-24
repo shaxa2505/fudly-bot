@@ -517,7 +517,7 @@
   font-size: var(--font-md);
   font-weight: var(--font-bold);
   color: var(--color-primary-dark);
-  background: #FFFFFF;
+  background: var(--color-bg-primary);
   padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(15, 118, 110, 0.12);

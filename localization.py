@@ -437,6 +437,14 @@ TEXTS = {
 
 Совет: товары с фото продаются лучше""",
         "partner_add_first": "➕ Добавить первый товар",
+        "partner_dashboard": """<b>Панель партнёра</b>
+Магазинов: {stores}
+Новые заказы: {new}
+В работе: {active}
+Завершено: {completed}
+Отменено: {cancelled}
+
+Выберите действие ниже.""",
         # Хардкод-тексты которые нужно было перевести
         "offer_not_found": "Товар не найден",
         "not_your_offer": "❌ Это не ваш товар",
@@ -1062,6 +1070,14 @@ Do'koningiz tasdiqlandi va ishlashga tayyor.
 
 Maslahat: rasmli mahsulotlar yaxshiroq sotiladi""",
         "partner_add_first": "➕ Birinchi mahsulotni qo'shish",
+        "partner_dashboard": """<b>Hamkor paneli</b>
+Do'konlar: {stores}
+Yangi buyurtmalar: {new}
+Jarayonda: {active}
+Yakunlangan: {completed}
+Bekor qilingan: {cancelled}
+
+Quyidan tanlang.""",
         # Qo'shimcha tarjimalar (xardkod-tekstlar)
         "offer_not_found": "Mahsulot topilmadi",
         "not_your_offer": "❌ Bu sizning mahsulotingiz emas",

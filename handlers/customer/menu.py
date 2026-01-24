@@ -8,6 +8,7 @@ from aiogram import F, Router, types
 
 from app.core.utils import get_field
 from handlers.common.utils import set_user_view_mode
+from handlers.seller.dashboard import send_partner_dashboard
 
 logger = logging.getLogger(__name__)
 
@@ -110,5 +111,7 @@ async def switch_to_seller(message: types.Message):
         "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
         reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id),
     )
+
+    await send_partner_dashboard(message, user_id, lang)
 
     logger.info(f"User {user_id} switched to seller mode successfully")

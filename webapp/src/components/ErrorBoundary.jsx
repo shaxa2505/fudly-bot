@@ -7,6 +7,18 @@ class ErrorBoundary extends React.Component {
     this.state = { hasError: false, error: null, errorInfo: null };
   }
 
+  static isDebugEnabled() {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('debug') === '1') return true;
+      if (window.localStorage?.getItem('fudly_debug') === '1') return true;
+    } catch {
+      return false;
+    }
+    return false;
+  }
+
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
@@ -36,6 +48,7 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const debugEnabled = ErrorBoundary.isDebugEnabled();
       return (
         <div style={styles.container}>
           <div style={styles.content}>
@@ -45,7 +58,7 @@ class ErrorBoundary extends React.Component {
               Ilovada kutilmagan xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.
             </p>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {(process.env.NODE_ENV === 'development' || debugEnabled) && this.state.error && (
               <details style={styles.details}>
                 <summary style={styles.summary}>Xatolik tafsilotlari</summary>
                 <pre style={styles.errorText}>
