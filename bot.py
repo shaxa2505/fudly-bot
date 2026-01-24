@@ -451,6 +451,7 @@ def _register_handlers() -> None:
     # Import handler modules
     from handlers import bookings
     from handlers.admin import dashboard as admin_dashboard
+    from handlers.admin import delivery_orders as admin_delivery_orders
     from handlers.admin import legacy as admin_legacy
     from handlers.admin import panel as admin_panel
     from handlers.admin import stats as admin_stats
@@ -466,7 +467,6 @@ def _register_handlers() -> None:
     from handlers.customer import (
         menu as customer_menu,
     )
-    from handlers.customer import payments as telegram_payments
     from handlers.customer.cart import router as cart_router
     from handlers.customer.cart import setup_dependencies as cart_setup
     from handlers.customer.cart.storage import cart_storage
@@ -504,7 +504,6 @@ def _register_handlers() -> None:
     seller_stats.setup_dependencies(db, bot)
     profile.setup_dependencies(db, bot, user_view_mode)
     favorites.setup_dependencies(db, bot, user_view_mode)
-    telegram_payments.setup(db, bot, get_text)
     cart_setup(db, bot)  # Setup cart dependencies
     customer_menu.setup(
         bot,
@@ -517,6 +516,7 @@ def _register_handlers() -> None:
     )
     user_features.setup(dp, db, get_text, booking_filters_keyboard, settings_keyboard)
     admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
+    admin_delivery_orders.setup(db)
     admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
     admin_stats.setup(admin_service, logger)
 
@@ -542,7 +542,6 @@ def _register_handlers() -> None:
     dp.include_router(store_settings.router)
 
     # 2. Customer routers
-    dp.include_router(telegram_payments.router)  # Payments must be high priority
     dp.include_router(cart_router)  # Cart before other customer handlers
     dp.include_router(profile.router)
     dp.include_router(favorites.router)
@@ -553,6 +552,7 @@ def _register_handlers() -> None:
 
     # 3. Admin routers
     dp.include_router(admin_dashboard.router)
+    dp.include_router(admin_delivery_orders.router)
     dp.include_router(admin_legacy.router)
     dp.include_router(admin_panel.router)
     dp.include_router(admin_stats.router)
@@ -668,16 +668,13 @@ async def on_startup() -> None:
     if USE_WEBHOOK:
         webhook_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
         try:
-            # Include all update types we handle, especially pre_checkout_query for payments
+            # Include all update types we handle
             allowed_updates = [
                 "message",
                 "edited_message",
                 "callback_query",
                 "inline_query",
                 "chosen_inline_result",
-                "pre_checkout_query",  # Critical for Telegram Payments!
-                "successful_payment",
-                "shipping_query",
             ]
             await bot.set_webhook(
                 url=webhook_url,

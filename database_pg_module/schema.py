@@ -405,6 +405,7 @@ class SchemaMixin:
                     offer_id INTEGER,
                     store_id INTEGER,
                     delivery_address TEXT,
+                    comment TEXT,
                     delivery_city TEXT,
                     delivery_region TEXT,
                     delivery_district TEXT,
@@ -444,6 +445,7 @@ class SchemaMixin:
                     cursor.execute(
                         "ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_district TEXT"
                     )
+                    cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS comment TEXT")
                     cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_lat REAL")
                     cursor.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_lon REAL")
                     cursor.execute(

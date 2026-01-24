@@ -259,6 +259,7 @@ class Order(Base):
     offer_id = Column(Integer, ForeignKey("offers.offer_id"), nullable=True)
     store_id = Column(Integer, ForeignKey("stores.store_id"), nullable=True)
     delivery_address = Column(Text, nullable=True)
+    comment = Column(Text, nullable=True)
     payment_method = Column(String(50), default="cash")
     payment_status = Column(String(20), default="not_required")
     payment_proof_photo_id = Column(String(255), nullable=True)

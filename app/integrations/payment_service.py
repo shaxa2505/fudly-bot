@@ -141,6 +141,8 @@ class PaymentService:
             try:
                 integrations = self._db.get_store_payment_integrations(store_id)
                 for integration in integrations:
+                    if integration["provider"] != "click":
+                        continue
                     if integration["provider"] not in providers:
                         providers.append(integration["provider"])
             except Exception as e:
@@ -160,10 +162,12 @@ class PaymentService:
             try:
                 integrations = self._db.get_store_payment_integrations(store_id)
                 for integration in integrations:
+                    if integration["provider"] != "click":
+                        continue
                     result.append(
                         {
                             "provider": integration["provider"],
-                            "name": "Click" if integration["provider"] == "click" else "Payme",
+                            "name": "Click",
                             "is_store_level": True,
                             "merchant_id": integration["merchant_id"][:8] + "...",  # Masked
                         }

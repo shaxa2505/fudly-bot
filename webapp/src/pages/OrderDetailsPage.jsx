@@ -118,24 +118,15 @@ export default function OrderDetailsPage() {
     })
   }
 
-  const handleUploadProof = () => {
-    if (window.Telegram?.WebApp) {
-      window.Telegram.WebApp.openTelegramLink(
-        `https://t.me/${window.Telegram.WebApp.initDataUnsafe?.bot?.username || import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'}?start=upload_proof_${orderId}`
-      )
-    }
-  }
-
   const handlePayOnline = async () => {
-    const provider = order?.payment_method
-    if (!provider || !['click', 'payme'].includes(provider)) {
+    if (order?.payment_method !== 'click') {
       return
     }
 
     try {
       const storeId = order.store_id || null
       const available = await apiClient.getPaymentProviders(storeId)
-      if (!available.includes(provider)) {
+      if (!available.includes('click')) {
         if (window.Telegram?.WebApp) {
           window.Telegram.WebApp.showAlert('Bu to\'lov usuli hozircha mavjud emas.')
         }
@@ -145,7 +136,7 @@ export default function OrderDetailsPage() {
       const returnUrl = window.location.origin + `/order/${orderId}/details`
       const paymentData = await apiClient.createPaymentLink(
         order.order_id,
-        provider,
+        'click',
         returnUrl,
         storeId,
         order.total_price || null
@@ -198,11 +189,11 @@ export default function OrderDetailsPage() {
     )
   }
 
-  const statusInfo = getStatusInfo(order.status)
   const fulfillmentStatus = order.fulfillment_status || normalizeOrderStatus(order.order_status || order.status)
+  const statusInfo = getStatusInfo(fulfillmentStatus || order.status)
   const isDelivery = order.order_type === 'delivery' || order.delivery_address
   const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
-  const canPayOnline = order.payment_method && ['click', 'payme'].includes(order.payment_method)
+  const canPayOnline = order.payment_method === 'click'
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
 
   const totalPrice = Number(order.total_price || 0)
@@ -232,23 +223,23 @@ export default function OrderDetailsPage() {
           text: "Buyurtma tasdiqlanishi uchun to'lovni yakunlash kerak.",
           tone: 'warning',
           icon: '!',
-          showActions: true,
+          showActions: canPayOnline,
         }
       case 'awaiting_proof':
         return {
-          title: 'Chek yuborish kerak',
-          text: "To'lovni tasdiqlash uchun chekni yuboring.",
+          title: "To'lov holati kutilmoqda",
+          text: "Bu buyurtma eski to'lov usuli bilan yaratilgan. Qo'llab-quvvatlashga yozing.",
           tone: 'warning',
           icon: '!',
-          showActions: true,
+          showActions: false,
         }
       case 'payment_rejected':
         return {
           title: "To'lov rad etildi",
-          text: "Chek qayta tekshirish uchun yangi chek yuboring yoki qayta to'lang.",
+          text: "To'lovni Click orqali qayta bajaring yoki qo'llab-quvvatlashga yozing.",
           tone: 'danger',
           icon: '!',
-          showActions: true,
+          showActions: false,
         }
       case 'proof_submitted':
         return {
@@ -263,15 +254,9 @@ export default function OrderDetailsPage() {
     }
   })()
 
-  const payButtonLabel = order.payment_method === 'click'
-    ? "Click bilan to'lash"
-    : "Payme bilan to'lash"
-
-  const showPayButton = canPayOnline && ['awaiting_payment', 'awaiting_proof', 'payment_rejected'].includes(order.status)
-  const showProofButton = ['awaiting_proof', 'payment_rejected'].includes(order.status)
-    || (!canPayOnline && order.status === 'awaiting_payment')
-  const isPayPrimary = order.status === 'awaiting_payment' && canPayOnline
-  const isProofPrimary = !isPayPrimary
+  const payButtonLabel = "Click bilan to'lash"
+  const showPayButton = canPayOnline && order.status === 'awaiting_payment'
+  const isPayPrimary = showPayButton
 
   const statusSteps = isDelivery
     ? [
@@ -340,14 +325,6 @@ export default function OrderDetailsPage() {
           </div>
           {paymentNotice.showActions && (
             <div className="action-buttons">
-              {showProofButton && (
-                <button
-                  className={`action-btn ${isProofPrimary ? 'primary' : 'ghost'}`}
-                  onClick={handleUploadProof}
-                >
-                  Chekni yuborish
-                </button>
-              )}
               {showPayButton && (
                 <button
                   className={`action-btn ${isPayPrimary ? 'primary' : 'ghost'}`}

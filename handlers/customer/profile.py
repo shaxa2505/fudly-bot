@@ -139,7 +139,11 @@ async def profile(message: types.Message, state: FSMContext) -> None:
             orders = []
 
         active_bookings = len(
-            [b for b in bookings if get_field(b, "status", 3) in ["pending", "confirmed"]]
+            [
+                b
+                for b in bookings
+                if get_field(b, "status", 3) in ["pending", "confirmed", "preparing", "ready"]
+            ]
         )
         completed_bookings = len([b for b in bookings if get_field(b, "status", 3) == "completed"])
 
@@ -148,7 +152,7 @@ async def profile(message: types.Message, state: FSMContext) -> None:
                 o
                 for o in orders
                 if get_field(o, "order_status", 10)
-                in ["pending", "confirmed", "preparing", "delivering"]
+                in ["pending", "confirmed", "preparing", "ready", "delivering"]
             ]
         )
         completed_orders = len(

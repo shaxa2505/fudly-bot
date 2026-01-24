@@ -12,7 +12,6 @@ This module is the main entry point. Partner handlers are in a separate module:
 """
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from aiogram import F, Router, types
@@ -21,6 +20,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.core.utils import get_offer_field, get_store_field
+from app.integrations.payment_service import get_payment_service
 from app.keyboards import main_menu_customer
 from app.services.unified_order_service import (
     OrderItem,
@@ -51,10 +51,6 @@ router = Router()
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
-# Toggle Telegram Payments (Click via Telegram Bot Payments)
-ENABLE_TELEGRAM_PAYMENTS = (
-    os.getenv("ENABLE_TELEGRAM_PAYMENTS", "0").strip().lower() in {"1", "true", "yes"}
-)
 
 
 def setup_dependencies(
@@ -708,9 +704,6 @@ async def dlv_pay_click(
         await callback.answer()
         return
 
-    # Import lazily to avoid circular imports
-    from handlers.customer import payments as telegram_payments
-
     data = await state.get_data()
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
@@ -718,14 +711,24 @@ async def dlv_pay_click(
     logger.info(f"User {user_id} selected Click payment")
     logger.info(f"FSM data: {data}")
 
-    # Payments must be enabled and provider token configured
-    if not ENABLE_TELEGRAM_PAYMENTS or not telegram_payments.PROVIDER_TOKEN:
+    payment_service = get_payment_service()
+    if hasattr(payment_service, "set_database"):
+        payment_service.set_database(db)
+
+    store_id = data.get("store_id")
+    credentials = None
+    try:
+        if store_id:
+            credentials = payment_service.get_store_credentials(int(store_id), "click")
+    except Exception:
+        credentials = None
+
+    if not credentials and not payment_service.click_enabled:
         msg = (
             "Click временно недоступен. Попробуйте позже."
             if lang != "uz"
             else "Click vaqtincha mavjud emas. Keyinroq urinib ko'ring."
         )
-        logger.warning("Telegram Payments disabled or token missing for Click")
         await callback.answer(msg, show_alert=True)
         return
 
@@ -789,43 +792,64 @@ async def dlv_pay_click(
 
             if not (result.success and result.order_ids):
                 logger.error(
-                    "Failed to create order before Telegram invoice: %s", result.error_message
+                    "Failed to create order before Click link: %s", result.error_message
                 )
                 await callback.answer(get_text(lang, "system_error"), show_alert=True)
                 return
 
             order_id = result.order_ids[0]
             await state.update_data(order_id=order_id, payment_method="click")
-            logger.info(f"Created order #{order_id} before sending Telegram invoice")
+            logger.info(f"Created order #{order_id} before generating Click link")
         except Exception as e:
-            logger.error(f"Error creating order before Telegram invoice: {e}", exc_info=True)
+            logger.error(f"Error creating order before Click link: {e}", exc_info=True)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
-    # Send Telegram invoice
+    order_total = None
     try:
-        items = [
-            {
-                "title": data.get("title", ""),
-                "quantity": int(data.get("quantity", 1)),
-                "price": int(data.get("price", 0)),
-            }
-        ]
-        delivery_cost = int(data.get("delivery_price", 0))
-        store_name = data.get("store_name", "")
+        if hasattr(db, "get_order"):
+            order_row = db.get_order(int(order_id))
+            if order_row:
+                order_total = int(order_row.get("total_price") or 0)
+    except Exception:
+        order_total = None
 
-        await telegram_payments.create_order_invoice(
-            chat_id=user_id,
+    if not order_total:
+        price = int(data.get("price", 0))
+        quantity = int(data.get("quantity", 1))
+        delivery_cost = int(data.get("delivery_price", 0))
+        order_total = price * quantity + delivery_cost
+
+    return_url = None
+    try:
+        import os
+
+        webapp_url = os.getenv("WEBAPP_URL", "").strip()
+        if webapp_url:
+            return_url = f"{webapp_url.rstrip('/')}/order/{order_id}/details"
+    except Exception:
+        return_url = None
+
+    try:
+        payment_url = payment_service.generate_click_url(
             order_id=int(order_id),
-            items=items,
-            delivery_cost=delivery_cost,
-            store_name=store_name,
+            amount=int(order_total),
+            return_url=return_url,
+            user_id=int(user_id),
+            store_id=int(store_id) if store_id else 0,
         )
-        logger.info(f"Sent Telegram invoice for order #{order_id}")
     except Exception as e:
-        logger.error(f"Failed to send Telegram invoice: {e}", exc_info=True)
-        await callback.answer(get_text(lang, "system_error"), show_alert=True)
+        logger.error(f"Failed to generate Click link: {e}", exc_info=True)
+        msg = (
+            "Click временно недоступен. Попробуйте позже."
+            if lang != "uz"
+            else "Click vaqtincha mavjud emas. Keyinroq urinib ko'ring."
+        )
+        await callback.answer(msg, show_alert=True)
         return
+
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💳 Click", url=payment_url)
 
     # Remove inline keyboard to prevent duplicate taps and clear state
     try:
@@ -834,14 +858,14 @@ async def dlv_pay_click(
         pass
     await state.clear()
 
-    # Notify user to pay the invoice
+    # Notify user to pay via Click link
     notify_text = (
-        "Счёт отправлен. Нажмите «Оплатить» в сообщении выше."
+        "Нажмите кнопку ниже, чтобы оплатить через Click."
         if lang != "uz"
-        else "Hisob yuborildi. Yuqoridagi xabarda «To'lash» tugmasini bosing."
+        else "Click orqali to'lash uchun pastdagi tugmani bosing."
     )
     try:
-        await callback.message.answer(notify_text)
+        await callback.message.answer(notify_text, reply_markup=kb.as_markup())
     except Exception:
         pass
 

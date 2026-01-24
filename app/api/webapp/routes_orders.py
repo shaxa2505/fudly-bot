@@ -214,10 +214,13 @@ async def create_order(
 
         offers_by_id, store_id = _load_offers_and_store(order.items, db)
 
-        if is_delivery and payment_method == "cash":
+        if payment_method not in ("cash", "click"):
+            raise HTTPException(status_code=400, detail="Unsupported payment method")
+
+        if is_delivery and payment_method != "click":
             raise HTTPException(
                 status_code=400,
-                detail="Cash is not allowed for delivery orders",
+                detail="Only Click is allowed for delivery orders",
             )
 
         if is_delivery:
@@ -449,7 +452,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
         if raw_payment_method:
             payment_method = PaymentStatus.normalize_method(raw_payment_method)
         else:
-            payment_method = "card" if order_type == "delivery" else "cash"
+            payment_method = "click" if order_type == "delivery" else "cash"
         payment_status = PaymentStatus.normalize(
             r.get("payment_status"),
             payment_method=payment_method,

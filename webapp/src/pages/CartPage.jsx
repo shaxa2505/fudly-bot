@@ -38,8 +38,6 @@ function CartPage({ user }) {
   const [orderLoading, setOrderLoading] = useState(false)
   const addressInputRef = useRef(null)
   const commentInputRef = useRef(null)
-  const paymentProofInputRef = useRef(null)
-  const fileSelectHandlerRef = useRef(null)
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(false)
@@ -60,14 +58,9 @@ function CartPage({ user }) {
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
 
   // Payment step for delivery
-  const [checkoutStep, setCheckoutStep] = useState('details') // 'details' | 'payment'
-  const [paymentCard, setPaymentCard] = useState(null)
-  const [paymentProof, setPaymentProof] = useState(null)
-  const [paymentProofData, setPaymentProofData] = useState(null)
-  const [paymentProofPreview, setPaymentProofPreview] = useState(null)
-  const [createdOrderId, setCreatedOrderId] = useState(null)
+  const [checkoutStep, setCheckoutStep] = useState('details') // details only (no manual proof)
   const [paymentProviders, setPaymentProviders] = useState([])
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash') // 'cash' | 'card' | 'click' | 'payme'
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash') // 'cash' | 'click'
   const [showPaymentSheet, setShowPaymentSheet] = useState(false)
   const [deliverySlot, setDeliverySlot] = useState('fast')
   const [addressMeta, setAddressMeta] = useState(() => {
@@ -76,6 +69,18 @@ function CartPage({ user }) {
     } catch {
       return {}
     }
+  })
+  const [deliveryCoords, setDeliveryCoords] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('fudly_location') || '{}')
+      const coords = saved?.coordinates
+      if (coords?.lat != null && coords?.lon != null) {
+        return { lat: coords.lat, lon: coords.lon }
+      }
+    } catch {
+      return null
+    }
+    return null
   })
   const [storeOffers, setStoreOffers] = useState([])
   const checkoutMapRef = useRef(null)
@@ -127,6 +132,9 @@ function CartPage({ user }) {
     const requestId = ++mapResolveSeqRef.current
     setMapResolving(true)
     setMapError('')
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      setDeliveryCoords({ lat, lon })
+    }
 
     if (mapResolveFailSafeRef.current) {
       clearTimeout(mapResolveFailSafeRef.current)
@@ -692,37 +700,16 @@ function CartPage({ user }) {
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
-  const paymentMethodLabels = {
-    cash: 'Naqd',
-    card: 'Kartaga o\'tkazish',
-    click: 'Click',
-    payme: 'Payme',
-  }
   const isProviderAvailable = (provider) => paymentProviders.includes(provider)
-  const hasOnlineProviders = paymentProviders.includes('click') || paymentProviders.includes('payme')
-  const hasCardProvider = paymentProviders.includes('card')
-  const hasPrepayProviders = hasOnlineProviders || hasCardProvider
+  const hasOnlineProviders = paymentProviders.includes('click')
   const deliveryRequiresPrepay = orderType === 'delivery'
-  const checkoutTitle = checkoutStep === 'payment' ? "To'lov" : "Buyurtmani rasmiylashtirish"
-  const cardSuffix = paymentCard?.card_number ? paymentCard.card_number.slice(-4) : ''
+  const checkoutTitle = "Buyurtmani rasmiylashtirish"
   const paymentOptions = [
-    {
-      id: 'card',
-      label: cardSuffix ? `Uzcard **** ${cardSuffix}` : 'Uzcard',
-      icon: 'card',
-      disabled: !isProviderAvailable('card'),
-    },
     {
       id: 'click',
       label: 'Click',
       icon: 'click',
       disabled: !isProviderAvailable('click'),
-    },
-    {
-      id: 'payme',
-      label: 'Payme',
-      icon: 'payme',
-      disabled: !isProviderAvailable('payme'),
     },
     {
       id: 'cash',
@@ -732,9 +719,7 @@ function CartPage({ user }) {
     },
   ]
   const paymentIconLabels = {
-    card: 'UZ',
     click: 'Click',
-    payme: 'Pay',
     cash: 'Naqd',
   }
 
@@ -742,14 +727,9 @@ function CartPage({ user }) {
     if (!deliveryRequiresPrepay) return
     if (selectedPaymentMethod !== 'cash') return
     if (hasOnlineProviders) {
-      const preferred = paymentProviders.includes('click') ? 'click' : 'payme'
-      setSelectedPaymentMethod(preferred)
-      return
+      setSelectedPaymentMethod('click')
     }
-    if (hasCardProvider) {
-      setSelectedPaymentMethod('card')
-    }
-  }, [deliveryRequiresPrepay, hasOnlineProviders, hasCardProvider, paymentProviders, selectedPaymentMethod])
+  }, [deliveryRequiresPrepay, hasOnlineProviders, selectedPaymentMethod])
 
   useEffect(() => {
     if (!storeDeliveryEnabled && orderType === 'delivery') {
@@ -763,21 +743,8 @@ function CartPage({ user }) {
     }
   }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled])
 
-  const clearPaymentProof = () => {
-    setPaymentProof(null)
-    setPaymentProofData(null)
-    setPaymentProofPreview(null)
-    if (paymentProofInputRef.current) {
-      paymentProofInputRef.current.value = ''
-    }
-    document.documentElement.classList.remove('file-picker-open')
-  }
-
   const selectPaymentMethod = (method) => {
     setSelectedPaymentMethod(method)
-    if (method !== 'card') {
-      clearPaymentProof()
-    }
   }
 
   const closeCheckout = () => {
@@ -786,16 +753,6 @@ function CartPage({ user }) {
     setShowPaymentSheet(false)
     setOrderTypeTouched(false)
     setMapSearchOpen(false)
-  }
-
-  // Open the file picker synchronously on user click (iOS Safari safe).
-  const openPaymentProofPicker = () => {
-    if (orderLoading) return
-    const input = paymentProofInputRef.current
-    if (!input) return
-    input.value = ''
-    document.documentElement.classList.add('file-picker-open')
-    input.click()
   }
 
   const handleClearCart = useCallback(() => {
@@ -883,61 +840,6 @@ function CartPage({ user }) {
     setShowCheckout(true)
   }
 
-  // Handle file selection for payment proof
-  const handleFileSelect = useCallback((event) => {
-    const file = event.target?.files?.[0]
-    if (!file) return
-    setPaymentProof(file)
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPaymentProofPreview(reader.result)
-      setPaymentProofData(reader.result)
-    }
-    reader.readAsDataURL(file)
-  }, [])
-
-  useEffect(() => {
-    fileSelectHandlerRef.current = handleFileSelect
-  }, [handleFileSelect])
-
-  useEffect(() => {
-    if (paymentProofInputRef.current) return
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/*,image/jpeg,image/jpg,image/png'
-    input.style.position = 'fixed'
-    input.style.top = '-1000px'
-    input.style.left = '0'
-    input.style.width = '1px'
-    input.style.height = '1px'
-    input.style.opacity = '0'
-    input.style.pointerEvents = 'none'
-    input.setAttribute('aria-hidden', 'true')
-
-    const handleChange = (event) => {
-      document.documentElement.classList.remove('file-picker-open')
-      fileSelectHandlerRef.current?.(event)
-    }
-    const handleWindowFocus = () => {
-      document.documentElement.classList.remove('file-picker-open')
-    }
-
-    input.addEventListener('change', handleChange)
-    window.addEventListener('focus', handleWindowFocus)
-    document.body.appendChild(input)
-    paymentProofInputRef.current = input
-
-    return () => {
-      input.removeEventListener('change', handleChange)
-      window.removeEventListener('focus', handleWindowFocus)
-      input.remove()
-      if (paymentProofInputRef.current === input) {
-        paymentProofInputRef.current = null
-      }
-      document.documentElement.classList.remove('file-picker-open')
-    }
-  }, [])
-
   const getResolvedPhone = useCallback(
     () => (canonicalPhone || phone || '').trim(),
     [canonicalPhone, phone]
@@ -970,19 +872,27 @@ function CartPage({ user }) {
     return normalized
   }
 
+  const buildDeliveryAddress = useCallback(() => {
+    if (orderType !== 'delivery') return null
+    const trimmedAddress = address.trim()
+    if (!trimmedAddress) return null
+    const lines = [trimmedAddress]
+    if (entrance.trim()) lines.push(`Kiraverish: ${entrance.trim()}`)
+    if (floor.trim()) lines.push(`Qavat: ${floor.trim()}`)
+    if (apartment.trim()) lines.push(`Xonadon: ${apartment.trim()}`)
+    return lines.join('\n')
+  }, [orderType, address, entrance, floor, apartment])
+
   const buildOrderComment = useCallback(() => {
     const lines = [orderType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish']
-    if (orderType === 'delivery') {
-      if (entrance.trim()) lines.push(`Kiraverish: ${entrance.trim()}`)
-      if (floor.trim()) lines.push(`Qavat: ${floor.trim()}`)
-      if (apartment.trim()) lines.push(`Xonadon: ${apartment.trim()}`)
-      if (deliverySlotLabel) lines.push(`Yetkazish vaqti: ${deliverySlotLabel}`)
+    if (orderType === 'delivery' && deliverySlotLabel) {
+      lines.push(`Yetkazish vaqti: ${deliverySlotLabel}`)
     }
     if (comment.trim()) lines.push(comment.trim())
     return lines.join('\n').trim()
-  }, [orderType, entrance, floor, apartment, deliverySlotLabel, comment])
+  }, [orderType, deliverySlotLabel, comment])
 
-  // Proceed to payment step (for delivery)
+  // Proceed to payment
   const proceedToPayment = async () => {
     const resolvedPhone = ensurePhoneOrPrompt()
     if (!resolvedPhone) {
@@ -992,37 +902,20 @@ function CartPage({ user }) {
       toast.warning('Yetkazib berish manzilini kiriting')
       return
     }
-    if (deliveryRequiresPrepay && !hasPrepayProviders) {
+    if (deliveryRequiresPrepay && !hasOnlineProviders) {
       toast.error('Yetkazib berish uchun to\'lov usullari mavjud emas')
       return
     }
 
-    if (['click', 'payme'].includes(selectedPaymentMethod)) {
-      await handleOnlinePayment(selectedPaymentMethod)
+    if (selectedPaymentMethod === 'click') {
+      await handleOnlinePayment()
       return
     }
 
-    if (selectedPaymentMethod === 'cash') {
-      await placeOrder()
-      return
-    }
-
-    // If card transfer - fetch payment card and show payment step
-    setOrderLoading(true)
-    try {
-      const storeId = cartItems[0]?.offer?.store_id || 0
-      const cardData = await api.getPaymentCard(storeId)
-      setPaymentCard(cardData)
-      setCheckoutStep('payment')
-    } catch (error) {
-      console.error('Error fetching payment card:', error)
-      toast.error('To\'lov rekvizitlarini olishda xatolik')
-    } finally {
-      setOrderLoading(false)
-    }
+    await placeOrder()
   }
 
-  // Place order (for pickup or after payment upload)
+  // Place order (cash/pickup)
   const placeOrder = async () => {
     if (isEmpty) return
 
@@ -1034,12 +927,19 @@ function CartPage({ user }) {
         setOrderLoading(false)
         return
       }
+      const deliveryAddress = orderType === 'delivery'
+        ? (buildDeliveryAddress() || address.trim())
+        : null
+      const deliveryLat = orderType === 'delivery' ? (deliveryCoords?.lat ?? null) : null
+      const deliveryLon = orderType === 'delivery' ? (deliveryCoords?.lon ?? null) : null
       const orderData = {
         items: cartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
-        delivery_address: orderType === 'delivery' ? address.trim() : null,
+        delivery_address: deliveryAddress,
+        delivery_lat: deliveryLat,
+        delivery_lon: deliveryLon,
         phone: resolvedPhone,
         comment: buildOrderComment(),
         order_type: orderType,
@@ -1058,46 +958,11 @@ function CartPage({ user }) {
 
       // Get order ID from response
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
-      setCreatedOrderId(orderId)
-
-      let paymentProofUploaded = false
-      if (selectedPaymentMethod === 'card' && paymentProof && orderId) {
-        try {
-          await api.uploadPaymentProof(orderId, paymentProof)
-          paymentProofUploaded = true
-        } catch (e) {
-          console.warn('Could not upload payment proof:', e)
-        }
-      }
-
-      // Check if payment proof required (delivery + card)
-      if (result.awaiting_payment && orderId) {
-        clearCart()
-        setShowCheckout(false)
-        setShowPaymentSheet(false)
-        setCheckoutStep('details')
-        setPaymentCard(result.payment_card || null)
-        setCreatedOrderId(orderId)
-        setOrderResult({
-          success: true,
-          orderId: orderId,
-          awaitingPayment: !paymentProofUploaded,
-          orderType: orderType,
-          total: total,
-          paymentCard: result.payment_card,
-          message: paymentProofUploaded
-            ? 'Chek yuborildi! Admin tekshiradi.'
-            : result.message || 'Buyurtma yaratildi! To\'lovni amalga oshiring.'
-        })
-        return
-      }
 
       clearCart()
       setShowCheckout(false)
       setShowPaymentSheet(false)
       setCheckoutStep('details')
-      clearPaymentProof()
-      setPaymentCard(null)
       setOrderResult({
         success: true,
         orderId: orderId,
@@ -1127,11 +992,10 @@ function CartPage({ user }) {
     }
   }
 
-  // Handle online payment (Click/Payme)
-  const handleOnlinePayment = async (provider) => {
-    if (!isProviderAvailable(provider)) {
-      const providerLabel = paymentMethodLabels[provider] || provider
-      toast.error(`${providerLabel} to\'lov vaqtincha mavjud emas. Boshqa to\'lov usulini tanlang.`)
+  // Handle online payment (Click)
+  const handleOnlinePayment = async () => {
+    if (!isProviderAvailable('click')) {
+      toast.error("Click to'lovi vaqtincha mavjud emas. Boshqa to'lov usulini tanlang.")
       return
     }
 
@@ -1143,18 +1007,25 @@ function CartPage({ user }) {
         setOrderLoading(false)
         return
       }
+      const deliveryAddress = orderType === 'delivery'
+        ? (buildDeliveryAddress() || address.trim())
+        : null
+      const deliveryLat = orderType === 'delivery' ? (deliveryCoords?.lat ?? null) : null
+      const deliveryLon = orderType === 'delivery' ? (deliveryCoords?.lon ?? null) : null
       // First create the order
       const orderData = {
         items: cartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
-        delivery_address: orderType === 'delivery' ? address.trim() : null,
+        delivery_address: deliveryAddress,
+        delivery_lat: deliveryLat,
+        delivery_lon: deliveryLon,
         phone: resolvedPhone,
         comment: buildOrderComment(),
         order_type: orderType,
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
-        payment_method: provider,
+        payment_method: 'click',
       }
 
       localStorage.setItem('fudly_phone', resolvedPhone)
@@ -1166,12 +1037,11 @@ function CartPage({ user }) {
       }
 
       orderId = result.order_id || result.bookings?.[0]?.booking_id
-      setCreatedOrderId(orderId)
       const storeId = cartItems[0]?.offer?.store_id || null
-      const returnUrl = window.location.origin + '/profile'
+      const returnUrl = `${window.location.origin}/order/${orderId}/details`
 
       // Create payment link
-      const paymentData = await api.createPaymentLink(orderId, provider, returnUrl, storeId, total)
+      const paymentData = await api.createPaymentLink(orderId, 'click', returnUrl, storeId, total)
 
       if (paymentData.payment_url) {
         clearCart()
@@ -1188,8 +1058,7 @@ function CartPage({ user }) {
       }
     } catch (error) {
       console.error('Online payment error:', error)
-      const providerLabel = paymentMethodLabels[provider] || provider
-      toast.error(`${providerLabel} to\'lovda xatolik: ` + (error.message || 'Noma\'lum xatolik'))
+      toast.error(`Click to'lovida xatolik: ` + (error.message || 'Noma\'lum xatolik'))
       if (orderId) {
         navigate(`/order/${orderId}`)
       }
@@ -1818,85 +1687,6 @@ function CartPage({ user }) {
                 </div>
               )}
 
-              {/* Step 2: Payment (for delivery) */}
-              {checkoutStep === 'payment' && (
-                <div className="payment-step">
-                  {/* Card Transfer UI */}
-                  {selectedPaymentMethod === 'card' && paymentCard && (
-                    <>
-                      <div className="payment-info checkout-section">
-                        <p className="payment-instruction">
-                          Quyidagi kartaga {Math.round(total).toLocaleString()} so'm o'tkazing:
-                        </p>
-
-                        <div className="payment-card">
-                          <div className="card-number">
-                            <span className="card-label">Karta raqami:</span>
-                            <span
-                              className="card-value"
-                              onClick={() => {
-                                navigator.clipboard.writeText(paymentCard.card_number)
-                                window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
-                                alert('Karta raqami nusxalandi!')
-                              }}
-                            >
-                              {paymentCard.card_number} (nusxa)
-                            </span>
-                          </div>
-                          {paymentCard.card_holder && (
-                            <div className="card-holder">
-                              <span className="card-label">Egasi:</span>
-                              <span className="card-value">{paymentCard.card_holder}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {paymentCard.payment_instructions && (
-                          <p className="payment-instructions">
-                            {paymentCard.payment_instructions}
-                          </p>
-                        )}
-
-                        <div className="payment-amount">
-                          <span>To'lov summasi:</span>
-                          <strong>{Math.round(total).toLocaleString()} so'm</strong>
-                        </div>
-                      </div>
-
-                      <div className="upload-section checkout-section">
-                        <p className="upload-label">
-                          O'tkazma chekini yuklang (majburiy):
-                        </p>
-
-                        <div className="upload-area">
-                          <button
-                            type="button"
-                            className={`upload-btn file-picker-btn${paymentProof ? ' is-hidden' : ''}${orderLoading ? ' is-disabled' : ''}`}
-                            onClick={openPaymentProofPicker}
-                            disabled={orderLoading}
-                          >
-                            Rasm tanlash
-                          </button>
-                        </div>
-
-                        {paymentProofPreview && (
-                          <div className="proof-preview">
-                            <img src={paymentProofPreview} alt="Chek" />
-                            <button
-                              className="remove-proof"
-                              onClick={() => {
-                                clearPaymentProof()
-                              }}
-                            >
-                              O'chirish
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
 
             {checkoutStep === 'details' && (
@@ -1912,24 +1702,6 @@ function CartPage({ user }) {
               </div>
             )}
 
-            {checkoutStep === 'payment' && (
-              <div className="modal-footer payment-footer">
-                <button
-                  className="cancel-btn"
-                  onClick={() => setCheckoutStep('details')}
-                  disabled={orderLoading}
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  className="confirm-btn"
-                  onClick={placeOrder}
-                  disabled={orderLoading || !paymentProof}
-                >
-                  {orderLoading ? 'Yuborilmoqda...' : 'Buyurtma berish'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -1942,32 +1714,6 @@ function CartPage({ user }) {
               <>
                 <div className="result-icon success">OK</div>
                 <h2>{orderResult.message || 'Buyurtma qabul qilindi!'}</h2>
-
-                {orderResult.awaitingPayment && (
-                  <div className="payment-status-chip">
-                    To'lov tasdiqlanishini kutyapti (chek yuborildi)
-                  </div>
-                )}
-
-                {/* Payment card info for awaiting payment orders */}
-                {orderResult.awaitingPayment && orderResult.paymentCard && (
-                  <div className="payment-instructions">
-                    <h3>To'lov ma'lumotlari</h3>
-                    <div className="payment-card-info">
-                      <p><strong>Karta raqami:</strong></p>
-                      <p className="card-number">{orderResult.paymentCard.card_number}</p>
-                      <p><strong>Egasi:</strong> {orderResult.paymentCard.card_holder}</p>
-                    </div>
-                    <div className="payment-steps">
-                      <p><strong>Qadamlar:</strong></p>
-                      <ol>
-                        <li>Yuqoridagi kartaga pul o'tkazing</li>
-                        <li>"Buyurtmalarim" bo'limiga o'ting</li>
-                        <li>Buyurtmangizni toping va chekni yuklang</li>
-                      </ol>
-                    </div>
-                  </div>
-                )}
 
                 {orderResult.bookingCode && (
                   <p className="booking-code-display">
@@ -1984,29 +1730,12 @@ function CartPage({ user }) {
                   Jami: {Math.round(orderResult.total).toLocaleString()} so'm
                 </p>
 
-                {orderResult.awaitingPayment ? (
-                  <>
-                    <button className="btn-primary" onClick={() => {
-                      setOrderResult(null)
-                      navigate('/profile')
-                    }}>
-                      Buyurtmalarimga o'tish
-                    </button>
-                    <button className="btn-secondary" onClick={() => {
-                      setOrderResult(null)
-                      navigate('/')
-                    }}>
-                      Bosh sahifa
-                    </button>
-                  </>
-                ) : (
-                  <button className="btn-primary" onClick={() => {
-                    setOrderResult(null)
-                    navigate('/')
-                  }}>
-                    Bosh sahifaga
-                  </button>
-                )}
+                <button className="btn-primary" onClick={() => {
+                  setOrderResult(null)
+                  navigate('/')
+                }}>
+                  Bosh sahifaga
+                </button>
               </>
             ) : (
               <>
@@ -2044,18 +1773,6 @@ function CartPage({ user }) {
                 <span className="payment-sheet-radio" aria-hidden="true"></span>
               </button>
               <button
-                className={`payment-sheet-item ${selectedPaymentMethod === 'card' ? 'active' : ''} ${!isProviderAvailable('card') ? 'disabled' : ''}`}
-                onClick={() => {
-                  if (!isProviderAvailable('card')) return
-                  selectPaymentMethod('card')
-                  setShowPaymentSheet(false)
-                }}
-                disabled={!isProviderAvailable('card')}
-              >
-                <span className="payment-sheet-label">Kartaga o'tkazish</span>
-                <span className="payment-sheet-radio" aria-hidden="true"></span>
-              </button>
-              <button
                 className={`payment-sheet-item ${selectedPaymentMethod === 'click' ? 'active' : ''} ${!isProviderAvailable('click') ? 'disabled' : ''}`}
                 onClick={() => {
                   if (!isProviderAvailable('click')) return
@@ -2065,18 +1782,6 @@ function CartPage({ user }) {
                 disabled={!isProviderAvailable('click')}
               >
                 <span className="payment-sheet-label">Click</span>
-                <span className="payment-sheet-radio" aria-hidden="true"></span>
-              </button>
-              <button
-                className={`payment-sheet-item ${selectedPaymentMethod === 'payme' ? 'active' : ''} ${!isProviderAvailable('payme') ? 'disabled' : ''}`}
-                onClick={() => {
-                  if (!isProviderAvailable('payme')) return
-                  selectPaymentMethod('payme')
-                  setShowPaymentSheet(false)
-                }}
-                disabled={!isProviderAvailable('payme')}
-              >
-                <span className="payment-sheet-label">Payme</span>
                 <span className="payment-sheet-radio" aria-hidden="true"></span>
               </button>
             </div>

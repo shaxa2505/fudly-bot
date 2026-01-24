@@ -1383,9 +1383,9 @@ async def create_webhook_app(
                 or data.get("payment_proof_photo_id")
                 or data.get("payment_screenshot")
             )
-            if isinstance(payment_proof, str) and payment_proof.strip().startswith("data:"):
-                logger.info("Ignoring data URL payment_proof in create_order payload")
-                payment_proof = None
+            if payment_proof:
+                logger.info("Ignoring payment_proof in create_order payload (disabled)")
+            payment_proof = None
 
             if not items:
                 return add_cors_headers(
@@ -1395,8 +1395,18 @@ async def create_webhook_app(
             is_delivery = delivery_type == "delivery"
             payment_method = data.get("payment_method")
             if not payment_method:
-                payment_method = "card" if is_delivery else "cash"
+                payment_method = "click" if is_delivery else "cash"
             payment_method = PaymentStatus.normalize_method(payment_method)
+            if payment_method not in ("cash", "click"):
+                return add_cors_headers(
+                    web.json_response({"error": "Unsupported payment method"}, status=400)
+                )
+            if is_delivery and payment_method != "click":
+                return add_cors_headers(
+                    web.json_response(
+                        {"error": "Only Click is allowed for delivery orders"}, status=400
+                    )
+                )
 
             idempotency_key = normalize_idempotency_key(
                 request.headers.get("Idempotency-Key")
@@ -1534,7 +1544,6 @@ async def create_webhook_app(
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
                         payment_method=payment_method,
-                        payment_proof=str(payment_proof) if payment_proof else None,
                         notify_customer=True,
                         notify_sellers=True,
                         telegram_notify=True,
@@ -1566,45 +1575,13 @@ async def create_webhook_app(
                             }
                         )
 
-                    initial_payment_status = PaymentStatus.initial_for_method(payment_method)
-                    resolved_payment_status = initial_payment_status
-                    if payment_proof and result.order_ids and hasattr(db, "update_payment_status"):
-                        try:
-                            for order_id in result.order_ids:
-                                db.update_payment_status(
-                                    int(order_id),
-                                    PaymentStatus.PROOF_SUBMITTED,
-                                    str(payment_proof),
-                                )
-                            resolved_payment_status = PaymentStatus.PROOF_SUBMITTED
-                        except Exception as proof_err:
-                            logger.warning(f"Failed to attach payment_proof to orders: {proof_err}")
+                    resolved_payment_status = PaymentStatus.initial_for_method(payment_method)
 
                     awaiting_payment = resolved_payment_status in (
                         PaymentStatus.AWAITING_PAYMENT,
                         PaymentStatus.AWAITING_PROOF,
                         PaymentStatus.PROOF_SUBMITTED,
                     )
-
-                    payment_card_info = None
-                    if payment_method == "card" and hasattr(db, "get_payment_card") and order_items:
-                        try:
-                            store_id = int(order_items[0].store_id)
-                            card = db.get_payment_card(store_id)
-                            if card:
-                                payment_card_info = {
-                                    "card_number": card.get("card_number")
-                                    if isinstance(card, dict)
-                                    else None,
-                                    "card_holder": card.get("card_holder")
-                                    if isinstance(card, dict)
-                                    else None,
-                                    "payment_instructions": card.get("payment_instructions")
-                                    if isinstance(card, dict)
-                                    else None,
-                                }
-                        except Exception:
-                            payment_card_info = None
 
                     response = {
                         "success": True,
@@ -1615,7 +1592,6 @@ async def create_webhook_app(
                         "payment_method": payment_method,
                         "payment_status": resolved_payment_status,
                         "awaiting_payment": awaiting_payment,
-                        "payment_card": payment_card_info,
                         "bookings": created_bookings,
                         "failed": failed_items,
                         "message": result.error_message or "OK",
@@ -1689,7 +1665,6 @@ async def create_webhook_app(
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
                         payment_method=payment_method,
-                        payment_proof=str(payment_proof) if payment_proof else None,
                         notify_customer=True,
                         notify_sellers=True,
                         telegram_notify=True,
@@ -1839,7 +1814,7 @@ async def create_webhook_app(
                 if raw_payment_method:
                     payment_method = PaymentStatus.normalize_method(raw_payment_method)
                 else:
-                    payment_method = "card" if order_type == "delivery" else "cash"
+                    payment_method = "click" if order_type == "delivery" else "cash"
                 payment_status = PaymentStatus.normalize(
                     r.get("payment_status"),
                     payment_method=payment_method,
@@ -2607,9 +2582,13 @@ async def create_webhook_app(
     async def api_upload_payment_proof(request: web.Request) -> web.Response:
         """POST /api/v1/orders/{order_id}/payment-proof - Upload payment screenshot.
 
-        For DELIVERY orders with CARD payment, this sends the payment proof to ADMIN
-        for verification before notifying the seller.
+        Payment proof uploads are disabled (Click-only payments).
         """
+        return add_cors_headers(
+            web.json_response(
+                {"error": "Payment proof uploads are disabled"}, status=410
+            )
+        )
         order_id_str = request.match_info.get("order_id")
         try:
             authenticated_user_id = _get_authenticated_user_id(request)
@@ -3113,18 +3092,6 @@ async def create_webhook_app(
             for provider in providers:
                 if provider == "click":
                     result.append({"id": "click", "name": "Click", "icon": "💳", "enabled": True})
-                elif provider == "payme":
-                    result.append({"id": "payme", "name": "Payme", "icon": "💳", "enabled": True})
-                elif provider == "card":
-                    result.append(
-                        {
-                            "id": "card",
-                            "name": "Karta orqali",
-                            "icon": "💳",
-                            "enabled": True,
-                            "description": "Karta raqamiga pul o'tkazish",
-                        }
-                    )
 
             return add_cors_headers(web.json_response({"providers": result}))
         except Exception as e:
@@ -3152,7 +3119,7 @@ async def create_webhook_app(
                     )
             order_id = data.get("order_id")
             amount = data.get("amount")
-            provider = str(data.get("provider", "card")).lower()
+            provider = str(data.get("provider", "click")).lower()
             user_id = authenticated_user_id
             return_url = data.get("return_url")
             store_id = data.get("store_id")  # For per-store credentials
@@ -3212,25 +3179,19 @@ async def create_webhook_app(
                     web.json_response({"error": "Order already finalized"}, status=400)
                 )
 
-            if provider in ("click", "payme"):
-                if payment_method and payment_method != provider:
-                    return add_cors_headers(
-                        web.json_response({"error": "Payment method mismatch"}, status=400)
-                    )
-                if payment_status not in ("awaiting_payment", ""):
-                    return add_cors_headers(
-                        web.json_response(
-                            {"error": "Payment not awaiting online payment"}, status=400
-                        )
-                    )
-            elif provider == "card":
-                if payment_status in ("proof_submitted", "confirmed", "completed"):
-                    return add_cors_headers(
-                        web.json_response({"error": "Payment already submitted"}, status=400)
-                    )
-            else:
+            if provider != "click":
                 return add_cors_headers(
-                    web.json_response({"error": "Unknown payment provider"}, status=400)
+                    web.json_response({"error": "Payment provider not supported"}, status=400)
+                )
+            if payment_method and payment_method != "click":
+                return add_cors_headers(
+                    web.json_response({"error": "Payment method mismatch"}, status=400)
+                )
+            if payment_status not in ("awaiting_payment", ""):
+                return add_cors_headers(
+                    web.json_response(
+                        {"error": "Payment not awaiting online payment"}, status=400
+                    )
                 )
 
             available = payment_service.get_available_providers(int(store_id) if store_id else None)
@@ -3245,69 +3206,31 @@ async def create_webhook_app(
                     web.json_response({"payment_url": cached_url, "provider": provider})
                 )
 
-            if provider == "click":
-                # Check for store-specific or platform-wide Click credentials
-                credentials = (
-                    payment_service.get_store_credentials(
-                        store_id=int(store_id) if store_id else 0, provider="click"
-                    )
-                    if store_id
-                    else None
+            # Check for store-specific or platform-wide Click credentials
+            credentials = (
+                payment_service.get_store_credentials(
+                    store_id=int(store_id) if store_id else 0, provider="click"
                 )
-                if not credentials and not payment_service.click_enabled:
-                    return add_cors_headers(
-                        web.json_response(
-                            {"error": "Click not configured for this store"}, status=400
-                        )
-                    )
-                payment_url = payment_service.generate_click_url(
-                    order_id=int(order_id),
-                    amount=int(amount),
-                    return_url=return_url,
-                    user_id=int(user_id) if user_id else 0,
-                    store_id=int(store_id) if store_id else 0,
-                )
-                set_cached_payment_link(int(order_id), "click", payment_url)
-                return add_cors_headers(
-                    web.json_response({"payment_url": payment_url, "provider": "click"})
-                )
-
-            elif provider == "payme":
-                # Check for store-specific or platform-wide Payme credentials
-                credentials = (
-                    payment_service.get_store_credentials(
-                        store_id=int(store_id) if store_id else 0, provider="payme"
-                    )
-                    if store_id
-                    else None
-                )
-                if not credentials and not payment_service.payme_enabled:
-                    return add_cors_headers(
-                        web.json_response(
-                            {"error": "Payme not configured for this store"}, status=400
-                        )
-                    )
-                payment_url = payment_service.generate_payme_url(
-                    order_id=int(order_id),
-                    amount=int(amount),
-                    return_url=return_url,
-                    store_id=int(store_id) if store_id else 0,
-                )
-                set_cached_payment_link(int(order_id), "payme", payment_url)
-                return add_cors_headers(
-                    web.json_response({"payment_url": payment_url, "provider": "payme"})
-                )
-
-            else:
-                # Card payment - return card info
+                if store_id
+                else None
+            )
+            if not credentials and not payment_service.click_enabled:
                 return add_cors_headers(
                     web.json_response(
-                        {
-                            "provider": "card",
-                            "message": "Use /api/v1/payment-card/{store_id} to get card details",
-                        }
+                        {"error": "Click not configured for this store"}, status=400
                     )
                 )
+            payment_url = payment_service.generate_click_url(
+                order_id=int(order_id),
+                amount=int(amount),
+                return_url=return_url,
+                user_id=int(user_id) if user_id else 0,
+                store_id=int(store_id) if store_id else 0,
+            )
+            set_cached_payment_link(int(order_id), "click", payment_url)
+            return add_cors_headers(
+                web.json_response({"payment_url": payment_url, "provider": "click"})
+            )
 
         except Exception as e:
             logger.error(f"API create payment error: {e}")

@@ -140,6 +140,9 @@ function OrderTrackingPage({ user }) {
     if (order?.payment_status === 'rejected') {
       return t('To\'lov rad etildi', 'To\'lov rad etildi');
     }
+    if (order?.payment_status === 'payment_rejected') {
+      return t('To\'lov rad etildi', 'To\'lov rad etildi');
+    }
     return null;
   };
 
@@ -184,6 +187,7 @@ function OrderTrackingPage({ user }) {
   const isCancelled = ['cancelled', 'rejected'].includes(order.status);
   const canShowQR = ['confirmed', 'preparing', 'ready'].includes(order.status) && order.qr_code;
   const orderPhotoUrl = resolveOrderItemImageUrl(order);
+  const orderCode = order.booking_code || order.booking_id || order.order_id || bookingId;
 
   return (
     <div ref={containerRef} className="order-tracking-page">
@@ -194,7 +198,7 @@ function OrderTrackingPage({ user }) {
       />
       <div className="tracking-header">
         <div className="topbar-card tracking-header-inner">
-          <h1>{t('Заказ', 'Buyurtma')} #{order.booking_code}</h1>
+          <h1>{t('Заказ', 'Buyurtma')} #{orderCode}</h1>
         </div>
       </div>
 

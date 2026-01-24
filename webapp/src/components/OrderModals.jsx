@@ -97,7 +97,7 @@ export function CheckoutModal({ onClose, onPlaceOrder, totalCost, loading }) {
           <div className="checkout-row">
             <span className="checkout-label">To'lov</span>
             <button className="checkout-value">
-              <span className="payment-icon">CARD</span>
+              <span className="payment-icon">CLICK</span>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M9 18l6-6-6-6" stroke="#181725" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>

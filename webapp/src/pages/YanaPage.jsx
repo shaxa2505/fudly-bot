@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   ArrowRight,
+  Bell,
   ChevronRight,
   CreditCard,
   Globe,
@@ -65,6 +65,7 @@ function YanaPage({ user }) {
     }
   })()
   const [notifications, setNotifications] = useState(true)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsList, setNotificationsList] = useState([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const notificationsRef = useRef([])
@@ -327,15 +328,6 @@ function YanaPage({ user }) {
     toast.info('Chiqish uchun Telegram oynasini yoping')
   }
 
-  const handleBack = () => {
-    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-    if (window.history.length > 1) {
-      navigate(-1)
-      return
-    }
-    navigate('/')
-  }
-
   const handleSupport = () => {
     const link = 'https://t.me/fudly_support'
     if (window.Telegram?.WebApp?.openTelegramLink) {
@@ -552,14 +544,6 @@ function YanaPage({ user }) {
 
       <header className="profile-topbar">
         <div className="profile-topbar-inner">
-          <button
-            type="button"
-            className="profile-topbar-btn"
-            onClick={handleBack}
-            aria-label="Orqaga"
-          >
-            <ArrowLeft size={18} strokeWidth={2.4} />
-          </button>
           <h1 className="profile-title">Profilim</h1>
           <button
             type="button"
@@ -779,53 +763,77 @@ function YanaPage({ user }) {
       </section>
 
       <section className="profile-section notifications-section">
-        <div className="section-header">
-          <h3 className="section-title">Bildirishnomalar</h3>
-        </div>
-        <div className="notifications-card">
-          <div className="notifications-toggle-row">
-            <span className="notifications-label">Yangiliklar va statuslar</span>
-            <button
-              className={`toggle ${notifications ? 'on' : ''}`}
-              onClick={handleToggleNotifications}
-            >
-              <span className="toggle-knob"></span>
-            </button>
+        <button
+          type="button"
+          className="notifications-accordion"
+          onClick={() => setNotificationsOpen((prev) => !prev)}
+          aria-expanded={notificationsOpen}
+        >
+          <div className="notifications-accordion-left">
+            <div className="settings-icon tone-blue">
+              <Bell size={18} strokeWidth={2} />
+            </div>
+            <div className="notifications-accordion-text">
+              <span className="notifications-accordion-title">Bildirishnomalar</span>
+              <span className="notifications-accordion-subtitle">
+                {notifications ? 'Yoqilgan' : "O'chirilgan"}
+              </span>
+            </div>
           </div>
-        </div>
+          <ChevronRight
+            size={18}
+            className={`notifications-accordion-chevron ${notificationsOpen ? 'open' : ''}`}
+          />
+        </button>
 
-        <div className="notifications-header">
-          <h4 className="notifications-title">So'nggi bildirishnomalar</h4>
-          <button className="clear-notifications-btn" onClick={handleClearNotifications}>
-            Tozalash
-          </button>
-        </div>
-
-        {notificationsLoading ? (
-          <div className="section-loading">
-            <div className="spinner"></div>
-            <p>Yuklanmoqda...</p>
-          </div>
-        ) : notificationsList.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">!</div>
-            <h3>Bildirishnomalar yo'q</h3>
-            <p>Yangi xabarlar shu yerda paydo bo'ladi.</p>
-          </div>
-        ) : (
-          <div className="notifications-list">
-            {notificationsList.map((item) => (
-              <div
-                key={item.id}
-                className={`notification-card notification-${item.type || 'system'}`}
-              >
-                <div className="notification-header">
-                  <span className="notification-title">{item.title}</span>
-                  <span className="notification-date">{formatDate(item.created_at)}</span>
-                </div>
-                <p className="notification-message">{item.message}</p>
+        {notificationsOpen && (
+          <div className="notifications-body">
+            <div className="notifications-card">
+              <div className="notifications-toggle-row">
+                <span className="notifications-label">Yangiliklar va statuslar</span>
+                <button
+                  className={`toggle ${notifications ? 'on' : ''}`}
+                  onClick={handleToggleNotifications}
+                >
+                  <span className="toggle-knob"></span>
+                </button>
               </div>
-            ))}
+            </div>
+
+            <div className="notifications-header">
+              <h4 className="notifications-title">So'nggi bildirishnomalar</h4>
+              <button className="clear-notifications-btn" onClick={handleClearNotifications}>
+                Tozalash
+              </button>
+            </div>
+
+            {notificationsLoading ? (
+              <div className="section-loading">
+                <div className="spinner"></div>
+                <p>Yuklanmoqda...</p>
+              </div>
+            ) : notificationsList.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">!</div>
+                <h3>Bildirishnomalar yo'q</h3>
+                <p>Yangi xabarlar shu yerda paydo bo'ladi.</p>
+              </div>
+            ) : (
+              <div className="notifications-list">
+                {notificationsList.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`notification-card notification-${item.type || 'system'}`}
+                  >
+                    <div className="notification-header">
+                      <span className="notification-title">{item.title}</span>
+                      <span className="notification-date">{formatDate(item.created_at)}</span>
+                    </div>
+                    <p className="notification-message">{item.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>

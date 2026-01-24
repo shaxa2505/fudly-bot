@@ -43,8 +43,10 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
             "pending": "Новый" if lang == "ru" else "Yangi",
             "confirmed": "Подтверждён" if lang == "ru" else "Tasdiqlangan",
             "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
+            "ready": "Готов" if lang == "ru" else "Tayyor",
             "completed": "Завершён" if lang == "ru" else "Yakunlangan",
             "cancelled": "Отменён" if lang == "ru" else "Bekor qilingan",
+            "rejected": "Отклонён" if lang == "ru" else "Rad etilgan",
         }.get(status, status)
         pickup_label = "Самовывоз" if lang == "ru" else "Olib ketish"
         return f"{idx}. {pickup_label} #{booking_id} • {title[:20]} ×{quantity} • {status_label}"
@@ -55,7 +57,12 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         status = _get_field(item, "order_status") or (
             item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else "pending"
         )
-        title = _get_field(item, "offer_title") or _get_field(item, "title") or "Товар"
+        title = (
+            _get_field(item, "item_title")
+            or _get_field(item, "offer_title")
+            or _get_field(item, "title")
+            or "Товар"
+        )
         quantity = _get_field(item, "quantity") or 1
 
         status_label = {
@@ -65,6 +72,7 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
             "delivering": "В доставке" if lang == "ru" else "Yetkazilmoqda",
             "completed": "Завершён" if lang == "ru" else "Yakunlangan",
             "cancelled": "Отменён" if lang == "ru" else "Bekor qilingan",
+            "rejected": "Отклонён" if lang == "ru" else "Rad etilgan",
         }.get(status, status)
         delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
         return f"{idx}. {delivery_label} #{order_id} • {title[:20]} ×{quantity} • {status_label}"
@@ -167,12 +175,16 @@ def _build_keyboard(
 def _filter_by_status(items: list, statuses: list, is_pickup: bool = False) -> list:
     """Filter items by status (v24+ unified orders - all use order_status field)."""
     result = []
+    normalized_targets = {OrderStatus.normalize(str(s).lower()) for s in statuses}
     for item in items:
         # v24+: all orders use order_status field
-        status = _get_field(item, "order_status") or (
+        status = _get_field(item, "order_status") or _get_field(item, "status") or (
             item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else None
         )
-        if status in statuses:
+        normalized_status = (
+            OrderStatus.normalize(str(status).lower()) if status is not None else None
+        )
+        if normalized_status in normalized_targets:
             result.append(item)
     return result
 
@@ -331,8 +343,12 @@ async def seller_filter_active(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     all_bookings, all_orders = _get_all_orders(db, callback.from_user.id)
-    filtered_bookings = _filter_by_status(all_bookings, ["confirmed", "preparing"], True)
-    filtered_orders = _filter_by_status(all_orders, ["confirmed", "ready", "delivering"], False)
+    filtered_bookings = _filter_by_status(
+        all_bookings, ["confirmed", "preparing", "ready"], True
+    )
+    filtered_orders = _filter_by_status(
+        all_orders, ["confirmed", "preparing", "ready", "delivering"], False
+    )
 
     text = _build_list_text(filtered_bookings, filtered_orders, lang, "active")
     kb = _build_keyboard(filtered_bookings, filtered_orders, lang, "active")
@@ -417,8 +433,11 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     user_id = _get_field(order, "user_id")
     offer_id = _get_field(order, "offer_id")
 
-    offer = db.get_offer(offer_id) if offer_id else None
-    title = _get_field(offer, "title") or "Товар"
+    item_title = _get_field(order, "item_title")
+    title = item_title
+    if not title:
+        offer = db.get_offer(offer_id) if offer_id else None
+        title = _get_field(offer, "title") or "Товар"
 
     customer = db.get_user_model(user_id) if user_id else None
     customer_name = customer.first_name if customer and customer.first_name else "Клиент"

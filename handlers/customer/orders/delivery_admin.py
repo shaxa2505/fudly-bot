@@ -105,9 +105,12 @@ async def admin_confirm_payment(
     customer = db.get_user_model(customer_id)
 
     owner_id = get_store_field(store, "owner_id") if store else None
-    delivery_price = (
-        get_store_field(store, "delivery_price", 0) if store and order_type == "delivery" else 0
-    )
+    delivery_price = _get_order_field(order, "delivery_price", None)
+    if delivery_price is None:
+        delivery_price = (
+            get_store_field(store, "delivery_price", 0) if store and order_type == "delivery" else 0
+        )
+    delivery_price = int(delivery_price or 0)
     order_total_price = order.get("total_price") if isinstance(order, dict) else None
 
     customer_name = customer.first_name if customer else "—"
@@ -130,9 +133,20 @@ async def admin_confirm_payment(
         )
     else:
         # Single item order
-        offer = db.get_offer(offer_id)
-        offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
-        offer_price = get_offer_field(offer, "discount_price", 0) if offer else 0
+        item_title = _get_order_field(order, "item_title", None)
+        item_price = _get_order_field(order, "item_price", None)
+        offer = None
+        if not item_title or item_price is None:
+            offer = db.get_offer(offer_id) if offer_id else None
+        offer_title = item_title or (
+            get_offer_field(offer, "title", "Товар") if offer else "Товар"
+        )
+        offer_price = (
+            int(item_price)
+            if item_price is not None
+            else int(get_offer_field(offer, "discount_price", 0) if offer else 0)
+        )
+        quantity = int(quantity or 1)
         items_list = f"• {offer_title} × {quantity}"
         total = int(order_total_price) if order_total_price is not None else (
             (offer_price * quantity) + delivery_price

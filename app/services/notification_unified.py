@@ -33,6 +33,18 @@ def _normalize_status(status: str | None) -> str | None:
     return normalized
 
 
+def _normalize_payment_status(payment_status: str | None) -> str | None:
+    if not payment_status:
+        return None
+    normalized = str(payment_status).strip().lower()
+    mapping = {
+        "paid": "confirmed",
+        "payment_rejected": "rejected",
+        "awaiting_admin_confirmation": "proof_submitted",
+    }
+    return mapping.get(normalized, normalized)
+
+
 def _normalize_items(items: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]]:
     if not items:
         return []
@@ -122,6 +134,7 @@ def _build_actions(
     is_cart: bool,
 ) -> list[dict[str, Any]]:
     actions: list[dict[str, Any]] = []
+    payment_status = _normalize_payment_status(payment_status)
     payload: dict[str, Any] = {}
     if entity_id is not None:
         payload["order_id"] = int(entity_id)
@@ -135,7 +148,7 @@ def _build_actions(
         elif payment_status == "awaiting_proof":
             actions.append(_action("upload_proof", payload=payload))
             actions.append(_action("support", style="secondary", payload=payload))
-        elif payment_status == "payment_rejected":
+        elif payment_status == "rejected":
             actions.append(_action("retry_payment", payload=payload))
             actions.append(_action("support", style="secondary", payload=payload))
         else:
@@ -219,9 +232,7 @@ def build_unified_order_payload(
     if ids:
         ids = [int(x) for x in ids if x is not None]
 
-    payment_status_normalized = (
-        str(payment_status).strip().lower() if payment_status is not None else None
-    )
+    payment_status_normalized = _normalize_payment_status(payment_status)
     payload: dict[str, Any] = {
         "id": str(uuid4()),
         "kind": kind,
@@ -254,7 +265,7 @@ def build_unified_order_payload(
             role=role,
             status=normalized_status,
             order_type=normalized_type,
-            payment_status=payment_status,
+            payment_status=payment_status_normalized,
             entity_id=entity_id,
             entity_ids=ids,
             is_cart=is_cart,

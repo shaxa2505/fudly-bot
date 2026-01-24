@@ -251,18 +251,21 @@ class OrderMixin:
                             ),
                         )
                     except Exception as e:
-                        # Older schemas may not have pickup_code or order_type columns
-                        if "pickup_code" in str(e) or "order_type" in str(e):
+                        message = str(e)
+                        missing_pickup_or_type = "pickup_code" in message or "order_type" in message
+                        missing_coords = any(
+                            token in message for token in ("delivery_lat", "delivery_lon", "comment")
+                        )
+                        if missing_coords and not missing_pickup_or_type:
                             logger.warning(
-                                f"pickup_code/order_type column missing, trying without: {e}"
+                                f"delivery_lat/lon/comment column missing, trying without: {e}"
                             )
                             cursor.execute(
                                 """
                                 INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
-                                                  delivery_lat, delivery_lon, comment,
                                                   total_price, delivery_price, item_title, item_price, item_original_price,
-                                                  payment_method, payment_status, order_status)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                  payment_method, payment_status, order_status, pickup_code, order_type)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                 RETURNING order_id
                                 """,
                                 (
@@ -271,9 +274,36 @@ class OrderMixin:
                                     offer_id,
                                     quantity,
                                     delivery_address,
-                                    delivery_lat,
-                                    delivery_lon,
-                                    comment,
+                                    total_amount,
+                                    delivery_price,
+                                    item_title,
+                                    item_price,
+                                    item_original_price,
+                                    payment_method_norm,
+                                    payment_status,
+                                    "pending",
+                                    pickup_code,
+                                    order_type,
+                                ),
+                            )
+                        elif missing_pickup_or_type:
+                            logger.warning(
+                                f"pickup_code/order_type column missing, trying without: {e}"
+                            )
+                            cursor.execute(
+                                """
+                                INSERT INTO orders (user_id, store_id, offer_id, quantity, delivery_address,
+                                                  total_price, delivery_price, item_title, item_price, item_original_price,
+                                                  payment_method, payment_status, order_status)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                RETURNING order_id
+                                """,
+                                (
+                                    user_id,
+                                    store_id,
+                                    offer_id,
+                                    quantity,
+                                    delivery_address,
                                     total_amount,
                                     delivery_price,
                                     item_title,
@@ -564,6 +594,9 @@ class OrderMixin:
         store_id: int,
         cart_items: list[dict[str, Any]],
         delivery_address: str | None = None,
+        delivery_lat: float | None = None,
+        delivery_lon: float | None = None,
+        comment: str | None = None,
         delivery_price: int = 0,
         payment_method: str = "cash",
         order_type: str | None = None,
@@ -685,18 +718,21 @@ class OrderMixin:
                     cursor.execute(
                         """
                         INSERT INTO orders (
-                            user_id, store_id, delivery_address, total_price,
-                            delivery_price, item_title, item_price, item_original_price,
+                            user_id, store_id, delivery_address, delivery_lat, delivery_lon, comment,
+                            total_price, delivery_price, item_title, item_price, item_original_price,
                             payment_method, payment_status, order_status, pickup_code,
                             order_type, cart_items, is_cart_order, quantity
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
                         RETURNING order_id
                         """,
                         (
                             user_id,
                             store_id,
                             delivery_address,
+                            delivery_lat,
+                            delivery_lon,
+                            comment,
                             total_price,
                             delivery_price,
                             item_title,
@@ -711,36 +747,66 @@ class OrderMixin:
                         ),
                     )
                 except Exception as e:
-                    # Fallback: older schemas without order_type
-                    if "order_type" not in str(e):
-                        raise
-                    cursor.execute(
-                        """
-                        INSERT INTO orders (
-                            user_id, store_id, delivery_address, total_price,
-                            delivery_price, item_title, item_price, item_original_price,
-                            payment_method, payment_status, order_status, pickup_code,
-                            cart_items, is_cart_order, quantity
+                    message = str(e)
+                    if any(token in message for token in ("delivery_lat", "delivery_lon", "comment")) and "order_type" not in message:
+                        cursor.execute(
+                            """
+                            INSERT INTO orders (
+                                user_id, store_id, delivery_address, total_price,
+                                delivery_price, item_title, item_price, item_original_price,
+                                payment_method, payment_status, order_status, pickup_code,
+                                order_type, cart_items, is_cart_order, quantity
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, %s, 1, %s)
+                            RETURNING order_id
+                            """,
+                            (
+                                user_id,
+                                store_id,
+                                delivery_address,
+                                total_price,
+                                delivery_price,
+                                item_title,
+                                item_price,
+                                item_original_price,
+                                payment_method_norm,
+                                payment_status,
+                                pickup_code,
+                                order_type,
+                                cart_items_json,
+                                total_quantity,
+                            ),
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
-                        RETURNING order_id
-                        """,
-                        (
-                            user_id,
-                            store_id,
-                            delivery_address,
-                            total_price,
-                            delivery_price,
-                            item_title,
-                            item_price,
-                            item_original_price,
-                            payment_method_norm,
-                            payment_status,
-                            pickup_code,
-                            cart_items_json,
-                            total_quantity,
-                        ),
-                    )
+                    elif "order_type" in message:
+                        cursor.execute(
+                            """
+                            INSERT INTO orders (
+                                user_id, store_id, delivery_address, total_price,
+                                delivery_price, item_title, item_price, item_original_price,
+                                payment_method, payment_status, order_status, pickup_code,
+                                cart_items, is_cart_order, quantity
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending', %s, %s, 1, %s)
+                            RETURNING order_id
+                            """,
+                            (
+                                user_id,
+                                store_id,
+                                delivery_address,
+                                total_price,
+                                delivery_price,
+                                item_title,
+                                item_price,
+                                item_original_price,
+                                payment_method_norm,
+                                payment_status,
+                                pickup_code,
+                                cart_items_json,
+                                total_quantity,
+                            ),
+                        )
+                    else:
+                        raise
                 order_id = cursor.fetchone()[0]
 
                 logger.info(

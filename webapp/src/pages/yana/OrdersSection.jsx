@@ -55,16 +55,6 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
     }
   }
 
-  const handleUploadProof = (orderId) => {
-    if (!orderId || !window.Telegram?.WebApp) return
-  const botUsername = window.Telegram.WebApp.initDataUnsafe?.bot?.username
-    || import.meta.env.VITE_BOT_USERNAME
-    || 'fudlyuzbot'
-    window.Telegram.WebApp.openTelegramLink(
-      `https://t.me/${botUsername}?start=upload_proof_${orderId}`
-    )
-  }
-
   return (
     <div className="yana-section orders-section">
       <div className="order-filters">
@@ -173,17 +163,6 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
                   )}
                 </div>
 
-                {['awaiting_proof', 'payment_rejected'].includes(order.status) && (
-                  <button
-                    className="upload-proof-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleUploadProof(orderId)
-                    }}
-                  >
-                    📸 Chekni yuklash / Загрузить чек
-                  </button>
-                )}
               </div>
             )
           })}

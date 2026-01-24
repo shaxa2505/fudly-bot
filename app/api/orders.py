@@ -15,7 +15,10 @@ from pydantic import BaseModel
 
 from app.api.webapp.common import get_current_user, get_optional_user
 from app.core.utils import normalize_city
-from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus
+from app.services.unified_order_service import (
+    OrderStatus as UnifiedOrderStatus,
+    PaymentStatus,
+)
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
@@ -59,7 +62,9 @@ class OrderStatus(BaseModel):
 
     booking_id: int
     booking_code: str
-    status: str  # pending, confirmed, ready, completed, cancelled
+    status: str  # pending, preparing, ready, delivering, completed, cancelled, rejected
+    payment_status: str | None = None
+    order_type: str | None = None
     created_at: str
     updated_at: str | None
 
@@ -236,6 +241,11 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     order_type = booking_dict.get("order_type") or ("delivery" if delivery_address else "pickup")
 
     booking_code = booking_dict.get("pickup_code") or booking_dict.get("booking_code") or ""
+    payment_status = PaymentStatus.normalize(
+        booking_dict.get("payment_status"),
+        payment_method=booking_dict.get("payment_method"),
+        payment_proof_photo_id=booking_dict.get("payment_proof_photo_id"),
+    )
 
     # Store details: prefer explicit store_id on the row, fallback to offer.store_id
     store_id = int(booking_dict.get("store_id") or 0)
@@ -324,6 +334,8 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
         booking_id=int(booking_id),
         booking_code=booking_code,
         status=status,
+        payment_status=payment_status,
+        order_type=order_type,
         created_at=str(booking_dict.get("created_at", "")),
         updated_at=str(booking_dict.get("updated_at")) if booking_dict.get("updated_at") else None,
         offer_title=offer_dict.get("title", "Товар"),
@@ -416,6 +428,11 @@ async def get_user_orders(
         )
         raw_order_status = r.get("order_status") or "pending"
         order_status = UnifiedOrderStatus.normalize(str(raw_order_status).strip().lower())
+        payment_status = PaymentStatus.normalize(
+            r.get("payment_status"),
+            payment_method=r.get("payment_method"),
+            payment_proof_photo_id=r.get("payment_proof_photo_id"),
+        )
 
         is_cart = int(r.get("is_cart_order") or 0) == 1
         cart_items_json = r.get("cart_items")
@@ -487,7 +504,7 @@ async def get_user_orders(
                 "items_count": len(items),
                 "items": items,
                 "payment_method": r.get("payment_method"),
-                "payment_status": r.get("payment_status"),
+                "payment_status": payment_status,
                 "payment_proof_photo_id": r.get("payment_proof_photo_id"),
                 "created_at": str(r.get("created_at") or ""),
                 "updated_at": str(r.get("updated_at") or ""),

@@ -1,11 +1,10 @@
 ﻿from __future__ import annotations
 
-import os
-
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.integrations.payment_service import get_payment_service
 from app.services.unified_order_service import (
     OrderItem,
     get_unified_order_service,
@@ -14,11 +13,6 @@ from localization import get_text
 
 from .common import esc
 from . import common
-
-
-ENABLE_TELEGRAM_PAYMENTS = (
-    os.getenv("ENABLE_TELEGRAM_PAYMENTS", "0").strip().lower() in {"1", "true", "yes"}
-)
 
 
 def register(router: Router) -> None:
@@ -30,15 +24,8 @@ def register(router: Router) -> None:
             await callback.answer()
             return
 
-        # Import lazily to avoid circular imports
-        from handlers.customer import payments as telegram_payments
-
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
-
-        if not ENABLE_TELEGRAM_PAYMENTS or not telegram_payments.PROVIDER_TOKEN:
-            await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
-            return
 
         data = await state.get_data()
         cart_items_stored = data.get("cart_items", [])
@@ -49,6 +36,20 @@ def register(router: Router) -> None:
         if not cart_items_stored or not store_id or not address:
             await state.clear()
             await callback.answer(get_text(lang, "cart_payment_data_missing"), show_alert=True)
+            return
+
+        payment_service = get_payment_service()
+        if hasattr(payment_service, "set_database"):
+            payment_service.set_database(common.db)
+
+        credentials = None
+        try:
+            credentials = payment_service.get_store_credentials(int(store_id), "click")
+        except Exception:
+            credentials = None
+
+        if not credentials and not payment_service.click_enabled:
+            await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
             return
 
         order_service = get_unified_order_service()
@@ -98,32 +99,48 @@ def register(router: Router) -> None:
             return
 
         order_id = result.order_ids[0]
+        order_total = None
+        try:
+            if hasattr(common.db, "get_order"):
+                order_row = common.db.get_order(int(order_id))
+                if order_row:
+                    order_total = int(order_row.get("total_price") or 0)
+        except Exception:
+            order_total = None
 
-        items_for_invoice = [
-            {
-                "title": item["title"],
-                "price": int(item["price"]),
-                "quantity": int(item["quantity"]),
-            }
-            for item in cart_items_stored
-        ]
+        if not order_total:
+            items_total = sum(
+                int(item["price"]) * int(item["quantity"]) for item in cart_items_stored
+            )
+            order_total = items_total + int(delivery_price)
 
-        store_name = str(cart_items_stored[0].get("store_name", ""))
+        return_url = None
+        try:
+            import os
+
+            webapp_url = os.getenv("WEBAPP_URL", "").strip()
+            if webapp_url:
+                return_url = f"{webapp_url.rstrip('/')}/order/{order_id}/details"
+        except Exception:
+            return_url = None
 
         try:
-            await telegram_payments.create_order_invoice(
-                chat_id=user_id,
+            payment_url = payment_service.generate_click_url(
                 order_id=int(order_id),
-                items=items_for_invoice,
-                delivery_cost=int(delivery_price),
-                store_name=store_name,
+                amount=int(order_total),
+                return_url=return_url,
+                user_id=int(user_id),
+                store_id=int(store_id),
             )
         except Exception as e:
             from logging_config import logger
 
-            logger.error(f"Failed to send Telegram invoice for cart order #{order_id}: {e}")
-            await callback.answer(get_text(lang, "system_error"), show_alert=True)
+            logger.error(f"Failed to generate Click link for cart order #{order_id}: {e}")
+            await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
             return
+
+        kb = InlineKeyboardBuilder()
+        kb.button(text=get_text(lang, "cart_delivery_payment_click"), url=payment_url)
 
         from .storage import cart_storage
 
@@ -142,12 +159,12 @@ def register(router: Router) -> None:
         await state.clear()
 
         notify_text = (
-            "Счёт отправлен. Нажмите «Оплатить» в сообщении выше."
+            "Нажмите кнопку ниже, чтобы оплатить через Click."
             if lang != "uz"
-            else "Hisob yuborildi. Yuqoridagi xabarda «To'lash» tugmasini bosing."
+            else "Click orqali to'lash uchun pastdagi tugmani bosing."
         )
         try:
-            await callback.message.answer(notify_text)
+            await callback.message.answer(notify_text, reply_markup=kb.as_markup())
         except Exception:
             pass
 
@@ -155,7 +172,7 @@ def register(router: Router) -> None:
 
     @router.callback_query(F.data == "cart_back_to_payment")
     async def cart_back_to_payment(callback: types.CallbackQuery, state: FSMContext) -> None:
-        """Go back from card details to payment method selection for cart orders."""
+        """Go back to payment method selection for cart orders."""
         if not common.db or not callback.message:
             await callback.answer()
             return

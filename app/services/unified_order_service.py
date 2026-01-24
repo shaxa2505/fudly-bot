@@ -127,6 +127,14 @@ class PaymentStatus:
         status = str(payment_status).strip().lower()
         method = cls.normalize_method(payment_method)
 
+        legacy_map = {
+            "paid": cls.CONFIRMED,
+            "payment_rejected": cls.REJECTED,
+            "awaiting_admin_confirmation": cls.PROOF_SUBMITTED,
+        }
+        if status in legacy_map:
+            return legacy_map[status]
+
         # Legacy "pending" was overloaded; infer from method and proof presence.
         if status in ("pending", ""):
             if method == "cash":
@@ -136,9 +144,6 @@ class PaymentStatus:
             if method in ("click", "payme"):
                 return cls.AWAITING_PAYMENT
             return cls.AWAITING_PROOF
-
-        if status == "paid":
-            return cls.CONFIRMED
 
         return status
 

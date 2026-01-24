@@ -7,6 +7,7 @@ const deriveDisplayStatus = (order) => {
   if (paymentStatus === 'awaiting_proof') return 'awaiting_proof'
   if (paymentStatus === 'proof_submitted') return 'proof_submitted'
   if (paymentStatus === 'rejected') return 'payment_rejected'
+  if (paymentStatus === 'payment_rejected') return 'payment_rejected'
   return order?.order_status || order?.status || 'pending'
 }
 

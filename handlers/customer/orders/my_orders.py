@@ -555,7 +555,11 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
                     off.original_price,
                     off.unit,
                     o.is_cart_order,
-                    o.cart_items
+                    o.cart_items,
+                    o.delivery_price,
+                    o.item_title,
+                    o.item_price,
+                    o.item_original_price
                 FROM orders o
                 LEFT JOIN stores s ON o.store_id = s.store_id
                 LEFT JOIN offers off ON o.offer_id = off.offer_id
@@ -576,7 +580,8 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     # Парсим данные (SQL возвращает tuple, нужен dict)
     # SELECT: order_id[0], order_type[1], order_status[2], pickup_code[3], delivery_address[4], total_price[5],
     #         created_at[6], quantity[7], store_name[8], store_address[9], store_phone[10], offer_title[11],
-    #         discount_price[12], original_price[13], unit[14], is_cart_order[15], cart_items[16]
+    #         discount_price[12], original_price[13], unit[14], is_cart_order[15], cart_items[16],
+    #         delivery_price[17], item_title[18], item_price[19], item_original_price[20]
     if hasattr(order, "get"):
         data = order
     else:
@@ -598,6 +603,10 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
             "unit": order[14],
             "is_cart_order": order[15] if len(order) > 15 else False,
             "cart_items": order[16] if len(order) > 16 else None,
+            "delivery_price": order[17] if len(order) > 17 else None,
+            "item_title": order[18] if len(order) > 18 else None,
+            "item_price": order[19] if len(order) > 19 else None,
+            "item_original_price": order[20] if len(order) > 20 else None,
         }
 
     raw_status = data.get("order_status", "pending")
@@ -653,12 +662,14 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
                 lines.append(f"   • {title} × {qty} = {_format_price(item_total, lang)}")
         except Exception:
             lines.append(f"   • {_t(lang, 'Корзина товаров', 'Savat')}")
-            subtotal = data.get("total_price", 0) - (data.get("delivery_fee", 0) or 0)
+            subtotal = data.get("total_price", 0) - int(data.get("delivery_price") or 0)
     else:
-        title = data.get("offer_title", "Товар")
+        title = data.get("item_title") or data.get("offer_title", "Товар")
         qty = data.get("quantity", 1)
-        price = data.get("discount_price", 0)
-        subtotal = price * qty
+        price = data.get("item_price")
+        if price is None:
+            price = data.get("discount_price", 0)
+        subtotal = int(price or 0) * int(qty or 1)
         lines.append(f"   • {title} × {qty} = {_format_price(subtotal, lang)}")
 
     # Итоги
@@ -668,10 +679,14 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     total_price = data.get("total_price") or 0
     delivery_fee = 0
     if is_delivery:
-        try:
-            delivery_fee = max(0, int(total_price) - int(subtotal))
-        except Exception:
-            delivery_fee = 0
+        delivery_fee_raw = data.get("delivery_price")
+        if delivery_fee_raw is None:
+            try:
+                delivery_fee = max(0, int(total_price) - int(subtotal))
+            except Exception:
+                delivery_fee = 0
+        else:
+            delivery_fee = int(delivery_fee_raw or 0)
         if delivery_fee > 0:
             lines.append(f"{_t(lang, 'Доставка', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
 
