@@ -75,7 +75,7 @@ describe('CategoryProductsPage', () => {
       state: { categoryId: 'dairy', categoryName: 'Sut' },
     })
 
-    const filterButton = document.querySelector('.filter-btn')
+    const filterButton = document.querySelector('.category-header-filter-btn')
     expect(filterButton).not.toBeNull()
     fireEvent.click(filterButton)
 

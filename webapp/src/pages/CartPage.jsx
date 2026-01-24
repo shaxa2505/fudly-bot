@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, Search, LocateFixed } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -18,6 +18,8 @@ const AUTO_DELIVERY_THRESHOLD = 30000
 
 function CartPage({ user }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const isCheckoutRoute = location.pathname === '/checkout'
   const { toast } = useToast()
   // Use cart from context
   const {
@@ -40,7 +42,7 @@ function CartPage({ user }) {
   const commentInputRef = useRef(null)
 
   // Checkout form
-  const [showCheckout, setShowCheckout] = useState(false)
+  const [showCheckout, setShowCheckout] = useState(() => isCheckoutRoute)
   const [phone, setPhone] = useState(() => canonicalPhone || localStorage.getItem('fudly_phone') || '')
   const [address, setAddress] = useState(() => {
     try {
@@ -209,7 +211,8 @@ function CartPage({ user }) {
     setMapResolving(false)
   }, [saveCoordsFallback])
 
-  const mapEnabled = showCheckout && orderType === 'delivery'
+  const showCheckoutSheet = showCheckout || isCheckoutRoute
+  const mapEnabled = showCheckoutSheet && orderType === 'delivery'
 
   useEffect(() => {
     if (!mapEnabled) {
@@ -501,7 +504,7 @@ function CartPage({ user }) {
       map.invalidateSize()
     }, 180)
     return () => clearTimeout(timer)
-  }, [mapEnabled, showCheckout])
+  }, [mapEnabled, showCheckoutSheet])
 
   const handleMapResultSelect = (result) => {
     const lat = Number(result?.lat)
@@ -744,6 +747,15 @@ function CartPage({ user }) {
     }
   }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled])
 
+  useEffect(() => {
+    if (!isCheckoutRoute) {
+      return
+    }
+    setShowCheckout(true)
+    setCheckoutStep('details')
+    setShowPaymentSheet(false)
+  }, [isCheckoutRoute])
+
   const selectPaymentMethod = (method) => {
     setSelectedPaymentMethod(method)
   }
@@ -754,6 +766,9 @@ function CartPage({ user }) {
     setShowPaymentSheet(false)
     setOrderTypeTouched(false)
     setMapSearchOpen(false)
+    if (isCheckoutRoute) {
+      navigate('/cart')
+    }
   }
 
   const handleClearCart = useCallback(() => {
@@ -838,6 +853,10 @@ function CartPage({ user }) {
     setOrderTypeTouched(false)
     setMapSearchOpen(false)
     setCheckoutStep('details')
+    if (!isCheckoutRoute) {
+      navigate('/checkout')
+      return
+    }
     setShowCheckout(true)
   }
 
@@ -1305,37 +1324,44 @@ function CartPage({ user }) {
         )}
       </main>
 
-      <div className="cart-summary">
-        <div className="cart-summary-card">
-          <div className="cart-summary-rows">
-            <div className="cart-summary-row">
-              <span>Mahsulotlar ({itemsCount})</span>
-              <span>{formatSum(originalTotal)} so'm</span>
+      {!isCheckoutRoute && (
+        <div className="cart-summary">
+          <div className="cart-summary-card">
+            <div className="cart-summary-rows">
+              <div className="cart-summary-row">
+                <span>Mahsulotlar ({itemsCount})</span>
+                <span>{formatSum(originalTotal)} so'm</span>
+              </div>
+              <div className="cart-summary-row savings">
+                <span>Tejamkorlik</span>
+                <span>{savingsLabel}</span>
+              </div>
+              <div className="cart-summary-row total">
+                <span>Umumiy</span>
+                <span>{formatSum(subtotal)} so'm</span>
+              </div>
             </div>
-            <div className="cart-summary-row savings">
-              <span>Tejamkorlik</span>
-              <span>{savingsLabel}</span>
-            </div>
-            <div className="cart-summary-row total">
-              <span>Umumiy</span>
-              <span>{formatSum(subtotal)} so'm</span>
-            </div>
+            <button
+              className="cart-summary-btn"
+              onClick={handleCheckout}
+              disabled={hasMultipleStores}
+            >
+              To'lovga o'tish
+            </button>
           </div>
-          <button
-            className="cart-summary-btn"
-            onClick={handleCheckout}
-            disabled={hasMultipleStores}
-          >
-            To'lovga o'tish
-          </button>
         </div>
-      </div>
+      )}
 
-      <BottomNav currentPage="cart" cartCount={itemsCount} />
+      {!isCheckoutRoute && (
+        <BottomNav currentPage="cart" cartCount={itemsCount} />
+      )}
 
       {/* Checkout Modal */}
-      {showCheckout && (
-        <div className="cart-modal-overlay checkout-overlay" onClick={closeCheckout}>
+      {showCheckoutSheet && (
+        <div
+          className="cart-modal-overlay checkout-overlay"
+          onClick={isCheckoutRoute ? undefined : closeCheckout}
+        >
           <div className="cart-modal checkout-modal" onClick={e => e.stopPropagation()}>
             <div className="checkout-topbar">
               <h2 className="checkout-title">{checkoutTitle}</h2>
@@ -1756,13 +1782,13 @@ function CartPage({ user }) {
       {showPaymentSheet && (
         <div className="cart-modal-overlay cart-payment-sheet-overlay" onClick={() => setShowPaymentSheet(false)}>
           <div className="cart-modal cart-payment-sheet" onClick={e => e.stopPropagation()}>
-            <div className="payment-sheet-header">
+            <div className="cart-payment-sheet-header">
               <h3>To'lov usullari</h3>
               <button className="cart-modal-close" onClick={() => setShowPaymentSheet(false)}>x</button>
             </div>
-            <div className="payment-sheet-list">
+            <div className="cart-payment-sheet-list">
               <button
-                className={`payment-sheet-item ${selectedPaymentMethod === 'cash' ? 'active' : ''} ${deliveryRequiresPrepay ? 'disabled' : ''}`}
+                className={`cart-payment-sheet-item ${selectedPaymentMethod === 'cash' ? 'active' : ''} ${deliveryRequiresPrepay ? 'disabled' : ''}`}
                 onClick={() => {
                   if (deliveryRequiresPrepay) return
                   selectPaymentMethod('cash')
@@ -1770,11 +1796,11 @@ function CartPage({ user }) {
                 }}
                 disabled={deliveryRequiresPrepay}
               >
-                <span className="payment-sheet-label">Naqd</span>
-                <span className="payment-sheet-radio" aria-hidden="true"></span>
+                <span className="cart-payment-sheet-label">Naqd</span>
+                <span className="cart-payment-sheet-radio" aria-hidden="true"></span>
               </button>
               <button
-                className={`payment-sheet-item ${selectedPaymentMethod === 'click' ? 'active' : ''} ${!isProviderAvailable('click') ? 'disabled' : ''}`}
+                className={`cart-payment-sheet-item ${selectedPaymentMethod === 'click' ? 'active' : ''} ${!isProviderAvailable('click') ? 'disabled' : ''}`}
                 onClick={() => {
                   if (!isProviderAvailable('click')) return
                   selectPaymentMethod('click')
@@ -1782,8 +1808,8 @@ function CartPage({ user }) {
                 }}
                 disabled={!isProviderAvailable('click')}
               >
-                <span className="payment-sheet-label">Click</span>
-                <span className="payment-sheet-radio" aria-hidden="true"></span>
+                <span className="cart-payment-sheet-label">Click</span>
+                <span className="cart-payment-sheet-radio" aria-hidden="true"></span>
               </button>
             </div>
           </div>

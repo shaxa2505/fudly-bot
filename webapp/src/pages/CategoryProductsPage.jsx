@@ -236,26 +236,26 @@ function CategoryProductsPage() {
     if (!hasActiveFilters) return null
 
     return (
-      <div className="active-filters-bar">
+      <div className="category-active-filters-bar">
         {minDiscount && (
-          <button className="filter-chip" onClick={() => setMinDiscount(null)}>
+          <button className="category-filter-chip" onClick={() => setMinDiscount(null)}>
             <span>{minDiscount}%+</span>
-            <span aria-hidden className="chip-close">x</span>
+            <span aria-hidden className="category-chip-close">x</span>
           </button>
         )}
         {priceRange !== 'all' && (
-          <button className="filter-chip" onClick={() => setPriceRange('all')}>
+          <button className="category-filter-chip" onClick={() => setPriceRange('all')}>
             <span>{PRICE_RANGE_LABELS[priceRange] || priceRange}</span>
-            <span aria-hidden className="chip-close">x</span>
+            <span aria-hidden className="category-chip-close">x</span>
           </button>
         )}
         {sortBy !== 'default' && (
-          <button className="filter-chip" onClick={() => setSortBy('default')}>
+          <button className="category-filter-chip" onClick={() => setSortBy('default')}>
             <span>{SORT_LABELS[sortBy] || sortBy}</span>
-            <span aria-hidden className="chip-close">x</span>
+            <span aria-hidden className="category-chip-close">x</span>
           </button>
         )}
-        <button className="clear-filters-btn" onClick={clearAllFilters}>
+        <button className="category-clear-filters-btn" onClick={clearAllFilters}>
           Tozalash
         </button>
       </div>
@@ -269,7 +269,7 @@ function CategoryProductsPage() {
         <div className="topbar-card category-header-inner">
           <h1 className="category-title">{categoryName || 'Mahsulotlar'}</h1>
           <button
-            className="filter-btn"
+            className="category-header-filter-btn"
             onClick={() => setShowAdvancedFilters(prev => !prev)}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -280,29 +280,29 @@ function CategoryProductsPage() {
               <circle cx="16" cy="12" r="2" fill="#181725"/>
               <circle cx="12" cy="18" r="2" fill="#181725"/>
             </svg>
-            {hasActiveFilters && <span className="filter-indicator" aria-hidden />}
+            {hasActiveFilters && <span className="category-filter-indicator" aria-hidden />}
           </button>
         </div>
       </header>
 
       {/* Search */}
-      <div className="search-section">
-        <div className="search-box">
-          <div className="search-field">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="search-icon-left">
+      <div className="category-search-section">
+        <div className="category-search-box">
+          <div className="category-search-field">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="category-search-icon">
               <circle cx="11" cy="11" r="8" stroke="#181725" strokeWidth="2"/>
               <path d="M21 21l-4.35-4.35" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
             </svg>
             <input
               type="text"
-              className="search-input-active"
+              className="category-search-input"
               placeholder="Qidirish"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
             />
             {searchQuery && (
-              <button className="clear-search-btn" onClick={handleClearSearch}>
+              <button className="category-clear-search-btn" onClick={handleClearSearch}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" fill="#B3B3B3"/>
                   <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
@@ -310,8 +310,8 @@ function CategoryProductsPage() {
               </button>
             )}
           </div>
-          <button className="filter-icon-btn" onClick={() => setShowAdvancedFilters(prev => !prev)}>
-            <span className="filter-icon" aria-hidden="true">
+          <button className="category-filter-toggle" onClick={() => setShowAdvancedFilters(prev => !prev)}>
+            <span className="category-filter-toggle-icon" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -321,80 +321,80 @@ function CategoryProductsPage() {
                 <circle cx="12" cy="18" r="2" fill="currentColor"/>
               </svg>
             </span>
-            <span className="filter-label">Filtr</span>
-            {hasActiveFilters && <span className="filter-indicator" aria-hidden />}
+            <span className="category-filter-label">Filtr</span>
+            {hasActiveFilters && <span className="category-filter-indicator" aria-hidden />}
           </button>
         </div>
       </div>
 
       {showAdvancedFilters && (
-        <div className="filters-section">
-          <div className="filters-advanced">
-            <div className="filter-group">
-              <span className="filter-group-label">Chegirma</span>
-              <div className="filter-group-row">
+        <div className="category-filters-section">
+          <div className="category-filters-advanced">
+            <div className="category-filter-group">
+              <span className="category-filter-group-label">Chegirma</span>
+              <div className="category-filter-group-row">
                 <button
-                  className={`filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
+                  className={`category-filter-pill discount ${minDiscount === 20 ? 'active' : ''}`}
                   onClick={() => setMinDiscount(minDiscount === 20 ? null : 20)}
                 >
-                  <span className="filter-pill-icon">%</span>
-                  <span className="filter-pill-text">20%+</span>
+                  <span className="category-filter-pill-icon">%</span>
+                  <span className="category-filter-pill-text">20%+</span>
                 </button>
                 <button
-                  className={`filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
+                  className={`category-filter-pill discount ${minDiscount === 30 ? 'active' : ''}`}
                   onClick={() => setMinDiscount(minDiscount === 30 ? null : 30)}
                 >
-                  <span className="filter-pill-icon">%</span>
-                  <span className="filter-pill-text">30%+</span>
+                  <span className="category-filter-pill-icon">%</span>
+                  <span className="category-filter-pill-text">30%+</span>
                 </button>
                 <button
-                  className={`filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
+                  className={`category-filter-pill discount ${minDiscount === 50 ? 'active' : ''}`}
                   onClick={() => setMinDiscount(minDiscount === 50 ? null : 50)}
                 >
-                  <span className="filter-pill-icon">%</span>
-                  <span className="filter-pill-text">50%+</span>
+                  <span className="category-filter-pill-icon">%</span>
+                  <span className="category-filter-pill-text">50%+</span>
                 </button>
               </div>
             </div>
 
-            <div className="filter-group">
-              <span className="filter-group-label">Narx</span>
-              <div className="filter-group-row">
+            <div className="category-filter-group">
+              <span className="category-filter-group-label">Narx</span>
+              <div className="category-filter-group-row">
                 <button
-                  className={`filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
+                  className={`category-filter-pill ${priceRange === 'up_20' ? 'active' : ''}`}
                   onClick={() => setPriceRange(priceRange === 'up_20' ? 'all' : 'up_20')}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">0-20k</span>
+                  <span className="category-filter-pill-icon">sum</span>
+                  <span className="category-filter-pill-text">0-20k</span>
                 </button>
                 <button
-                  className={`filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
+                  className={`category-filter-pill ${priceRange === '20_50' ? 'active' : ''}`}
                   onClick={() => setPriceRange(priceRange === '20_50' ? 'all' : '20_50')}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">20-50k</span>
+                  <span className="category-filter-pill-icon">sum</span>
+                  <span className="category-filter-pill-text">20-50k</span>
                 </button>
                 <button
-                  className={`filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
+                  className={`category-filter-pill ${priceRange === '50_100' ? 'active' : ''}`}
                   onClick={() => setPriceRange(priceRange === '50_100' ? 'all' : '50_100')}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">50-100k</span>
+                  <span className="category-filter-pill-icon">sum</span>
+                  <span className="category-filter-pill-text">50-100k</span>
                 </button>
                 <button
-                  className={`filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
+                  className={`category-filter-pill ${priceRange === '100_plus' ? 'active' : ''}`}
                   onClick={() => setPriceRange(priceRange === '100_plus' ? 'all' : '100_plus')}
                 >
-                  <span className="filter-pill-icon">sum</span>
-                  <span className="filter-pill-text">100k+</span>
+                  <span className="category-filter-pill-icon">sum</span>
+                  <span className="category-filter-pill-text">100k+</span>
                 </button>
               </div>
             </div>
 
-            <div className="filter-group">
-              <span className="filter-group-label">Tartib</span>
+            <div className="category-filter-group">
+              <span className="category-filter-group-label">Tartib</span>
               <select
-                className="sort-select"
+                className="category-sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
@@ -407,7 +407,7 @@ function CategoryProductsPage() {
 
             {hasActiveFilters && (
               <div className="category-filters-reset">
-                <button className="clear-filters-btn" onClick={clearAllFilters}>
+                <button className="category-clear-filters-btn" onClick={clearAllFilters}>
                   Filtrlarni tozalash
                 </button>
               </div>

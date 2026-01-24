@@ -28,10 +28,10 @@ const FiltersPanel = ({
 
   return (
     <section className="section">
-      <div className="section-header">
+      <div className="home-section-header">
         <div>
           <p className="text-caption" style={{ color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Tez filtrlar</p>
-          <h2 className="section-title">Topilmangizni aniqlang</h2>
+          <h2 className="home-section-title">Topilmangizni aniqlang</h2>
           <p className="text-body" style={{ color: 'var(--color-text-secondary)', marginTop: '4px' }}>
             Chegirmalar va tartiblash yordamida eng mos taklifni toping.
           </p>

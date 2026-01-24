@@ -82,17 +82,17 @@ function ExplorePage({ onNavigate }) {
       {/* Header */}
       <header className="explore-header">
         <div className="topbar-card explore-header-inner">
-          <h1 className="page-title">Mahsulotlarni Topish</h1>
+          <h1 className="explore-title">Mahsulotlarni Topish</h1>
         </div>
       </header>
 
       {/* Search */}
-      <div className="search-section">
-        <div className="search-box">
-          <Search size={20} className="search-icon" color="#7C7C7C" strokeWidth={2} />
+      <div className="explore-search-section">
+        <div className="explore-search-box">
+          <Search size={20} className="explore-search-icon" color="#7C7C7C" strokeWidth={2} />
           <input
             type="text"
-            className="search-input"
+            className="explore-search-input"
             placeholder="Do'kon qidirish"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}

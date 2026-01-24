@@ -18,7 +18,7 @@ const HeroSection = ({
           onCategorySelect={(category) => {
             onCategorySelect(category)
             setTimeout(() => {
-              document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+              document.querySelector('.home-section-header')?.scrollIntoView({ behavior: 'smooth' })
             }, 100)
           }}
         />

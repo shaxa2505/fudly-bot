@@ -1208,7 +1208,7 @@ function HomePage() {
       <HeroBanner onCategorySelect={(category) => {
         handleCategorySelect(category, { withHaptic: false })
         setTimeout(() => {
-          document.querySelector('.section-header')?.scrollIntoView({ behavior: 'smooth' })
+          document.querySelector('.home-section-header')?.scrollIntoView({ behavior: 'smooth' })
         }, 100)
       }} />
 
@@ -1273,18 +1273,18 @@ function HomePage() {
 
       {/* Section Title */}
       <div
-        className="section-header"
+        className="home-section-header"
         data-category-id={selectedCategory === 'all' ? 'all' : selectedCategory}
       >
-        <div className="section-header-left">
-          <h2 className="section-title">
+        <div className="home-section-header-left">
+          <h2 className="home-section-title">
             {selectedCategory === 'all' ? 'Siz uchun takliflar' : CATEGORIES.find(c => c.id === selectedCategory)?.name}
           </h2>
           <span className="offers-count">{offersCountBadge}</span>
         </div>
         <button
           type="button"
-          className="section-link"
+          className="home-section-link"
           onClick={() => {
             window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
             handleCategorySelect('all', { withHaptic: false })

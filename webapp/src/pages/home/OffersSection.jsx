@@ -22,8 +22,8 @@ const OffersSection = ({
 
   return (
     <>
-      <div className="section-header">
-        <h2 className="section-title">{sectionTitle}</h2>
+      <div className="home-section-header">
+        <h2 className="home-section-title">{sectionTitle}</h2>
         <span className="offers-count">{offers.length} ta</span>
       </div>
 

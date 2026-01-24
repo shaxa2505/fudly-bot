@@ -216,10 +216,18 @@ def _parse_expiry_input_text(text: str) -> str | None:
 
 
 @router.message(
-    F.text.contains("Мои товары")
+    F.text.in_(
+        {
+            get_text("ru", "my_items"),
+            get_text("uz", "my_items"),
+            "??????",
+            "Mahsulotlar",
+            "?? ??????",
+            "?? Mahsulotlar",
+        }
+    )
+    | F.text.contains("??? ??????")
     | F.text.contains("Mening mahsulotlarim")
-    | F.text.contains(get_text("ru", "my_items"))
-    | F.text.contains(get_text("uz", "my_items"))
 )
 async def my_offers(message: types.Message, state: FSMContext) -> None:
     """Display seller's offers with management buttons."""

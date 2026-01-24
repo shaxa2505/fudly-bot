@@ -1,7 +1,7 @@
 const CategoriesSection = ({ categories, selectedCategory, onSelectCategory }) => (
   <section className="section">
     <div style={{ padding: '0 var(--spacing-lg)' }}>
-      <h2 className="section-title" style={{ marginBottom: 'var(--spacing-md)' }}>Kategoriyalar</h2>
+      <h2 className="home-section-title" style={{ marginBottom: 'var(--spacing-md)' }}>Kategoriyalar</h2>
       <div style={{ display: 'flex', gap: 'var(--spacing-sm)', overflowX: 'auto', paddingBottom: 'var(--spacing-xs)' }}>
         {categories.map(cat => (
           <button
