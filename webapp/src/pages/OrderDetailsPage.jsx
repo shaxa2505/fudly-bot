@@ -157,8 +157,8 @@ export default function OrderDetailsPage() {
   if (loading) {
     return (
       <div className="order-details-page">
-        <div className="loading-container">
-          <div className="spinner"></div>
+        <div className="details-loading">
+          <div className="details-spinner"></div>
           <p>Yuklanmoqda...</p>
         </div>
       </div>
@@ -181,8 +181,8 @@ export default function OrderDetailsPage() {
             </div>
           </div>
         </div>
-        <div className="error-container">
-          <div className="error-icon">!</div>
+        <div className="details-error">
+          <div className="details-error-icon">!</div>
           <p>{error || 'Xatolik yuz berdi'}</p>
         </div>
       </div>
@@ -364,7 +364,7 @@ export default function OrderDetailsPage() {
 
       {!isCancelled && (
         <div className="details-section">
-          <h2 className="section-title">Buyurtma bosqichlari</h2>
+          <h2 className="details-section-title">Buyurtma bosqichlari</h2>
           <div className="progress-card">
             {statusSteps.map((step, index) => {
               const isComplete = index <= activeStepIndex
@@ -389,7 +389,7 @@ export default function OrderDetailsPage() {
       )}
 
       <div className="details-section">
-        <h2 className="section-title">Mahsulotlar</h2>
+        <h2 className="details-section-title">Mahsulotlar</h2>
         <div className="items-list">
           {order.items && order.items.length > 0 ? (
             order.items.map((item, idx) => {
@@ -462,7 +462,7 @@ export default function OrderDetailsPage() {
 
       {isDelivery && order.delivery_address && (
         <div className="details-section">
-          <h2 className="section-title">Yetkazib berish</h2>
+          <h2 className="details-section-title">Yetkazib berish</h2>
           <div className="info-card">
             <div className="info-row">
               <span className="info-label">Manzil</span>
@@ -486,7 +486,7 @@ export default function OrderDetailsPage() {
 
       {!isDelivery && order.booking_code && (
         <div className="details-section">
-          <h2 className="section-title">Olib ketish</h2>
+          <h2 className="details-section-title">Olib ketish</h2>
           <div className="info-card">
             <div className="info-row">
               <span className="info-label">Kod</span>
@@ -503,7 +503,7 @@ export default function OrderDetailsPage() {
       )}
 
       <div className="details-section">
-        <h2 className="section-title">To'lov tafsilotlari</h2>
+        <h2 className="details-section-title">To'lov tafsilotlari</h2>
         <div className="info-card">
           <div className="info-row">
             <span className="info-label">Mahsulotlar</span>
@@ -533,7 +533,7 @@ export default function OrderDetailsPage() {
       </div>
 
       <div className="details-section">
-        <h2 className="section-title">Do'kon</h2>
+        <h2 className="details-section-title">Do'kon</h2>
         <div className="info-card">
           <div className="info-row">
             <span className="info-label">Nomi</span>

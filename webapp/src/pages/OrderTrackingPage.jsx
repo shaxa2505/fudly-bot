@@ -154,8 +154,8 @@ function OrderTrackingPage({ user }) {
           pullDistance={pullDistance}
           progress={progress}
         />
-        <div className="loading-container">
-          <div className="spinner"></div>
+        <div className="tracking-loading">
+          <div className="tracking-spinner"></div>
           <p>{t('Загрузка заказа...', 'Buyurtma yuklanmoqda...')}</p>
         </div>
       </div>
@@ -175,9 +175,9 @@ function OrderTrackingPage({ user }) {
             <h1>{t('?????', 'Buyurtma')}</h1>
           </div>
         </div>
-        <div className="error-container">
-          <p className="error-icon">!</p>
-          <p className="error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
+        <div className="tracking-error">
+          <p className="tracking-error-icon">!</p>
+          <p className="tracking-error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
         </div>
       </div>
     );

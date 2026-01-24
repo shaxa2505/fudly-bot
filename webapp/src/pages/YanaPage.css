@@ -207,21 +207,21 @@
   padding: var(--spacing-lg) var(--page-padding-x);
 }
 
-.section-header {
+.profile-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--spacing-sm);
 }
 
-.section-title {
+.profile-section-title {
   margin: 0;
   font-size: var(--font-lg);
   font-weight: var(--font-bold);
   color: var(--color-text-primary);
 }
 
-.section-badge {
+.profile-section-badge {
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(15, 118, 110, 0.12);
@@ -230,7 +230,7 @@
   font-weight: 700;
 }
 
-.section-label {
+.profile-section-label {
   margin: 0 0 var(--spacing-sm);
   font-size: 11px;
   font-weight: 700;
@@ -239,7 +239,7 @@
   letter-spacing: 0.08em;
 }
 
-.section-loading {
+.profile-section-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -247,17 +247,17 @@
   padding: var(--spacing-3xl) var(--spacing-xl);
 }
 
-.spinner {
+.profile-spinner {
   width: 32px;
   height: 32px;
   border: 3px solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: profile-spin 0.8s linear infinite;
 }
 
 /* Empty State */
-.empty-state {
+.profile-empty-state {
   text-align: center;
   padding: var(--spacing-3xl) var(--spacing-xl);
   background: #FFFFFF;
@@ -266,26 +266,26 @@
   box-shadow: var(--shadow-xs);
 }
 
-.empty-icon {
+.profile-empty-icon {
   font-size: 32px;
   margin-bottom: var(--spacing-sm);
   color: var(--color-text-muted);
 }
 
-.empty-state h3 {
+.profile-empty-state h3 {
   margin: 0 0 var(--spacing-xs);
   font-size: var(--font-lg);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
 }
 
-.empty-state p {
+.profile-empty-state p {
   margin: 0 0 var(--spacing-md);
   font-size: 12px;
   color: var(--color-text-secondary);
 }
 
-.cta-btn {
+.profile-cta-btn {
   height: 40px;
   padding: 0 18px;
   background: var(--color-primary);
@@ -296,8 +296,14 @@
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
-.cta-btn:active {
+.profile-cta-btn:active {
   transform: scale(0.98);
+}
+
+@keyframes profile-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Active Orders */

@@ -587,21 +587,21 @@ function YanaPage({ user }) {
       </section>
 
       <section className="profile-section active-orders-section">
-        <div className="section-header">
-          <h3 className="section-title">Faol buyurtmalar</h3>
-          <span className="section-badge">{activeOrders.length} ta</span>
+        <div className="profile-section-header">
+          <h3 className="profile-section-title">Faol buyurtmalar</h3>
+          <span className="profile-section-badge">{activeOrders.length} ta</span>
         </div>
         {loading ? (
-          <div className="section-loading">
-            <div className="spinner"></div>
+          <div className="profile-section-loading">
+            <div className="profile-spinner"></div>
             <p>Yuklanmoqda...</p>
           </div>
         ) : activeOrders.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">IMG</div>
+          <div className="profile-empty-state">
+            <div className="profile-empty-icon">IMG</div>
             <h3>Faol buyurtmalar yo'q</h3>
             <p>Yangi buyurtmalar shu yerda ko'rinadi.</p>
-            <button className="cta-btn" onClick={() => navigate('/')}>Xarid qilish</button>
+            <button className="profile-cta-btn" onClick={() => navigate('/')}>Xarid qilish</button>
           </div>
         ) : (
           <div className="active-orders-scroll">
@@ -703,20 +703,20 @@ function YanaPage({ user }) {
       </section>
 
       <section className="profile-section order-history-section">
-        <div className="section-header">
-          <h3 className="section-title">Buyurtmalar tarixi</h3>
+        <div className="profile-section-header">
+          <h3 className="profile-section-title">Buyurtmalar tarixi</h3>
         </div>
         {loading ? (
-          <div className="section-loading">
-            <div className="spinner"></div>
+          <div className="profile-section-loading">
+            <div className="profile-spinner"></div>
             <p>Yuklanmoqda...</p>
           </div>
         ) : completedOrders.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">IMG</div>
+          <div className="profile-empty-state">
+            <div className="profile-empty-icon">IMG</div>
             <h3>Buyurtmalar yo'q</h3>
             <p>Birinchi buyurtmangizni bering!</p>
-            <button className="cta-btn" onClick={() => navigate('/')}>Xarid qilish</button>
+            <button className="profile-cta-btn" onClick={() => navigate('/')}>Xarid qilish</button>
           </div>
         ) : (
           <div className="order-history-list">
@@ -808,13 +808,13 @@ function YanaPage({ user }) {
             </div>
 
             {notificationsLoading ? (
-              <div className="section-loading">
-                <div className="spinner"></div>
+              <div className="profile-section-loading">
+                <div className="profile-spinner"></div>
                 <p>Yuklanmoqda...</p>
               </div>
             ) : notificationsList.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">!</div>
+              <div className="profile-empty-state">
+                <div className="profile-empty-icon">!</div>
                 <h3>Bildirishnomalar yo'q</h3>
                 <p>Yangi xabarlar shu yerda paydo bo'ladi.</p>
               </div>
@@ -839,7 +839,7 @@ function YanaPage({ user }) {
       </section>
 
       <section className="profile-section settings-section">
-        <h3 className="section-label">Sozlamalar</h3>
+        <h3 className="profile-section-label">Sozlamalar</h3>
         <div className="settings-list">
           {settingsItems.map((item) => {
             const Icon = item.icon
