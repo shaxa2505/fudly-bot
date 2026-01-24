@@ -4,6 +4,7 @@ from typing import Any
 from aiogram import types
 
 # Import shared field extractors from central utils
+from app.core.order_math import calc_total_price
 from app.core.utils import (
     get_booking_field,
     get_offer_field,
@@ -131,4 +132,4 @@ def format_booking_code(code: str | None, booking_id: int | None = None) -> str:
 
 def calculate_total(price: float, quantity: int, delivery_cost: int = 0) -> int:
     """Calculate total order amount."""
-    return int(price * quantity) + delivery_cost
+    return calc_total_price(int(price * quantity), delivery_cost)

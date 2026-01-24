@@ -7,8 +7,6 @@ Covers:
 """
 from __future__ import annotations
 
-import os
-import tempfile
 from datetime import datetime
 
 import pytest
@@ -24,7 +22,6 @@ from aiogram.types import (
     User as TgUser,
 )
 
-from database import Database
 from handlers.common import commands as user_commands
 from localization import get_text
 
@@ -36,22 +33,8 @@ class SentEvent:
         self.text = text
 
 
-@pytest.fixture
-def temp_db():
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    db = Database(path)
-    try:
-        yield db
-    finally:
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
-
-
 @pytest.mark.asyncio
-async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest.MonkeyPatch):
+async def test_registration_language_flow(db, monkeypatch: pytest.MonkeyPatch):
     # Prepare dispatcher and router with handlers wired
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
@@ -59,7 +42,7 @@ async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest
     # Inject DB middleware
     from app.middlewares.db_middleware import DbSessionMiddleware
 
-    dp.update.middleware(DbSessionMiddleware(temp_db))
+    dp.update.middleware(DbSessionMiddleware(db))
 
     # Include router - skip if already attached (happens when running all tests)
     try:
@@ -164,7 +147,7 @@ async def test_registration_language_flow(temp_db: Database, monkeypatch: pytest
     # - user is created and language is set to 'ru'
     # - bot edits the message to 'language_changed'
     # - bot asks for phone sharing
-    user = temp_db.get_user(tg_user.id)
+    user = db.get_user(tg_user.id)
     assert user is not None
     assert user.get("language") == "ru"
 

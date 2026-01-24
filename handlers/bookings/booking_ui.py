@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.order_math import calc_total_price
 from handlers.common.utils import fix_mojibake_text, html_escape as _esc
 from logging_config import logger
 
@@ -34,7 +35,7 @@ def build_order_card_text(
     # Calculate totals
     subtotal = price * quantity
     delivery_cost = delivery_price if delivery_method == "delivery" else 0
-    total = subtotal + delivery_cost
+    total = calc_total_price(subtotal, delivery_cost)
 
     # Header - same as product card
     lines = [f"📦 <b>{_esc(title)}</b>"]

@@ -5,29 +5,11 @@ Tests input validation, price logic, date constraints, and business rules.
 """
 from __future__ import annotations
 
-import os
-import tempfile
-
 import pytest
-
-from database import Database
 
 
 class TestOfferValidation:
     """Test offer creation and validation rules"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
 
     @pytest.fixture
     def test_store(self, db):
@@ -103,19 +85,6 @@ class TestBookingValidation:
     """Test booking validation rules"""
 
     @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
-
-    @pytest.fixture
     def sample_offer(self, db):
         """Create offer for booking tests"""
         seller_id = 111111
@@ -150,7 +119,7 @@ class TestBookingValidation:
         db.add_user(user_id=user_id, username="buyer")
 
         # Try to book 0 items (invalid)
-        ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=0)
+        ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=0)
 
         # Should fail or handle gracefully
         # Currently database may allow this - documents expected behavior
@@ -162,7 +131,7 @@ class TestBookingValidation:
         db.add_user(user_id=user_id, username="greedy_buyer")
 
         # Try to book 100 items when only 10 available
-        ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=100)
+        ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=100)
 
         assert ok is False
         assert booking_id is None
@@ -170,14 +139,14 @@ class TestBookingValidation:
         # Verify quantity unchanged
         offer = db.get_offer(sample_offer)
         assert offer is not None
-        assert offer[6] == 10  # quantity field is index 6
+        assert offer.get("quantity") == 10
 
     def test_booking_code_format(self, db, sample_offer):
         """Test that booking code has correct format"""
         user_id = 444444
         db.add_user(user_id=user_id, username="buyer")
 
-        ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
+        ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
         assert ok is True
         assert code is not None
@@ -188,19 +157,6 @@ class TestBookingValidation:
 
 class TestStoreValidation:
     """Test store creation and validation"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
 
     def test_store_requires_valid_owner(self, db):
         """Test that store must have a valid seller owner"""
@@ -257,19 +213,6 @@ class TestRatingValidation:
     """Test rating validation rules"""
 
     @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
-
-    @pytest.fixture
     def completed_booking(self, db):
         """Create a completed booking for rating"""
         seller_id = 777777
@@ -299,7 +242,7 @@ class TestRatingValidation:
         buyer_id = 888888
         db.add_user(user_id=buyer_id, username="buyer")
 
-        ok, booking_id, code = db.create_booking_atomic(offer_id, buyer_id, quantity=1)
+        ok, booking_id, code, _ = db.create_booking_atomic(offer_id, buyer_id, quantity=1)
         db.update_booking_status(booking_id, "confirmed")
 
         return booking_id, buyer_id, store_id
@@ -350,19 +293,6 @@ class TestRatingValidation:
 class TestBusinessRules:
     """Test business logic and constraints"""
 
-    @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
-
     def test_seller_cannot_book_own_offer(self, db):
         """Test that seller should not book their own offer"""
         seller_id = 999999
@@ -390,7 +320,7 @@ class TestBusinessRules:
         )
 
         # Try to book own offer (should be prevented at application level)
-        ok, booking_id, code = db.create_booking_atomic(offer_id, seller_id, quantity=1)
+        ok, booking_id, code, _ = db.create_booking_atomic(offer_id, seller_id, quantity=1)
 
         # Database allows this, but application should validate
         # This test documents expected behavior

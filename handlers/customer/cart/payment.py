@@ -4,6 +4,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.order_math import calc_items_total, calc_total_price
 from app.integrations.payment_service import get_payment_service
 from app.services.unified_order_service import (
     OrderItem,
@@ -109,10 +110,8 @@ def register(router: Router) -> None:
             order_total = None
 
         if not order_total:
-            items_total = sum(
-                int(item["price"]) * int(item["quantity"]) for item in cart_items_stored
-            )
-            order_total = items_total + int(delivery_price)
+            items_total = calc_items_total(cart_items_stored)
+            order_total = calc_total_price(items_total, int(delivery_price or 0))
 
         return_url = None
         try:
@@ -192,8 +191,8 @@ def register(router: Router) -> None:
             return
 
         currency = "so'm" if lang == "uz" else "сум"
-        total = sum(int(item["price"]) * int(item["quantity"]) for item in cart_items_stored)
-        total_with_delivery = total + int(delivery_price)
+        total = calc_items_total(cart_items_stored)
+        total_with_delivery = calc_total_price(total, int(delivery_price or 0))
 
         safe_address = esc(address)
         text = (

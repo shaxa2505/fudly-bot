@@ -1,34 +1,11 @@
-"""
-Unit tests for database modules (SQLite and PostgreSQL)
-"""
+"""Unit tests for database modules (PostgreSQL)."""
 from __future__ import annotations
-
-import os
-import tempfile
 
 import pytest
 
-from database import Database
 
-
-class TestDatabaseSQLite:
-    """Tests for SQLite database implementation"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary SQLite database for testing"""
-        # Create temp file
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        # Initialize database
-        db_instance = Database(path)
-
-        yield db_instance
-
-        # Cleanup
-        if os.path.exists(path):
-            os.remove(path)
+class TestDatabasePostgres:
+    """Tests for PostgreSQL database implementation"""
 
     def test_get_user_returns_dict(self, db):
         """Test that get_user returns dict format"""
@@ -210,27 +187,17 @@ class TestDatabaseSQLite:
 class TestDatabaseProtocol:
     """Tests for DatabaseProtocol typing compliance"""
 
-    def test_database_implements_protocol(self):
+    def test_database_implements_protocol(self, db):
         """Test that Database class implements DatabaseProtocol"""
-        # Create temp database
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
+        # Check that methods exist
+        assert hasattr(db, "get_user")
+        assert hasattr(db, "get_user_stores")
+        assert hasattr(db, "get_stores_by_city")
+        assert hasattr(db, "get_approved_stores")
+        assert hasattr(db, "get_store")
+        assert hasattr(db, "add_user")
+        assert hasattr(db, "update_user_role")
 
-        try:
-            db = Database(path)
-
-            # Check that methods exist
-            assert hasattr(db, "get_user")
-            assert hasattr(db, "get_user_stores")
-            assert hasattr(db, "get_stores_by_city")
-            assert hasattr(db, "get_approved_stores")
-            assert hasattr(db, "get_store")
-            assert hasattr(db, "add_user")
-            assert hasattr(db, "update_user_role")
-
-            # Type check (static)
-            assert callable(db.get_user)
-            assert callable(db.get_user_stores)
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
+        # Type check (static)
+        assert callable(db.get_user)
+        assert callable(db.get_user_stores)

@@ -11,6 +11,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_field, get_store_field
+from app.interfaces.bot.presenters.order_messages import (
+    build_seller_payment_confirmed,
+    build_seller_payment_rejected,
+)
 from app.services.unified_order_service import get_unified_order_service
 from handlers.common.states import CourierHandover
 from localization import get_text
@@ -157,12 +161,7 @@ async def confirm_payment(callback: types.CallbackQuery):
     kb.button(text=handover_text, callback_data=f"handover_courier_{order_id}")
 
     # Уведомляем продавца с кнопкой
-    payment_confirmed_text = "Оплата подтверждена!" if lang == "ru" else "To'lov tasdiqlandi!"
-    next_step_text = (
-        "Когда заказ будет готов, передайте его курьеру"
-        if lang == "ru"
-        else "Buyurtma tayyor bo'lganda, kuryerga topshiring"
-    )
+    payment_confirmed_text, next_step_text = build_seller_payment_confirmed(lang)
 
     try:
         await callback.message.edit_caption(
@@ -216,11 +215,7 @@ async def reject_payment(callback: types.CallbackQuery):
     )
 
     # Уведомляем продавца
-    payment_rejected_text = (
-        "Оплата отклонена, заказ отменён"
-        if lang == "ru"
-        else "To'lov rad etildi, buyurtma bekor qilindi"
-    )
+    payment_rejected_text = build_seller_payment_rejected(lang)
     await callback.message.edit_caption(
         caption=callback.message.caption + f"\n\n{payment_rejected_text}"
     )

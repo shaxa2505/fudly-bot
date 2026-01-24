@@ -3,8 +3,6 @@ E2E tests for admin legacy approve/reject store callbacks.
 """
 from __future__ import annotations
 
-import os
-import tempfile
 from datetime import datetime
 
 import pytest
@@ -14,7 +12,6 @@ from aiogram.types import CallbackQuery, Chat, Message, Update
 from aiogram.types import User as TgUser
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from database import Database
 from handlers.admin import legacy as admin_legacy
 from localization import get_text as loc_get_text
 
@@ -39,31 +36,17 @@ def _dummy_moderation_keyboard(store_id: int):
     return b.as_markup()
 
 
-@pytest.fixture
-def temp_db():
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    db = Database(path)
-    try:
-        yield db
-    finally:
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
-
-
 @pytest.mark.asyncio
-async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: pytest.MonkeyPatch):
+async def test_admin_approve_and_reject_store(db, monkeypatch: pytest.MonkeyPatch):
     admin_id = 700001
     owner_id = 700002
 
-    temp_db.add_user(user_id=admin_id, username="admin")
-    temp_db.update_user_role(admin_id, "admin")
+    db.add_user(user_id=admin_id, username="admin")
+    db.update_user_role(admin_id, "admin")
 
-    temp_db.add_user(user_id=owner_id, username="owner", first_name="Owner")
-    temp_db.update_user_language(owner_id, "ru")
-    store_id = temp_db.add_store(
+    db.add_user(user_id=owner_id, username="owner", first_name="Owner")
+    db.update_user_language(owner_id, "ru")
+    store_id = db.add_store(
         owner_id=owner_id,
         name="Moderated Store",
         city="Ташкент",
@@ -115,12 +98,12 @@ async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: py
     # Wire admin legacy dependencies
     admin_legacy.setup(
         bot,
-        temp_db,
+        db,
         _adapter_get_text,
         _dummy_moderation_keyboard,
         lambda: datetime.now(),
         admin_id,
-        database_url=getattr(temp_db, "db_name", ""),
+        database_url=getattr(db, "db_name", ""),
     )
 
     # Approve callback
@@ -143,17 +126,17 @@ async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: py
     await dp.feed_update(bot, Update(update_id=300, callback_query=approve_cb))
 
     # Store is activated and owner is seller; owner notified
-    store = temp_db.get_store(store_id)
+    store = db.get_store(store_id)
     assert store is not None
     assert store.get("status") in ("active", "approved")
-    owner = temp_db.get_user(owner_id)
+    owner = db.get_user(owner_id)
     assert owner is not None and owner.get("role") == "seller"
     # Notification to owner is best-effort in handler (wrapped in try/except);
     # we don't assert on outbound message to avoid flakiness.
 
     # Reject callback
     # First set back to pending for test purposes
-    temp_db.update_store_status(store_id, "pending")
+    db.update_store_status(store_id, "pending")
     reject_cb = CallbackQuery(
         id="cbq_admin_2",
         from_user=tg_admin,
@@ -163,5 +146,5 @@ async def test_admin_approve_and_reject_store(temp_db: Database, monkeypatch: py
     )
     await dp.feed_update(bot, Update(update_id=301, callback_query=reject_cb))
 
-    store2 = temp_db.get_store(store_id)
+    store2 = db.get_store(store_id)
     assert store2 is not None and store2.get("status") == "rejected"

@@ -16,6 +16,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
 from app.services.unified_order_service import OrderStatus, get_unified_order_service
 from handlers.common.utils import fix_mojibake_text, is_my_orders_button
 
@@ -649,18 +650,16 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
 
     subtotal = 0
     if is_cart and cart_items_json:
-        try:
-            items = (
-                json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
-            )
+        items = parse_cart_items(cart_items_json)
+        if items:
+            subtotal = calc_items_total(items)
             for item in items:
                 title = item.get("title", "Товар")
                 qty = item.get("quantity", 1)
                 price = item.get("price", 0)
-                item_total = price * qty
-                subtotal += item_total
+                item_total = int(price or 0) * int(qty or 1)
                 lines.append(f"   • {title} × {qty} = {_format_price(item_total, lang)}")
-        except Exception:
+        else:
             lines.append(f"   • {_t(lang, 'Корзина товаров', 'Savat')}")
             subtotal = data.get("total_price", 0) - int(data.get("delivery_price") or 0)
     else:
@@ -679,14 +678,12 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     total_price = data.get("total_price") or 0
     delivery_fee = 0
     if is_delivery:
-        delivery_fee_raw = data.get("delivery_price")
-        if delivery_fee_raw is None:
-            try:
-                delivery_fee = max(0, int(total_price) - int(subtotal))
-            except Exception:
-                delivery_fee = 0
-        else:
-            delivery_fee = int(delivery_fee_raw or 0)
+        delivery_fee = calc_delivery_fee(
+            total_price,
+            subtotal,
+            delivery_price=data.get("delivery_price"),
+            order_type="delivery",
+        )
         if delivery_fee > 0:
             lines.append(f"{_t(lang, 'Доставка', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
 

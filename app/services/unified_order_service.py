@@ -40,6 +40,7 @@ from PIL import Image
 
 from app.core.geocoding import geocode_store_address
 from app.core.notifications import Notification, NotificationType, get_notification_service
+from app.domain.order import OrderStatus, PaymentStatus
 from app.services.notification_builder import NotificationBuilder
 from app.services.notification_unified import build_unified_order_payload
 
@@ -58,119 +59,6 @@ def _delivery_cash_enabled() -> bool:
         "yes",
         "on",
     }
-
-
-# =============================================================================
-# ORDER STATUSES
-# =============================================================================
-
-
-class OrderStatus:
-    """Unified order statuses for both bookings and orders."""
-
-    PENDING = "pending"  # Waiting for seller confirmation
-    PREPARING = "preparing"  # Seller accepted, preparing
-    READY = "ready"  # Ready for pickup/delivery
-    DELIVERING = "delivering"  # In transit (delivery only)
-    COMPLETED = "completed"  # Order completed
-    REJECTED = "rejected"  # Rejected by seller
-    CANCELLED = "cancelled"  # Cancelled by customer
-
-    # Mapping from old statuses
-    @classmethod
-    def normalize(cls, status: str) -> str:
-        """Normalize status from old system."""
-        mapping = {
-            "confirmed": cls.PREPARING,  # Old booking "confirmed" = now "preparing"
-            "new": cls.PENDING,
-            # Legacy/temporary order_status values used during payment flows.
-            "awaiting_payment": cls.PENDING,
-            "awaiting_admin_confirmation": cls.PENDING,
-            "paid": cls.PENDING,
-        }
-        return mapping.get(status, status)
-
-
-# =============================================================================
-# PAYMENT STATUSES
-# =============================================================================
-
-
-class PaymentStatus:
-    """Payment lifecycle status stored in orders.payment_status."""
-
-    NOT_REQUIRED = "not_required"  # cash payments
-    AWAITING_PAYMENT = "awaiting_payment"  # online providers (click/payme)
-    AWAITING_PROOF = "awaiting_proof"  # manual card transfer (screenshot)
-    PROOF_SUBMITTED = "proof_submitted"  # proof uploaded, waiting for admin review
-    CONFIRMED = "confirmed"  # payment confirmed (admin or provider)
-    REJECTED = "rejected"  # payment rejected by admin
-
-    @classmethod
-    def normalize_method(cls, payment_method: str | None) -> str:
-        if not payment_method:
-            return "cash"
-        method = str(payment_method).strip().lower()
-        return "card" if method == "pending" else method
-
-    @classmethod
-    def initial_for_method(cls, payment_method: str | None) -> str:
-        method = cls.normalize_method(payment_method)
-        if method == "cash":
-            return cls.NOT_REQUIRED
-        if method in ("click", "payme"):
-            return cls.AWAITING_PAYMENT
-        return cls.AWAITING_PROOF
-
-    @classmethod
-    def normalize(
-        cls,
-        payment_status: str | None,
-        *,
-        payment_method: str | None = None,
-        payment_proof_photo_id: str | None = None,
-    ) -> str | None:
-        """Normalize legacy payment_status values to the target model."""
-        if payment_status is None:
-            return None
-
-        status = str(payment_status).strip().lower()
-        method = cls.normalize_method(payment_method)
-
-        legacy_map = {
-            "paid": cls.CONFIRMED,
-            "payment_rejected": cls.REJECTED,
-            "awaiting_admin_confirmation": cls.PROOF_SUBMITTED,
-        }
-        if status in legacy_map:
-            return legacy_map[status]
-
-        # Legacy "pending" was overloaded; infer from method and proof presence.
-        if status in ("pending", ""):
-            if method == "cash":
-                return cls.NOT_REQUIRED
-            if payment_proof_photo_id:
-                return cls.PROOF_SUBMITTED
-            if method in ("click", "payme"):
-                return cls.AWAITING_PAYMENT
-            return cls.AWAITING_PROOF
-
-        return status
-
-    @classmethod
-    def is_cleared(
-        cls,
-        payment_status: str | None,
-        *,
-        payment_method: str | None = None,
-        payment_proof_photo_id: str | None = None,
-    ) -> bool:
-        normalized = cls.normalize(
-            payment_status,
-            payment_method=payment_method,
-            payment_proof_photo_id=payment_proof_photo_id,
-        )
-        return normalized in (cls.NOT_REQUIRED, cls.CONFIRMED)
 
 
 # =============================================================================

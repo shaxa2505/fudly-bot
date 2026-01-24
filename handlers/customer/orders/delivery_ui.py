@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.order_math import calc_total_price
 from handlers.common.utils import html_escape as _esc
 
 
@@ -30,7 +31,7 @@ def build_delivery_card_text(
     currency = "so'm" if lang == "uz" else "сум"
 
     subtotal = price * quantity
-    total = subtotal + delivery_price
+    total = calc_total_price(subtotal, delivery_price)
 
     lines = [
         f"🚚 <b>{'Yetkazib berish' if lang == 'uz' else 'Доставка'}</b>",

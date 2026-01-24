@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.core.order_math import calc_items_total, calc_quantity
 from .common import CartItem, CartResponse, get_db, get_val, is_offer_active, logger, normalize_price
 
 router = APIRouter()
@@ -19,6 +20,7 @@ async def calculate_cart(
         items: list[CartItem] = []
         total = 0.0
         items_count = 0
+        calc_items: list[dict[str, int | float]] = []
 
         for item_str in offer_ids.split(","):
             if ":" not in item_str:
@@ -39,8 +41,10 @@ async def calculate_cart(
                         photo=get_val(offer, "photo") or get_val(offer, "photo_id"),
                     )
                 )
-                total += price * quantity
-                items_count += quantity
+                calc_items.append({"price": price, "quantity": quantity})
+
+        total = calc_items_total(calc_items)
+        items_count = calc_quantity(calc_items)
 
         return CartResponse(items=items, total=total, items_count=items_count)
 

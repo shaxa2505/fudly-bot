@@ -10,6 +10,7 @@ from localization import get_text
 
 from .common import esc
 from . import common
+from app.core.order_math import calc_items_total, calc_total_price
 
 
 class IsCartOrder(BaseFilter):
@@ -58,7 +59,9 @@ def register(router: Router) -> None:
             (item.delivery_price for item in items if item.delivery_enabled), default=0
         )
 
-        total = int(sum(item.price * item.quantity for item in items))
+        total = calc_items_total(
+            [{"price": item.price, "quantity": item.quantity} for item in items]
+        )
 
         store = common.db.get_store(store_id)
         if store:
@@ -140,8 +143,8 @@ def register(router: Router) -> None:
         await state.set_state(OrderDelivery.payment_method_select)
 
         currency = "so'm" if lang == "uz" else "сум"
-        total = sum(item["price"] * item["quantity"] for item in cart_items_stored)
-        total_with_delivery = total + delivery_price
+        total = calc_items_total(cart_items_stored)
+        total_with_delivery = calc_total_price(total, delivery_price)
 
         lines: list[str] = [f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>"]
         for item in cart_items_stored:

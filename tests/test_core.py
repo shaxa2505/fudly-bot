@@ -180,10 +180,10 @@ class TestUtils:
         assert normalize_city("Nukus") == "Нукус"
 
     def test_normalize_city_english(self):
-        """Test normalize_city with English names (returns as-is, not translated)."""
-        assert normalize_city("Tashkent") == "Tashkent"
-        assert normalize_city("Samarkand") == "Samarkand"
-        assert normalize_city("Bukhara") == "Bukhara"
+        """Test normalize_city with English names (normalized to Russian)."""
+        assert normalize_city("Tashkent") == "Ташкент"
+        assert normalize_city("Samarkand") == "Самарканд"
+        assert normalize_city("Bukhara") == "Бухара"
 
     def test_normalize_city_unknown(self):
         """Test normalize_city with unknown city."""
@@ -191,7 +191,7 @@ class TestUtils:
         assert normalize_city("") == ""  # Empty string returns empty
 
     def test_normalize_city_case_sensitive(self):
-        """Test that normalize_city is case-sensitive."""
-        assert normalize_city("TOSHKENT") == "TOSHKENT"  # Not found, returns as-is
-        assert normalize_city("ToShKeNt") == "ToShKeNt"  # Not found, returns as-is
-        assert normalize_city("samarqand") == "samarqand"  # Not found, returns as-is
+        """Test that normalize_city is case-insensitive for known cities."""
+        assert normalize_city("TOSHKENT") == "Ташкент"
+        assert normalize_city("ToShKeNt") == "Ташкент"
+        assert normalize_city("samarqand") == "Самарканд"

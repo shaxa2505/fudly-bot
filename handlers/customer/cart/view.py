@@ -10,6 +10,7 @@ from handlers.common.utils import is_cart_button
 from .common import esc
 from . import common
 from .storage import cart_storage
+from app.core.order_math import calc_items_total, calc_total_price
 
 
 async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | None:
@@ -37,11 +38,11 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
     remove_label = "Удалить" if lang == "ru" else "O'chirish"
     lines: list[str] = [get_text(lang, "cart_title"), ""]
 
-    total = 0
+    cart_items = []
     for i, item in enumerate(items, 1):
+        cart_items.append({"price": item.price, "quantity": item.quantity})
         price_sums = int(item.price)
         subtotal = price_sums * item.quantity
-        total += subtotal
         lines.append(f"\n<b>{i}. {esc(item.title)}</b>")
         unit = f" {esc(item.unit)}" if item.unit else ""
         lines.append(
@@ -49,6 +50,7 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         )
         lines.append(f"   {store_label}: {esc(item.store_name)}")
 
+    total = calc_items_total(cart_items)
     lines.append("\n" + "-" * 25)
     lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
 
@@ -61,7 +63,7 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         lines.append(
             f"\n{get_text(lang, 'cart_delivery_label')}: +{delivery_price:,} {currency}"
         )
-        grand_total = total + delivery_price
+        grand_total = calc_total_price(total, delivery_price)
         lines.append(
             f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
         )

@@ -957,6 +957,9 @@ class SchemaMixin:
         # Rating and favorites indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ratings_store ON ratings(store_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id)")
+        cursor.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_booking_unique ON ratings(booking_id)"
+        )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)")
 

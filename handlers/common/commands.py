@@ -33,6 +33,7 @@ from handlers.common.utils import (
 from handlers.common.webapp import get_partner_panel_url
 from localization import get_cities, get_text
 from app.core.utils import normalize_city
+from app.core.order_math import calc_quantity, parse_cart_items
 
 try:
     from logging_config import logger
@@ -102,21 +103,14 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
         pickup_code = order.get("pickup_code") or code_input
 
         if int(order.get("is_cart_order") or 0) == 1 and order.get("cart_items"):
-            try:
-                cart_items = (
-                    json.loads(order["cart_items"])
-                    if isinstance(order["cart_items"], str)
-                    else order["cart_items"]
-                )
-            except Exception:
-                cart_items = []
+            cart_items = parse_cart_items(order.get("cart_items"))
 
             if cart_items:
                 offer_title = "Корзина"
                 items_lines = "\n".join(
                     [f"• {it.get('title', 'Товар')} × {it.get('quantity', 1)}" for it in cart_items]
                 )
-                quantity = len(cart_items)
+                quantity = calc_quantity(cart_items)
         else:
             offer_id = order.get("offer_id")
             quantity = int(order.get("quantity") or 1)

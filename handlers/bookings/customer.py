@@ -12,6 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
+from app.core.order_math import calc_total_price
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
 from app.services.unified_order_service import (
     OrderItem,
@@ -92,7 +93,7 @@ def build_order_card_text(
 
     subtotal = price * quantity
     delivery_cost = delivery_price if delivery_method == "delivery" else 0
-    total = subtotal + delivery_cost
+    total = calc_total_price(subtotal, delivery_cost)
 
     lines = [f"🛍 <b>{_esc(title)}</b>"]
 

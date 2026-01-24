@@ -8,29 +8,11 @@ Tests end-to-end scenarios:
 """
 from __future__ import annotations
 
-import os
-import tempfile
-
 import pytest
-
-from database import Database
 
 
 class TestUserFlow:
     """Test complete user journey from registration to booking completion"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary database for integration tests"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
 
     def test_complete_buyer_flow(self, db):
         """
@@ -53,9 +35,8 @@ class TestUserFlow:
         assert user.get("role") == "customer"  # Default role is 'customer'
 
         # Step 2: Update profile
-        db.update_user_profile(
-            user_id=user_id, city="Tashkent", phone="+998901234567", full_name="Test Buyer"
-        )
+        db.update_user_city(user_id, "Tashkent")
+        db.update_user_phone(user_id, "+998901234567")
 
         user = db.get_user(user_id)
         assert user.get("city") == "Tashkent"
@@ -87,13 +68,15 @@ class TestUserFlow:
         )
 
         # Browse offers in user's city
-        offers = db.get_offers_by_city("Tashkent")
+        offers = db.get_active_offers(city="Tashkent")
         assert len(offers) > 0
         found_offer = next((o for o in offers if o.get("offer_id") == offer_id), None)
         assert found_offer is not None
 
         # Step 4: Create booking
-        ok, booking_id, booking_code = db.create_booking_atomic(offer_id, user_id, quantity=1)
+        ok, booking_id, booking_code, _ = db.create_booking_atomic(
+            offer_id, user_id, quantity=1
+        )
         assert ok is True
         assert booking_id is not None
         assert booking_code is not None
@@ -101,15 +84,15 @@ class TestUserFlow:
         # Verify booking created
         booking = db.get_booking(booking_id)
         assert booking is not None
-        assert booking[3] == "pending"  # status
-        assert booking[2] == user_id  # user_id
-        assert booking[1] == offer_id  # offer_id
+        assert booking.get("status") == "pending"
+        assert booking.get("user_id") == user_id
+        assert booking.get("offer_id") == offer_id
 
         # Step 5: Confirm pickup (seller confirms)
         db.update_booking_status(booking_id, "confirmed")
 
         booking = db.get_booking(booking_id)
-        assert booking[3] == "confirmed"  # status
+        assert booking.get("status") == "confirmed"
 
         # Step 6: Rate the experience
         rating_id = db.add_rating(
@@ -125,8 +108,8 @@ class TestUserFlow:
         # Verify rating saved
         ratings = db.get_store_ratings(store_id)
         assert len(ratings) == 1
-        assert ratings[0][4] == 5  # rating column
-        assert ratings[0][5] == "Amazing pizza!"  # comment column
+        assert ratings[0].get("rating") == 5
+        assert ratings[0].get("comment") == "Amazing pizza!"
 
     def test_complete_seller_flow(self, db):
         """
@@ -190,14 +173,16 @@ class TestUserFlow:
         customer_id = 999999999
         db.add_user(user_id=customer_id, username="bread_lover")
 
-        ok, booking_id, code = db.create_booking_atomic(offer_id, customer_id, quantity=2)
+        ok, booking_id, code, _ = db.create_booking_atomic(
+            offer_id, customer_id, quantity=2
+        )
         assert ok is True
 
         # Step 6: Seller confirms booking
         db.update_booking_status(booking_id, "confirmed")
 
         # Step 7: Seller views booking history
-        bookings = db.get_bookings_for_store(store_id)
+        bookings = db.get_store_bookings(store_id)
         assert len(bookings) == 1
         assert bookings[0].get("booking_id") == booking_id
         assert bookings[0].get("status") == "confirmed"
@@ -224,23 +209,24 @@ class TestUserFlow:
             address="Amir Temur 100",
             phone="+998903333333",
         )
+        db.approve_store(store_id)
 
         # Add to favorites
-        db.add_favorite(user_id, store_id)
+        db.add_to_favorites(user_id, store_id)
 
         # Check favorites
-        favorites = db.get_user_favorites(user_id)
+        favorites = db.get_favorites(user_id)
         assert len(favorites) == 1
-        assert favorites[0][0] == store_id  # store_id is first column
+        assert favorites[0].get("store_id") == store_id
 
         # Check if is favorite
         is_fav = db.is_favorite(user_id, store_id)
         assert is_fav is True
 
         # Remove from favorites
-        db.remove_favorite(user_id, store_id)
+        db.remove_from_favorites(user_id, store_id)
 
-        favorites = db.get_user_favorites(user_id)
+        favorites = db.get_favorites(user_id)
         assert len(favorites) == 0
 
         is_fav = db.is_favorite(user_id, store_id)
@@ -249,19 +235,6 @@ class TestUserFlow:
 
 class TestAdminFlow:
     """Test admin operations and store management"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
 
     def test_admin_store_approval_workflow(self, db):
         """
@@ -295,7 +268,7 @@ class TestAdminFlow:
             sellers_and_stores.append((seller_id, store_id))
 
         # Admin views pending stores
-        pending = db.get_stores_by_status("pending")
+        pending = db.get_pending_stores()
         assert len(pending) == 5
 
         # Approve first 3 stores
@@ -307,30 +280,23 @@ class TestAdminFlow:
             db.update_store_status(store_id, "rejected")
 
         # Verify final counts
-        approved = db.get_stores_by_status("approved")
-        rejected = db.get_stores_by_status("rejected")
-        pending = db.get_stores_by_status("pending")
+        def _count_status(status: str) -> int:
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM stores WHERE status = %s", (status,))
+                return cursor.fetchone()[0] or 0
 
-        assert len(approved) == 3
-        assert len(rejected) == 2
-        assert len(pending) == 0
+        approved = _count_status("approved")
+        rejected = _count_status("rejected")
+        pending = _count_status("pending")
+
+        assert approved == 3
+        assert rejected == 2
+        assert pending == 0
 
 
 class TestErrorHandling:
     """Test error cases and edge conditions"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary database"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        if os.path.exists(path):
-            os.remove(path)
 
     def test_booking_nonexistent_offer_fails(self, db):
         """Test that booking a non-existent offer fails gracefully"""
@@ -338,7 +304,9 @@ class TestErrorHandling:
         db.add_user(user_id=user_id, username="test_user")
 
         fake_offer_id = 999999
-        ok, booking_id, code = db.create_booking_atomic(fake_offer_id, user_id, quantity=1)
+        ok, booking_id, code, _ = db.create_booking_atomic(
+            fake_offer_id, user_id, quantity=1
+        )
 
         assert ok is False
         assert booking_id is None
@@ -371,11 +339,12 @@ class TestErrorHandling:
             address="Address",
             phone="+998901234567",
         )
+        db.approve_store(store_id)
 
         # Add favorite twice
-        db.add_favorite(user_id, store_id)
-        db.add_favorite(user_id, store_id)
+        db.add_to_favorites(user_id, store_id)
+        db.add_to_favorites(user_id, store_id)
 
         # Should only appear once
-        favorites = db.get_user_favorites(user_id)
+        favorites = db.get_favorites(user_id)
         assert len(favorites) == 1

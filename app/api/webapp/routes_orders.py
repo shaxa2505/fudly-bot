@@ -13,6 +13,13 @@ from pydantic import BaseModel
 
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
+from app.core.order_math import (
+    calc_delivery_fee,
+    calc_items_total,
+    calc_quantity,
+    calc_total_price,
+    parse_cart_items,
+)
 from app.services.unified_order_service import (
     OrderItem,
     OrderStatus,
@@ -143,13 +150,15 @@ def _validate_min_order(
     items: list[Any],
     offers_by_id: dict[int, Any],
 ) -> None:
-    total_check = 0.0
+    calc_items: list[dict[str, int | float]] = []
     for item in items:
         offer = offers_by_id.get(item.offer_id)
         if not offer:
             continue
         price = normalize_price(get_val(offer, "discount_price", 0))
-        total_check += price * item.quantity
+        calc_items.append({"price": price, "quantity": item.quantity})
+
+    total_check = calc_items_total(calc_items)
 
     store_check = db.get_store(store_id) if hasattr(db, "get_store") else None
     if not store_check:
@@ -298,8 +307,12 @@ async def create_order(
                     oid = result.order_ids[0] if result.order_ids else 0
                     delivery_price = int(order_items[0].delivery_price) if order_items else 0
                     for idx, item_obj in enumerate(order_items):
-                        total = (item_obj.price * item_obj.quantity) + (
-                            delivery_price if idx == 0 else 0
+                        item_total = calc_items_total(
+                            [{"price": item_obj.price, "quantity": item_obj.quantity}]
+                        )
+                        total = calc_total_price(
+                            item_total,
+                            delivery_price if idx == 0 else 0,
                         )
                         created_items.append(
                             {
@@ -317,7 +330,9 @@ async def create_order(
                     pickup_code = result.pickup_codes[0] if result.pickup_codes else None
                     oid = result.order_ids[0] if result.order_ids else 0
                     for item_obj in order_items:
-                        total = item_obj.price * item_obj.quantity
+                        total = calc_items_total(
+                            [{"price": item_obj.price, "quantity": item_obj.quantity}]
+                        )
                         created_items.append(
                             {
                                 "id": oid,
@@ -520,21 +535,14 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
         qty_total = 0
 
         if is_cart and cart_items_json:
-            try:
-                cart_items = (
-                    json.loads(cart_items_json)
-                    if isinstance(cart_items_json, str)
-                    else cart_items_json
-                )
-            except Exception:
-                cart_items = []
+            cart_items = parse_cart_items(cart_items_json)
+            items_total = calc_items_total(cart_items)
+            qty_total = calc_quantity(cart_items)
 
             for it in cart_items or []:
                 title = it.get("title") or "Tovar"
                 qty = int(it.get("quantity") or 1)
                 price = int(it.get("price") or 0)
-                items_total += price * qty
-                qty_total += qty
                 items.append(
                     {
                         "offer_id": it.get("offer_id"),
@@ -552,7 +560,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             price = int(r.get("item_price") or r.get("offer_price") or 0)
             title = r.get("item_title") or r.get("offer_title") or "Tovar"
             photo = r.get("offer_photo") or r.get("offer_photo_id")
-            items_total = price * qty
+            items_total = calc_items_total([{"price": price, "quantity": qty}])
             qty_total = qty
             items.append(
                 {
@@ -568,16 +576,12 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             )
 
         total_price = int(r.get("total_price") or 0)
-        delivery_fee = 0
-        if order_type == "delivery":
-            delivery_fee_raw = r.get("delivery_price")
-            if delivery_fee_raw is not None:
-                try:
-                    delivery_fee = int(delivery_fee_raw)
-                except Exception:
-                    delivery_fee = 0
-            else:
-                delivery_fee = max(0, total_price - items_total)
+        delivery_fee = calc_delivery_fee(
+            total_price,
+            items_total,
+            delivery_price=r.get("delivery_price"),
+            order_type=order_type,
+        )
 
         primary_item = items[0] if items else {}
         offer_title = primary_item.get("title") or primary_item.get("offer_title")

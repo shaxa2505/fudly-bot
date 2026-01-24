@@ -1,14 +1,17 @@
 ﻿from __future__ import annotations
 
-from html import escape as esc
-
 from aiogram import F, Router, types
 
-from app.services.unified_order_service import (
-    OrderStatus,
-    get_unified_order_service,
-    init_unified_order_service,
+from app.application.orders.confirm_payment import confirm_payment
+from app.application.orders.reject_payment import reject_payment
+from app.infra.db.orders_repo import OrdersRepository
+from app.interfaces.bot.presenters.order_messages import (
+    build_admin_payment_confirmed_caption,
+    build_admin_payment_rejected_caption,
+    build_customer_payment_confirmed,
+    build_customer_payment_rejected,
 )
+from app.services.unified_order_service import get_unified_order_service, init_unified_order_service
 from localization import get_text
 
 try:
@@ -38,12 +41,6 @@ def _get_lang(user_id: int | None) -> str:
     return "ru"
 
 
-def _get_order_field(order, key: str, default=None):
-    if isinstance(order, dict):
-        return order.get(key, default)
-    return getattr(order, key, default)
-
-
 @router.callback_query(F.data.startswith("admin_confirm_payment_"))
 async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
     """Admin confirms payment proof for delivery order."""
@@ -63,62 +60,51 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
             await callback.answer(get_text(lang, "admin_db_error"), show_alert=True)
             return
 
-        order = db.get_order(order_id)
-        if not order:
-            await callback.answer(get_text(lang, "admin_order_not_found"), show_alert=True)
-            return
-
-        user_id = _get_order_field(order, "user_id")
-        store_id = _get_order_field(order, "store_id")
-        order_status = _get_order_field(order, "order_status")
-        payment_status = _get_order_field(order, "payment_status")
-
-        if payment_status not in ["proof_submitted", "awaiting_proof", "awaiting_admin_confirmation"]:
-            await callback.answer(
-                get_text(
-                    lang,
-                    "admin_order_already_processed",
-                    status=payment_status or order_status,
-                ),
-                show_alert=True,
-            )
-            return
-
+        repo = OrdersRepository(db)
         order_service = get_unified_order_service()
         if not order_service and callback.bot:
             order_service = init_unified_order_service(db, callback.bot)
-        if not order_service:
-            await callback.answer(get_text(lang, "admin_service_unavailable"), show_alert=True)
+
+        result = await confirm_payment(order_id, repo=repo, order_service=order_service)
+        if not result.ok:
+            if result.error_key == "already_processed":
+                status = result.payment_status or repo.get_field(
+                    result.order, "order_status", ""
+                )
+                await callback.answer(
+                    get_text(
+                        lang,
+                        "admin_order_already_processed",
+                        status=status or "",
+                    ),
+                    show_alert=True,
+                )
+                return
+            error_map = {
+                "db_error": "admin_db_error",
+                "not_found": "admin_order_not_found",
+                "service_unavailable": "admin_service_unavailable",
+                "processing_error": "admin_payment_processing_error",
+            }
+            key = error_map.get(result.error_key or "", "error")
+            await callback.answer(get_text(lang, key), show_alert=True)
             return
 
-        ok = await order_service.confirm_payment(order_id)
-        if not ok:
-            await callback.answer(get_text(lang, "admin_payment_processing_error"), show_alert=True)
-            return
-
-        store = db.get_store(store_id) if hasattr(db, "get_store") and store_id else None
-        store_name = esc(str(_get_order_field(store, "name", "")))
+        order = result.order
+        user_id = repo.get_field(order, "user_id")
+        store_id = repo.get_field(order, "store_id")
+        store = repo.get_store(store_id)
+        store_name = str(repo.get_field(store, "name", ""))
 
         customer_lang = _get_lang(user_id)
-        customer_msg = get_text(
-            customer_lang,
-            "admin_payment_confirmed_customer",
-            order_id=str(order_id),
-            store_name=store_name,
-        )
+        customer_msg = build_customer_payment_confirmed(customer_lang, order_id, store_name)
 
         if callback.bot and user_id:
-            await callback.bot.send_message(
-                chat_id=user_id,
-                text=customer_msg,
-                parse_mode="HTML",
-            )
+            await callback.bot.send_message(chat_id=user_id, text=customer_msg, parse_mode="HTML")
 
         caption = callback.message.caption or ""
-        admin_note = get_text(
-            lang,
-            "admin_payment_confirmed_caption",
-            admin_name=esc(callback.from_user.first_name or ""),
+        admin_note = build_admin_payment_confirmed_caption(
+            lang, callback.from_user.first_name or ""
         )
         try:
             await callback.message.edit_caption(
@@ -155,62 +141,48 @@ async def admin_reject_payment(callback: types.CallbackQuery) -> None:
             await callback.answer(get_text(lang, "admin_db_error"), show_alert=True)
             return
 
-        order = db.get_order(order_id)
-        if not order:
-            await callback.answer(get_text(lang, "admin_order_not_found"), show_alert=True)
-            return
-
-        user_id = _get_order_field(order, "user_id")
-        order_status = _get_order_field(order, "order_status")
-        payment_status = _get_order_field(order, "payment_status")
-
-        if payment_status not in ["proof_submitted", "awaiting_proof", "awaiting_admin_confirmation"]:
-            await callback.answer(
-                get_text(
-                    lang,
-                    "admin_order_already_processed",
-                    status=payment_status or order_status,
-                ),
-                show_alert=True,
-            )
-            return
-
+        repo = OrdersRepository(db)
         order_service = get_unified_order_service()
         if not order_service and callback.bot:
             order_service = init_unified_order_service(db, callback.bot)
-        if not order_service:
-            await callback.answer(get_text(lang, "admin_service_unavailable"), show_alert=True)
+
+        result = await reject_payment(order_id, repo=repo, order_service=order_service)
+        if not result.ok:
+            if result.error_key == "already_processed":
+                status = result.payment_status or repo.get_field(
+                    result.order, "order_status", ""
+                )
+                await callback.answer(
+                    get_text(
+                        lang,
+                        "admin_order_already_processed",
+                        status=status or "",
+                    ),
+                    show_alert=True,
+                )
+                return
+            error_map = {
+                "db_error": "admin_db_error",
+                "not_found": "admin_order_not_found",
+                "service_unavailable": "admin_service_unavailable",
+                "processing_error": "admin_payment_processing_error",
+            }
+            key = error_map.get(result.error_key or "", "error")
+            await callback.answer(get_text(lang, key), show_alert=True)
             return
 
-        await order_service.update_status(
-            entity_id=order_id,
-            entity_type="order",
-            new_status=OrderStatus.REJECTED,
-            notify_customer=False,
-            reject_reason="payment_rejected_by_admin",
-        )
-        if hasattr(db, "update_payment_status"):
-            db.update_payment_status(order_id, "rejected")
+        order = result.order
+        user_id = repo.get_field(order, "user_id")
 
         customer_lang = _get_lang(user_id)
-        customer_msg = get_text(
-            customer_lang,
-            "admin_payment_rejected_customer",
-            order_id=str(order_id),
-        )
+        customer_msg = build_customer_payment_rejected(customer_lang, order_id)
 
         if callback.bot and user_id:
-            await callback.bot.send_message(
-                chat_id=user_id,
-                text=customer_msg,
-                parse_mode="HTML",
-            )
+            await callback.bot.send_message(chat_id=user_id, text=customer_msg, parse_mode="HTML")
 
         caption = callback.message.caption or ""
-        admin_note = get_text(
-            lang,
-            "admin_payment_rejected_caption",
-            admin_name=esc(callback.from_user.first_name or ""),
+        admin_note = build_admin_payment_rejected_caption(
+            lang, callback.from_user.first_name or ""
         )
         try:
             await callback.message.edit_caption(

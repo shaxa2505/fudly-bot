@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_customer
+from app.core.order_math import calc_items_total, calc_total_price
 from app.services.unified_order_service import (
     NotificationTemplates,
     OrderItem,
@@ -116,7 +117,9 @@ def register(router: Router) -> None:
         )
 
         currency = "so'm" if lang == "uz" else "сум"
-        total = int(sum(item.price * item.quantity for item in items))
+        total = calc_items_total(
+            [{"price": item.price, "quantity": item.quantity} for item in items]
+        )
 
         store_label = "Магазин" if lang == "ru" else "Do'kon"
 
@@ -135,7 +138,7 @@ def register(router: Router) -> None:
         lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
         if delivery_enabled:
             lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
-            grand_total = total + delivery_price
+            grand_total = calc_total_price(total, delivery_price)
             lines.append(
                 f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
             )

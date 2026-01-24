@@ -9,16 +9,27 @@ from typing import Any
 
 import qrcode
 from aiogram import Bot
-from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import BufferedInputFile
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.api.webapp.common import get_current_user, get_optional_user
-from app.core.utils import normalize_city
-from app.services.unified_order_service import (
-    OrderStatus as UnifiedOrderStatus,
-    PaymentStatus,
+from app.core.order_math import (
+    calc_delivery_fee,
+    calc_items_total,
+    calc_quantity,
+    calc_total_price,
+    parse_cart_items,
 )
+from app.core.utils import normalize_city
+from app.application.orders.submit_payment_proof import submit_payment_proof
+from app.domain.order import PaymentStatus as DomainPaymentStatus
+from app.infra.db.orders_repo import OrdersRepository
+from app.interfaces.bot.presenters.payment_proof_messages import (
+    build_admin_payment_proof_caption,
+    build_admin_payment_proof_keyboard,
+)
+from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus, PaymentStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
@@ -219,8 +230,6 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     Returns:
         OrderStatus model
     """
-    import json
-
     # Convert to dict if needed
     booking_dict = dict(booking) if not isinstance(booking, dict) else booking
 
@@ -253,14 +262,7 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     # Cart order support (delivery cart = 1 row with cart_items)
     is_cart = int(booking_dict.get("is_cart_order") or booking_dict.get("is_cart_booking") or 0)
     cart_items_json = booking_dict.get("cart_items")
-    cart_items: list[dict[str, Any]] = []
-    if is_cart and cart_items_json:
-        try:
-            cart_items = (
-                json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
-            )
-        except Exception:
-            cart_items = []
+    cart_items: list[dict[str, Any]] = parse_cart_items(cart_items_json) if is_cart else []
 
     offer_id = booking_dict.get("offer_id")
     quantity = int(booking_dict.get("quantity") or 1)
@@ -283,21 +285,17 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
             total_price = 0.0
 
         # Calculate delivery_cost if possible (total - items)
-        items_total = 0
-        qty_total = 0
-        for item in cart_items:
-            item_qty = int(item.get("quantity") or 1)
-            item_price = int(item.get("price") or 0)
-            qty_total += item_qty
-            items_total += item_price * item_qty
+        items_total = calc_items_total(cart_items)
+        qty_total = calc_quantity(cart_items)
         quantity = qty_total if qty_total > 0 else quantity
 
-        if total_price and items_total and not delivery_cost:
-            try:
-                derived_delivery = float(total_price) - float(items_total)
-                delivery_cost = derived_delivery if derived_delivery > 0 else 0
-            except Exception:
-                pass
+        if total_price and not delivery_cost:
+            delivery_cost = calc_delivery_fee(
+                total_price,
+                items_total,
+                delivery_price=booking_dict.get("delivery_price"),
+                order_type=order_type,
+            )
 
         if first_offer_id:
             offer = db.get_offer(int(first_offer_id))
@@ -316,7 +314,8 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
                 total_price = 0.0
         else:
             discount_price = int(offer_dict.get("discount_price") or 0)
-            total_price = float((discount_price * quantity) + (delivery_cost or 0))
+            items_total = calc_items_total([{"price": discount_price, "quantity": quantity}])
+            total_price = float(calc_total_price(items_total, delivery_cost or 0))
 
         if not store_id:
             store_id = int(offer_dict.get("store_id") or 0)
@@ -413,8 +412,6 @@ async def get_user_orders(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-    import json
-
     for r in raw_orders:
         if not hasattr(r, "get"):
             continue
@@ -442,21 +439,14 @@ async def get_user_orders(
         qty_total = 0
 
         if is_cart and cart_items_json:
-            try:
-                cart_items = (
-                    json.loads(cart_items_json)
-                    if isinstance(cart_items_json, str)
-                    else cart_items_json
-                )
-            except Exception:
-                cart_items = []
+            cart_items = parse_cart_items(cart_items_json)
+            items_total = calc_items_total(cart_items)
+            qty_total = calc_quantity(cart_items)
 
             for it in cart_items or []:
                 title = it.get("title") or "Товар"
                 qty = int(it.get("quantity") or 1)
                 price = int(it.get("price") or 0)
-                items_total += price * qty
-                qty_total += qty
                 items.append(
                     {
                         "offer_id": it.get("offer_id"),
@@ -474,7 +464,7 @@ async def get_user_orders(
             price = int(r.get("offer_price") or 0)
             title = r.get("offer_title") or "Товар"
             photo = r.get("offer_photo") or r.get("offer_photo_id")
-            items_total = price * qty
+            items_total = calc_items_total([{"price": price, "quantity": qty}])
             qty_total = qty
             items.append(
                 {
@@ -547,6 +537,9 @@ async def upload_payment_proof(
         store_name = order.get("store_name", "")
         total_price = order.get("total_price", 0)
         delivery_fee = order.get("delivery_fee") or order.get("delivery_price") or 0
+        payment_method = order.get("payment_method")
+        payment_status_raw = order.get("payment_status")
+        payment_proof_photo_id = order.get("payment_proof_photo_id")
     else:
         order_type = getattr(order, "order_type", None)
         order_user_id = getattr(order, "user_id", None)
@@ -555,6 +548,9 @@ async def upload_payment_proof(
         store_name = getattr(order, "store_name", "")
         total_price = getattr(order, "total_price", 0)
         delivery_fee = getattr(order, "delivery_fee", 0)
+        payment_method = getattr(order, "payment_method", None)
+        payment_status_raw = getattr(order, "payment_status", None)
+        payment_proof_photo_id = getattr(order, "payment_proof_photo_id", None)
 
     try:
         order_user_id_int = int(order_user_id) if order_user_id is not None else None
@@ -569,6 +565,20 @@ async def upload_payment_proof(
             status_code=400, detail=f"Order type is '{order_type}', not 'delivery'"
         )
 
+    payment_status = DomainPaymentStatus.normalize(
+        payment_status_raw,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    if payment_status == DomainPaymentStatus.PROOF_SUBMITTED:
+        raise HTTPException(status_code=409, detail="Payment proof already submitted")
+    if payment_status == DomainPaymentStatus.CONFIRMED:
+        raise HTTPException(status_code=409, detail="Payment already confirmed")
+    if payment_status == DomainPaymentStatus.NOT_REQUIRED:
+        raise HTTPException(status_code=400, detail="Payment proof not required")
+    if payment_status not in (DomainPaymentStatus.AWAITING_PROOF, DomainPaymentStatus.REJECTED):
+        raise HTTPException(status_code=400, detail="Payment proof not allowed")
+
     photo_file = BufferedInputFile(photo_data, filename=photo.filename or "payment_proof.jpg")
 
     customer = db.get_user(order_user_id) if hasattr(db, "get_user") else None
@@ -582,67 +592,21 @@ async def upload_payment_proof(
             customer_name = getattr(customer, "first_name", "")
             customer_phone = getattr(customer, "phone", "")
 
-    import json
+    cart_items = parse_cart_items(cart_items_json)
 
-    cart_items = []
-    if cart_items_json:
-        try:
-            cart_items = (
-                json.loads(cart_items_json)
-                if isinstance(cart_items_json, str)
-                else cart_items_json
-            )
-        except Exception:
-            cart_items = []
-
-    admin_msg = "💳 <b>НОВАЯ ДОСТАВКА - ЧЕК НА ПРОВЕРКЕ</b>\n\n"
-    admin_msg += "🔄 <b>Статус:</b> ◻ ◻ ◻ ◻ ◻\n"
-    admin_msg += "   <i>Ожидает подтверждения оплаты</i>\n\n"
-    admin_msg += f"📦 <b>Заказ #{order_id}</b>\n"
-    admin_msg += f"👤 {customer_name or 'Клиент'}\n"
-
-    if customer_phone:
-        admin_msg += f"📱 <code>{customer_phone}</code>\n"
-    if store_name:
-        admin_msg += f"🏪 {store_name}\n"
-    if delivery_address:
-        admin_msg += f"📍 {delivery_address}\n"
-
-    if cart_items:
-        admin_msg += f"\n📋 <b>Товары ({len(cart_items)}):</b>\n"
-        for idx, item in enumerate(cart_items[:5], 1):
-            title = item.get("title", "Товар")
-            qty = item.get("quantity", 1)
-            price = item.get("price", 0)
-            item_total = price * qty
-            admin_msg += f"{idx}. {title} × {qty} = {int(item_total):,} сум\n"
-        if len(cart_items) > 5:
-            admin_msg += f"   ... и ещё {len(cart_items) - 5}\n"
-
-    subtotal = total_price - delivery_fee if delivery_fee else total_price
-    admin_msg += "\n💰 <b>Итого:</b>\n"
-    admin_msg += f"   Товары: {int(subtotal):,} сум\n"
-    if delivery_fee:
-        admin_msg += f"   Доставка: {int(delivery_fee):,} сум\n"
-    admin_msg += f"   <b>Всего: {int(total_price):,} сум</b>\n"
-    admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
-
-    admin_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Оплата подтверждена",
-                    callback_data=f"admin_confirm_payment_{order_id}",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="❌ Отклонить заказ",
-                    callback_data=f"admin_reject_payment_{order_id}",
-                ),
-            ],
-        ]
+    admin_msg = build_admin_payment_proof_caption(
+        order_id=order_id,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        store_name=store_name,
+        delivery_address=delivery_address,
+        cart_items=cart_items,
+        total_price=total_price,
+        delivery_fee=delivery_fee,
+        lang="ru",
     )
+
+    admin_keyboard = build_admin_payment_proof_keyboard(order_id)
 
     admin_ids: list[int] = []
     if hasattr(db, "get_all_users"):
@@ -681,11 +645,18 @@ async def upload_payment_proof(
     if sent_count == 0:
         raise HTTPException(status_code=500, detail="Failed to send to admins")
 
-    if file_id:
-        if hasattr(db, "update_payment_status"):
-            db.update_payment_status(order_id, "proof_submitted", file_id)
-        elif hasattr(db, "update_order_payment_proof"):
-            db.update_order_payment_proof(order_id, file_id)
+    if not file_id:
+        raise HTTPException(status_code=500, detail="Failed to persist payment proof")
+
+    repo = OrdersRepository(db)
+    result = await submit_payment_proof(
+        order_id,
+        actor_user_id=user_id,
+        proof_file_id=file_id,
+        repo=repo,
+    )
+    if not result.ok:
+        raise HTTPException(status_code=500, detail="Failed to persist payment proof")
 
     return {
         "success": True,

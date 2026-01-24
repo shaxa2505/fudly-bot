@@ -27,9 +27,12 @@ class RatingMixin:
                 INSERT INTO ratings (booking_id, user_id, store_id, rating, comment)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (booking_id) DO UPDATE SET rating = %s, comment = %s
+                RETURNING rating_id
             """,
                 (booking_id, user_id, store_id, rating, comment, rating, comment),
             )
+            row = cursor.fetchone()
+            return row[0] if row else None
 
     def update_rating_review(self, booking_id: int, user_id: int, review_text: str) -> bool:
         """Update rating with review text."""

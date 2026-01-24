@@ -6,45 +6,13 @@ and prevents overbooking when multiple users try to book the same offer.
 """
 from __future__ import annotations
 
-import os
-import tempfile
 import threading
-import time
 
 import pytest
-
-from database import Database
 
 
 class TestBookingRaceCondition:
     """Test concurrent booking scenarios to prevent overbooking"""
-
-    @pytest.fixture
-    def db(self):
-        """Create temporary SQLite database for testing"""
-        fd, path = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-
-        db_instance = Database(path)
-
-        yield db_instance
-
-        # Cleanup (Windows-friendly: ensure connections closed and retry remove)
-        try:
-            # Give SQLite a brief moment to release file handles
-            time.sleep(0.1)
-            if os.path.exists(path):
-                os.remove(path)
-        except PermissionError:
-            # Retry a few times on Windows if file is locked
-            for _ in range(10):
-                time.sleep(0.2)
-                try:
-                    if os.path.exists(path):
-                        os.remove(path)
-                    break
-                except PermissionError:
-                    continue
 
     @pytest.fixture
     def sample_offer(self, db):
@@ -83,7 +51,7 @@ class TestBookingRaceCondition:
         user_id = 222222
         db.add_user(user_id=user_id, username="test_buyer")
 
-        ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
+        ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
         assert ok is True
         assert booking_id is not None
@@ -93,7 +61,7 @@ class TestBookingRaceCondition:
         # Verify offer quantity decreased
         offer = db.get_offer(sample_offer)
         assert offer is not None
-        quantity_field = offer[6]  # quantity is at index 6
+        quantity_field = offer.get("quantity")
         assert quantity_field == 4  # 5 - 1 = 4
 
     def test_concurrent_bookings_no_overbooking(self, db, sample_offer):
@@ -110,7 +78,7 @@ class TestBookingRaceCondition:
         def book_item(user_id: int):
             """Each thread tries to book 1 item"""
             db.add_user(user_id=user_id, username=f"concurrent_user_{user_id}")
-            ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
+            ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
             with results_lock:
                 results.append((ok, booking_id, code))
@@ -146,11 +114,11 @@ class TestBookingRaceCondition:
 
         # Verify offer quantity is now 0
         offer = db.get_offer(sample_offer)
-        quantity_field = offer[6]  # quantity is at index 6
+        quantity_field = offer.get("quantity")
         assert quantity_field == 0, f"Expected quantity 0, got {quantity_field}"
 
         # Verify offer status changed to inactive
-        status_field = offer[10]  # status is at index 10
+        status_field = offer.get("status")
         assert status_field == "inactive", f"Expected status 'inactive', got {status_field}"
 
     def test_concurrent_large_quantity_bookings(self, db, sample_offer):
@@ -167,7 +135,7 @@ class TestBookingRaceCondition:
         def book_items(user_id: int):
             """Each thread tries to book 2 items"""
             db.add_user(user_id=user_id, username=f"bulk_user_{user_id}")
-            ok, booking_id, code = db.create_booking_atomic(
+            ok, booking_id, code, _ = db.create_booking_atomic(
                 sample_offer, user_id, quantity=quantity_per_booking
             )
 
@@ -199,29 +167,18 @@ class TestBookingRaceCondition:
 
         # Verify final quantity
         offer = db.get_offer(sample_offer)
-        quantity_field = offer[6]  # quantity is at index 6
+        quantity_field = offer.get("quantity")
         assert quantity_field == 1, f"Expected 1 item remaining (5-2-2=1), got {quantity_field}"
 
     def test_booking_inactive_offer_fails(self, db, sample_offer):
         """Test that booking an inactive offer fails"""
         # Mark offer as inactive
-        conn = db.get_connection()
-        try:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE offers SET status = ? WHERE offer_id = ?", ("inactive", sample_offer)
-            )
-            conn.commit()
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
+        db.deactivate_offer(sample_offer)
 
         user_id = 555555
         db.add_user(user_id=user_id, username="test_user")
 
-        ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
+        ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
         assert ok is False
         assert booking_id is None
@@ -233,7 +190,7 @@ class TestBookingRaceCondition:
         db.add_user(user_id=user_id, username="greedy_user")
 
         # Try to book 10 items when only 5 available
-        ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=10)
+        ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=10)
 
         assert ok is False
         assert booking_id is None
@@ -241,7 +198,7 @@ class TestBookingRaceCondition:
 
         # Verify quantity unchanged
         offer = db.get_offer(sample_offer)
-        quantity_field = offer[6]  # quantity is at index 6
+        quantity_field = offer.get("quantity")
         assert quantity_field == 5, "Quantity should remain 5 after failed booking"
 
     def test_unique_booking_codes(self, db, sample_offer):
@@ -252,7 +209,7 @@ class TestBookingRaceCondition:
             user_id = 700000 + i
             db.add_user(user_id=user_id, username=f"user_{i}")
 
-            ok, booking_id, code = db.create_booking_atomic(sample_offer, user_id, quantity=1)
+            ok, booking_id, code, _ = db.create_booking_atomic(sample_offer, user_id, quantity=1)
 
             assert ok is True
             assert code not in codes, f"Duplicate booking code generated: {code}"

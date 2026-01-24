@@ -14,12 +14,14 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import (
-    OrderStatus,
-    PaymentStatus,
-    get_unified_order_service,
-    init_unified_order_service,
+from app.application.orders.submit_payment_proof import submit_payment_proof
+from app.domain.order import OrderStatus, PaymentStatus
+from app.infra.db.orders_repo import OrdersRepository
+from app.interfaces.bot.presenters.payment_proof_messages import (
+    build_admin_payment_proof_caption,
+    build_admin_payment_proof_keyboard,
 )
+from app.services.unified_order_service import get_unified_order_service, init_unified_order_service
 from localization import get_text
 
 try:
@@ -264,14 +266,14 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
         if user:
             if isinstance(user, dict):
                 customer_name = user.get("full_name") or user.get("username") or f"User {user_id}"
-            customer_phone = user.get("phone") or ""
+                customer_phone = user.get("phone") or ""
             else:
                 customer_name = (
                     getattr(user, "full_name", None)
                     or getattr(user, "username", None)
                     or f"User {user_id}"
                 )
-            customer_phone = getattr(user, "phone", "") or ""
+                customer_phone = getattr(user, "phone", "") or ""
 
         # Get store name
         store_name = "Магазин"
@@ -332,31 +334,59 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
             return
 
         # Build admin message
-        admin_msg = (
-            f"<b>Новый платёж на подтверждение</b>\n\n"
-            f"Заказ #{order_id}\n"
-            f"Клиент: {customer_name}\n"
+        admin_msg = build_admin_payment_proof_caption(
+            order_id=order_id,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            store_name=store_name,
+            delivery_address=delivery_address,
+            cart_items=None,
+            total_price=total_price,
+            delivery_fee=None,
+            lang="ru",
         )
-        if customer_phone:
-            admin_msg += f"Телефон: {customer_phone}\n"
-        admin_msg += f"Магазин: {store_name}\n" f"Сумма: {int(total_price):,} сум\n"
-        if delivery_address:
-            admin_msg += f"Адрес: {delivery_address}\n"
-
-        # Create admin keyboard
-        kb = InlineKeyboardBuilder()
-        kb.button(text="Подтвердить", callback_data=f"admin_confirm_payment_{order_id}")
-        kb.button(text="Отклонить", callback_data=f"admin_reject_payment_{order_id}")
-        kb.adjust(2)
+        admin_keyboard = build_admin_payment_proof_keyboard(order_id)
 
         # Send photo to all admins
         photo = message.photo[-1]
 
-        # Persist payment proof in DB for audit trail and later access
-        if hasattr(db, "update_payment_status"):
-            db.update_payment_status(order_id, "proof_submitted", photo.file_id)
-        elif hasattr(db, "update_order_payment_proof"):
-            db.update_order_payment_proof(order_id, photo.file_id)
+        repo = OrdersRepository(db) if db else None
+        result = await submit_payment_proof(
+            order_id,
+            actor_user_id=user_id,
+            proof_file_id=photo.file_id,
+            repo=repo,
+        )
+        if not result.ok:
+            error_map = {
+                "db_error": _service_unavailable(lang),
+                "processing_error": _service_unavailable(lang),
+                "not_found": _t(lang, "Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ.", "Buyurtma topilmadi."),
+                "forbidden": _t(lang, "Р­С‚Рѕ РЅРµ РІР°С€ Р·Р°РєР°Р·.", "Bu buyurtma sizniki emas."),
+                "already_submitted": _t(
+                    lang,
+                    "Р§РµРє СѓР¶Рµ РѕС‚РїСЂР°РІР»РµРЅ. РћР¶РёРґР°Р№С‚Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ.",
+                    "Chek allaqachon yuborilgan. Tasdiqlanishini kuting.",
+                ),
+                "already_confirmed": _t(
+                    lang,
+                    "РћРїР»Р°С‚Р° СѓР¶Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅР°.",
+                    "To'lov allaqachon tasdiqlangan.",
+                ),
+                "not_required": _t(
+                    lang,
+                    "Р”Р»СЏ СЌС‚РѕРіРѕ Р·Р°РєР°Р·Р° РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ РѕРїР»Р°С‚Р°.",
+                    "Bu buyurtma uchun to'lov kerak emas.",
+                ),
+                "not_allowed": _t(
+                    lang,
+                    "Р”Р»СЏ СЌС‚РѕРіРѕ Р·Р°РєР°Р·Р° РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ РѕС‚РїСЂР°РІР»СЏС‚СЊ С‡РµРє.",
+                    "Bu buyurtma uchun chek yuborish kerak emas.",
+                ),
+            }
+            await message.answer(error_map.get(result.error_key, _service_unavailable(lang)))
+            await state.clear()
+            return
 
         sent_count = 0
         for admin_id in admin_ids:
@@ -365,7 +395,7 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
                     chat_id=admin_id,
                     photo=photo.file_id,
                     caption=admin_msg,
-                    reply_markup=kb.as_markup(),
+                    reply_markup=admin_keyboard,
                     parse_mode="HTML",
                 )
                 sent_count += 1
