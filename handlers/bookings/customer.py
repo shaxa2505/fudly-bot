@@ -1338,7 +1338,7 @@ async def notify_partner_new_pickup_order(
             f"━━━━━━━━━━━━━━━━━━\n"
             f"⏳ <b>Buyurtmani tasdiqlang!</b>"
         )
-        confirm_text = "✅ Tasdiqlash"
+        confirm_text = "✅ Qabul qilish"
         reject_text = "❌ Rad etish"
     else:
         text = (
@@ -1438,7 +1438,7 @@ async def notify_partner_new_booking(
             f"🏪 <b>O'zi olib ketadi</b>\n"
             f"━━━━━━━━━━━━━━━━━━"
         )
-        confirm_text = "✅ Tasdiqlash"
+        confirm_text = "✅ Qabul qilish"
         reject_text = "❌ Rad etish"
     else:
         text = (
@@ -1455,7 +1455,7 @@ async def notify_partner_new_booking(
             f"🏪 <b>Самовывоз</b>\n"
             f"━━━━━━━━━━━━━━━━━━"
         )
-        confirm_text = "✅ Подтвердить"
+        confirm_text = "✅ Принять"
         reject_text = "❌ Отклонить"
 
     kb = InlineKeyboardBuilder()

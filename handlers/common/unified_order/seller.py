@@ -18,6 +18,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.services.unified_order_service import (
     NotificationTemplates,
     OrderStatus,
+    PaymentStatus,
     get_unified_order_service,
 )
 from handlers.common.states import CourierHandover
@@ -28,10 +29,10 @@ from .common import _get_db, _get_entity_field, _get_store_field, logger
 
 # Regex patterns for all supported callback formats
 CONFIRM_PATTERN = re.compile(
-    r"^(order_confirm_|partner_confirm_order_|confirm_order_)(\d+)$"
+    r"^(order_confirm_|partner_confirm_order_|confirm_order_|confirm_payment_)(\d+)$"
 )
 REJECT_PATTERN = re.compile(
-    r"^(order_reject_|partner_reject_order_|cancel_order_)(\d+)$"
+    r"^(order_reject_|partner_reject_order_|cancel_order_|reject_payment_)(\d+)$"
 )
 
 
@@ -119,6 +120,21 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         msg = "Buyurtma topilmadi" if lang == "uz" else "Заказ не найден"
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
+
+    if prefix == "confirm_payment_":
+        payment_status = _get_entity_field(entity, "payment_status")
+        payment_method = _get_entity_field(entity, "payment_method")
+        proof_photo = _get_entity_field(entity, "payment_proof_photo_id")
+        if not PaymentStatus.is_cleared(
+            payment_status,
+            payment_method=payment_method,
+            payment_proof_photo_id=proof_photo,
+        ):
+            msg = (
+                "To'lov hali tasdiqlanmagan" if lang == "uz" else "Оплата ещё не подтверждена"
+            )
+            await callback.answer(msg, show_alert=True)
+            return
 
     # Verify ownership
     store_id = _get_entity_field(entity, "store_id")
@@ -236,14 +252,16 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     if order_type != "delivery":
         # Pickup order created через orders: сразу ждём фактической выдачи.
         if lang == "uz":
-            hint = "\n\n<i>Mijoz buyurtmani olganda “Topshirildi” tugmasini bosing.</i>"
+            hint = "\n\n<i>Mijoz buyurtmani olganda “Berildi” tugmasini bosing.</i>"
         else:
             hint = "\n\n<i>Когда клиент заберёт заказ, нажмите «Выдано».</i>"
         seller_text += hint
     else:
         # Delivery flow: сначала готовим, потом передаём курьеру.
         if lang == "uz":
-            hint = "\n\n<i>Buyurtma tayyor bo'lganda “Topshirishga tayyor” " "tugmasini bosing.</i>"
+            hint = (
+                "\n\n<i>Buyurtma tayyor bo'lganda “Topshirishga tayyor” tugmasini bosing.</i>"
+            )
         else:
             hint = "\n\n<i>Когда заказ будет готов, нажмите «Готов к передаче».</i>"
         seller_text += hint
@@ -253,7 +271,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         # Pickup‑заказ, оформленный через orders: не показываем этапы доставки,
         # сразу даём кнопку "выдано" как для брони.
         if lang == "uz":
-            kb.button(text="✅ Topshirildi", callback_data=f"order_complete_{entity_id}")
+            kb.button(text="✅ Berildi", callback_data=f"order_complete_{entity_id}")
         else:
             kb.button(text="✅ Выдано", callback_data=f"order_complete_{entity_id}")
     else:
@@ -317,6 +335,12 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         msg = "Buyurtma topilmadi" if lang == "uz" else "Заказ не найден"
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
+
+    if prefix == "reject_payment_" and hasattr(db_instance, "update_payment_status"):
+        try:
+            db_instance.update_payment_status(entity_id, PaymentStatus.REJECTED)
+        except Exception:  # pragma: no cover - defensive
+            pass
 
     store_id = _get_entity_field(entity, "store_id")
     if not store_id:
@@ -559,7 +583,7 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
     order_type = _get_entity_field(order, "order_type", "delivery")
     if order_type not in ("delivery", "taxi"):
         msg = (
-            "O'zi olib ketishda kuryer telefoni kerak emas. Buyurtma berilgach \"Topshirildi\" tugmasini bosing."
+            "O'zi olib ketishda kuryer telefoni kerak emas. Buyurtma berilgach \"Berildi\" tugmasini bosing."
             if lang == "uz"
             else "Для самовывоза номер курьера не нужен. Нажмите \"Выдано\" после выдачи."
         )
@@ -980,6 +1004,9 @@ def register(router: Router) -> None:
     router.callback_query.register(order_ready_handler, F.data.regexp(r"^order_ready_(\d+)$"))
     router.callback_query.register(
         order_delivering_handler, F.data.regexp(r"^order_delivering_(\d+)$")
+    )
+    router.callback_query.register(
+        order_delivering_handler, F.data.regexp(r"^handover_courier_(\d+)$")
     )
     router.callback_query.register(
         skip_courier_phone_handler, F.data.regexp(r"^skip_courier_phone_(\d+)$")

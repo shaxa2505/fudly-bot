@@ -537,7 +537,7 @@ async def process_successful_payment(message: types.Message) -> None:
                 confirm_text = "✅ Qabul qilish" if seller_lang == "uz" else "✅ Принять"
                 reject_text = "❌ Rad etish" if seller_lang == "uz" else "❌ Отклонить"
             else:
-                confirm_text = "✅ Tasdiqlash" if seller_lang == "uz" else "✅ Подтвердить"
+                confirm_text = "✅ Qabul qilish" if seller_lang == "uz" else "✅ Принять"
                 reject_text = "❌ Rad etish" if seller_lang == "uz" else "❌ Отклонить"
 
             partner_kb.button(text=confirm_text, callback_data=f"order_confirm_{order_id}")

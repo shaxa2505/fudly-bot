@@ -494,37 +494,48 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
 
     if status == OrderStatus.PENDING:
         kb.button(
-            text="Qabul qilish" if lang == "uz" else "Принять",
+            text="✅ Qabul qilish" if lang == "uz" else "✅ Принять",
             callback_data=f"order_confirm_{order_id}",
         )
         kb.button(
-            text="Rad etish" if lang == "uz" else "Отклонить",
+            text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
             callback_data=f"order_reject_{order_id}",
         )
     elif status == OrderStatus.PREPARING:
         if is_delivery:
             kb.button(
-                text="Tayyor" if lang == "uz" else "Готов",
+                text="📦 Topshirishga tayyor" if lang == "uz" else "📦 Готов к передаче",
                 callback_data=f"order_ready_{order_id}",
             )
         else:
             kb.button(
-                text="Topshirildi" if lang == "uz" else "Выдано",
+                text="✅ Berildi" if lang == "uz" else "✅ Выдано",
                 callback_data=f"order_complete_{order_id}",
             )
         kb.button(
-            text="Bekor" if lang == "uz" else "Отменить",
+            text="❌ Bekor" if lang == "uz" else "❌ Отменить",
             callback_data=f"order_cancel_seller_{order_id}",
         )
     elif status == OrderStatus.READY:
         if is_delivery:
             kb.button(
-                text="Yo'lga chiqdi" if lang == "uz" else "В пути",
+                text="🚚 Kuryerga topshirdim" if lang == "uz" else "🚚 Передал курьеру",
                 callback_data=f"order_delivering_{order_id}",
             )
         else:
             kb.button(
-                text="Topshirildi" if lang == "uz" else "Выдано",
+                text="✅ Berildi" if lang == "uz" else "✅ Выдано",
+                callback_data=f"order_complete_{order_id}",
+            )
+    elif status == OrderStatus.DELIVERING:
+        if is_delivery:
+            kb.button(
+                text="✅ Topshirildi" if lang == "uz" else "✅ Доставлено",
+                callback_data=f"order_complete_{order_id}",
+            )
+        else:
+            kb.button(
+                text="✅ Berildi" if lang == "uz" else "✅ Выдано",
                 callback_data=f"order_complete_{order_id}",
             )
 

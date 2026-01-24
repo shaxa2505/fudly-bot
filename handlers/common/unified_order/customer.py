@@ -139,3 +139,6 @@ def register(router: Router) -> None:
     router.callback_query.register(
         customer_received_handler, F.data.regexp(CUSTOMER_RECEIVED_PATTERN)
     )
+    router.callback_query.register(
+        customer_received_handler, F.data.regexp(r"^order_received_(\d+)$")
+    )

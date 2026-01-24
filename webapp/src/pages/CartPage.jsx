@@ -706,7 +706,10 @@ function CartPage({ user }) {
   const isProviderAvailable = (provider) => paymentProviders.includes(provider)
   const hasOnlineProviders = paymentProviders.includes('click')
   const hasPrepayProviders = hasOnlineProviders
-  const deliveryRequiresPrepay = orderType === 'delivery'
+  const deliveryCashEnabled = ['1', 'true', 'yes', 'on'].includes(
+    String(import.meta.env.VITE_DELIVERY_CASH_ENABLED ?? '1').toLowerCase()
+  )
+  const deliveryRequiresPrepay = orderType === 'delivery' && !deliveryCashEnabled
   const checkoutTitle = "Buyurtmani rasmiylashtirish"
   const paymentOptions = [
     {
@@ -1609,7 +1612,7 @@ function CartPage({ user }) {
                         Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
                       </p>
                     )}
-                    {orderType === 'delivery' && storeDeliveryEnabled && canDelivery && !hasPrepayProviders && (
+                    {orderType === 'delivery' && storeDeliveryEnabled && canDelivery && deliveryRequiresPrepay && !hasPrepayProviders && (
                       <p className="checkout-hint">
                         Yetkazib berish uchun to'lov usullari mavjud emas
                       </p>

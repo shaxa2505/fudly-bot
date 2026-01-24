@@ -51,6 +51,15 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 
+def _delivery_cash_enabled() -> bool:
+    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "1").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 # =============================================================================
 # ORDER STATUSES
 # =============================================================================
@@ -1120,7 +1129,7 @@ class UnifiedOrderService:
                 logger.warning("Delivery geocode failed in create_order: %s", geo_err)
 
         payment_method = PaymentStatus.normalize_method(payment_method)
-        if is_delivery and payment_method == "cash":
+        if is_delivery and payment_method == "cash" and not _delivery_cash_enabled():
             return OrderResult(
                 success=False,
                 order_ids=[],
@@ -3021,34 +3030,34 @@ class UnifiedOrderService:
                                 if target_status in (OrderStatus.PENDING, OrderStatus.PREPARING):
                                     if seller_lang == "uz":
                                         kb.button(
-                                            text="Topshirishga tayyor",
+                                            text="📦 Topshirishga tayyor",
                                             callback_data=f"order_ready_{entity_id}",
                                         )
                                     else:
                                         kb.button(
-                                            text="Gotov k peredache",
+                                            text="📦 Готов к передаче",
                                             callback_data=f"order_ready_{entity_id}",
                                         )
                                 elif target_status == OrderStatus.READY:
                                     if seller_lang == "uz":
                                         kb.button(
-                                            text="Kuryerga topshirdim",
+                                            text="🚚 Kuryerga topshirdim",
                                             callback_data=f"order_delivering_{entity_id}",
                                         )
                                     else:
                                         kb.button(
-                                            text="Peredal kureru",
+                                            text="🚚 Передал курьеру",
                                             callback_data=f"order_delivering_{entity_id}",
                                         )
                                 elif target_status == OrderStatus.DELIVERING:
                                     if seller_lang == "uz":
                                         kb.button(
-                                            text="Topshirildi",
+                                            text="✅ Topshirildi",
                                             callback_data=f"order_complete_{entity_id}",
                                         )
                                     else:
                                         kb.button(
-                                            text="Vydano",
+                                            text="✅ Доставлено",
                                             callback_data=f"order_complete_{entity_id}",
                                         )
                             else:
@@ -3060,12 +3069,12 @@ class UnifiedOrderService:
                                 ):
                                     if seller_lang == "uz":
                                         kb.button(
-                                            text="Topshirildi",
+                                            text="✅ Berildi",
                                             callback_data=f"order_complete_{entity_id}",
                                         )
                                     else:
                                         kb.button(
-                                            text="Vydano",
+                                            text="✅ Выдано",
                                             callback_data=f"order_complete_{entity_id}",
                                         )
 

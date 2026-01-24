@@ -491,21 +491,21 @@ async def send_order_card(
         if status == "pending":
             # Use order_ prefix since pickup orders live in orders.
             builder.button(
-                text="Подтвердить" if lang == "ru" else "Tasdiqlash",
+                text="✅ Принять" if lang == "ru" else "✅ Qabul qilish",
                 callback_data=f"order_confirm_{booking_id}",
             )
             builder.button(
-                text="Отменить" if lang == "ru" else "Bekor qilish",
+                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
                 callback_data=f"order_reject_{booking_id}",
             )
             builder.adjust(2, 2)
         elif status == "confirmed":
             builder.button(
-                text="Выдано" if lang == "ru" else "Berildi",
+                text="✅ Выдано" if lang == "ru" else "✅ Berildi",
                 callback_data=f"order_complete_{booking_id}",
             )
             builder.button(
-                text="Отменить" if lang == "ru" else "Bekor qilish",
+                text="❌ Отменить" if lang == "ru" else "❌ Bekor qilish",
                 callback_data=f"order_cancel_seller_{booking_id}",
             )
             builder.adjust(2, 2)
@@ -606,30 +606,33 @@ async def send_order_card(
 
         builder = InlineKeyboardBuilder()
 
-        # Buttons depend on status
-        if status == "pending" and payment_status == "pending":
-            # Waiting for payment confirmation
+        # Buttons depend on status (unified order callbacks)
+        if status == "pending":
             builder.button(
-                text="Подтвердить оплату" if lang == "ru" else "To'lovni tasdiqlash",
-                callback_data=f"confirm_payment_{order_id}",
+                text="✅ Принять" if lang == "ru" else "✅ Qabul qilish",
+                callback_data=f"order_confirm_{order_id}",
             )
             builder.button(
-                text="Отклонить" if lang == "ru" else "Rad etish",
-                callback_data=f"reject_payment_{order_id}",
+                text="❌ Отклонить" if lang == "ru" else "❌ Rad etish",
+                callback_data=f"order_reject_{order_id}",
             )
             builder.adjust(2)
         elif status == "preparing":
-            # Payment confirmed, preparing order
             builder.button(
-                text="Передать курьеру" if lang == "ru" else "Kuryerga topshirish",
-                callback_data=f"handover_courier_{order_id}",
+                text="📦 Готов к передаче" if lang == "ru" else "📦 Topshirishga tayyor",
+                callback_data=f"order_ready_{order_id}",
+            )
+            builder.adjust(1)
+        elif status == "ready":
+            builder.button(
+                text="🚚 Передал курьеру" if lang == "ru" else "🚚 Kuryerga topshirdim",
+                callback_data=f"order_delivering_{order_id}",
             )
             builder.adjust(1)
         elif status == "delivering":
-            # Order is being delivered - no actions needed
             builder.button(
-                text="В пути" if lang == "ru" else "Yo'lda",
-                callback_data="noop",
+                text="✅ Доставлено" if lang == "ru" else "✅ Topshirildi",
+                callback_data=f"order_complete_{order_id}",
             )
             builder.adjust(1)
 

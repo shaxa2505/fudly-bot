@@ -32,6 +32,15 @@ from logging_config import logger
 # =============================================================================
 
 
+def _delivery_cash_enabled() -> bool:
+    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "1").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def get_offer_value(obj: Any, key: str, default: Any = None) -> Any:
     """Get value from dict or object."""
     if isinstance(obj, dict):
@@ -1401,10 +1410,10 @@ async def create_webhook_app(
                 return add_cors_headers(
                     web.json_response({"error": "Unsupported payment method"}, status=400)
                 )
-            if is_delivery and payment_method != "click":
+            if is_delivery and payment_method == "cash" and not _delivery_cash_enabled():
                 return add_cors_headers(
                     web.json_response(
-                        {"error": "Only Click is allowed for delivery orders"}, status=400
+                        {"error": "Cash is not allowed for delivery orders"}, status=400
                     )
                 )
 
@@ -1463,7 +1472,7 @@ async def create_webhook_app(
 
             if is_delivery and (not address or not str(address).strip()):
                 return _respond({"error": "Delivery address required"}, 400)
-            if is_delivery and payment_method == "cash":
+            if is_delivery and payment_method == "cash" and not _delivery_cash_enabled():
                 return _respond(
                     {"error": "Cash is not allowed for delivery orders"},
                     400,

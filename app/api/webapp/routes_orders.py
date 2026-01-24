@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 from typing import Any
 
 from aiogram import Bot
@@ -38,6 +39,15 @@ from .common import (
 )
 
 router = APIRouter()
+
+
+def _delivery_cash_enabled() -> bool:
+    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "1").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 class CancelOrderResponse(BaseModel):
@@ -217,10 +227,10 @@ async def create_order(
         if payment_method not in ("cash", "click"):
             raise HTTPException(status_code=400, detail="Unsupported payment method")
 
-        if is_delivery and payment_method != "click":
+        if is_delivery and payment_method == "cash" and not _delivery_cash_enabled():
             raise HTTPException(
                 status_code=400,
-                detail="Only Click is allowed for delivery orders",
+                detail="Cash is not allowed for delivery orders",
             )
 
         if is_delivery:
@@ -834,7 +844,7 @@ async def notify_partner_webapp_order(
         else:
             text += "\n🏪 <b>O'zi olib ketadi</b>\n"
         text += "━━━━━━━━━━━━━━━━━━━━"
-        confirm_text = "✅ Tasdiqlash"
+        confirm_text = "✅ Qabul qilish"
         reject_text = "❌ Rad etish"
     else:
         text = (
@@ -855,7 +865,7 @@ async def notify_partner_webapp_order(
         else:
             text += "\n🏪 <b>Самовывоз</b>\n"
         text += "━━━━━━━━━━━━━━━━━━━━"
-        confirm_text = "✅ Подтвердить"
+        confirm_text = "✅ Принять"
         reject_text = "❌ Отклонить"
 
     kb = InlineKeyboardBuilder()
