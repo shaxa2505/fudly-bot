@@ -102,7 +102,7 @@ function ExplorePage({ onNavigate }) {
       </div>
 
       {/* Categories Grid */}
-      <div className="categories-grid">
+      <div className="explore-categories-grid">
         {filteredCategories.map(category => {
           const IconComponent = category.icon
           return (
@@ -115,7 +115,7 @@ function ExplorePage({ onNavigate }) {
               }}
               onClick={() => handleCategoryClick(category)}
             >
-              <div className="category-image">
+              <div className="explore-category-image">
                 <IconComponent
                   size={48}
                   color={category.borderColor}
@@ -123,7 +123,7 @@ function ExplorePage({ onNavigate }) {
                   aria-hidden="true"
                 />
               </div>
-              <h3 className="category-name">{category.name}</h3>
+              <h3 className="explore-category-name">{category.name}</h3>
             </button>
           )
         })}
