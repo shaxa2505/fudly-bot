@@ -1110,6 +1110,15 @@ class UnifiedOrderService:
                 error_message="Delivery address required",
             )
 
+        if is_delivery and delivery_address and (delivery_lat is None or delivery_lon is None):
+            try:
+                geo = await geocode_store_address(delivery_address, None)
+                if geo:
+                    delivery_lat = geo.get("latitude")
+                    delivery_lon = geo.get("longitude")
+            except Exception as geo_err:
+                logger.warning("Delivery geocode failed in create_order: %s", geo_err)
+
         payment_method = PaymentStatus.normalize_method(payment_method)
         if is_delivery and payment_method == "cash":
             return OrderResult(
@@ -1732,14 +1741,11 @@ class UnifiedOrderService:
 
                 seller_lang = self.db.get_user_language(owner_id)
                 currency = "so'm" if seller_lang == "uz" else "сум"
+                is_delivery = order_type in ("delivery", "taxi")
 
                 # Calculate store totals
                 store_total = sum(o["price"] * o["quantity"] for o in store_orders)
-                store_delivery = (
-                    store_orders[0].get("delivery_price", 0)
-                    if order_type in ("delivery", "taxi")
-                    else 0
-                )
+                store_delivery = store_orders[0].get("delivery_price", 0) if is_delivery else 0
 
                 # Build notification
                 order_ids: list[str] = []
