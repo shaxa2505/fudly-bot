@@ -702,6 +702,7 @@ function CartPage({ user }) {
   const canDelivery = subtotal >= minOrderAmount
   const isProviderAvailable = (provider) => paymentProviders.includes(provider)
   const hasOnlineProviders = paymentProviders.includes('click')
+  const hasPrepayProviders = hasOnlineProviders
   const deliveryRequiresPrepay = orderType === 'delivery'
   const checkoutTitle = "Buyurtmani rasmiylashtirish"
   const paymentOptions = [
