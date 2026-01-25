@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
+import { calcTotalPrice } from '../utils/orderMath'
 import { getCurrentUser } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation } from '../utils/cityUtils'
@@ -669,9 +670,12 @@ function CartPage({ user }) {
 
   // Calculate totals using context values
   const subtotal = cartTotal
-  const total = orderType === 'delivery' ? subtotal + deliveryFee : subtotal
+  const total = calcTotalPrice(
+    subtotal,
+    orderType === 'delivery' ? deliveryFee : 0
+  )
   const serviceFee = 0
-  const checkoutTotal = total + serviceFee
+  const checkoutTotal = calcTotalPrice(total, serviceFee)
   const itemsCount = cartCount
   const savingsTotal = useMemo(() => {
     return cartItems.reduce((sum, item) => {
@@ -687,7 +691,7 @@ function CartPage({ user }) {
     }, 0)
   }, [cartItems])
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
-  const originalTotal = subtotal + savingsTotal
+  const originalTotal = calcTotalPrice(subtotal, savingsTotal)
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
   const deliveryOptions = [
     { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },

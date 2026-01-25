@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
+import { calcItemsTotal } from '../utils/orderMath'
 import api from '../api/client'
 import { resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from '../components/QuantityControl'
@@ -107,8 +108,8 @@ function ProductDetailPage() {
     : 0
   const discountPercent = Number(offer?.discount_percent ?? 0) || fallbackDiscountPercent
   const savingsPerUnit = hasDiscount ? Math.max(0, originalPrice - unitPrice) : 0
-  const totalPrice = Math.max(0, unitPrice * quantity)
-  const totalSavings = savingsPerUnit * quantity
+  const totalPrice = Math.max(0, calcItemsTotal([{ price: unitPrice, quantity }]))
+  const totalSavings = calcItemsTotal([{ price: savingsPerUnit, quantity }])
   const storeName = offer?.store_name || store?.name || ''
   const storeAddress = offer?.store_address || store?.address || ''
   const storeRating = Number(store?.rating ?? 0)

@@ -241,9 +241,9 @@ class UserMixin:
     def get_user_model(self, user_id: int) -> Any | None:
         """Return user as Pydantic model."""
         try:
-            from app.domain import User
-        except ImportError:
-            logger.error("Domain models not available. Install pydantic.")
+            from app.domain.entities import User
+        except Exception as e:
+            logger.error(f"Domain models not available: {e}")
             return None
 
         user_dict = self.get_user(user_id)
