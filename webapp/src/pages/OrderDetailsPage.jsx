@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
+import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
@@ -196,16 +197,27 @@ export default function OrderDetailsPage() {
   const canPayOnline = order.payment_method === 'click'
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
 
-  const totalPrice = Number(order.total_price || 0)
+  const rawTotalValue = order?.total_price
+  const rawTotal = rawTotalValue == null ? null : Number(rawTotalValue || 0)
   const hasItemBreakdown = Array.isArray(order.items) && order.items.length > 0
   const rawItemsSubtotal = hasItemBreakdown
-    ? order.items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0)
+    ? calcItemsTotal(order.items, {
+      getPrice: (item) => Number(item?.price || 0),
+      getQuantity: (item) => Number(item?.quantity || 0),
+    })
     : 0
-  const fallbackDeliveryFee = hasItemBreakdown && totalPrice > rawItemsSubtotal ? totalPrice - rawItemsSubtotal : 0
-  const deliveryFee = isDelivery ? (Number(order.delivery_fee || 0) || fallbackDeliveryFee) : 0
-  const itemsSubtotal = hasItemBreakdown ? rawItemsSubtotal : Math.max(0, totalPrice - deliveryFee)
+  const deliveryFee = isDelivery
+    ? calcDeliveryFee(rawTotal, rawItemsSubtotal, {
+      deliveryFee: order?.delivery_fee,
+      isDelivery,
+    })
+    : 0
+  const itemsSubtotal = hasItemBreakdown
+    ? rawItemsSubtotal
+    : Math.max(0, (rawTotal || 0) - deliveryFee)
+  const totalPrice = calcTotalPrice(rawItemsSubtotal, deliveryFee, { totalPrice: rawTotal })
   const totalUnits = hasItemBreakdown
-    ? order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    ? calcQuantity(order.items, item => Number(item?.quantity || 0))
     : (order.quantity || 1)
 
   const paymentMethodLabels = {

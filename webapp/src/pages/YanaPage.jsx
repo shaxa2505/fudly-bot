@@ -19,6 +19,7 @@ import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import { resolveImageUrl } from '../utils/imageUtils'
+import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import './YanaPage.css'
 
 const ACTIVE_STATUSES = new Set([
@@ -358,7 +359,7 @@ function YanaPage({ user }) {
     const items = Array.isArray(order.items) ? order.items : []
     const explicitQty = Number(order.quantity || 0)
     if (explicitQty) return explicitQty
-    const itemsQty = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    const itemsQty = calcQuantity(items, item => Number(item?.quantity || 0))
     return itemsQty || 1
   }
 
@@ -370,14 +371,17 @@ function YanaPage({ user }) {
     const orderStatus = normalizeOrderStatus(order.order_status || order.status)
     const quantity = getOrderQuantity(order)
     const rawTotal = Number(order.total_price ?? order.total_amount ?? order.total ?? 0)
-    const itemsTotal = items.reduce((sum, item) => {
-      const price = Number(item.price ?? item.discount_price ?? 0)
-      const qty = Number(item.quantity ?? 0)
-      return sum + price * qty
-    }, 0)
-    const deliveryFee = Number(order.delivery_fee ?? 0)
-    const baseTotal = itemsTotal || (rawTotal && deliveryFee ? Math.max(0, rawTotal - deliveryFee) : rawTotal)
-    const totalPrice = rawTotal || itemsTotal
+    const itemsTotal = calcItemsTotal(items, {
+      getPrice: (item) => Number(item?.price ?? item?.discount_price ?? 0),
+      getQuantity: (item) => Number(item?.quantity ?? 0),
+    })
+    const isDelivery = order?.order_type === 'delivery' || order?.delivery_address
+    const deliveryFee = calcDeliveryFee(rawTotal, itemsTotal, {
+      deliveryFee: order?.delivery_fee,
+      isDelivery,
+    })
+    const baseTotal = itemsTotal || (rawTotal ? Math.max(0, rawTotal - deliveryFee) : 0)
+    const totalPrice = calcTotalPrice(itemsTotal, deliveryFee, { totalPrice: rawTotal || null })
     const unitPrice = quantity
       ? Math.round((baseTotal || 0) / quantity)
       : (items[0]?.price ?? items[0]?.discount_price ?? 0)

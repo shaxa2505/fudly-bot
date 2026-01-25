@@ -567,7 +567,7 @@ class RegistrationCheckMiddleware(BaseMiddleware):
 
         # Only check if user exists, NOT if they have phone
         # Phone is requested during registration (checkout still validates)
-        user = self.db.get_user_model(user_id)
+        user = self.db.get_user(user_id) if hasattr(self.db, "get_user") else None
         if not user:
             lang = "ru"
             logger.debug(

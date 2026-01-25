@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { calcItemsTotal, calcQuantity } from '../utils/orderMath';
 
 const STORAGE_KEY = 'fudly_cart_v2';
 
@@ -175,21 +176,18 @@ export function CartProvider({ children }) {
   // Computed values
   const cartItems = useMemo(() => Object.values(cart), [cart]);
 
-  const cartCount = useMemo(() => {
-    return cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  }, [cartItems]);
+  const cartCount = useMemo(() => (
+    calcQuantity(cartItems, item => item?.quantity ?? 0)
+  ), [cartItems]);
 
-  const cartTotal = useMemo(() => {
-    return cartItems.reduce(
-      (sum, item) => {
-        const price = Number(
-          item.offer.discount_price ?? item.offer.original_price ?? 0
-        )
-        return sum + price * item.quantity
-      },
-      0
-    );
-  }, [cartItems]);
+  const cartTotal = useMemo(() => (
+    calcItemsTotal(cartItems, {
+      getPrice: (item) => (
+        item?.offer?.discount_price ?? item?.offer?.original_price ?? 0
+      ),
+      getQuantity: (item) => item?.quantity ?? 0,
+    })
+  ), [cartItems]);
 
   const isEmpty = cartItems.length === 0;
 
