@@ -98,6 +98,29 @@ class OrderResult:
     failed_items: list[OrderItem] | None = None
 
 
+@dataclass
+class StatusUpdateContext:
+    """Normalized context for status updates."""
+
+    entity_id: int
+    entity_type: Literal["order", "booking"]
+    entity: Any
+    user_id: int | None
+    store_id: int | None
+    pickup_code: str | None
+    current_status_raw: str | None
+    order_type: str | None
+    payment_method: str | None
+    payment_status: str | None
+    delivery_address: str | None
+    delivery_price: int
+    is_cart: bool
+    cart_items_json: Any
+    offer_id: int | None
+    quantity: int
+    total_price: int | None
+
+
 # =============================================================================
 # NOTIFICATION TEMPLATES
 # =============================================================================
@@ -2046,6 +2069,993 @@ class UnifiedOrderService:
     # STATUS MANAGEMENT
     # =========================================================================
 
+    def _get_status_update_context(
+        self,
+        entity_id: int,
+        entity_type: Literal["order", "booking"],
+    ) -> StatusUpdateContext | None:
+        """Load entity and normalize status update context."""
+        # IMPORTANT: orders and bookings may still live in different tables at runtime.
+        # Respect entity_type to avoid updating a wrong record on id collision.
+        if entity_type == "booking":
+            if not hasattr(self.db, "get_booking"):
+                logger.warning("DB layer does not support bookings")
+                return None
+
+            entity = self.db.get_booking(entity_id)
+            if not entity:
+                logger.warning(f"Booking not found: #{entity_id}")
+                return None
+
+            if isinstance(entity, dict):
+                user_id = entity.get("user_id")
+                store_id = entity.get("store_id")
+                pickup_code = entity.get("booking_code") or entity.get("pickup_code")
+                current_status_raw = entity.get("status") or entity.get("order_status")
+                is_cart = int(entity.get("is_cart_booking") or 0) == 1
+                cart_items_json = entity.get("cart_items")
+                offer_id = entity.get("offer_id")
+                quantity = int(entity.get("quantity") or 1)
+            else:
+                user_id = getattr(entity, "user_id", None)
+                store_id = getattr(entity, "store_id", None)
+                pickup_code = getattr(entity, "booking_code", None) or getattr(
+                    entity, "pickup_code", None
+                )
+                current_status_raw = getattr(entity, "status", None) or getattr(
+                    entity, "order_status", None
+                )
+                is_cart = int(getattr(entity, "is_cart_booking", 0) or 0) == 1
+                cart_items_json = getattr(entity, "cart_items", None)
+                offer_id = getattr(entity, "offer_id", None)
+                quantity = int(getattr(entity, "quantity", 1) or 1)
+
+            return StatusUpdateContext(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                entity=entity,
+                user_id=user_id,
+                store_id=store_id,
+                pickup_code=pickup_code,
+                current_status_raw=current_status_raw,
+                order_type="pickup",
+                payment_method=None,
+                payment_status=None,
+                delivery_address=None,
+                delivery_price=0,
+                is_cart=is_cart,
+                cart_items_json=cart_items_json,
+                offer_id=offer_id,
+                quantity=quantity,
+                total_price=None,
+            )
+
+        if not hasattr(self.db, "get_order"):
+            logger.warning("DB layer does not support orders")
+            return None
+
+        entity = self.db.get_order(entity_id)
+        if not entity:
+            logger.warning(f"Order not found: #{entity_id}")
+            return None
+
+        if isinstance(entity, dict):
+            user_id = entity.get("user_id")
+            store_id = entity.get("store_id")
+            pickup_code = entity.get("pickup_code")
+            current_status_raw = entity.get("order_status")
+            order_type = entity.get("order_type")
+            payment_method = entity.get("payment_method")
+            payment_status = entity.get("payment_status")
+            delivery_address = entity.get("delivery_address")
+            delivery_price = int(entity.get("delivery_price") or 0)
+            is_cart = int(entity.get("is_cart_order") or 0) == 1
+            cart_items_json = entity.get("cart_items")
+            offer_id = entity.get("offer_id")
+            quantity = int(entity.get("quantity") or 1)
+            total_price = entity.get("total_price")
+
+            # Fallback: if order_type not set, determine from delivery_address
+            if not order_type:
+                order_type = "delivery" if delivery_address else "pickup"
+                logger.info(
+                    f"Order type fallback for #{entity_id}: "
+                    f"delivery_address={delivery_address}, order_type={order_type}"
+                )
+            else:
+                logger.info(f"Order type from DB for #{entity_id}: {order_type}")
+        else:
+            # Tuple format
+            user_id = getattr(entity, "user_id", None)
+            store_id = getattr(entity, "store_id", None)
+            pickup_code = getattr(entity, "pickup_code", None)
+            current_status_raw = getattr(entity, "order_status", None)
+            order_type = getattr(entity, "order_type", None)
+            payment_method = getattr(entity, "payment_method", None)
+            payment_status = getattr(entity, "payment_status", None)
+            delivery_address = getattr(entity, "delivery_address", None)
+            delivery_price = int(getattr(entity, "delivery_price", 0) or 0)
+            is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
+            cart_items_json = getattr(entity, "cart_items", None)
+            offer_id = getattr(entity, "offer_id", None)
+            quantity = int(getattr(entity, "quantity", 1) or 1)
+            total_price = getattr(entity, "total_price", None)
+            if not order_type:
+                order_type = "delivery" if delivery_address else "pickup"
+
+        return StatusUpdateContext(
+            entity_id=entity_id,
+            entity_type=entity_type,
+            entity=entity,
+            user_id=user_id,
+            store_id=store_id,
+            pickup_code=pickup_code,
+            current_status_raw=current_status_raw,
+            order_type=order_type,
+            payment_method=payment_method,
+            payment_status=payment_status,
+            delivery_address=delivery_address,
+            delivery_price=delivery_price,
+            is_cart=is_cart,
+            cart_items_json=cart_items_json,
+            offer_id=offer_id,
+            quantity=quantity,
+            total_price=total_price,
+        )
+
+    def _apply_status_update(
+        self,
+        ctx: StatusUpdateContext,
+        target_status: str,
+        current_status_raw: str | None,
+        terminal_statuses: set[str],
+    ) -> tuple[bool, bool]:
+        """Persist status change. Returns (update_ok, short_circuit)."""
+        update_ok = True
+        if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED]:
+            try:
+                with self.db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    if ctx.entity_type == "booking":
+                        if current_status_raw is not None:
+                            cursor.execute(
+                                "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s AND status = %s",
+                                (target_status, ctx.entity_id, current_status_raw),
+                            )
+                        else:
+                            cursor.execute(
+                                "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s",
+                                (target_status, ctx.entity_id),
+                            )
+                    else:
+                        if current_status_raw is not None:
+                            cursor.execute(
+                                "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s AND order_status = %s",
+                                (target_status, ctx.entity_id, current_status_raw),
+                            )
+                        else:
+                            cursor.execute(
+                                "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s",
+                                (target_status, ctx.entity_id),
+                            )
+                    update_ok = cursor.rowcount > 0
+            except Exception as e:
+                logger.error(f"Failed to update status atomically: {e}")
+                return False, False
+
+            if not update_ok:
+                latest = (
+                    self.db.get_booking(ctx.entity_id)
+                    if ctx.entity_type == "booking"
+                    else self.db.get_order(ctx.entity_id)
+                )
+                latest_status_raw = None
+                if isinstance(latest, dict):
+                    latest_status_raw = (
+                        latest.get("status")
+                        if ctx.entity_type == "booking"
+                        else latest.get("order_status")
+                    )
+                else:
+                    latest_status_raw = (
+                        getattr(latest, "status", None)
+                        if ctx.entity_type == "booking"
+                        else getattr(latest, "order_status", None)
+                    )
+
+                latest_status = (
+                    OrderStatus.normalize(str(latest_status_raw))
+                    if latest_status_raw
+                    else None
+                )
+                if latest_status in terminal_statuses:
+                    logger.info(
+                        f"STATUS_UPDATE skipped due to race: #{ctx.entity_id} status={latest_status}"
+                    )
+                    return False, True
+                return False, False
+        else:
+            if ctx.entity_type == "booking":
+                if not hasattr(self.db, "update_booking_status"):
+                    logger.warning("DB layer does not support update_booking_status")
+                    return False, False
+                self.db.update_booking_status(ctx.entity_id, target_status)
+            else:
+                if not hasattr(self.db, "update_order_status"):
+                    logger.warning("DB layer does not support update_order_status")
+                    return False, False
+                self.db.update_order_status(ctx.entity_id, target_status)
+
+        return True, False
+
+    async def _notify_status_change(
+        self,
+        ctx: StatusUpdateContext,
+        target_status: str,
+        normalized_payment_status: str,
+        notify_customer: bool,
+        reject_reason: str | None,
+        courier_phone: str | None,
+        new_status: str,
+    ) -> None:
+        entity = ctx.entity
+        entity_type = ctx.entity_type
+        entity_id = ctx.entity_id
+        user_id = ctx.user_id
+        store_id = ctx.store_id
+        pickup_code = ctx.pickup_code
+        order_type = ctx.order_type
+        delivery_address = ctx.delivery_address
+        delivery_price = ctx.delivery_price
+        is_cart = ctx.is_cart
+        cart_items_json = ctx.cart_items_json
+        offer_id = ctx.offer_id
+        quantity = ctx.quantity
+        total_price = ctx.total_price
+
+        # Send notification to customer - SMART FILTERING
+        # Skip redundant notifications to avoid spam:
+        # - READY status (internal state, customer doesn't need notification)
+        # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
+        notifications_enabled = self._notifications_enabled(user_id)
+        should_notify = notify_customer and user_id and notifications_enabled
+        existing_message_id = None
+        if isinstance(entity, dict):
+            existing_message_id = entity.get("customer_message_id")
+        else:
+            existing_message_id = getattr(entity, "customer_message_id", None)
+        should_edit = bool(existing_message_id) and user_id and notifications_enabled
+        should_force_send = (
+            self.force_telegram_sync and user_id and not existing_message_id and notifications_enabled
+        )
+
+        logger.info(
+            f"Notification check for #{entity_id}: "
+            f"status={target_status}, order_type={order_type}, "
+            f"notify_customer={notify_customer}, user_id={user_id}, "
+            f"should_notify={should_notify}, should_edit={should_edit}, "
+            f"should_force_send={should_force_send}"
+        )
+
+        # OPTIMIZATION: Skip READY notification for delivery orders only
+        # READY is mostly internal for delivery (courier pickup), but it's important for pickup
+        if target_status == OrderStatus.READY and order_type in ("delivery", "taxi"):
+            should_notify = False
+            should_edit = False
+            should_force_send = False
+            logger.info(
+                f"Skipping READY notification for delivery order#{entity_id}"
+            )
+
+        if user_id:
+            try:
+                from app.core.websocket import get_websocket_manager
+
+                customer_unified_min = build_unified_order_payload(
+                    kind="order_status_changed",
+                    role="customer",
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    entity_ids=[entity_id],
+                    is_cart=is_cart,
+                    order_type=order_type,
+                    status=target_status,
+                    payment_status=normalized_payment_status,
+                    pickup_code=pickup_code,
+                    delivery_address=delivery_address,
+                    store={"id": int(store_id)} if store_id else None,
+                    customer={"id": int(user_id)} if user_id else None,
+                    courier={"phone": courier_phone} if courier_phone else None,
+                    amounts={"delivery_fee": int(delivery_price or 0)},
+                )
+                ws_manager = get_websocket_manager()
+                await ws_manager.send_to_user(
+                    int(user_id),
+                    {
+                        "type": "order_status_changed",
+                        "data": {
+                            "entity_id": entity_id,
+                            "entity_type": entity_type,
+                            "status": target_status,
+                            "order_type": order_type,
+                            "unified": customer_unified_min,
+                        },
+                    },
+                )
+            except Exception as ws_error:
+                logger.warning(f"WebSocket notify failed for status change: {ws_error}")
+
+        if store_id:
+            partner_unified_min = build_unified_order_payload(
+                kind="order_status_changed",
+                role="partner",
+                entity_type=entity_type,
+                entity_id=entity_id,
+                entity_ids=[entity_id],
+                is_cart=is_cart,
+                order_type=order_type,
+                status=target_status,
+                payment_status=normalized_payment_status,
+                pickup_code=pickup_code,
+                delivery_address=delivery_address,
+                store={"id": int(store_id)},
+                customer={"id": int(user_id)} if user_id else None,
+                courier={"phone": courier_phone} if courier_phone else None,
+                amounts={"delivery_fee": int(delivery_price or 0)},
+            )
+            try:
+                from app.api.websocket_manager import get_connection_manager
+
+                store_ws = get_connection_manager()
+                await store_ws.notify_order_status(
+                    int(store_id),
+                    int(entity_id),
+                    target_status,
+                    unified=partner_unified_min,
+                )
+            except Exception as ws_error:
+                logger.warning(f"Partner WebSocket notify failed: {ws_error}")
+
+            try:
+                notification_service = get_notification_service()
+                await notification_service.notify_store(
+                    Notification(
+                        type=NotificationType.SYSTEM_ANNOUNCEMENT,
+                        recipient_id=int(store_id),
+                        title=f"Order #{entity_id}",
+                        message=f"Status: {target_status}",
+                        data={
+                            "kind": "order_status_changed",
+                            "order_id": entity_id,
+                            "status": target_status,
+                            "order_type": order_type,
+                            "unified": partner_unified_min,
+                        },
+                        priority=0,
+                    )
+                )
+            except Exception as notify_error:
+                logger.warning(f"Store status notification failed: {notify_error}")
+
+        if should_notify or should_edit or should_force_send:
+            store = self.db.get_store(store_id) if store_id else None
+            store_name = store.get("name", "") if isinstance(store, dict) else ""
+            store_address = store.get("address", "") if isinstance(store, dict) else ""
+
+            customer_lang = self.db.get_user_language(user_id)
+            currency = None
+            cart_items = None
+            if is_cart and cart_items_json:
+                try:
+                    import json
+
+                    cart_items = (
+                        json.loads(cart_items_json)
+                        if isinstance(cart_items_json, str)
+                        else cart_items_json
+                    )
+                except Exception:
+                    cart_items = None
+
+            if not cart_items and offer_id:
+                item_title = ""
+                item_price = None
+                if hasattr(self.db, "get_offer"):
+                    offer = self.db.get_offer(int(offer_id))
+                    if isinstance(offer, dict):
+                        item_title = offer.get("title", "")
+                        item_price = offer.get("discount_price", None)
+                    else:
+                        item_title = getattr(offer, "title", "") if offer else ""
+                        item_price = getattr(offer, "discount_price", None) if offer else None
+
+                if not item_title:
+                    item_title = "Mahsulot" if customer_lang == "uz" else "Товар"
+
+                if item_price is None and total_price is not None and quantity:
+                    try:
+                        item_price = int((float(total_price) - float(delivery_price)) / quantity)
+                    except Exception:
+                        item_price = 0
+
+                cart_items = [
+                    {
+                        "title": item_title,
+                        "quantity": int(quantity or 1),
+                        "price": int(item_price or 0),
+                    }
+                ]
+
+            photo_ids = self._collect_photos_from_items(cart_items)
+            customer_photo = None
+            if len(photo_ids) > 1:
+                customer_photo = await self._build_collage_photo(photo_ids)
+            if not customer_photo and photo_ids:
+                customer_photo = photo_ids[0]
+            if not customer_photo and offer_id:
+                try:
+                    customer_photo = self._get_offer_photo(int(offer_id))
+                except (TypeError, ValueError):
+                    customer_photo = None
+
+            group_order_ids = None
+            group_statuses: list[str] | None = None
+            orders_for_group = None
+            if entity_type == "order" and existing_message_id:
+                if hasattr(self.db, "get_orders_by_customer_message_id"):
+                    try:
+                        orders_for_group = self.db.get_orders_by_customer_message_id(
+                            int(existing_message_id)
+                        )
+                    except Exception as group_err:
+                        logger.debug(f"Failed to load grouped orders: {group_err}")
+                elif user_id and hasattr(self.db, "get_user_orders"):
+                    try:
+                        orders_for_group = self.db.get_user_orders(int(user_id)) or []
+                    except Exception as group_err:
+                        logger.debug(f"Failed to load grouped orders: {group_err}")
+
+            if orders_for_group:
+                try:
+                    grouped_ids: list[int] = []
+                    grouped_statuses: list[str] = []
+                    for order in orders_for_group:
+                        if not isinstance(order, dict):
+                            continue
+                        if order.get("customer_message_id") != existing_message_id:
+                            continue
+                        oid = order.get("order_id") or order.get("id")
+                        if oid is not None:
+                            grouped_ids.append(int(oid))
+                        raw_status = order.get("order_status") or order.get("status")
+                        if raw_status:
+                            grouped_statuses.append(
+                                OrderStatus.normalize(str(raw_status))
+                            )
+                    if grouped_ids:
+                        group_order_ids = grouped_ids
+                    if grouped_statuses:
+                        group_statuses = grouped_statuses
+                except Exception as group_err:
+                    logger.debug(f"Failed to load grouped order ids: {group_err}")
+
+            is_grouped = False
+            aggregated_status = target_status
+            if cart_items:
+                currency = "so'm" if customer_lang == "uz" else "сум"
+                is_grouped = bool(group_order_ids and len(group_order_ids) > 1)
+                if is_grouped and group_statuses:
+                    unique_statuses = set(group_statuses)
+                    if unique_statuses == {OrderStatus.COMPLETED}:
+                        aggregated_status = OrderStatus.COMPLETED
+                    elif OrderStatus.REJECTED in unique_statuses:
+                        aggregated_status = OrderStatus.REJECTED
+                    elif OrderStatus.CANCELLED in unique_statuses:
+                        aggregated_status = OrderStatus.CANCELLED
+                    elif OrderStatus.DELIVERING in unique_statuses:
+                        aggregated_status = OrderStatus.DELIVERING
+                    elif OrderStatus.READY in unique_statuses:
+                        aggregated_status = OrderStatus.READY
+                    elif OrderStatus.PREPARING in unique_statuses:
+                        aggregated_status = OrderStatus.PREPARING
+                    elif OrderStatus.PENDING in unique_statuses:
+                        aggregated_status = OrderStatus.PENDING
+
+                msg = NotificationTemplates.customer_cart_status_update(
+                    lang=customer_lang,
+                    order_id=entity_id,
+                    status=aggregated_status,
+                    order_type=order_type,
+                    items=cart_items,
+                    currency=currency,
+                    is_cart=is_cart or is_grouped,
+                    order_ids=group_order_ids,
+                    store_name=store_name,
+                    store_address=store_address,
+                    delivery_address=delivery_address,
+                    delivery_price=delivery_price,
+                    pickup_code=pickup_code,
+                    reject_reason=reject_reason,
+                    courier_phone=courier_phone,
+                )
+            else:
+                msg = NotificationTemplates.customer_status_update(
+                    lang=customer_lang,
+                    order_id=entity_id,
+                    status=target_status,
+                    order_type=order_type,
+                    store_name=store_name,
+                    store_address=store_address,
+                    pickup_code=pickup_code,
+                    reject_reason=reject_reason,
+                    courier_phone=courier_phone,
+                )
+
+            amounts_payload = {"delivery_fee": int(delivery_price or 0)}
+            if total_price is not None:
+                amounts_payload["subtotal"] = int(total_price or 0)
+                amounts_payload["total"] = int(total_price or 0) + int(delivery_price or 0)
+            if currency:
+                amounts_payload["currency"] = currency
+
+            customer_unified_full = build_unified_order_payload(
+                kind="order_status_changed",
+                role="customer",
+                entity_type=entity_type,
+                entity_id=entity_id,
+                entity_ids=group_order_ids or [entity_id],
+                is_cart=is_cart or is_grouped,
+                order_type=order_type,
+                status=aggregated_status,
+                payment_status=normalized_payment_status,
+                pickup_code=pickup_code,
+                delivery_address=delivery_address,
+                store={
+                    "id": int(store_id) if store_id else None,
+                    "name": store_name,
+                    "address": store_address,
+                },
+                customer={"id": int(user_id)} if user_id else None,
+                courier={"phone": courier_phone} if courier_phone else None,
+                items=cart_items,
+                amounts=amounts_payload,
+            )
+
+            if should_notify:
+
+
+                try:
+                    notif_title = (
+                        f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"Заказ #{entity_id}"
+                    )
+                    plain_msg = re.sub(r"<[^>]+>", "", msg)
+                    if target_status in (OrderStatus.CANCELLED,):
+                        notif_type = NotificationType.BOOKING_CANCELLED
+                    elif target_status in (OrderStatus.COMPLETED,):
+                        notif_type = NotificationType.BOOKING_COMPLETED
+                    elif target_status in (OrderStatus.PREPARING, OrderStatus.DELIVERING):
+                        notif_type = NotificationType.BOOKING_CONFIRMED
+                    else:
+                        notif_type = NotificationType.SYSTEM_ANNOUNCEMENT
+
+                    notification_service = get_notification_service()
+                    await notification_service.notify_user(
+                        Notification(
+                            type=notif_type,
+                            recipient_id=int(user_id),
+                            title=notif_title,
+                            message=plain_msg,
+                            data={
+                                "order_id": entity_id,
+                                "status": target_status,
+                                "order_type": order_type,
+                                "entity_type": entity_type,
+                                "unified": customer_unified_full,
+                            },
+                            priority=0,
+                        )
+                    )
+                except Exception as notify_error:
+                    logger.warning(
+                        f"Notification service failed for {entity_type}#{entity_id}: {notify_error}"
+                    )
+
+            # Add buttons for customer based on status
+            reply_markup = None
+            if target_status == OrderStatus.COMPLETED:
+                # Rating buttons for completed orders
+                kb = InlineKeyboardBuilder()
+                callback_prefix = (
+                    f"rate_order_{entity_id}_"
+                    if entity_type == "order"
+                    else f"rate_booking_{entity_id}_"
+                )
+                for i in range(1, 6):
+                    kb.button(text="⭐" * i, callback_data=f"{callback_prefix}{i}")
+                kb.adjust(5)
+                reply_markup = kb.as_markup()
+            elif new_status == OrderStatus.DELIVERING and order_type in ("delivery", "taxi"):
+                # "Received" button for delivery orders in transit
+                kb = InlineKeyboardBuilder()
+                received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
+                kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
+                reply_markup = kb.as_markup()
+            elif target_status == OrderStatus.READY and order_type == "pickup":
+                # "Received" button for pickup orders when ready
+                # v24+: all orders in unified table, use customer_received_
+                kb = InlineKeyboardBuilder()
+                received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
+                kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
+                reply_markup = kb.as_markup()
+            # Try to EDIT existing message first (live status update)
+            # This reduces spam - customer sees ONE message that updates
+            allow_telegram_updates = (
+                self.telegram_order_notifications or should_edit or should_force_send
+            )
+
+            if allow_telegram_updates:
+                message_sent = None
+                edit_success = False
+
+                if should_edit and existing_message_id:
+                    logger.info(
+                        f"Trying to edit message {existing_message_id} for #{entity_id}"
+                    )
+
+                    # Try BOTH methods - caption first (for photos), then text
+                    # Because we don't know if original message had photo or not
+
+                    # Method 1: Try edit_message_caption (for messages with photo)
+                    try:
+                        await self.bot.edit_message_caption(
+                            chat_id=user_id,
+                            message_id=existing_message_id,
+                            caption=msg,
+                            parse_mode="HTML",
+                            reply_markup=reply_markup,
+                        )
+                        edit_success = True
+                        logger.info(f"Edited CAPTION for {entity_type}#{entity_id}")
+                    except Exception as caption_error:
+                        logger.debug(f"Caption edit failed: {caption_error}")
+
+                        # Method 2: Try edit_message_text (for text-only messages)
+                        try:
+                            await self.bot.edit_message_text(
+                                chat_id=user_id,
+                                message_id=existing_message_id,
+                                text=msg,
+                                parse_mode="HTML",
+                                reply_markup=reply_markup,
+                            )
+                            edit_success = True
+                            logger.info(f"Edited TEXT for {entity_type}#{entity_id}")
+                        except Exception as text_error:
+                            logger.warning(
+                                "Both edit methods failed for {}#{}: caption={}, text={}".format(
+                                    entity_type,
+                                    entity_id,
+                                    caption_error,
+                                    text_error,
+                                )
+                            )
+
+                if not edit_success and (
+                    should_force_send
+                    or (self.telegram_order_notifications and should_notify)
+                ):
+                    # Send new message only if edit failed or no existing message
+                    try:
+                        if customer_photo:
+                            try:
+                                message_sent = await self.bot.send_photo(
+                                    user_id,
+                                    photo=customer_photo,
+                                    caption=msg,
+                                    parse_mode="HTML",
+                                    reply_markup=reply_markup,
+                                )
+                            except Exception as photo_err:
+                                logger.warning(
+                                    f"Failed to send status photo to customer {user_id}: {photo_err}"
+                                )
+                        if not message_sent:
+                            message_sent = await self.bot.send_message(
+                                user_id, msg, parse_mode="HTML", reply_markup=reply_markup
+                            )
+                        logger.info(f"Sent NEW message for {entity_type}#{entity_id}")
+                        # Save message_id for future edits - ALWAYS save to maintain live update chain
+                        if message_sent:
+                            if entity_type == "order" and hasattr(
+                                self.db, "set_order_customer_message_id"
+                            ):
+                                self.db.set_order_customer_message_id(
+                                    entity_id, message_sent.message_id
+                                )
+                                logger.info(
+                                    "Saved message_id={} for order#{}".format(
+                                        message_sent.message_id, entity_id
+                                    )
+                                )
+                            elif entity_type == "booking" and hasattr(
+                                self.db, "set_booking_customer_message_id"
+                            ):
+                                self.db.set_booking_customer_message_id(
+                                    entity_id, message_sent.message_id
+                                )
+                                logger.info(
+                                    "Saved message_id={} for booking#{}".format(
+                                        message_sent.message_id, entity_id
+                                    )
+                                )
+                    except Exception as e:
+                        logger.error(f"Failed to notify customer {user_id}: {e}")
+
+        # Update seller message in Telegram if it exists (partner bot sync) if it exists (partner bot sync)
+        if entity_type == "order":
+            try:
+                seller_message_id = (
+                    entity.get("seller_message_id")
+                    if isinstance(entity, dict)
+                    else getattr(entity, "seller_message_id", None)
+                )
+                if store_id:
+                    store = self.db.get_store(store_id) if store_id else None
+                    owner_id = store.get("owner_id") if isinstance(store, dict) else None
+                    if owner_id and (seller_message_id or self.force_telegram_sync):
+                        seller_lang = self.db.get_user_language(owner_id)
+                        currency = "so'm" if seller_lang == "uz" else "sum"
+
+                        customer_name = None
+                        customer_phone = None
+                        if user_id:
+                            customer = (
+                                self.db.get_user_model(user_id)
+                                if hasattr(self.db, "get_user_model")
+                                else self.db.get_user(user_id)
+                                if hasattr(self.db, "get_user")
+                                else None
+                            )
+                            if isinstance(customer, dict):
+                                customer_name = customer.get("first_name") or customer.get("name")
+                                customer_phone = customer.get("phone")
+                            else:
+                                customer_name = getattr(customer, "first_name", None) if customer else None
+                                customer_phone = getattr(customer, "phone", None) if customer else None
+
+                        resolved_order_type = order_type or (
+                            "delivery" if delivery_address else "pickup"
+                        )
+
+                        items: list[dict] = []
+                        total = 0
+
+                        cart_items_json = (
+                            entity.get("cart_items")
+                            if isinstance(entity, dict)
+                            else getattr(entity, "cart_items", None)
+                        )
+                        if cart_items_json:
+                            try:
+                                import json
+
+                                cart_items = (
+                                    json.loads(cart_items_json)
+                                    if isinstance(cart_items_json, str)
+                                    else cart_items_json
+                                )
+                                for item in cart_items or []:
+                                    qty = int(item.get("quantity", 1))
+                                    price = int(item.get("price", 0))
+                                    title = item.get("title", "")
+                                    item_offer_id = item.get("offer_id")
+                                    item_photo = item.get("photo") or item.get("photo_id")
+                                    items.append(
+                                        {
+                                            "title": title,
+                                            "quantity": qty,
+                                            "price": price,
+                                            "offer_id": item_offer_id,
+                                            "photo": item_photo,
+                                        }
+                                    )
+                                    total += price * qty
+                            except Exception:
+                                pass
+                        else:
+                            offer_id = (
+                                entity.get("offer_id")
+                                if isinstance(entity, dict)
+                                else getattr(entity, "offer_id", None)
+                            )
+                            quantity = (
+                                entity.get("quantity", 1)
+                                if isinstance(entity, dict)
+                                else getattr(entity, "quantity", 1)
+                            )
+                            if offer_id:
+                                offer = (
+                                    self.db.get_offer(offer_id)
+                                    if hasattr(self.db, "get_offer")
+                                    else None
+                                )
+                                title = offer.get("title", "") if isinstance(offer, dict) else ""
+                                price = (
+                                    offer.get("discount_price", 0) if isinstance(offer, dict) else 0
+                                )
+                                offer_photo = None
+                                if isinstance(offer, dict):
+                                    offer_photo = offer.get("photo") or offer.get("photo_id")
+                                else:
+                                    offer_photo = getattr(offer, "photo", None) if offer else None
+                                    if not offer_photo:
+                                        offer_photo = (
+                                            getattr(offer, "photo_id", None) if offer else None
+                                        )
+                                items.append(
+                                    {
+                                        "title": title,
+                                        "quantity": int(quantity or 1),
+                                        "price": int(price or 0),
+                                        "offer_id": int(offer_id),
+                                        "photo": offer_photo,
+                                    }
+                                )
+                                total = int(price or 0) * int(quantity or 1)
+
+                        delivery_price = 0
+                        if resolved_order_type in ("delivery", "taxi"):
+                            raw_delivery = (
+                                entity.get("delivery_price")
+                                if isinstance(entity, dict)
+                                else getattr(entity, "delivery_price", None)
+                            )
+                            if raw_delivery is None and isinstance(store, dict):
+                                raw_delivery = store.get("delivery_price", 0)
+                            try:
+                                delivery_price = int(raw_delivery or 0)
+                            except Exception:
+                                delivery_price = 0
+
+                        seller_text = NotificationTemplates.seller_status_update(
+                            lang=seller_lang,
+                            order_id=entity_id,
+                            status=target_status,
+                            order_type=resolved_order_type,
+                            items=items or None,
+                            customer_name=customer_name,
+                            customer_phone=customer_phone,
+                            delivery_address=delivery_address,
+                            total=total,
+                            delivery_price=delivery_price,
+                            currency=currency,
+                        )
+                        photo_ids = self._collect_photos_from_items(items)
+                        seller_photo = None
+                        if len(photo_ids) > 1:
+                            seller_photo = await self._build_collage_photo(photo_ids)
+                        if not seller_photo and photo_ids:
+                            seller_photo = photo_ids[0]
+                        if not seller_photo and offer_id:
+                            try:
+                                seller_photo = self._get_offer_photo(int(offer_id))
+                            except (TypeError, ValueError):
+                                seller_photo = None
+
+                        kb = InlineKeyboardBuilder()
+                        if resolved_order_type in ("delivery", "taxi"):
+                            if target_status in (OrderStatus.PENDING, OrderStatus.PREPARING):
+                                if seller_lang == "uz":
+                                    kb.button(
+                                        text="📦 Topshirishga tayyor",
+                                        callback_data=f"order_ready_{entity_id}",
+                                    )
+                                else:
+                                    kb.button(
+                                        text="📦 Готов к передаче",
+                                        callback_data=f"order_ready_{entity_id}",
+                                    )
+                            elif target_status == OrderStatus.READY:
+                                if seller_lang == "uz":
+                                    kb.button(
+                                        text="🚚 Kuryerga topshirdim",
+                                        callback_data=f"order_delivering_{entity_id}",
+                                    )
+                                else:
+                                    kb.button(
+                                        text="🚚 Передал курьеру",
+                                        callback_data=f"order_delivering_{entity_id}",
+                                    )
+                            elif target_status == OrderStatus.DELIVERING:
+                                if seller_lang == "uz":
+                                    kb.button(
+                                        text="✅ Topshirildi",
+                                        callback_data=f"order_complete_{entity_id}",
+                                    )
+                                else:
+                                    kb.button(
+                                        text="✅ Доставлено",
+                                        callback_data=f"order_complete_{entity_id}",
+                                    )
+                        else:
+                            if target_status in (
+                                OrderStatus.PENDING,
+                                OrderStatus.PREPARING,
+                                OrderStatus.READY,
+                                OrderStatus.DELIVERING,
+                            ):
+                                if seller_lang == "uz":
+                                    kb.button(
+                                        text="✅ Berildi",
+                                        callback_data=f"order_complete_{entity_id}",
+                                    )
+                                else:
+                                    kb.button(
+                                        text="✅ Выдано",
+                                        callback_data=f"order_complete_{entity_id}",
+                                    )
+
+                        reply_markup = kb.as_markup() if kb.buttons else None
+
+                        if seller_message_id:
+                            try:
+                                await self.bot.edit_message_caption(
+                                    chat_id=owner_id,
+                                    message_id=seller_message_id,
+                                    caption=seller_text,
+                                    parse_mode="HTML",
+                                    reply_markup=reply_markup,
+                                )
+                            except Exception:
+                                try:
+                                    await self.bot.edit_message_text(
+                                        chat_id=owner_id,
+                                        message_id=seller_message_id,
+                                        text=seller_text,
+                                        parse_mode="HTML",
+                                        reply_markup=reply_markup,
+                                    )
+                                except Exception as edit_error:
+                                    logger.warning(
+                                        f"Failed to update seller message for order#{entity_id}: {edit_error}"
+                                    )
+                        elif self.force_telegram_sync:
+                            try:
+                                sent_msg = None
+                                if seller_photo:
+                                    try:
+                                        sent_msg = await self.bot.send_photo(
+                                            owner_id,
+                                            photo=seller_photo,
+                                            caption=seller_text,
+                                            parse_mode="HTML",
+                                            reply_markup=reply_markup,
+                                        )
+                                    except Exception as photo_err:
+                                        logger.warning(
+                                            f"Failed to send status photo to seller {owner_id}: {photo_err}"
+                                        )
+                                if not sent_msg:
+                                    sent_msg = await self.bot.send_message(
+                                        owner_id,
+                                        seller_text,
+                                        parse_mode="HTML",
+                                        reply_markup=reply_markup,
+                                    )
+                                if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
+                                    self.db.set_order_seller_message_id(
+                                        entity_id, sent_msg.message_id
+                                    )
+                            except Exception as send_error:
+                                logger.warning(
+                                    f"Failed to send seller message for order#{entity_id}: {send_error}"
+                                )
+            except Exception as seller_error:
+                logger.warning(
+                    f"Seller message update skipped for order#{entity_id}: {seller_error}"
+                )
+
+
     async def update_status(
         self,
         entity_id: int,
@@ -2070,115 +3080,23 @@ class UnifiedOrderService:
             True if successful
         """
         try:
-            # IMPORTANT: orders and bookings may still live in different tables at runtime.
-            # Respect entity_type to avoid updating a wrong record on id collision.
-            payment_method = None
-            payment_status = None
-            delivery_address = None
-            delivery_price = 0
-            cart_items_json = None
-            is_cart = False
-            offer_id = None
-            quantity = 1
-            total_price = None
-            if entity_type == "booking":
-                if not hasattr(self.db, "get_booking"):
-                    logger.warning("DB layer does not support bookings")
-                    return False
-
-                entity = self.db.get_booking(entity_id)
-                if not entity:
-                    logger.warning(f"Booking not found: #{entity_id}")
-                    return False
-            else:
-                if not hasattr(self.db, "get_order"):
-                    logger.warning("DB layer does not support orders")
-                    return False
-
-                entity = self.db.get_order(entity_id)
-                if not entity:
-                    logger.warning(f"Order not found: #{entity_id}")
-                    return False
-
-            # Get entity fields
-            if entity_type == "booking":
-                if isinstance(entity, dict):
-                    user_id = entity.get("user_id")
-                    store_id = entity.get("store_id")
-                    pickup_code = entity.get("booking_code") or entity.get("pickup_code")
-                    current_status_raw = entity.get("status") or entity.get("order_status")
-                    is_cart = int(entity.get("is_cart_booking") or 0) == 1
-                    cart_items_json = entity.get("cart_items")
-                    offer_id = entity.get("offer_id")
-                    quantity = int(entity.get("quantity") or 1)
-                else:
-                    user_id = getattr(entity, "user_id", None)
-                    store_id = getattr(entity, "store_id", None)
-                    pickup_code = getattr(entity, "booking_code", None) or getattr(
-                        entity, "pickup_code", None
-                    )
-                    current_status_raw = getattr(entity, "status", None) or getattr(
-                        entity, "order_status", None
-                    )
-                    is_cart = int(getattr(entity, "is_cart_booking", 0) or 0) == 1
-                    cart_items_json = getattr(entity, "cart_items", None)
-                    offer_id = getattr(entity, "offer_id", None)
-                    quantity = int(getattr(entity, "quantity", 1) or 1)
-
-                order_type = "pickup"
-            else:
-                if isinstance(entity, dict):
-                    user_id = entity.get("user_id")
-                    store_id = entity.get("store_id")
-                    pickup_code = entity.get("pickup_code")
-                    current_status_raw = entity.get("order_status")
-                    order_type = entity.get("order_type")
-                    payment_method = entity.get("payment_method")
-                    payment_status = entity.get("payment_status")
-                    delivery_address = entity.get("delivery_address")
-                    delivery_price = int(entity.get("delivery_price") or 0)
-                    is_cart = int(entity.get("is_cart_order") or 0) == 1
-                    cart_items_json = entity.get("cart_items")
-                    offer_id = entity.get("offer_id")
-                    quantity = int(entity.get("quantity") or 1)
-                    total_price = entity.get("total_price")
-
-                    # Fallback: if order_type not set, determine from delivery_address
-                    if not order_type:
-                        order_type = "delivery" if delivery_address else "pickup"
-                        logger.info(
-                            f"Order type fallback for #{entity_id}: "
-                            f"delivery_address={delivery_address}, order_type={order_type}"
-                        )
-                    else:
-                        logger.info(f"Order type from DB for #{entity_id}: {order_type}")
-                else:
-                    # Tuple format
-                    user_id = getattr(entity, "user_id", None)
-                    store_id = getattr(entity, "store_id", None)
-                    pickup_code = getattr(entity, "pickup_code", None)
-                    current_status_raw = getattr(entity, "order_status", None)
-                    order_type = getattr(entity, "order_type", None)
-                    payment_method = getattr(entity, "payment_method", None)
-                    payment_status = getattr(entity, "payment_status", None)
-                    delivery_address = getattr(entity, "delivery_address", None)
-                    delivery_price = int(getattr(entity, "delivery_price", 0) or 0)
-                    is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
-                    cart_items_json = getattr(entity, "cart_items", None)
-                    offer_id = getattr(entity, "offer_id", None)
-                    quantity = int(getattr(entity, "quantity", 1) or 1)
-                    total_price = getattr(entity, "total_price", None)
-                    if not order_type:
-                        order_type = "delivery" if delivery_address else "pickup"
+            ctx = self._get_status_update_context(
+                entity_id=entity_id,
+                entity_type=entity_type,
+            )
+            if not ctx:
+                return False
 
             # Normalize statuses and enforce safe transitions/idempotence
             current_status = (
-                OrderStatus.normalize(str(current_status_raw)) if current_status_raw else None
+                OrderStatus.normalize(str(ctx.current_status_raw))
+                if ctx.current_status_raw
+                else None
             )
             target_status = OrderStatus.normalize(str(new_status))
-            normalized_payment_method = PaymentStatus.normalize_method(payment_method)
+            normalized_payment_method = PaymentStatus.normalize_method(ctx.payment_method)
             normalized_payment_status = PaymentStatus.normalize(
-                payment_status, payment_method=payment_method
+                ctx.payment_status, payment_method=ctx.payment_method
             )
             terminal_statuses = {
                 OrderStatus.COMPLETED,
@@ -2200,831 +3118,39 @@ class UnifiedOrderService:
                 return True
 
             if target_status == OrderStatus.DELIVERING:
-                if order_type not in ("delivery", "taxi"):
+                if ctx.order_type not in ("delivery", "taxi"):
                     logger.info(
-                        f"STATUS_UPDATE invalid delivering for pickup: #{entity_id} order_type={order_type}"
+                        f"STATUS_UPDATE invalid delivering for pickup: #{entity_id} order_type={ctx.order_type}"
                     )
                     return False
 
-            # Update status in DB
-            update_ok = True
-            if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED]:
-                try:
-                    with self.db.get_connection() as conn:
-                        cursor = conn.cursor()
-                        if entity_type == "booking":
-                            if current_status_raw is not None:
-                                cursor.execute(
-                                    "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s AND status = %s",
-                                    (target_status, entity_id, current_status_raw),
-                                )
-                            else:
-                                cursor.execute(
-                                    "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s",
-                                    (target_status, entity_id),
-                                )
-                        else:
-                            if current_status_raw is not None:
-                                cursor.execute(
-                                    "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s AND order_status = %s",
-                                    (target_status, entity_id, current_status_raw),
-                                )
-                            else:
-                                cursor.execute(
-                                    "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s",
-                                    (target_status, entity_id),
-                                )
-                        update_ok = cursor.rowcount > 0
-                except Exception as e:
-                    logger.error(f"Failed to update status atomically: {e}")
-                    return False
-
-                if not update_ok:
-                    latest = (
-                        self.db.get_booking(entity_id)
-                        if entity_type == "booking"
-                        else self.db.get_order(entity_id)
-                    )
-                    latest_status_raw = None
-                    if isinstance(latest, dict):
-                        latest_status_raw = (
-                            latest.get("status")
-                            if entity_type == "booking"
-                            else latest.get("order_status")
-                        )
-                    else:
-                        latest_status_raw = getattr(latest, "status", None) if entity_type == "booking" else getattr(latest, "order_status", None)
-
-                    latest_status = (
-                        OrderStatus.normalize(str(latest_status_raw))
-                        if latest_status_raw
-                        else None
-                    )
-                    if latest_status in terminal_statuses:
-                        logger.info(
-                            f"STATUS_UPDATE skipped due to race: #{entity_id} status={latest_status}"
-                        )
-                        return True
-                    return False
-            else:
-                if entity_type == "booking":
-                    if not hasattr(self.db, "update_booking_status"):
-                        logger.warning("DB layer does not support update_booking_status")
-                        return False
-                    self.db.update_booking_status(entity_id, target_status)
-                else:
-                    if not hasattr(self.db, "update_order_status"):
-                        logger.warning("DB layer does not support update_order_status")
-                        return False
-                    self.db.update_order_status(entity_id, target_status)
+            update_ok, short_circuit = self._apply_status_update(
+                ctx=ctx,
+                target_status=target_status,
+                current_status_raw=ctx.current_status_raw,
+                terminal_statuses=terminal_statuses,
+            )
+            if short_circuit:
+                return True
+            if not update_ok:
+                return False
 
             # Restore quantity if rejected or cancelled
             if target_status in [OrderStatus.REJECTED, OrderStatus.CANCELLED] and (
                 current_status not in [OrderStatus.REJECTED, OrderStatus.CANCELLED]
             ):
                 if update_ok:
-                    await self._restore_quantities(entity, entity_type)
-            # Send notification to customer - SMART FILTERING
-            # Skip redundant notifications to avoid spam:
-            # - READY status (internal state, customer doesn't need notification)
-            # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
-            notifications_enabled = self._notifications_enabled(user_id)
-            should_notify = notify_customer and user_id and notifications_enabled
-            existing_message_id = None
-            if isinstance(entity, dict):
-                existing_message_id = entity.get("customer_message_id")
-            else:
-                existing_message_id = getattr(entity, "customer_message_id", None)
-            should_edit = bool(existing_message_id) and user_id and notifications_enabled
-            should_force_send = (
-                self.force_telegram_sync and user_id and not existing_message_id and notifications_enabled
+                    await self._restore_quantities(ctx.entity, ctx.entity_type)
+
+            await self._notify_status_change(
+                ctx=ctx,
+                target_status=target_status,
+                normalized_payment_status=normalized_payment_status,
+                notify_customer=notify_customer,
+                reject_reason=reject_reason,
+                courier_phone=courier_phone,
+                new_status=new_status,
             )
-
-            logger.info(
-                f"Notification check for #{entity_id}: "
-                f"status={target_status}, order_type={order_type}, "
-                f"notify_customer={notify_customer}, user_id={user_id}, "
-                f"should_notify={should_notify}, should_edit={should_edit}, "
-                f"should_force_send={should_force_send}"
-            )
-
-            # OPTIMIZATION: Skip READY notification for delivery orders only
-            # READY is mostly internal for delivery (courier pickup), but it's important for pickup
-            if target_status == OrderStatus.READY and order_type in ("delivery", "taxi"):
-                should_notify = False
-                should_edit = False
-                should_force_send = False
-                logger.info(
-                    f"Skipping READY notification for delivery order#{entity_id}"
-                )
-
-            if user_id:
-                try:
-                    from app.core.websocket import get_websocket_manager
-
-                    customer_unified_min = build_unified_order_payload(
-                        kind="order_status_changed",
-                        role="customer",
-                        entity_type=entity_type,
-                        entity_id=entity_id,
-                        entity_ids=[entity_id],
-                        is_cart=is_cart,
-                        order_type=order_type,
-                        status=target_status,
-                        payment_status=normalized_payment_status,
-                        pickup_code=pickup_code,
-                        delivery_address=delivery_address,
-                        store={"id": int(store_id)} if store_id else None,
-                        customer={"id": int(user_id)} if user_id else None,
-                        courier={"phone": courier_phone} if courier_phone else None,
-                        amounts={"delivery_fee": int(delivery_price or 0)},
-                    )
-                    ws_manager = get_websocket_manager()
-                    await ws_manager.send_to_user(
-                        int(user_id),
-                        {
-                            "type": "order_status_changed",
-                            "data": {
-                                "entity_id": entity_id,
-                                "entity_type": entity_type,
-                                "status": target_status,
-                                "order_type": order_type,
-                                "unified": customer_unified_min,
-                            },
-                        },
-                    )
-                except Exception as ws_error:
-                    logger.warning(f"WebSocket notify failed for status change: {ws_error}")
-
-            if store_id:
-                partner_unified_min = build_unified_order_payload(
-                    kind="order_status_changed",
-                    role="partner",
-                    entity_type=entity_type,
-                    entity_id=entity_id,
-                    entity_ids=[entity_id],
-                    is_cart=is_cart,
-                    order_type=order_type,
-                    status=target_status,
-                    payment_status=normalized_payment_status,
-                    pickup_code=pickup_code,
-                    delivery_address=delivery_address,
-                    store={"id": int(store_id)},
-                    customer={"id": int(user_id)} if user_id else None,
-                    courier={"phone": courier_phone} if courier_phone else None,
-                    amounts={"delivery_fee": int(delivery_price or 0)},
-                )
-                try:
-                    from app.api.websocket_manager import get_connection_manager
-
-                    store_ws = get_connection_manager()
-                    await store_ws.notify_order_status(
-                        int(store_id),
-                        int(entity_id),
-                        target_status,
-                        unified=partner_unified_min,
-                    )
-                except Exception as ws_error:
-                    logger.warning(f"Partner WebSocket notify failed: {ws_error}")
-
-                try:
-                    notification_service = get_notification_service()
-                    await notification_service.notify_store(
-                        Notification(
-                            type=NotificationType.SYSTEM_ANNOUNCEMENT,
-                            recipient_id=int(store_id),
-                            title=f"Order #{entity_id}",
-                            message=f"Status: {target_status}",
-                            data={
-                                "kind": "order_status_changed",
-                                "order_id": entity_id,
-                                "status": target_status,
-                                "order_type": order_type,
-                                "unified": partner_unified_min,
-                            },
-                            priority=0,
-                        )
-                    )
-                except Exception as notify_error:
-                    logger.warning(f"Store status notification failed: {notify_error}")
-
-            if should_notify or should_edit or should_force_send:
-                store = self.db.get_store(store_id) if store_id else None
-                store_name = store.get("name", "") if isinstance(store, dict) else ""
-                store_address = store.get("address", "") if isinstance(store, dict) else ""
-
-                customer_lang = self.db.get_user_language(user_id)
-                currency = None
-                cart_items = None
-                if is_cart and cart_items_json:
-                    try:
-                        import json
-
-                        cart_items = (
-                            json.loads(cart_items_json)
-                            if isinstance(cart_items_json, str)
-                            else cart_items_json
-                        )
-                    except Exception:
-                        cart_items = None
-
-                if not cart_items and offer_id:
-                    item_title = ""
-                    item_price = None
-                    if hasattr(self.db, "get_offer"):
-                        offer = self.db.get_offer(int(offer_id))
-                        if isinstance(offer, dict):
-                            item_title = offer.get("title", "")
-                            item_price = offer.get("discount_price", None)
-                        else:
-                            item_title = getattr(offer, "title", "") if offer else ""
-                            item_price = getattr(offer, "discount_price", None) if offer else None
-
-                    if not item_title:
-                        item_title = "Mahsulot" if customer_lang == "uz" else "Товар"
-
-                    if item_price is None and total_price is not None and quantity:
-                        try:
-                            item_price = int((float(total_price) - float(delivery_price)) / quantity)
-                        except Exception:
-                            item_price = 0
-
-                    cart_items = [
-                        {
-                            "title": item_title,
-                            "quantity": int(quantity or 1),
-                            "price": int(item_price or 0),
-                        }
-                    ]
-
-                photo_ids = self._collect_photos_from_items(cart_items)
-                customer_photo = None
-                if len(photo_ids) > 1:
-                    customer_photo = await self._build_collage_photo(photo_ids)
-                if not customer_photo and photo_ids:
-                    customer_photo = photo_ids[0]
-                if not customer_photo and offer_id:
-                    try:
-                        customer_photo = self._get_offer_photo(int(offer_id))
-                    except (TypeError, ValueError):
-                        customer_photo = None
-
-                group_order_ids = None
-                group_statuses: list[str] | None = None
-                orders_for_group = None
-                if entity_type == "order" and existing_message_id:
-                    if hasattr(self.db, "get_orders_by_customer_message_id"):
-                        try:
-                            orders_for_group = self.db.get_orders_by_customer_message_id(
-                                int(existing_message_id)
-                            )
-                        except Exception as group_err:
-                            logger.debug(f"Failed to load grouped orders: {group_err}")
-                    elif user_id and hasattr(self.db, "get_user_orders"):
-                        try:
-                            orders_for_group = self.db.get_user_orders(int(user_id)) or []
-                        except Exception as group_err:
-                            logger.debug(f"Failed to load grouped orders: {group_err}")
-
-                if orders_for_group:
-                    try:
-                        grouped_ids: list[int] = []
-                        grouped_statuses: list[str] = []
-                        for order in orders_for_group:
-                            if not isinstance(order, dict):
-                                continue
-                            if order.get("customer_message_id") != existing_message_id:
-                                continue
-                            oid = order.get("order_id") or order.get("id")
-                            if oid is not None:
-                                grouped_ids.append(int(oid))
-                            raw_status = order.get("order_status") or order.get("status")
-                            if raw_status:
-                                grouped_statuses.append(
-                                    OrderStatus.normalize(str(raw_status))
-                                )
-                        if grouped_ids:
-                            group_order_ids = grouped_ids
-                        if grouped_statuses:
-                            group_statuses = grouped_statuses
-                    except Exception as group_err:
-                        logger.debug(f"Failed to load grouped order ids: {group_err}")
-
-                is_grouped = False
-                aggregated_status = target_status
-                if cart_items:
-                    currency = "so'm" if customer_lang == "uz" else "сум"
-                    is_grouped = bool(group_order_ids and len(group_order_ids) > 1)
-                    if is_grouped and group_statuses:
-                        unique_statuses = set(group_statuses)
-                        if unique_statuses == {OrderStatus.COMPLETED}:
-                            aggregated_status = OrderStatus.COMPLETED
-                        elif OrderStatus.REJECTED in unique_statuses:
-                            aggregated_status = OrderStatus.REJECTED
-                        elif OrderStatus.CANCELLED in unique_statuses:
-                            aggregated_status = OrderStatus.CANCELLED
-                        elif OrderStatus.DELIVERING in unique_statuses:
-                            aggregated_status = OrderStatus.DELIVERING
-                        elif OrderStatus.READY in unique_statuses:
-                            aggregated_status = OrderStatus.READY
-                        elif OrderStatus.PREPARING in unique_statuses:
-                            aggregated_status = OrderStatus.PREPARING
-                        elif OrderStatus.PENDING in unique_statuses:
-                            aggregated_status = OrderStatus.PENDING
-
-                    msg = NotificationTemplates.customer_cart_status_update(
-                        lang=customer_lang,
-                        order_id=entity_id,
-                        status=aggregated_status,
-                        order_type=order_type,
-                        items=cart_items,
-                        currency=currency,
-                        is_cart=is_cart or is_grouped,
-                        order_ids=group_order_ids,
-                        store_name=store_name,
-                        store_address=store_address,
-                        delivery_address=delivery_address,
-                        delivery_price=delivery_price,
-                        pickup_code=pickup_code,
-                        reject_reason=reject_reason,
-                        courier_phone=courier_phone,
-                    )
-                else:
-                    msg = NotificationTemplates.customer_status_update(
-                        lang=customer_lang,
-                        order_id=entity_id,
-                        status=target_status,
-                        order_type=order_type,
-                        store_name=store_name,
-                        store_address=store_address,
-                        pickup_code=pickup_code,
-                        reject_reason=reject_reason,
-                        courier_phone=courier_phone,
-                    )
-
-                amounts_payload = {"delivery_fee": int(delivery_price or 0)}
-                if total_price is not None:
-                    amounts_payload["subtotal"] = int(total_price or 0)
-                    amounts_payload["total"] = int(total_price or 0) + int(delivery_price or 0)
-                if currency:
-                    amounts_payload["currency"] = currency
-
-                customer_unified_full = build_unified_order_payload(
-                    kind="order_status_changed",
-                    role="customer",
-                    entity_type=entity_type,
-                    entity_id=entity_id,
-                    entity_ids=group_order_ids or [entity_id],
-                    is_cart=is_cart or is_grouped,
-                    order_type=order_type,
-                    status=aggregated_status,
-                    payment_status=normalized_payment_status,
-                    pickup_code=pickup_code,
-                    delivery_address=delivery_address,
-                    store={
-                        "id": int(store_id) if store_id else None,
-                        "name": store_name,
-                        "address": store_address,
-                    },
-                    customer={"id": int(user_id)} if user_id else None,
-                    courier={"phone": courier_phone} if courier_phone else None,
-                    items=cart_items,
-                    amounts=amounts_payload,
-                )
-
-                if should_notify:
-
-
-                    try:
-                        notif_title = (
-                            f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"Заказ #{entity_id}"
-                        )
-                        plain_msg = re.sub(r"<[^>]+>", "", msg)
-                        if target_status in (OrderStatus.CANCELLED,):
-                            notif_type = NotificationType.BOOKING_CANCELLED
-                        elif target_status in (OrderStatus.COMPLETED,):
-                            notif_type = NotificationType.BOOKING_COMPLETED
-                        elif target_status in (OrderStatus.PREPARING, OrderStatus.DELIVERING):
-                            notif_type = NotificationType.BOOKING_CONFIRMED
-                        else:
-                            notif_type = NotificationType.SYSTEM_ANNOUNCEMENT
-
-                        notification_service = get_notification_service()
-                        await notification_service.notify_user(
-                            Notification(
-                                type=notif_type,
-                                recipient_id=int(user_id),
-                                title=notif_title,
-                                message=plain_msg,
-                                data={
-                                    "order_id": entity_id,
-                                    "status": target_status,
-                                    "order_type": order_type,
-                                    "entity_type": entity_type,
-                                    "unified": customer_unified_full,
-                                },
-                                priority=0,
-                            )
-                        )
-                    except Exception as notify_error:
-                        logger.warning(
-                            f"Notification service failed for {entity_type}#{entity_id}: {notify_error}"
-                        )
-
-                # Add buttons for customer based on status
-                reply_markup = None
-                if target_status == OrderStatus.COMPLETED:
-                    # Rating buttons for completed orders
-                    kb = InlineKeyboardBuilder()
-                    callback_prefix = (
-                        f"rate_order_{entity_id}_"
-                        if entity_type == "order"
-                        else f"rate_booking_{entity_id}_"
-                    )
-                    for i in range(1, 6):
-                        kb.button(text="⭐" * i, callback_data=f"{callback_prefix}{i}")
-                    kb.adjust(5)
-                    reply_markup = kb.as_markup()
-                elif new_status == OrderStatus.DELIVERING and order_type in ("delivery", "taxi"):
-                    # "Received" button for delivery orders in transit
-                    kb = InlineKeyboardBuilder()
-                    received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
-                    kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
-                    reply_markup = kb.as_markup()
-                elif target_status == OrderStatus.READY and order_type == "pickup":
-                    # "Received" button for pickup orders when ready
-                    # v24+: all orders in unified table, use customer_received_
-                    kb = InlineKeyboardBuilder()
-                    received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
-                    kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
-                    reply_markup = kb.as_markup()
-                # Try to EDIT existing message first (live status update)
-                # This reduces spam - customer sees ONE message that updates
-                allow_telegram_updates = (
-                    self.telegram_order_notifications or should_edit or should_force_send
-                )
-
-                if allow_telegram_updates:
-                    message_sent = None
-                    edit_success = False
-
-                    if should_edit and existing_message_id:
-                        logger.info(
-                            f"Trying to edit message {existing_message_id} for #{entity_id}"
-                        )
-
-                        # Try BOTH methods - caption first (for photos), then text
-                        # Because we don't know if original message had photo or not
-
-                        # Method 1: Try edit_message_caption (for messages with photo)
-                        try:
-                            await self.bot.edit_message_caption(
-                                chat_id=user_id,
-                                message_id=existing_message_id,
-                                caption=msg,
-                                parse_mode="HTML",
-                                reply_markup=reply_markup,
-                            )
-                            edit_success = True
-                            logger.info(f"Edited CAPTION for {entity_type}#{entity_id}")
-                        except Exception as caption_error:
-                            logger.debug(f"Caption edit failed: {caption_error}")
-
-                            # Method 2: Try edit_message_text (for text-only messages)
-                            try:
-                                await self.bot.edit_message_text(
-                                    chat_id=user_id,
-                                    message_id=existing_message_id,
-                                    text=msg,
-                                    parse_mode="HTML",
-                                    reply_markup=reply_markup,
-                                )
-                                edit_success = True
-                                logger.info(f"Edited TEXT for {entity_type}#{entity_id}")
-                            except Exception as text_error:
-                                logger.warning(
-                                    "Both edit methods failed for {}#{}: caption={}, text={}".format(
-                                        entity_type,
-                                        entity_id,
-                                        caption_error,
-                                        text_error,
-                                    )
-                                )
-
-                    if not edit_success and (
-                        should_force_send
-                        or (self.telegram_order_notifications and should_notify)
-                    ):
-                        # Send new message only if edit failed or no existing message
-                        try:
-                            if customer_photo:
-                                try:
-                                    message_sent = await self.bot.send_photo(
-                                        user_id,
-                                        photo=customer_photo,
-                                        caption=msg,
-                                        parse_mode="HTML",
-                                        reply_markup=reply_markup,
-                                    )
-                                except Exception as photo_err:
-                                    logger.warning(
-                                        f"Failed to send status photo to customer {user_id}: {photo_err}"
-                                    )
-                            if not message_sent:
-                                message_sent = await self.bot.send_message(
-                                    user_id, msg, parse_mode="HTML", reply_markup=reply_markup
-                                )
-                            logger.info(f"Sent NEW message for {entity_type}#{entity_id}")
-                            # Save message_id for future edits - ALWAYS save to maintain live update chain
-                            if message_sent:
-                                if entity_type == "order" and hasattr(
-                                    self.db, "set_order_customer_message_id"
-                                ):
-                                    self.db.set_order_customer_message_id(
-                                        entity_id, message_sent.message_id
-                                    )
-                                    logger.info(
-                                        "Saved message_id={} for order#{}".format(
-                                            message_sent.message_id, entity_id
-                                        )
-                                    )
-                                elif entity_type == "booking" and hasattr(
-                                    self.db, "set_booking_customer_message_id"
-                                ):
-                                    self.db.set_booking_customer_message_id(
-                                        entity_id, message_sent.message_id
-                                    )
-                                    logger.info(
-                                        "Saved message_id={} for booking#{}".format(
-                                            message_sent.message_id, entity_id
-                                        )
-                                    )
-                        except Exception as e:
-                            logger.error(f"Failed to notify customer {user_id}: {e}")
-
-            # Update seller message in Telegram if it exists (partner bot sync) if it exists (partner bot sync)
-            if entity_type == "order":
-                try:
-                    seller_message_id = (
-                        entity.get("seller_message_id")
-                        if isinstance(entity, dict)
-                        else getattr(entity, "seller_message_id", None)
-                    )
-                    if store_id:
-                        store = self.db.get_store(store_id) if store_id else None
-                        owner_id = store.get("owner_id") if isinstance(store, dict) else None
-                        if owner_id and (seller_message_id or self.force_telegram_sync):
-                            seller_lang = self.db.get_user_language(owner_id)
-                            currency = "so'm" if seller_lang == "uz" else "sum"
-
-                            customer_name = None
-                            customer_phone = None
-                            if user_id:
-                                customer = (
-                                    self.db.get_user_model(user_id)
-                                    if hasattr(self.db, "get_user_model")
-                                    else self.db.get_user(user_id)
-                                    if hasattr(self.db, "get_user")
-                                    else None
-                                )
-                                if isinstance(customer, dict):
-                                    customer_name = customer.get("first_name") or customer.get("name")
-                                    customer_phone = customer.get("phone")
-                                else:
-                                    customer_name = getattr(customer, "first_name", None) if customer else None
-                                    customer_phone = getattr(customer, "phone", None) if customer else None
-
-                            resolved_order_type = order_type or (
-                                "delivery" if delivery_address else "pickup"
-                            )
-
-                            items: list[dict] = []
-                            total = 0
-
-                            cart_items_json = (
-                                entity.get("cart_items")
-                                if isinstance(entity, dict)
-                                else getattr(entity, "cart_items", None)
-                            )
-                            if cart_items_json:
-                                try:
-                                    import json
-
-                                    cart_items = (
-                                        json.loads(cart_items_json)
-                                        if isinstance(cart_items_json, str)
-                                        else cart_items_json
-                                    )
-                                    for item in cart_items or []:
-                                        qty = int(item.get("quantity", 1))
-                                        price = int(item.get("price", 0))
-                                        title = item.get("title", "")
-                                        item_offer_id = item.get("offer_id")
-                                        item_photo = item.get("photo") or item.get("photo_id")
-                                        items.append(
-                                            {
-                                                "title": title,
-                                                "quantity": qty,
-                                                "price": price,
-                                                "offer_id": item_offer_id,
-                                                "photo": item_photo,
-                                            }
-                                        )
-                                        total += price * qty
-                                except Exception:
-                                    pass
-                            else:
-                                offer_id = (
-                                    entity.get("offer_id")
-                                    if isinstance(entity, dict)
-                                    else getattr(entity, "offer_id", None)
-                                )
-                                quantity = (
-                                    entity.get("quantity", 1)
-                                    if isinstance(entity, dict)
-                                    else getattr(entity, "quantity", 1)
-                                )
-                                if offer_id:
-                                    offer = (
-                                        self.db.get_offer(offer_id)
-                                        if hasattr(self.db, "get_offer")
-                                        else None
-                                    )
-                                    title = offer.get("title", "") if isinstance(offer, dict) else ""
-                                    price = (
-                                        offer.get("discount_price", 0) if isinstance(offer, dict) else 0
-                                    )
-                                    offer_photo = None
-                                    if isinstance(offer, dict):
-                                        offer_photo = offer.get("photo") or offer.get("photo_id")
-                                    else:
-                                        offer_photo = getattr(offer, "photo", None) if offer else None
-                                        if not offer_photo:
-                                            offer_photo = (
-                                                getattr(offer, "photo_id", None) if offer else None
-                                            )
-                                    items.append(
-                                        {
-                                            "title": title,
-                                            "quantity": int(quantity or 1),
-                                            "price": int(price or 0),
-                                            "offer_id": int(offer_id),
-                                            "photo": offer_photo,
-                                        }
-                                    )
-                                    total = int(price or 0) * int(quantity or 1)
-
-                            delivery_price = 0
-                            if resolved_order_type in ("delivery", "taxi"):
-                                raw_delivery = (
-                                    entity.get("delivery_price")
-                                    if isinstance(entity, dict)
-                                    else getattr(entity, "delivery_price", None)
-                                )
-                                if raw_delivery is None and isinstance(store, dict):
-                                    raw_delivery = store.get("delivery_price", 0)
-                                try:
-                                    delivery_price = int(raw_delivery or 0)
-                                except Exception:
-                                    delivery_price = 0
-
-                            seller_text = NotificationTemplates.seller_status_update(
-                                lang=seller_lang,
-                                order_id=entity_id,
-                                status=target_status,
-                                order_type=resolved_order_type,
-                                items=items or None,
-                                customer_name=customer_name,
-                                customer_phone=customer_phone,
-                                delivery_address=delivery_address,
-                                total=total,
-                                delivery_price=delivery_price,
-                                currency=currency,
-                            )
-                            photo_ids = self._collect_photos_from_items(items)
-                            seller_photo = None
-                            if len(photo_ids) > 1:
-                                seller_photo = await self._build_collage_photo(photo_ids)
-                            if not seller_photo and photo_ids:
-                                seller_photo = photo_ids[0]
-                            if not seller_photo and offer_id:
-                                try:
-                                    seller_photo = self._get_offer_photo(int(offer_id))
-                                except (TypeError, ValueError):
-                                    seller_photo = None
-
-                            kb = InlineKeyboardBuilder()
-                            if resolved_order_type in ("delivery", "taxi"):
-                                if target_status in (OrderStatus.PENDING, OrderStatus.PREPARING):
-                                    if seller_lang == "uz":
-                                        kb.button(
-                                            text="📦 Topshirishga tayyor",
-                                            callback_data=f"order_ready_{entity_id}",
-                                        )
-                                    else:
-                                        kb.button(
-                                            text="📦 Готов к передаче",
-                                            callback_data=f"order_ready_{entity_id}",
-                                        )
-                                elif target_status == OrderStatus.READY:
-                                    if seller_lang == "uz":
-                                        kb.button(
-                                            text="🚚 Kuryerga topshirdim",
-                                            callback_data=f"order_delivering_{entity_id}",
-                                        )
-                                    else:
-                                        kb.button(
-                                            text="🚚 Передал курьеру",
-                                            callback_data=f"order_delivering_{entity_id}",
-                                        )
-                                elif target_status == OrderStatus.DELIVERING:
-                                    if seller_lang == "uz":
-                                        kb.button(
-                                            text="✅ Topshirildi",
-                                            callback_data=f"order_complete_{entity_id}",
-                                        )
-                                    else:
-                                        kb.button(
-                                            text="✅ Доставлено",
-                                            callback_data=f"order_complete_{entity_id}",
-                                        )
-                            else:
-                                if target_status in (
-                                    OrderStatus.PENDING,
-                                    OrderStatus.PREPARING,
-                                    OrderStatus.READY,
-                                    OrderStatus.DELIVERING,
-                                ):
-                                    if seller_lang == "uz":
-                                        kb.button(
-                                            text="✅ Berildi",
-                                            callback_data=f"order_complete_{entity_id}",
-                                        )
-                                    else:
-                                        kb.button(
-                                            text="✅ Выдано",
-                                            callback_data=f"order_complete_{entity_id}",
-                                        )
-
-                            reply_markup = kb.as_markup() if kb.buttons else None
-
-                            if seller_message_id:
-                                try:
-                                    await self.bot.edit_message_caption(
-                                        chat_id=owner_id,
-                                        message_id=seller_message_id,
-                                        caption=seller_text,
-                                        parse_mode="HTML",
-                                        reply_markup=reply_markup,
-                                    )
-                                except Exception:
-                                    try:
-                                        await self.bot.edit_message_text(
-                                            chat_id=owner_id,
-                                            message_id=seller_message_id,
-                                            text=seller_text,
-                                            parse_mode="HTML",
-                                            reply_markup=reply_markup,
-                                        )
-                                    except Exception as edit_error:
-                                        logger.warning(
-                                            f"Failed to update seller message for order#{entity_id}: {edit_error}"
-                                        )
-                            elif self.force_telegram_sync:
-                                try:
-                                    sent_msg = None
-                                    if seller_photo:
-                                        try:
-                                            sent_msg = await self.bot.send_photo(
-                                                owner_id,
-                                                photo=seller_photo,
-                                                caption=seller_text,
-                                                parse_mode="HTML",
-                                                reply_markup=reply_markup,
-                                            )
-                                        except Exception as photo_err:
-                                            logger.warning(
-                                                f"Failed to send status photo to seller {owner_id}: {photo_err}"
-                                            )
-                                    if not sent_msg:
-                                        sent_msg = await self.bot.send_message(
-                                            owner_id,
-                                            seller_text,
-                                            parse_mode="HTML",
-                                            reply_markup=reply_markup,
-                                        )
-                                    if sent_msg and hasattr(self.db, "set_order_seller_message_id"):
-                                        self.db.set_order_seller_message_id(
-                                            entity_id, sent_msg.message_id
-                                        )
-                                except Exception as send_error:
-                                    logger.warning(
-                                        f"Failed to send seller message for order#{entity_id}: {send_error}"
-                                    )
-                except Exception as seller_error:
-                    logger.warning(
-                        f"Seller message update skipped for order#{entity_id}: {seller_error}"
-                    )
 
             logger.info(f"STATUS_UPDATE: #{entity_id} -> {target_status}")
             return True
