@@ -126,6 +126,23 @@ class SearchMixin:
                 params.extend(condition_params)
         return conditions, params
 
+    def _resolve_city_fallback_search(self, city: str | None) -> tuple[str | None, str | None]:
+        """Resolve a city input into region/district when it is actually a district."""
+        if not city or not hasattr(self, "resolve_geo_location"):
+            return None, None
+        try:
+            resolved = self.resolve_geo_location(region=None, district=city, city=city)
+        except Exception as exc:
+            logger.debug("Geo resolve failed for search fallback: %s", exc)
+            return None, None
+        if not resolved:
+            return None, None
+        region_name = resolved.get("region_name_ru")
+        district_name = resolved.get("district_name_ru")
+        if not region_name and not district_name:
+            return None, None
+        return region_name, district_name
+
     def search_offers(
         self,
         query: str,
@@ -300,7 +317,25 @@ class SearchMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             cursor.execute(base_sql, tuple(params))
-            return [dict(row) for row in cursor.fetchall()]
+            results = [dict(row) for row in cursor.fetchall()]
+
+        if not results and city and not region and not district:
+            resolved_region, resolved_district = self._resolve_city_fallback_search(city)
+            if resolved_region or resolved_district:
+                return self.search_offers(
+                    query,
+                    city=None,
+                    limit=limit,
+                    offset=offset,
+                    region=resolved_region,
+                    district=resolved_district,
+                    min_price=min_price,
+                    max_price=max_price,
+                    min_discount=min_discount,
+                    category=category,
+                )
+
+        return results
 
     def get_offer_suggestions(
         self,
@@ -393,6 +428,16 @@ class SearchMixin:
                 title = row[0]
                 if title:
                     suggestions.append(title)
+        if not suggestions and city and not region and not district:
+            resolved_region, resolved_district = self._resolve_city_fallback_search(city)
+            if resolved_region or resolved_district:
+                return self.get_offer_suggestions(
+                    query,
+                    limit=limit,
+                    city=None,
+                    region=resolved_region,
+                    district=resolved_district,
+                )
         return suggestions
 
     def get_store_suggestions(
@@ -472,6 +517,16 @@ class SearchMixin:
                 name = row[0]
                 if name:
                     suggestions.append(name)
+        if not suggestions and city and not region and not district:
+            resolved_region, resolved_district = self._resolve_city_fallback_search(city)
+            if resolved_region or resolved_district:
+                return self.get_store_suggestions(
+                    query,
+                    limit=limit,
+                    city=None,
+                    region=resolved_region,
+                    district=resolved_district,
+                )
         return suggestions
 
     def get_search_suggestions(
@@ -503,7 +558,13 @@ class SearchMixin:
 
         return suggestions[:limit]
 
-    def search_stores(self, query: str, city: str = None) -> list[Any]:
+    def search_stores(
+        self,
+        query: str,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+    ) -> list[Any]:
         """Search stores by name with transliteration support."""
         tsquery = self._build_tsquery(query)
         if tsquery and self._is_fts_available("stores"):
@@ -511,7 +572,7 @@ class SearchMixin:
             params: list[Any] = []
 
             location_conditions, location_params = self._collect_location_filters(
-                city, None, None, alias=""
+                city, region, district, alias=""
             )
             where_parts.extend(location_conditions)
             params.extend(location_params)
@@ -534,7 +595,9 @@ class SearchMixin:
             with self.get_connection() as conn:
                 cursor = conn.cursor(row_factory=dict_row)
                 cursor.execute(base_sql, tuple(select_params))
-                return [dict(row) for row in cursor.fetchall()]
+                results = [dict(row) for row in cursor.fetchall()]
+                if results:
+                    return results
 
         base_sql = """
             SELECT
@@ -558,7 +621,7 @@ class SearchMixin:
 
         # Добавляем фильтр по городу с транслитерацией
         location_conditions, location_params = self._collect_location_filters(
-            city, None, None, alias=""
+            city, region, district, alias=""
         )
         if location_conditions:
             base_sql += " AND " + " AND ".join(location_conditions)
@@ -579,4 +642,16 @@ class SearchMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
             cursor.execute(base_sql, tuple(params))
-            return [dict(row) for row in cursor.fetchall()]
+            results = [dict(row) for row in cursor.fetchall()]
+
+        if not results and city and not region and not district:
+            resolved_region, resolved_district = self._resolve_city_fallback_search(city)
+            if resolved_region or resolved_district:
+                return self.search_stores(
+                    query,
+                    city=None,
+                    region=resolved_region,
+                    district=resolved_district,
+                )
+
+        return results

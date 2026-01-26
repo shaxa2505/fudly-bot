@@ -828,12 +828,24 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
         await callback.answer("❌", show_alert=True)
         return
 
-    order = db_instance.get_order(order_id)
-    if not order:
+    entity = db_instance.get_order(order_id)
+    entity_type = "order"
+    if not entity and hasattr(db_instance, "get_booking"):
+        booking = db_instance.get_booking(order_id)
+        if booking:
+            entity = booking
+            entity_type = "booking"
+    if not entity:
         await callback.answer("❌", show_alert=True)
         return
 
-    store_id = _get_entity_field(order, "store_id")
+    store_id = _get_entity_field(entity, "store_id")
+    if not store_id:
+        offer_id = _get_entity_field(entity, "offer_id")
+        if offer_id:
+            offer = db_instance.get_offer(offer_id)
+            if offer:
+                store_id = _get_entity_field(offer, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
     owner_id = _get_store_field(store, "owner_id") if store else None
 
@@ -842,10 +854,13 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
         return
 
     if order_service:
-        success = await order_service.complete_order(order_id, "order")
+        success = await order_service.complete_order(order_id, entity_type)
     else:
         try:
-            db_instance.update_order_status(order_id, OrderStatus.COMPLETED)
+            if entity_type == "order":
+                db_instance.update_order_status(order_id, OrderStatus.COMPLETED)
+            else:
+                db_instance.update_booking_status(order_id, OrderStatus.COMPLETED)
             success = True
         except Exception:  # pragma: no cover
             success = False
@@ -857,33 +872,68 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
     from app.core.utils import get_offer_field
 
     items: list[dict] = []
-    delivery_address = _get_entity_field(order, "delivery_address")
+    delivery_address = None
     total = 0
+    delivery_price = 0
+    order_type = "pickup"
 
-    offer_id = _get_entity_field(order, "offer_id")
-    quantity = _get_entity_field(order, "quantity", 1)
-    if offer_id:
-        offer = db_instance.get_offer(offer_id)
-        if offer:
-            title = get_offer_field(offer, "title", "Товар")
-            price = get_offer_field(offer, "discount_price", 0)
-            items.append({"title": title, "quantity": quantity, "price": price})
-            total = price * quantity
+    if entity_type == "order":
+        delivery_address = _get_entity_field(entity, "delivery_address")
 
-    cart_items_json = _get_entity_field(order, "cart_items")
-    if cart_items_json:
-        try:
-            cart_items = (
-                json.loads(cart_items_json) if isinstance(cart_items_json, str) else cart_items_json
-            )
-            items = cart_items
-            total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
-        except Exception:  # pragma: no cover
-            pass
+        offer_id = _get_entity_field(entity, "offer_id")
+        quantity = _get_entity_field(entity, "quantity", 1)
+        if offer_id:
+            offer = db_instance.get_offer(offer_id)
+            if offer:
+                title = get_offer_field(offer, "title", "Товар")
+                price = get_offer_field(offer, "discount_price", 0)
+                items.append({"title": title, "quantity": quantity, "price": price})
+                total = price * quantity
 
-    delivery_price = _get_store_field(store, "delivery_price", 0)
+        cart_items_json = _get_entity_field(entity, "cart_items")
+        if cart_items_json:
+            try:
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+                items = cart_items
+                total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            except Exception:  # pragma: no cover
+                pass
 
-    customer_id = _get_entity_field(order, "user_id")
+        delivery_price = _get_store_field(store, "delivery_price", 0)
+        # Respect actual order_type from DB so pickup orders don't
+        # render as delivery in seller/status templates.
+        order_type = _get_entity_field(entity, "order_type", "delivery")
+    else:
+        # Booking (pickup by default)
+        is_cart_booking = _get_entity_field(entity, "is_cart_booking", 0) == 1
+        cart_items_json = _get_entity_field(entity, "cart_items")
+        if is_cart_booking and cart_items_json:
+            try:
+                cart_items = (
+                    json.loads(cart_items_json)
+                    if isinstance(cart_items_json, str)
+                    else cart_items_json
+                )
+                items = cart_items
+                total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
+            except Exception:  # pragma: no cover
+                pass
+        else:
+            offer_id = _get_entity_field(entity, "offer_id")
+            quantity = _get_entity_field(entity, "quantity", 1)
+            if offer_id:
+                offer = db_instance.get_offer(offer_id)
+                if offer:
+                    title = get_offer_field(offer, "title", "Товар")
+                    price = get_offer_field(offer, "discount_price", 0)
+                    items.append({"title": title, "quantity": quantity, "price": price})
+                    total = price * quantity
+
+    customer_id = _get_entity_field(entity, "user_id")
     customer_name = None
     customer_phone = None
     if customer_id:
@@ -893,10 +943,6 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             customer_phone = customer.phone
 
     currency = "so'm" if lang == "uz" else "сум"
-
-    # Respect actual order_type from DB so pickup orders don't
-    # render as delivery in seller/status templates.
-    order_type = _get_entity_field(order, "order_type", "delivery")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
