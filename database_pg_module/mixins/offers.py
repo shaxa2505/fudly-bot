@@ -578,11 +578,11 @@ class OfferMixin:
             if not rows and city and not region and not district:
                 resolved_region, resolved_district = self._resolve_city_fallback(city)
                 if resolved_region or resolved_district:
-                    return self.get_offers_by_city_and_category(
+                    return self.get_hot_offers(
                         city=None,
-                        category=category,
                         limit=limit,
                         offset=offset,
+                        business_type=business_type,
                         region=resolved_region,
                         district=resolved_district,
                         sort_by=sort_by,
