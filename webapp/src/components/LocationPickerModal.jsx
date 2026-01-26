@@ -412,7 +412,7 @@ function LocationPickerModal({
           <div className="location-picker-map">
             <div className="location-picker-map-topbar">
               <button type="button" className="location-picker-map-back" onClick={closeMap}>
-                <- Ortga
+                {'<- Ortga'}
               </button>
                 <button
                   type="button"

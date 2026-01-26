@@ -119,6 +119,9 @@ class StatusUpdateContext:
     offer_id: int | None
     quantity: int
     total_price: int | None
+    item_title: str | None
+    item_price: int | None
+    item_original_price: int | None
 
 
 # =============================================================================
@@ -2257,6 +2260,9 @@ class UnifiedOrderService:
                 offer_id=offer_id,
                 quantity=quantity,
                 total_price=None,
+                item_title=None,
+                item_price=None,
+                item_original_price=None,
             )
 
         if not hasattr(self.db, "get_order"):
@@ -2283,6 +2289,9 @@ class UnifiedOrderService:
             offer_id = entity.get("offer_id")
             quantity = int(entity.get("quantity") or 1)
             total_price = entity.get("total_price")
+            item_title = entity.get("item_title")
+            item_price = entity.get("item_price")
+            item_original_price = entity.get("item_original_price")
 
             # Fallback: if order_type not set, determine from delivery_address
             if not order_type:
@@ -2309,6 +2318,9 @@ class UnifiedOrderService:
             offer_id = getattr(entity, "offer_id", None)
             quantity = int(getattr(entity, "quantity", 1) or 1)
             total_price = getattr(entity, "total_price", None)
+            item_title = getattr(entity, "item_title", None)
+            item_price = getattr(entity, "item_price", None)
+            item_original_price = getattr(entity, "item_original_price", None)
             if not order_type:
                 order_type = "delivery" if delivery_address else "pickup"
 
@@ -2330,6 +2342,9 @@ class UnifiedOrderService:
             offer_id=offer_id,
             quantity=quantity,
             total_price=total_price,
+            item_title=item_title,
+            item_price=item_price,
+            item_original_price=item_original_price,
         )
 
     def _apply_status_update(
@@ -2449,17 +2464,23 @@ class UnifiedOrderService:
         customer_lang: str,
         total_price: int | None,
         delivery_price: int,
+        item_title: str | None = None,
+        item_price: int | None = None,
     ) -> list[dict[str, Any]]:
-        item_title = ""
-        item_price = None
+        item_title = item_title or ""
         if hasattr(self.db, "get_offer"):
-            offer = self.db.get_offer(int(offer_id))
-            if isinstance(offer, dict):
-                item_title = offer.get("title", "")
-                item_price = offer.get("discount_price", None)
-            else:
-                item_title = getattr(offer, "title", "") if offer else ""
-                item_price = getattr(offer, "discount_price", None) if offer else None
+            if not item_title or item_price is None:
+                offer = self.db.get_offer(int(offer_id))
+                if isinstance(offer, dict):
+                    item_title = item_title or offer.get("title", "")
+                    if item_price is None:
+                        item_price = offer.get("discount_price", None)
+                else:
+                    item_title = item_title or (getattr(offer, "title", "") if offer else "")
+                    if item_price is None:
+                        item_price = (
+                            getattr(offer, "discount_price", None) if offer else None
+                        )
 
         if not item_title:
             item_title = "Mahsulot" if customer_lang == "uz" else "РўРѕРІР°СЂ"
@@ -2578,6 +2599,8 @@ class UnifiedOrderService:
                 customer_lang=customer_lang,
                 total_price=total_price,
                 delivery_price=delivery_price,
+                item_title=ctx.item_title,
+                item_price=ctx.item_price,
             )
 
         group_order_ids, group_statuses = self._load_grouped_orders(
