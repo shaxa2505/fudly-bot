@@ -275,6 +275,23 @@ class OfferMixin:
         value = str(category).strip().lower()
         return [value] if value else None
 
+    def _resolve_city_fallback(self, city: str | None) -> tuple[str | None, str | None]:
+        """Resolve city input into region/district when city is actually a district."""
+        if not city or not hasattr(self, "resolve_geo_location"):
+            return None, None
+        try:
+            resolved = self.resolve_geo_location(region=None, district=city, city=city)
+        except Exception as exc:
+            logger.debug("Geo resolve failed for city fallback: %s", exc)
+            return None, None
+        if not resolved:
+            return None, None
+        region_name = resolved.get("region_name_ru")
+        district_name = resolved.get("district_name_ru")
+        if not region_name and not district_name:
+            return None, None
+        return region_name, district_name
+
     def add_offer(
         self,
         store_id: int,
@@ -420,7 +437,23 @@ class OfferMixin:
                 params.append(offset)
 
             cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+            rows = [dict(row) for row in cursor.fetchall()]
+            if not rows and city and not region and not district:
+                resolved_region, resolved_district = self._resolve_city_fallback(city)
+                if resolved_region or resolved_district:
+                    return self.get_hot_offers(
+                        city=None,
+                        limit=limit,
+                        offset=offset,
+                        business_type=business_type,
+                        region=resolved_region,
+                        district=resolved_district,
+                        sort_by=sort_by,
+                        min_price=min_price,
+                        max_price=max_price,
+                        min_discount=min_discount,
+                    )
+            return rows
 
     def get_active_offers(
         self, city: str | None = None, store_id: int | None = None
@@ -541,7 +574,23 @@ class OfferMixin:
             params.extend([limit, offset])
 
             cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+            rows = [dict(row) for row in cursor.fetchall()]
+            if not rows and city and not region and not district:
+                resolved_region, resolved_district = self._resolve_city_fallback(city)
+                if resolved_region or resolved_district:
+                    return self.get_offers_by_city_and_category(
+                        city=None,
+                        category=category,
+                        limit=limit,
+                        offset=offset,
+                        region=resolved_region,
+                        district=resolved_district,
+                        sort_by=sort_by,
+                        min_price=min_price,
+                        max_price=max_price,
+                        min_discount=min_discount,
+                    )
+            return rows
 
     def count_hot_offers(
         self,
@@ -593,7 +642,17 @@ class OfferMixin:
                 params.append(business_type)
 
             cursor.execute(query, params)
-            return cursor.fetchone()[0]
+            count = cursor.fetchone()[0]
+            if count == 0 and city and not region and not district:
+                resolved_region, resolved_district = self._resolve_city_fallback(city)
+                if resolved_region or resolved_district:
+                    return self.count_hot_offers(
+                        city=None,
+                        business_type=business_type,
+                        region=resolved_region,
+                        district=resolved_district,
+                    )
+            return count
 
     def count_offers_by_filters(
         self,
@@ -666,7 +725,20 @@ class OfferMixin:
                 params.append(min_discount)
 
             cursor.execute(query, params)
-            return cursor.fetchone()[0]
+            count = cursor.fetchone()[0]
+            if count == 0 and city and not region and not district:
+                resolved_region, resolved_district = self._resolve_city_fallback(city)
+                if resolved_region or resolved_district:
+                    return self.count_offers_by_filters(
+                        city=None,
+                        region=resolved_region,
+                        district=resolved_district,
+                        category=category,
+                        min_price=min_price,
+                        max_price=max_price,
+                        min_discount=min_discount,
+                    )
+            return count
 
     def get_nearby_offers(
         self,

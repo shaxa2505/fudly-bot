@@ -637,6 +637,71 @@ async def change_city_text(
     )
 
 
+@router.message(F.text)
+async def change_city_free_text(
+    message: types.Message, state: FSMContext | None = None, db: DatabaseProtocol | None = None
+):
+    """Allow free-text city/district change via geo resolver."""
+    if not db or not message.from_user or not message.text:
+        return
+    text = message.text.strip()
+    if not text or text.startswith("/"):
+        return
+    if state is not None:
+        current_state = await state.get_state()
+        if current_state:
+            return
+    # Avoid duplicating the explicit city list handler
+    if text in get_cities("ru") + get_cities("uz"):
+        return
+    if not hasattr(db, "resolve_geo_location"):
+        return
+
+    try:
+        resolved = db.resolve_geo_location(region=None, district=text, city=text)
+    except Exception:
+        resolved = None
+    if not resolved:
+        return
+    region_name = resolved.get("region_name_ru")
+    district_name = resolved.get("district_name_ru")
+    if not region_name and not district_name:
+        return
+
+    user_id = message.from_user.id
+    lang = db.get_user_language(user_id)
+    city_value = normalize_city(region_name or text)
+
+    if hasattr(db, "update_user_location"):
+        db.update_user_location(
+            user_id,
+            city=city_value,
+            region=region_name,
+            district=district_name,
+            region_id=resolved.get("region_id"),
+            district_id=resolved.get("district_id"),
+        )
+    else:
+        db.update_user_city(user_id, city_value)
+
+    city_display = region_name or city_value
+    if district_name:
+        city_display = f"{city_display} / {district_name}"
+
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
+    )
+    await message.answer(
+        get_text(lang, "city_changed_confirm", city=city_display),
+        parse_mode="HTML",
+        reply_markup=menu,
+    )
+
+
 # ===================== OPTIMIZED REGISTRATION FLOW =====================
 # Single card that transforms: Welcome+Lang → Phone → City → Done
 # Minimal messages, maximum UX

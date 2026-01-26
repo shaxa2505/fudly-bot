@@ -240,13 +240,25 @@ class OfferService:
         }
         return mapping.get(business_type, "supermarket")
 
-    @staticmethod
     def _build_location_scopes(
+        self,
         city: str | None,
         region: str | None,
         district: str | None,
     ) -> list[tuple[str | None, str | None, str | None]]:
         scopes: list[tuple[str | None, str | None, str | None]] = []
+        if city and not region and not district and hasattr(self._db, "resolve_geo_location"):
+            try:
+                resolved = self._db.resolve_geo_location(region=None, district=city, city=city)
+            except Exception:
+                resolved = None
+            if resolved:
+                resolved_region = resolved.get("region_name_ru")
+                resolved_district = resolved.get("district_name_ru")
+                if resolved_district:
+                    scopes.append((None, resolved_region, resolved_district))
+                if resolved_region:
+                    scopes.append((None, resolved_region, None))
         if district:
             scopes.append((None, region, district))
         if region:
