@@ -956,6 +956,279 @@ class UnifiedOrderService:
     # ORDER CREATION
     # =========================================================================
 
+    def _error_result(
+        self,
+        error_message: str,
+        failed_items: list[OrderItem] | None = None,
+    ) -> OrderResult:
+        return OrderResult(
+            success=False,
+            order_ids=[],
+            booking_ids=[],
+            pickup_codes=[],
+            total_items=0,
+            total_price=0,
+            delivery_price=0,
+            grand_total=0,
+            error_message=error_message,
+            failed_items=failed_items,
+        )
+
+    @staticmethod
+    def _calc_items_payload(items: list[OrderItem]) -> list[dict[str, int]]:
+        return [
+            {"title": item.title, "price": item.price, "quantity": item.quantity}
+            for item in items
+        ]
+
+    @staticmethod
+    def _build_db_items(items: list[OrderItem], is_delivery: bool) -> list[dict[str, Any]]:
+        return [
+            {
+                "offer_id": item.offer_id,
+                "store_id": item.store_id,
+                "quantity": item.quantity,
+                "price": item.price,
+                "delivery_price": item.delivery_price if is_delivery else 0,
+                "title": item.title,
+                "store_name": item.store_name,
+                "store_address": item.store_address,
+            }
+            for item in items
+        ]
+
+    async def _notify_customer_on_create(
+        self,
+        user_id: int,
+        items: list[OrderItem],
+        order_type: str,
+        delivery_address: str | None,
+        payment_method: str,
+        order_ids: list[int],
+        booking_ids: list[int],
+        pickup_codes: list[str],
+        total_price: int,
+        delivery_price: int,
+        customer_name: str,
+        customer_phone: str,
+        customer_lang: str,
+        currency: str,
+        customer_notifications: bool,
+        telegram_enabled: bool,
+        notifications_enabled: bool,
+    ) -> None:
+        # Send notification/event to customer (WebApp sync always; Telegram optional)
+        publish_customer_event = bool(user_id) and notifications_enabled
+        if not (customer_notifications or publish_customer_event):
+            return
+
+        all_ids = [str(x) for x in (order_ids + booking_ids)]
+        items_for_template = self._calc_items_payload(items)
+
+        customer_msg = NotificationTemplates.customer_order_created(
+            lang=customer_lang,
+            order_ids=all_ids,
+            pickup_codes=pickup_codes,
+            items=items_for_template,
+            order_type=order_type,
+            delivery_address=delivery_address,
+            payment_method=payment_method,
+            store_name=items[0].store_name if items else "",
+            store_address=items[0].store_address if items else "",
+            total=total_price,
+            delivery_price=delivery_price,
+            currency=currency,
+        )
+
+        primary_offer_id = items[0].offer_id if items else None
+        photo_ids = self._collect_photos_from_items(items)
+        customer_photo = None
+        if len(photo_ids) > 1:
+            customer_photo = await self._build_collage_photo(photo_ids)
+        if not customer_photo and photo_ids:
+            customer_photo = photo_ids[0]
+        if not customer_photo and primary_offer_id:
+            customer_photo = self._get_offer_photo(primary_offer_id)
+
+        entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
+        entity_ids = [int(x) for x in entity_ids_raw]
+        entity_id = entity_ids[0] if entity_ids else None
+        entity_type = "order" if order_ids else "booking"
+        store_id = items[0].store_id if items else None
+        store_name = items[0].store_name if items else ""
+        store_address = items[0].store_address if items else ""
+        customer_payload = {"id": int(user_id)} if user_id else None
+        if customer_payload is not None:
+            customer_payload["name"] = customer_name or ""
+            customer_payload["phone"] = customer_phone or ""
+        amounts_payload = {
+            "subtotal": int(total_price or 0),
+            "delivery_fee": int(delivery_price or 0),
+            "total": int(total_price or 0) + int(delivery_price or 0),
+            "currency": currency,
+        }
+        unified_payload = build_unified_order_payload(
+            kind="order_created",
+            role="customer",
+            entity_type=entity_type,
+            entity_id=entity_id,
+            entity_ids=entity_ids,
+            is_cart=len(entity_ids) > 1,
+            order_type=order_type,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.initial_for_method(payment_method),
+            pickup_code=pickup_codes[0] if len(pickup_codes) == 1 else None,
+            delivery_address=delivery_address,
+            store={
+                "id": int(store_id) if store_id is not None else None,
+                "name": store_name,
+                "address": store_address,
+            },
+            customer=customer_payload,
+            items=items_for_template,
+            amounts=amounts_payload,
+        )
+
+        sent_msg = None
+        if customer_notifications and telegram_enabled:
+            try:
+                if customer_photo:
+                    try:
+                        sent_msg = await self.bot.send_photo(
+                            user_id,
+                            photo=customer_photo,
+                            caption=customer_msg,
+                            parse_mode="HTML",
+                        )
+                    except Exception as photo_err:
+                        logger.warning(
+                            f"Failed to send customer photo for {user_id}: {photo_err}"
+                        )
+                if not sent_msg:
+                    sent_msg = await self.bot.send_message(
+                        user_id, customer_msg, parse_mode="HTML"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to notify customer {user_id}: {e}")
+
+        if sent_msg:
+            total_entities = len(order_ids) + len(booking_ids)
+            if total_entities == 1:
+                if order_ids and hasattr(self.db, "set_order_customer_message_id"):
+                    try:
+                        self.db.set_order_customer_message_id(
+                            int(order_ids[0]), sent_msg.message_id
+                        )
+                        logger.info(
+                            "Saved customer_message_id=%s for order#%s",
+                            sent_msg.message_id,
+                            order_ids[0],
+                        )
+                    except Exception as save_err:
+                        logger.warning(
+                            "Failed to save customer_message_id for order %s: %s",
+                            order_ids[0],
+                            save_err,
+                        )
+                elif booking_ids and hasattr(self.db, "set_booking_customer_message_id"):
+                    try:
+                        self.db.set_booking_customer_message_id(
+                            int(booking_ids[0]), sent_msg.message_id
+                        )
+                        logger.info(
+                            "Saved customer_message_id=%s for booking#%s",
+                            sent_msg.message_id,
+                            booking_ids[0],
+                        )
+                    except Exception as save_err:
+                        logger.warning(
+                            "Failed to save customer_message_id for booking %s: %s",
+                            booking_ids[0],
+                            save_err,
+                        )
+            else:
+                # Cart/legacy multi-order: attach the same message_id to all entities
+                if order_ids and hasattr(self.db, "set_order_customer_message_id"):
+                    for order_id in order_ids:
+                        try:
+                            self.db.set_order_customer_message_id(
+                                int(order_id), sent_msg.message_id
+                            )
+                        except Exception as save_err:
+                            logger.warning(
+                                "Failed to save customer_message_id for order %s: %s",
+                                order_id,
+                                save_err,
+                            )
+                if booking_ids and hasattr(self.db, "set_booking_customer_message_id"):
+                    for booking_id in booking_ids:
+                        try:
+                            self.db.set_booking_customer_message_id(
+                                int(booking_id), sent_msg.message_id
+                            )
+                        except Exception as save_err:
+                            logger.warning(
+                                "Failed to save customer_message_id for booking %s: %s",
+                                booking_id,
+                                save_err,
+                            )
+                logger.info(
+                    "Saved shared customer_message_id=%s for user %s: order_ids=%s booking_ids=%s",
+                    sent_msg.message_id,
+                    user_id,
+                    order_ids,
+                    booking_ids,
+                )
+
+        if publish_customer_event:
+            try:
+                notification_service = get_notification_service()
+                title = "Buyurtma qabul qilindi" if customer_lang == "uz" else "????? ??????"
+                plain_msg = re.sub(r"<[^>]+>", "", customer_msg)
+                await notification_service.notify_user(
+                    Notification(
+                        type=NotificationType.NEW_BOOKING,
+                        recipient_id=int(user_id),
+                        title=title,
+                        message=plain_msg,
+                        data={
+                            "order_ids": order_ids,
+                            "booking_ids": booking_ids,
+                            "status": OrderStatus.PENDING,
+                            "order_type": order_type,
+                            "unified": unified_payload,
+                        },
+                        priority=0,
+                    )
+                )
+            except Exception as notify_error:
+                logger.warning(
+                    f"Notification service failed for order create: {notify_error}"
+                )
+
+            try:
+                from app.core.websocket import get_websocket_manager
+
+                ws_manager = get_websocket_manager()
+                await ws_manager.send_to_user(
+                    int(user_id),
+                    {
+                        "type": "order_created",
+                        "data": {
+                            "order_ids": order_ids,
+                            "booking_ids": booking_ids,
+                            "status": OrderStatus.PENDING,
+                            "order_type": order_type,
+                            "unified": unified_payload,
+                        },
+                    },
+                )
+            except Exception as ws_error:
+                logger.warning(
+                    f"WebSocket notify failed for order create: {ws_error}"
+                )
+
+
     async def create_order(
         self,
         user_id: int,
@@ -992,43 +1265,13 @@ class UnifiedOrderService:
             OrderResult with all order details
         """
         if not items:
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message="No items provided",
-            )
+            return self._error_result("No items provided")
         if any(int(getattr(item, "quantity", 0) or 0) <= 0 for item in items):
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message="Invalid item quantity",
-            )
+            return self._error_result("Invalid item quantity")
 
         is_delivery = order_type in ("delivery", "taxi")
         if is_delivery and not delivery_address:
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message="Delivery address required",
-            )
+            return self._error_result("Delivery address required")
 
         if is_delivery and delivery_address and (delivery_lat is None or delivery_lon is None):
             try:
@@ -1041,17 +1284,7 @@ class UnifiedOrderService:
 
         payment_method = PaymentStatus.normalize_method(payment_method)
         if is_delivery and payment_method == "cash" and not _delivery_cash_enabled():
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message="Cash is not allowed for delivery orders",
-            )
+            return self._error_result("Cash is not allowed for delivery orders")
         # Enforce business invariant: one order must belong to ONE store
         # This protects from mixed-store carts and keeps pricing logic correct.
         store_ids = {item.store_id for item in items}
@@ -1082,19 +1315,7 @@ class UnifiedOrderService:
             notify_sellers = False
 
         # Prepare items for database
-        db_items = [
-            {
-                "offer_id": item.offer_id,
-                "store_id": item.store_id,
-                "quantity": item.quantity,
-                "price": item.price,
-                "delivery_price": item.delivery_price if is_delivery else 0,
-                "title": item.title,
-                "store_name": item.store_name,
-                "store_address": item.store_address,
-            }
-            for item in items
-        ]
+        db_items = self._build_db_items(items, is_delivery)
 
         # Create orders using appropriate method based on type
         if order_type == "pickup":
@@ -1116,16 +1337,8 @@ class UnifiedOrderService:
         if not result.get("success"):
             error_msg = result.get("error", "Failed to create orders")
             friendly_error = self._normalize_creation_error(error_msg, items)
-            return OrderResult(
-                success=False,
-                order_ids=[],
-                booking_ids=[],
-                pickup_codes=[],
-                total_items=0,
-                total_price=0,
-                delivery_price=0,
-                grand_total=0,
-                error_message=friendly_error,
+            return self._error_result(
+                friendly_error,
                 failed_items=result.get("failed_items"),
             )
 
@@ -1190,215 +1403,25 @@ class UnifiedOrderService:
                 send_telegram=telegram_enabled,
             )
 
-        # Send notification/event to customer (WebApp sync always; Telegram optional)
-        publish_customer_event = bool(user_id) and notifications_enabled
-        if customer_notifications or publish_customer_event:
-            all_ids = [str(x) for x in (order_ids + booking_ids)]
-            items_for_template = [
-                {"title": item.title, "price": item.price, "quantity": item.quantity}
-                for item in items
-            ]
-
-            customer_msg = NotificationTemplates.customer_order_created(
-                lang=customer_lang,
-                order_ids=all_ids,
-                pickup_codes=pickup_codes,
-                items=items_for_template,
-                order_type=order_type,
-                delivery_address=delivery_address,
-                payment_method=payment_method,
-                store_name=items[0].store_name if items else "",
-                store_address=items[0].store_address if items else "",
-                total=total_price,
-                delivery_price=delivery_price,
-                currency=currency,
-            )
-
-            primary_offer_id = items[0].offer_id if items else None
-            photo_ids = self._collect_photos_from_items(items)
-            customer_photo = None
-            if len(photo_ids) > 1:
-                customer_photo = await self._build_collage_photo(photo_ids)
-            if not customer_photo and photo_ids:
-                customer_photo = photo_ids[0]
-            if not customer_photo and primary_offer_id:
-                customer_photo = self._get_offer_photo(primary_offer_id)
-
-            entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
-            entity_ids = [int(x) for x in entity_ids_raw]
-            entity_id = entity_ids[0] if entity_ids else None
-            entity_type = "order" if order_ids else "booking"
-            store_id = items[0].store_id if items else None
-            store_name = items[0].store_name if items else ""
-            store_address = items[0].store_address if items else ""
-            customer_payload = {"id": int(user_id)} if user_id else None
-            if customer_payload is not None:
-                customer_payload["name"] = customer_name or ""
-                customer_payload["phone"] = customer_phone or ""
-            amounts_payload = {
-                "subtotal": int(total_price or 0),
-                "delivery_fee": int(delivery_price or 0),
-                "total": int(total_price or 0) + int(delivery_price or 0),
-                "currency": currency,
-            }
-            unified_payload = build_unified_order_payload(
-                kind="order_created",
-                role="customer",
-                entity_type=entity_type,
-                entity_id=entity_id,
-                entity_ids=entity_ids,
-                is_cart=len(entity_ids) > 1,
-                order_type=order_type,
-                status=OrderStatus.PENDING,
-                payment_status=PaymentStatus.initial_for_method(payment_method),
-                pickup_code=pickup_codes[0] if len(pickup_codes) == 1 else None,
-                delivery_address=delivery_address,
-                store={
-                    "id": int(store_id) if store_id is not None else None,
-                    "name": store_name,
-                    "address": store_address,
-                },
-                customer=customer_payload,
-                items=items_for_template,
-                amounts=amounts_payload,
-            )
-
-            sent_msg = None
-            if customer_notifications and telegram_enabled:
-                try:
-                    if customer_photo:
-                        try:
-                            sent_msg = await self.bot.send_photo(
-                                user_id,
-                                photo=customer_photo,
-                                caption=customer_msg,
-                                parse_mode="HTML",
-                            )
-                        except Exception as photo_err:
-                            logger.warning(
-                                f"Failed to send customer photo for {user_id}: {photo_err}"
-                            )
-                    if not sent_msg:
-                        sent_msg = await self.bot.send_message(
-                            user_id, customer_msg, parse_mode="HTML"
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to notify customer {user_id}: {e}")
-
-            if sent_msg:
-                total_entities = len(order_ids) + len(booking_ids)
-                if total_entities == 1:
-                    if order_ids and hasattr(self.db, "set_order_customer_message_id"):
-                        try:
-                            self.db.set_order_customer_message_id(
-                                int(order_ids[0]), sent_msg.message_id
-                            )
-                            logger.info(
-                                "Saved customer_message_id=%s for order#%s",
-                                sent_msg.message_id,
-                                order_ids[0],
-                            )
-                        except Exception as save_err:
-                            logger.warning(
-                                "Failed to save customer_message_id for order %s: %s",
-                                order_ids[0],
-                                save_err,
-                            )
-                    elif booking_ids and hasattr(
-                        self.db, "set_booking_customer_message_id"
-                    ):
-                        try:
-                            self.db.set_booking_customer_message_id(
-                                int(booking_ids[0]), sent_msg.message_id
-                            )
-                            logger.info(
-                                "Saved customer_message_id=%s for booking#%s",
-                                sent_msg.message_id,
-                                booking_ids[0],
-                            )
-                        except Exception as save_err:
-                            logger.warning(
-                                "Failed to save customer_message_id for booking %s: %s",
-                                booking_ids[0],
-                                save_err,
-                            )
-                else:
-                    # Cart/legacy multi-order: attach the same message_id to all entities
-                    if order_ids and hasattr(self.db, "set_order_customer_message_id"):
-                        for order_id in order_ids:
-                            try:
-                                self.db.set_order_customer_message_id(
-                                    int(order_id), sent_msg.message_id
-                                )
-                            except Exception as save_err:
-                                logger.warning(
-                                    "Failed to save customer_message_id for order %s: %s",
-                                    order_id,
-                                    save_err,
-                                )
-                    if booking_ids and hasattr(self.db, "set_booking_customer_message_id"):
-                        for booking_id in booking_ids:
-                            try:
-                                self.db.set_booking_customer_message_id(
-                                    int(booking_id), sent_msg.message_id
-                                )
-                            except Exception as save_err:
-                                logger.warning(
-                                    "Failed to save customer_message_id for booking %s: %s",
-                                    booking_id,
-                                    save_err,
-                                )
-                    logger.info(
-                        "Saved shared customer_message_id=%s for user %s: order_ids=%s booking_ids=%s",
-                        sent_msg.message_id,
-                        user_id,
-                        order_ids,
-                        booking_ids,
-                    )
-
-            if publish_customer_event:
-                try:
-                    notification_service = get_notification_service()
-                    title = "Buyurtma qabul qilindi" if customer_lang == "uz" else "Заказ принят"
-                    plain_msg = re.sub(r"<[^>]+>", "", customer_msg)
-                    await notification_service.notify_user(
-                        Notification(
-                            type=NotificationType.NEW_BOOKING,
-                            recipient_id=int(user_id),
-                            title=title,
-                            message=plain_msg,
-                            data={
-                                "order_ids": order_ids,
-                                "booking_ids": booking_ids,
-                                "status": OrderStatus.PENDING,
-                                "order_type": order_type,
-                                "unified": unified_payload,
-                            },
-                            priority=0,
-                        )
-                    )
-                except Exception as notify_error:
-                    logger.warning(f"Notification service failed for order create: {notify_error}")
-
-                try:
-                    from app.core.websocket import get_websocket_manager
-
-                    ws_manager = get_websocket_manager()
-                    await ws_manager.send_to_user(
-                        int(user_id),
-                        {
-                            "type": "order_created",
-                            "data": {
-                                "order_ids": order_ids,
-                                "booking_ids": booking_ids,
-                                "status": OrderStatus.PENDING,
-                                "order_type": order_type,
-                                "unified": unified_payload,
-                            },
-                        },
-                    )
-                except Exception as ws_error:
-                    logger.warning(f"WebSocket notify failed for order create: {ws_error}")
+        await self._notify_customer_on_create(
+            user_id=user_id,
+            items=items,
+            order_type=order_type,
+            delivery_address=delivery_address,
+            payment_method=payment_method,
+            order_ids=order_ids,
+            booking_ids=booking_ids,
+            pickup_codes=pickup_codes,
+            total_price=total_price,
+            delivery_price=delivery_price,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            customer_lang=customer_lang,
+            currency=currency,
+            customer_notifications=customer_notifications,
+            telegram_enabled=telegram_enabled,
+            notifications_enabled=notifications_enabled,
+        )
 
         # Log order creation
         logger.info(
@@ -1632,6 +1655,95 @@ class UnifiedOrderService:
             logger.error(f"Failed to create delivery orders: {e}")
             return {"success": False, "error": str(e)}
 
+    @staticmethod
+    def _collect_order_ids(store_orders: list[dict]) -> tuple[list[str], list[int]]:
+        order_ids: list[str] = []
+        order_id_ints: list[int] = []
+        seen_order_ids: set[int] = set()
+        for order in store_orders:
+            oid = order.get("order_id")
+            if not oid:
+                continue
+            oid_int = int(oid)
+            if oid_int in seen_order_ids:
+                continue
+            seen_order_ids.add(oid_int)
+            order_ids.append(str(oid_int))
+            order_id_ints.append(oid_int)
+        return order_ids, order_id_ints
+
+    @staticmethod
+    def _collect_pickup_codes(store_orders: list[dict]) -> list[str]:
+        pickup_codes: list[str] = []
+        seen_codes: set[str] = set()
+        for order in store_orders:
+            code = order.get("pickup_code")
+            if not code or code in seen_codes:
+                continue
+            seen_codes.add(code)
+            pickup_codes.append(code)
+        return pickup_codes
+
+    async def _resolve_delivery_map(
+        self,
+        *,
+        is_delivery: bool,
+        delivery_address: str | None,
+        delivery_lat: float | None,
+        delivery_lon: float | None,
+    ) -> tuple[str | None, str | None]:
+        map_url = None
+        static_map_url = None
+        lat_val = None
+        lon_val = None
+        if is_delivery and (delivery_lat is not None and delivery_lon is not None):
+            try:
+                lat_val = float(delivery_lat)
+                lon_val = float(delivery_lon)
+            except (TypeError, ValueError):
+                lat_val = None
+                lon_val = None
+        elif is_delivery and delivery_address:
+            try:
+                geo = await geocode_store_address(delivery_address, None)
+                if geo:
+                    lat_val = float(geo.get("latitude"))
+                    lon_val = float(geo.get("longitude"))
+            except Exception as geo_err:
+                logger.warning("Delivery geocode failed: %s", geo_err)
+        if lat_val is not None and lon_val is not None:
+            map_url = (
+                "https://www.openstreetmap.org/?mlat="
+                f"{lat_val:.6f}&mlon={lon_val:.6f}#map=18/{lat_val:.6f}/{lon_val:.6f}"
+            )
+            static_map_url = (
+                "https://staticmap.openstreetmap.de/staticmap.php"
+                f"?center={lat_val:.6f},{lon_val:.6f}"
+                f"&zoom=17&size=640x360&markers={lat_val:.6f},{lon_val:.6f},red-pushpin"
+            )
+        return map_url, static_map_url
+
+    @staticmethod
+    def _build_seller_keyboard(
+        seller_lang: str,
+        first_order_id: int,
+        map_url: str | None,
+    ) -> InlineKeyboardBuilder:
+        kb = InlineKeyboardBuilder()
+        if seller_lang == "uz":
+            kb.button(text="✅ Qabul qilish", callback_data=f"order_confirm_{first_order_id}")
+            kb.button(text="❌ Rad etish", callback_data=f"order_reject_{first_order_id}")
+        else:
+            kb.button(text="✅ Принять", callback_data=f"order_confirm_{first_order_id}")
+            kb.button(text="❌ Отклонить", callback_data=f"order_reject_{first_order_id}")
+        if map_url:
+            map_text = "🗺 Xarita" if seller_lang == "uz" else "🗺 Карта"
+            kb.button(text=map_text, url=map_url)
+            kb.adjust(2, 1)
+        else:
+            kb.adjust(2)
+        return kb
+
     async def _notify_sellers_new_order(
         self,
         stores_orders: dict[int, list[dict]],
@@ -1668,58 +1780,14 @@ class UnifiedOrderService:
                 store_delivery = store_orders[0].get("delivery_price", 0) if is_delivery else 0
 
                 # Build notification
-                order_ids: list[str] = []
-                order_id_ints: list[int] = []
-                seen_order_ids: set[int] = set()
-                for o in store_orders:
-                    oid = o.get("order_id")
-                    if not oid:
-                        continue
-                    oid_int = int(oid)
-                    if oid_int in seen_order_ids:
-                        continue
-                    seen_order_ids.add(oid_int)
-                    order_ids.append(str(oid_int))
-                    order_id_ints.append(oid_int)
-
-                pickup_codes: list[str] = []
-                seen_codes: set[str] = set()
-                for o in store_orders:
-                    code = o.get("pickup_code")
-                    if not code or code in seen_codes:
-                        continue
-                    seen_codes.add(code)
-                    pickup_codes.append(code)
-
-                map_url = None
-                static_map_url = None
-                lat_val = None
-                lon_val = None
-                if is_delivery and (delivery_lat is not None and delivery_lon is not None):
-                    try:
-                        lat_val = float(delivery_lat)
-                        lon_val = float(delivery_lon)
-                    except (TypeError, ValueError):
-                        lat_val = None
-                        lon_val = None
-                elif is_delivery and delivery_address:
-                    try:
-                        geo = await geocode_store_address(delivery_address, None)
-                        if geo:
-                            lat_val = float(geo.get("latitude"))
-                            lon_val = float(geo.get("longitude"))
-                    except Exception as geo_err:
-                        logger.warning("Delivery geocode failed: %s", geo_err)
-                if lat_val is not None and lon_val is not None:
-                    map_url = (
-                        "https://www.openstreetmap.org/?mlat="
-                        f"{lat_val:.6f}&mlon={lon_val:.6f}#map=18/{lat_val:.6f}/{lon_val:.6f}"
-                    )
-                    static_map_url = (
-                        "https://staticmap.openstreetmap.de/staticmap.php"
-                        f"?center={lat_val:.6f},{lon_val:.6f}"
-                        f"&zoom=17&size=640x360&markers={lat_val:.6f},{lon_val:.6f},red-pushpin"
-                    )
+                order_ids, order_id_ints = self._collect_order_ids(store_orders)
+                pickup_codes = self._collect_pickup_codes(store_orders)
+                map_url, static_map_url = await self._resolve_delivery_map(
+                    is_delivery=is_delivery,
+                    delivery_address=delivery_address,
+                    delivery_lat=delivery_lat,
+                    delivery_lon=delivery_lon,
+                )
 
                 seller_text = NotificationTemplates.seller_new_order(
                     lang=seller_lang,
@@ -1780,21 +1848,11 @@ class UnifiedOrderService:
 
                 # Build keyboard - unified callback pattern
                 first_order_id = store_orders[0]["order_id"]
-                kb = InlineKeyboardBuilder()
-                if seller_lang == "uz":
-                    kb.button(
-                        text="✅ Qabul qilish", callback_data=f"order_confirm_{first_order_id}"
-                    )
-                    kb.button(text="❌ Rad etish", callback_data=f"order_reject_{first_order_id}")
-                else:
-                    kb.button(text="✅ Принять", callback_data=f"order_confirm_{first_order_id}")
-                    kb.button(text="❌ Отклонить", callback_data=f"order_reject_{first_order_id}")
-                if map_url:
-                    map_text = "🗺 Xarita" if seller_lang == "uz" else "🗺 Карта"
-                    kb.button(text=map_text, url=map_url)
-                    kb.adjust(2, 1)
-                else:
-                    kb.adjust(2)
+                kb = self._build_seller_keyboard(
+                    seller_lang=seller_lang,
+                    first_order_id=first_order_id,
+                    map_url=map_url,
+                )
 
                 sent_msg = None
                 if telegram_enabled:

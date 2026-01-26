@@ -142,9 +142,9 @@ class StoreMixin:
     def get_store_model(self, store_id: int) -> Any | None:
         """Get store as Pydantic model."""
         try:
-            from app.domain import Store
-        except ImportError:
-            logger.error("Domain models not available. Install pydantic.")
+            from app.domain.entities import Store
+        except Exception as e:
+            logger.error(f"Domain models not available: {e}")
             return None
 
         store_dict = self.get_store(store_id)

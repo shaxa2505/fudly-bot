@@ -131,6 +131,14 @@ def canonicalize_geo_slug(value: str | None) -> str | None:
     return _GEO_SLUG_MAP.get(base, base)
 
 
+def _slug_like_pattern(value: str) -> str:
+    """Build a permissive pattern for slug ILIKE matching."""
+    if not value:
+        return "%"
+    spaced = re.sub(r"\s+", "%", value.strip())
+    return f"%{spaced}%"
+
+
 class OfferMixin:
     """Mixin for offer-related database operations."""
 
@@ -212,6 +220,12 @@ class OfferMixin:
                 )
                 conditions.append(f"({slug_conditions})")
                 params.extend(slug_values)
+
+                slug_like_conditions = " OR ".join(
+                    [f"{prefix}{slug_column} ILIKE %s" for _ in slug_values]
+                )
+                conditions.append(f"({slug_like_conditions})")
+                params.extend([_slug_like_pattern(v) for v in slug_values])
 
             if variants:
                 ilike_conditions = " OR ".join(
