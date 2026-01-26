@@ -301,7 +301,26 @@ function LocationPickerModal({
             <p>{mode === 'map' ? "Xaritadan tanlang" : "Manzilingizni kiriting"}</p>
           </div>
           <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
-            x
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="location-picker-tabs">
+          <button
+            type="button"
+            className={`location-picker-tab ${mode === 'search' ? 'is-active' : ''}`}
+            onClick={() => setMode('search')}
+          >
+            Qidiruv
+          </button>
+          <button
+            type="button"
+            className={`location-picker-tab ${mode === 'map' ? 'is-active' : ''}`}
+            onClick={openMap}
+          >
+            Xarita
           </button>
         </div>
 
@@ -309,7 +328,12 @@ function LocationPickerModal({
           <>
             <div className="location-picker-search">
               <div className="location-picker-input">
-                <span className="location-picker-input-icon">SEARCH</span>
+                <span className="location-picker-input-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+                    <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
                 <input
                   type="text"
                   value={query}
@@ -323,7 +347,9 @@ function LocationPickerModal({
                     onClick={() => setQuery('')}
                     aria-label="Tozalash"
                   >
-                    x
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
                   </button>
                 )}
               </div>
@@ -335,7 +361,12 @@ function LocationPickerModal({
                   onClick={() => onDetectLocation?.()}
                   disabled={!canDetect || isLocating}
                 >
-                  <span>PIN</span>
+                  <span className="location-picker-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 21s7-7 7-11a7 7 0 1 0-14 0c0 4 7 11 7 11z" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <circle cx="12" cy="10" r="2.5" fill="currentColor" />
+                    </svg>
+                  </span>
                   {isLocating ? 'Aniqlanmoqda...' : 'Joylashuvni aniqlash'}
                 </button>
                 <button
@@ -343,7 +374,12 @@ function LocationPickerModal({
                   className="location-picker-action secondary"
                   onClick={openMap}
                 >
-                  <span>MAP</span>
+                  <span className="location-picker-action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 6l6-2 6 2 4-2v14l-4 2-6-2-6 2V6z" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <path d="M10 4v14M16 6v14" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  </span>
                   Xaritada tanlash
                 </button>
               </div>
@@ -374,7 +410,12 @@ function LocationPickerModal({
                   className="location-picker-result"
                   onClick={() => handleSelectResult(item)}
                 >
-                  <span className="location-picker-result-icon">PIN</span>
+                  <span className="location-picker-result-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 21s7-7 7-11a7 7 0 1 0-14 0c0 4 7 11 7 11z" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <circle cx="12" cy="10" r="2.5" fill="currentColor" />
+                    </svg>
+                  </span>
                   <span className="location-picker-result-body">
                     <span className="location-picker-result-title">{getPrimaryLabel(item)}</span>
                     <span className="location-picker-result-subtitle">{getSecondaryLabel(item)}</span>
@@ -391,7 +432,12 @@ function LocationPickerModal({
                   className="location-picker-result manual"
                   onClick={handleUseTyped}
                 >
-                  <span className="location-picker-result-icon">PEN</span>
+                  <span className="location-picker-result-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M4 20l4-1 9-9-3-3-9 9-1 4z" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <path d="M13 7l3 3" stroke="currentColor" strokeWidth="2" />
+                    </svg>
+                  </span>
                   <span className="location-picker-result-body">
                     <span className="location-picker-result-title">Kiritilgan manzilni saqlash</span>
                     <span className="location-picker-result-subtitle">{query.trim()}</span>
@@ -412,7 +458,12 @@ function LocationPickerModal({
           <div className="location-picker-map">
             <div className="location-picker-map-topbar">
               <button type="button" className="location-picker-map-back" onClick={closeMap}>
-                {'<- Ortga'}
+                <span aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                Ortga
               </button>
                 <button
                   type="button"

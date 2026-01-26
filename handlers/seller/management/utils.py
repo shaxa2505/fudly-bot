@@ -548,6 +548,10 @@ async def send_order_card(
         is_cart_order = order.get("is_cart_order", 0) if isinstance(order, dict) else 0
         cart_items_json = order.get("cart_items") if isinstance(order, dict) else None
 
+        # Prefer snapshot fields when present
+        item_title = order.get("item_title") if isinstance(order, dict) else None
+        item_price = order.get("item_price") if isinstance(order, dict) else None
+
         # Get offer info or cart items
         if is_cart_order and cart_items_json:
             import json
@@ -574,11 +578,15 @@ async def send_order_card(
                 if isinstance(order, dict)
                 else (order[2] if len(order) > 2 else None)
             )
-            offer = database.get_offer(offer_id) if offer_id else None
-            offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
-            offer_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
-            items_text = f"- {offer_title} x {quantity}"
-            total_price = offer_price * int(quantity)
+            offer = None
+            if item_title is None or item_price is None:
+                offer = database.get_offer(offer_id) if offer_id else None
+            if item_title is None:
+                item_title = get_offer_field(offer, "title", "?????") if offer else "?????"
+            if item_price is None:
+                item_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
+            items_text = f"- {item_title} x {quantity}"
+            total_price = int(item_price or 0) * int(quantity)
 
         payment_text = "Оплачено" if payment_status == "confirmed" else "Ожидает подтверждения"
         if lang != "ru":
