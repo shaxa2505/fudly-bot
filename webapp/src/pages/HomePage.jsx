@@ -9,6 +9,7 @@ import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
+import LocationPickerModal from '../components/LocationPickerModal'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import { blurOnEnter } from '../utils/helpers'
@@ -89,9 +90,6 @@ function HomePage() {
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [showAddressModal, setShowAddressModal] = useState(false)
-  const [manualCity, setManualCity] = useState(location.city)
-  const [manualAddress, setManualAddress] = useState(location.address)
-  const [manualError, setManualError] = useState('')
   const [geoStatusLabel, setGeoStatusLabel] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
 
   // Quick filters state
@@ -808,12 +806,26 @@ function HomePage() {
   }, [])
 
   // Функция для автоматического геокодирования (при старте)
+  const applyLocation = useCallback((nextLocation, options = {}) => {
+    if (!nextLocation) return
+    const normalized = {
+      ...nextLocation,
+      city: normalizeLocationName(nextLocation.city || ''),
+      region: normalizeLocationName(nextLocation.region || ''),
+      district: normalizeLocationName(nextLocation.district || ''),
+    }
+    setLocation(prev => ({ ...prev, ...normalized }))
+    if (options.closeModal) {
+      setShowAddressModal(false)
+    }
+    setLocationError('')
+  }, [])
+
   const reverseGeocodeAuto = async (lat, lon) => {
     try {
       const data = await api.reverseGeocode(lat, lon, 'uz')
       if (!data) throw new Error('Geo lookup failed')
-      setLocation(buildLocationFromReverseGeocode(data, lat, lon))
-      setLocationError('')
+      applyLocation(buildLocationFromReverseGeocode(data, lat, lon))
       return true
     } catch (error) {
       console.error('Reverse geocode error', error)
@@ -875,9 +887,7 @@ function HomePage() {
     try {
       const data = await api.reverseGeocode(lat, lon, 'uz')
       if (!data) throw new Error('Geo lookup failed')
-      setLocation(buildLocationFromReverseGeocode(data, lat, lon))
-      setLocationError('')
-      setShowAddressModal(false)
+      applyLocation(buildLocationFromReverseGeocode(data, lat, lon), { closeModal: true })
       return true // Закрываем модалку после успешного определения
     } catch (error) {
       console.error('Reverse geocode error', error)
@@ -925,44 +935,16 @@ function HomePage() {
   }
 
   const openAddressModal = () => {
-    setManualCity(location.city)
-    setManualAddress(location.address)
-    setManualError('')
     setShowAddressModal(true)
-  }
-
-  const handleSaveManualAddress = () => {
-    const trimmedCity = normalizeLocationName(manualCity.trim())
-    const trimmedAddress = manualAddress.trim()
-    if (!trimmedCity) {
-      setManualError('Shahar yoki hududni kiriting')
-      return
-    }
-    setManualError('')
-    setLocation(prev => {
-      const keepRegion = prev.city?.startsWith(trimmedCity)
-      return {
-        city: trimmedCity || DEFAULT_LOCATION.city,
-        address: trimmedAddress,
-        coordinates: trimmedAddress ? prev.coordinates : null,
-        region: keepRegion ? prev.region : '',
-        district: keepRegion ? prev.district : '',
-        source: 'manual',
-      }
-    })
-    setShowAddressModal(false)
-    setLocationError('')
   }
 
   const handleResetLocation = () => {
     setLocation(DEFAULT_LOCATION)
-    setManualCity('')
-    setManualAddress('')
-    setManualError('')
     setLocationError('')
     localStorage.removeItem(GEO_ATTEMPT_KEY)
     localStorage.removeItem(GEO_STATUS_KEY)
     autoLocationAttempted.current = false
+    setShowAddressModal(false)
   }
 
   // Cart functions now come from useCart() hook
@@ -1362,80 +1344,17 @@ function HomePage() {
         cartCount={cartCount}
       />
 
-      {showAddressModal && (
-        <div className="address-modal-overlay" onClick={() => setShowAddressModal(false)}>
-          <div className="address-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="address-modal-header">
-              <h3>Manzilni kiriting</h3>
-              <button className="address-modal-close" onClick={() => setShowAddressModal(false)} aria-label="Yopish">
-                x
-              </button>
-            </div>
-
-            {/* Кнопка автоопределения */}
-            <button
-              className="address-detect-btn"
-              onClick={handleDetectLocation}
-              disabled={isLocating}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-              {isLocating ? "Aniqlanmoqda..." : "Joylashuvni aniqlash"}
-            </button>
-
-            {locationError && (
-              <div className="address-error">{locationError}</div>
-            )}
-            {geoStatusLabel && (
-              <div className="address-helper">
-                Oxirgi avto-aniqlash: {geoStatusLabel}
-              </div>
-            )}
-
-            <div className="address-divider">
-              <span>yoki</span>
-            </div>
-
-            <label className="address-label">
-              Shahar yoki hudud
-              <input
-                type="text"
-                value={manualCity}
-                onChange={(e) => setManualCity(e.target.value)}
-                onKeyDown={blurOnEnter}
-                className="address-input"
-                placeholder="Masalan, Toshkent, O'zbekiston"
-              />
-              <span className="address-helper">Shahar yoki tuman nomi kerak</span>
-            </label>
-            <label className="address-label">
-              Aniq manzil
-              <textarea
-                value={manualAddress}
-                onChange={(e) => setManualAddress(e.target.value)}
-                onKeyDown={blurOnEnter}
-                className="address-textarea"
-                placeholder="Ko'cha, uy, blok, mo'ljal"
-              />
-              <span className="address-helper">Ixtiyoriy, agar yetkazib berish kerak bo‘lsa</span>
-            </label>
-            {manualError && <div className="address-error">{manualError}</div>}
-            <div className="address-modal-actions">
-              <button className="address-btn secondary" onClick={() => setShowAddressModal(false)}>
-                Bekor qilish
-              </button>
-              <button className="address-btn" onClick={handleSaveManualAddress}>
-                Saqlash
-              </button>
-              <button className="address-btn ghost" onClick={handleResetLocation}>
-                Joylashuvni tozalash
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LocationPickerModal
+        isOpen={showAddressModal}
+        location={location}
+        isLocating={isLocating}
+        locationError={locationError}
+        geoStatusLabel={geoStatusLabel}
+        onClose={() => setShowAddressModal(false)}
+        onDetectLocation={handleDetectLocation}
+        onApply={(nextLocation) => applyLocation(nextLocation, { closeModal: true })}
+        onReset={handleResetLocation}
+      />
     </div>
   )
 }

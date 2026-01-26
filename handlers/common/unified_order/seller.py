@@ -100,7 +100,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -109,7 +109,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
     match = CONFIRM_PATTERN.match(callback.data)
     if not match:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     prefix = match.group(1)
@@ -117,7 +117,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
     entity_type, entity = _determine_entity_type(prefix, entity_id, db_instance)
     if not entity:
-        msg = "Buyurtma topilmadi" if lang == "uz" else "Заказ не найден"
+        msg = get_text(lang, "order_not_found")
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
@@ -130,9 +130,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             payment_method=payment_method,
             payment_proof_photo_id=proof_photo,
         ):
-            msg = (
-                "To'lov hali tasdiqlanmagan" if lang == "uz" else "Оплата ещё не подтверждена"
-            )
+            msg = get_text(lang, "payment_not_confirmed")
             await callback.answer(msg, show_alert=True)
             return
 
@@ -156,7 +154,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             entity_type,
             entity_id,
         )
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     # Use UnifiedOrderService if available, otherwise fallback
@@ -231,7 +229,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             customer_name = customer.first_name
             customer_phone = customer.phone
 
-    currency = "so'm" if lang == "uz" else "сум"
+    currency = get_text(lang, "currency")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -251,35 +249,22 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     # what to do after confirmation for each flow.
     if order_type != "delivery":
         # Pickup order created через orders: сразу ждём фактической выдачи.
-        if lang == "uz":
-            hint = "\n\n<i>Mijoz buyurtmani olganda “Berildi” tugmasini bosing.</i>"
-        else:
-            hint = "\n\n<i>Когда клиент заберёт заказ, нажмите «Выдано».</i>"
-        seller_text += hint
+        seller_text += get_text(lang, "confirm_pickup_hint")
     else:
         # Delivery flow: сначала готовим, потом передаём курьеру.
-        if lang == "uz":
-            hint = (
-                "\n\n<i>Buyurtma tayyor bo'lganda “Topshirishga tayyor” tugmasini bosing.</i>"
-            )
-        else:
-            hint = "\n\n<i>Когда заказ будет готов, нажмите «Готов к передаче».</i>"
-        seller_text += hint
+        seller_text += get_text(lang, "confirm_delivery_hint")
 
     kb = InlineKeyboardBuilder()
     if order_type != "delivery":
         # Pickup‑заказ, оформленный через orders: не показываем этапы доставки,
         # сразу даём кнопку "выдано" как для брони.
-        if lang == "uz":
-            kb.button(text="✅ Berildi", callback_data=f"order_complete_{entity_id}")
-        else:
-            kb.button(text="✅ Выдано", callback_data=f"order_complete_{entity_id}")
+        kb.button(text=get_text(lang, "btn_mark_issued"), callback_data=f"order_complete_{entity_id}")
     else:
         # Настоящая доставка: сначала "готов к передаче", затем курьер и т.д.
-        if lang == "uz":
-            kb.button(text="📦 Topshirishga tayyor", callback_data=f"order_ready_{entity_id}")
-        else:
-            kb.button(text="📦 Готов к передаче", callback_data=f"order_ready_{entity_id}")
+        kb.button(
+            text=get_text(lang, "btn_ready_for_delivery"),
+            callback_data=f"order_ready_{entity_id}",
+        )
     kb.adjust(1)
 
     try:
@@ -302,7 +287,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     # NOTE: Customer notification is handled by UnifiedOrderService.confirm_order()
     # No need to send duplicate message here
 
-    confirmed_msg = "Tasdiqlandi" if lang == "uz" else "Подтверждено"
+    confirmed_msg = get_text(lang, "order_confirmed")
     await callback.answer(f"✅ {confirmed_msg}")
 
 
@@ -315,7 +300,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -324,7 +309,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
 
     match = REJECT_PATTERN.match(callback.data)
     if not match:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     prefix = match.group(1)
@@ -332,7 +317,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
 
     entity_type, entity = _determine_entity_type(prefix, entity_id, db_instance)
     if not entity:
-        msg = "Buyurtma topilmadi" if lang == "uz" else "Заказ не найден"
+        msg = get_text(lang, "order_not_found")
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
 
@@ -361,7 +346,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
             entity_type,
             entity_id,
         )
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     if order_service:
@@ -384,10 +369,9 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
     # No need to send duplicate message here
 
     # Update seller's message
+    rejected_text = get_text(lang, "order_rejected_bold")
     try:
         if callback.message:
-            rejected_text = "❌ <b>RAD ETILDI</b>" if lang == "uz" else "❌ <b>ОТКЛОНЕНО</b>"
-
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
                     caption=f"{callback.message.caption}\n\n{rejected_text}",
@@ -401,7 +385,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
     except Exception as e:  # pragma: no cover - defensive logging
         logger.warning(f"Failed to update seller message: {e}")
 
-    rejected_msg = "Rad etildi" if lang == "uz" else "Отклонено"
+    rejected_msg = get_text(lang, "order_rejected")
     await callback.answer(f"❌ {rejected_msg}")
 
 
@@ -419,7 +403,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -429,18 +413,18 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     order = db_instance.get_order(order_id)
     if not order:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     # Only delivery orders should go through the courier flow.
     order_type = _get_entity_field(order, "order_type", "delivery")
     if order_type != "delivery":
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     store_id = _get_entity_field(order, "store_id")
@@ -448,7 +432,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
     owner_id = _get_store_field(store, "owner_id") if store else None
 
     if not owner_id or partner_id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     if order_service:
@@ -461,7 +445,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     from app.core.utils import get_offer_field
@@ -502,7 +486,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
             customer_name = customer.first_name
             customer_phone = customer.phone
 
-    currency = "so'm" if lang == "uz" else "сум"
+    currency = get_text(lang, "currency")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -519,10 +503,10 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
     )
 
     kb = InlineKeyboardBuilder()
-    if lang == "uz":
-        kb.button(text="🚚 Kuryerga topshirdim", callback_data=f"order_delivering_{order_id}")
-    else:
-        kb.button(text="🚚 Передал курьеру", callback_data=f"order_delivering_{order_id}")
+    kb.button(
+        text=get_text(lang, "btn_delivered_to_courier"),
+        callback_data=f"order_delivering_{order_id}",
+    )
     kb.adjust(1)
 
     try:
@@ -542,7 +526,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
     except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to edit ready message: {e}")
 
-    msg = "Tayyor!" if lang == "uz" else "Готово к передаче!"
+    msg = get_text(lang, "order_ready_success")
     await callback.answer(f"📦 {msg}")
 
 
@@ -555,7 +539,7 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     partner_id = callback.from_user.id
@@ -564,12 +548,12 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     order = db_instance.get_order(order_id)
     if not order:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     store_id = _get_entity_field(order, "store_id")
@@ -577,17 +561,12 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
     owner_id = _get_store_field(store, "owner_id") if store else None
 
     if not owner_id or partner_id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     order_type = _get_entity_field(order, "order_type", "delivery")
     if order_type not in ("delivery", "taxi"):
-        msg = (
-            "O'zi olib ketishda kuryer telefoni kerak emas. Buyurtma berilgach \"Berildi\" tugmasini bosing."
-            if lang == "uz"
-            else "Для самовывоза номер курьера не нужен. Нажмите \"Выдано\" после выдачи."
-        )
-        await callback.answer(msg, show_alert=True)
+        await callback.answer(get_text(lang, "courier_not_needed_pickup"), show_alert=True)
         return
 
     await state.set_state(CourierHandover.courier_phone)
@@ -598,14 +577,9 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
     )
 
     kb = InlineKeyboardBuilder()
-    skip_text = "⏩ O'tkazib yuborish" if lang == "uz" else "⏩ Пропустить"
-    kb.button(text=skip_text, callback_data=f"skip_courier_phone_{order_id}")
+    kb.button(text=get_text(lang, "btn_skip"), callback_data=f"skip_courier_phone_{order_id}")
 
-    prompt = (
-        "📱 Kuryer telefon raqamini kiriting:\n\n<i>Mijoz kuryer bilan bog'lanishi uchun</i>"
-        if lang == "uz"
-        else "📱 Введите телефон курьера:\n\n<i>Чтобы клиент мог связаться с курьером</i>"
-    )
+    prompt = get_text(lang, "courier_phone_prompt")
 
     try:
         await callback.message.answer(prompt, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -622,10 +596,13 @@ async def skip_courier_phone_handler(callback: types.CallbackQuery, state: FSMCo
         await callback.answer()
         return
 
+    db_instance = _get_db()
+    lang = db_instance.get_user_language(callback.from_user.id) if db_instance else "ru"
+
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     await _process_delivery_handover(callback, state, order_id, courier_phone=None)
@@ -653,12 +630,7 @@ async def courier_phone_entered_handler(message: types.Message, state: FSMContex
     if len(digits_only) < 7:
         db_instance = _get_db()
         lang = db_instance.get_user_language(message.from_user.id) if db_instance else "ru"
-        error_text = (
-            "❌ Noto'g'ri telefon raqami. Qaytadan kiriting:"
-            if lang == "uz"
-            else "❌ Неверный номер. Введите ещё раз:"
-        )
-        await message.answer(error_text)
+        await message.answer(get_text(lang, "courier_phone_invalid"))
         return
 
     await _process_delivery_handover(message, state, order_id, courier_phone=courier_phone)
@@ -712,7 +684,7 @@ async def _process_delivery_handover(
             success = False
 
     if not success:
-        error_text = "❌ Xatolik yuz berdi" if lang == "uz" else "❌ Произошла ошибка"
+        error_text = get_text(lang, "error_generic")
         if isinstance(event, types.Message):
             await event.answer(error_text)
         else:
@@ -755,7 +727,7 @@ async def _process_delivery_handover(
             customer_name = customer.first_name
             customer_phone_info = customer.phone
 
-    currency = "so'm" if lang == "uz" else "сум"
+    currency = get_text(lang, "currency")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -772,7 +744,7 @@ async def _process_delivery_handover(
     )
 
     if courier_phone:
-        courier_label = "Kuryer" if lang == "uz" else "Курьер"
+        courier_label = get_text(lang, "label_courier")
         seller_text += f"\n\n📞 {courier_label}: <code>{courier_phone}</code>"
 
     if isinstance(event, types.CallbackQuery) and event.message:
@@ -790,7 +762,7 @@ async def _process_delivery_handover(
         except Exception as e:  # pragma: no cover
             logger.warning(f"Failed to edit delivering message: {e}")
 
-    msg = "Kuryerga topshirildi" if lang == "uz" else "Передано курьеру"
+    msg = get_text(lang, "courier_handover_done")
     if isinstance(event, types.CallbackQuery):
         await event.answer(f"🚚 {msg}", show_alert=True)
     else:
@@ -815,7 +787,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -825,7 +797,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     entity = db_instance.get_order(order_id)
@@ -836,7 +808,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             entity = booking
             entity_type = "booking"
     if not entity:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     store_id = _get_entity_field(entity, "store_id")
@@ -850,7 +822,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
     owner_id = _get_store_field(store, "owner_id") if store else None
 
     if not owner_id or partner_id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     if order_service:
@@ -866,7 +838,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     from app.core.utils import get_offer_field
@@ -942,7 +914,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             customer_name = customer.first_name
             customer_phone = customer.phone
 
-    currency = "so'm" if lang == "uz" else "сум"
+    currency = get_text(lang, "currency")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -973,7 +945,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
     except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to edit complete message: {e}")
 
-    msg = "Bajarildi!" if lang == "uz" else "Выполнено!"
+    msg = get_text(lang, "order_completed_seller")
     await callback.answer(f"🎉 {msg}")
 
 
@@ -986,7 +958,7 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -996,13 +968,13 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
     try:
         entity_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
     entity = db_instance.get_order(entity_id)
     entity_type = "order"
 
     if not entity:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     store_id = _get_entity_field(entity, "store_id")
@@ -1010,7 +982,7 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
     owner_id = _get_store_field(store, "owner_id") if store else None
 
     if not owner_id or partner_id != owner_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     if order_service:
@@ -1024,11 +996,11 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     try:
-        cancel_text = "❌ <b>BEKOR QILINDI</b>" if lang == "uz" else "❌ <b>ОТМЕНЕНО</b>"
+        cancel_text = get_text(lang, "order_cancelled_bold")
         if callback.message and getattr(callback.message, "text", None):
             await callback.message.edit_text(
                 text=f"{callback.message.text}\n\n{cancel_text}",
@@ -1037,7 +1009,7 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
     except Exception:  # pragma: no cover
         pass
 
-    msg = "Bekor qilindi" if lang == "uz" else "Отменено"
+    msg = get_text(lang, "order_cancelled")
     await callback.answer(f"❌ {msg}")
 
 

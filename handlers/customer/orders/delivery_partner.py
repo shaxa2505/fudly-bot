@@ -22,6 +22,7 @@ from app.services.unified_order_service import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.utils import html_escape as _esc, resolve_order_photo
+from localization import get_text
 from logging_config import logger
 
 router = Router()
@@ -186,9 +187,13 @@ async def partner_confirm_order_batch(
                     offer_id = _get_order_field(order, "offer_id", 3)
                     quantity = _get_order_field(order, "quantity", 4)
                     address = _get_order_field(order, "delivery_address", 7)
-    
-                    offer = db.get_offer(offer_id) if offer_id else None
-                    offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
+
+                    is_cart = int(_get_order_field(order, "is_cart_order", 0) or 0) == 1
+                    item_title = _get_order_field(order, "item_title", 0)
+                    offer_title = item_title
+                    if not offer_title and not is_cart:
+                        offer = db.get_offer(offer_id) if offer_id else None
+                        offer_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
                     store_name = get_store_field(store, "name", "Магазин") if store else "Магазин"
     
                     customer_notifications[customer_id]["orders"].append(
@@ -198,6 +203,7 @@ async def partner_confirm_order_batch(
                             "quantity": quantity,
                             "store_name": store_name,
                             "address": address,
+                            "is_cart": is_cart,
                         }
                     )
                     if not customer_notifications[customer_id]["photo"]:
@@ -221,9 +227,12 @@ async def partner_confirm_order_batch(
     
                 orders_info = payload.get("orders", [])
                 for info in orders_info:
+                    title = info.get("title")
+                    if info.get("is_cart"):
+                        title = get_text(cust_lang, "label_cart")
                     lines.append(f"📦 #{info['order_id']}")
                     lines.append(f"🏪 {_esc(info['store_name'])}")
-                    lines.append(f"🛒 {_esc(info['title'])} × {info['quantity']}")
+                    lines.append(f"🛒 {_esc(title)} × {info['quantity']}")
                     lines.append(f"📍 {_esc(info['address'])}\n")
     
                 if cust_lang == "uz":

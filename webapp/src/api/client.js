@@ -388,6 +388,21 @@ const api = {
     return cachedGet('/location/reverse', { lat, lon, lang }, 3600000)
   },
 
+  async searchLocations(query, options = {}) {
+    const normalized = String(query || '').trim()
+    if (normalized.length < 2) return []
+    const params = {
+      query: normalized,
+      lang: options.lang || 'uz',
+      limit: options.limit || 8,
+    }
+    if (options.lat != null) params.lat = options.lat
+    if (options.lon != null) params.lon = options.lon
+    if (options.radius_km != null) params.radius_km = options.radius_km
+    if (options.countrycodes != null) params.countrycodes = options.countrycodes
+    return cachedGet('/location/search', params, 120000)
+  },
+
   async getFavorites() {
     try {
       const { data } = await client.get('/favorites')

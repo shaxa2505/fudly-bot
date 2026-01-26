@@ -12,6 +12,7 @@ from app.services.unified_order_service import (
     OrderStatus,
     get_unified_order_service,
 )
+from localization import get_text
 
 from .common import _get_db, _get_entity_field, _get_store_field, logger
 
@@ -30,7 +31,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
 
     db_instance = _get_db()
     if not db_instance:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -40,17 +41,17 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     order = db_instance.get_order(order_id)
     if not order:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     order_user_id = _get_entity_field(order, "user_id")
     if order_user_id != customer_id:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     current_status = _get_entity_field(order, "order_status") or _get_entity_field(order, "status")
@@ -71,8 +72,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
             current_status,
             valid_statuses,
         )
-        msg = "Buyurtma allaqachon yakunlangan" if lang == "uz" else "Заказ уже завершён"
-        await callback.answer(msg, show_alert=True)
+        await callback.answer(get_text(lang, "order_already_completed"), show_alert=True)
         return
 
     if order_service:
@@ -85,7 +85,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer("❌", show_alert=True)
+        await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     # Determine order type for proper completion template
@@ -129,7 +129,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
     except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to edit customer received message: {e}")
 
-    msg = "Rahmat! Buyurtma yakunlandi" if lang == "uz" else "Спасибо! Заказ завершён"
+    msg = get_text(lang, "order_completed_thanks")
     await callback.answer(f"✅ {msg}", show_alert=True)
 
 

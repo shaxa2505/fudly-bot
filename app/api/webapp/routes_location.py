@@ -12,10 +12,41 @@ from .common import logger
 router = APIRouter()
 
 _geocode_cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=5000, ttl=3600)
+_search_cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=5000, ttl=3600)
 
 
 def _make_cache_key(lat: float, lon: float, lang: str) -> str:
     return f"{round(lat, 5)}:{round(lon, 5)}:{lang.strip().lower()}"
+
+
+def _make_search_key(
+    query: str,
+    lang: str,
+    limit: int,
+    lat: float | None,
+    lon: float | None,
+    countrycodes: str | None,
+    radius_km: float | None,
+) -> str:
+    lat_key = f"{round(lat, 4)}" if lat is not None else ""
+    lon_key = f"{round(lon, 4)}" if lon is not None else ""
+    country_key = (countrycodes or "").strip().lower()
+    radius_key = f"{round(radius_km or 0, 1)}"
+    return f"{query.strip().lower()}|{lang.strip().lower()}|{limit}|{lat_key}:{lon_key}|{country_key}|{radius_key}"
+
+
+def _normalize_query(value: str) -> str:
+    return " ".join((value or "").strip().split())
+
+
+def _build_viewbox(lat: float, lon: float, radius_km: float) -> str:
+    lat_delta = radius_km / 111.0
+    lon_delta = radius_km / max(0.1, 111.0 * math.cos(lat * math.pi / 180.0))
+    left = lon - lon_delta
+    right = lon + lon_delta
+    top = lat + lat_delta
+    bottom = lat - lat_delta
+    return f"{left},{top},{right},{bottom}"
 
 
 def _needs_overpass_details(data: dict[str, Any]) -> bool:
@@ -129,6 +160,57 @@ async def _fetch_reverse_geocode(lat: float, lon: float, lang: str) -> dict[str,
             return await response.json()
 
 
+async def _fetch_search_geocode(
+    query: str,
+    lang: str,
+    limit: int,
+    lat: float | None,
+    lon: float | None,
+    radius_km: float,
+    countrycodes: str | None,
+) -> list[dict[str, Any]]:
+    url = "https://nominatim.openstreetmap.org/search"
+    params: dict[str, Any] = {
+        "format": "jsonv2",
+        "q": query,
+        "limit": limit,
+        "accept-language": lang,
+        "addressdetails": 1,
+        "namedetails": 1,
+        "extratags": 1,
+    }
+    if countrycodes:
+        params["countrycodes"] = countrycodes
+    if lat is not None and lon is not None:
+        params["viewbox"] = _build_viewbox(lat, lon, radius_km)
+        params["bounded"] = 0
+
+    headers = {
+        "User-Agent": "FudlyApp/1.0 (webapp search geocode)",
+    }
+    timeout = aiohttp.ClientTimeout(total=8)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(url, params=params, headers=headers) as response:
+            if response.status != 200:
+                raise HTTPException(status_code=502, detail="Geo lookup failed")
+            data = await response.json()
+
+    if not isinstance(data, list):
+        return []
+
+    if lat is None or lon is None:
+        return data
+
+    for item in data:
+        try:
+            item_lat = float(item.get("lat"))
+            item_lon = float(item.get("lon"))
+        except (TypeError, ValueError):
+            continue
+        item["distance_m"] = _distance_m(lat, lon, item_lat, item_lon)
+    return data
+
+
 @router.get("/location/reverse")
 async def reverse_geocode(
     lat: float = Query(..., description="Latitude"),
@@ -157,3 +239,48 @@ async def reverse_geocode(
 
     _geocode_cache[cache_key] = data
     return data
+
+
+@router.get("/location/search")
+async def search_location(
+    query: str = Query(..., min_length=2, description="Address query"),
+    lang: str = Query("uz", description="Response language"),
+    limit: int = Query(8, ge=1, le=20, description="Max results"),
+    lat: float | None = Query(None, description="User latitude"),
+    lon: float | None = Query(None, description="User longitude"),
+    radius_km: float = Query(40, ge=5, le=200, description="Bias radius around user"),
+    countrycodes: str | None = Query("uz", description="Country codes for search"),
+) -> dict[str, Any]:
+    normalized = _normalize_query(query)
+    if len(normalized) < 2:
+        return {"items": []}
+
+    if lat is not None and not math.isfinite(lat):
+        lat = None
+    if lon is not None and not math.isfinite(lon):
+        lon = None
+
+    cache_key = _make_search_key(normalized, lang, limit, lat, lon, countrycodes, radius_km)
+    cached = _search_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        items = await _fetch_search_geocode(
+            normalized,
+            lang,
+            limit,
+            lat,
+            lon,
+            radius_km,
+            countrycodes,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("Forward geocode failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Geo lookup failed") from exc
+
+    response = {"items": items}
+    _search_cache[cache_key] = response
+    return response

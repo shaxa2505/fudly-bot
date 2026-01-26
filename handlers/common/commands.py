@@ -31,9 +31,9 @@ from handlers.common.utils import (
     set_user_view_mode,
 )
 from handlers.common.webapp import get_partner_panel_url
-from localization import get_cities, get_text
+from localization import LANGUAGES, get_cities, get_text
 from app.core.utils import normalize_city
-from app.core.order_math import calc_quantity, parse_cart_items
+from app.core.order_math import calc_items_total, calc_quantity, parse_cart_items
 
 try:
     from logging_config import logger
@@ -60,6 +60,9 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
     user_id = message.from_user.id
     lang = db.get_user_language(user_id)
     logger.info(f"🔗 handle_qr_pickup: user={user_id}, lang={lang}")
+    store_name = get_text(lang, "label_store")
+    customer_name = get_text(lang, "label_customer")
+    offer_title = get_text(lang, "label_item")
 
     code_input = (booking_code or "").strip().upper()
     if code_input.startswith("FUDLY-"):
@@ -71,13 +74,16 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
     store_id: int | None = None
     customer_id: int | None = None
     pickup_code: str | None = None
-    store_name: str = "Магазин"
-    customer_name: str = "Клиент"
+    store_name: str = ""
+    customer_name: str = ""
     customer_phone: str = ""
 
-    offer_title: str = "Товар"
+    offer_title: str = ""
     quantity: int = 1
     items_lines: str = ""
+    price_line: str = ""
+    total_line: str = ""
+    currency = get_text(lang, "currency")
 
     # Prefer unified pickup orders by pickup_code (v24+)
     order = None
@@ -106,20 +112,59 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
             cart_items = parse_cart_items(order.get("cart_items"))
 
             if cart_items:
-                offer_title = "Корзина"
+                item_fallback = get_text(lang, "label_item")
+                offer_title = get_text(lang, "label_cart")
                 items_lines = "\n".join(
-                    [f"• {it.get('title', 'Товар')} × {it.get('quantity', 1)}" for it in cart_items]
+                    [f"• {it.get('title', item_fallback)} × {it.get('quantity', 1)}" for it in cart_items]
                 )
                 quantity = calc_quantity(cart_items)
+                cart_total = calc_items_total(cart_items)
+                if cart_total:
+                    total_line = (
+                        f"🧾 {get_text(lang, 'label_total')}: <b>{cart_total:,} {currency}</b>"
+                    )
         else:
             offer_id = order.get("offer_id")
             quantity = int(order.get("quantity") or 1)
+            snapshot_title = order.get("item_title") if isinstance(order, dict) else None
+            if snapshot_title:
+                offer_title = snapshot_title
             if offer_id:
                 offer = db.get_offer(offer_id)
                 if isinstance(offer, dict):
-                    offer_title = offer.get("title", offer_title)
+                    if not snapshot_title:
+                        offer_title = offer.get("title", offer_title)
                 elif offer and len(offer) > 2:
-                    offer_title = offer[2] if len(offer) > 2 else offer_title
+                    if not snapshot_title:
+                        offer_title = offer[2] if len(offer) > 2 else offer_title
+            if isinstance(order, dict):
+                item_price = order.get("item_price")
+                item_original_price = order.get("item_original_price")
+            else:
+                item_price = None
+                item_original_price = None
+            if item_price is not None:
+                try:
+                    price_value = int(item_price or 0)
+                except (TypeError, ValueError):
+                    price_value = 0
+                try:
+                    original_value = int(item_original_price or 0) if item_original_price else 0
+                except (TypeError, ValueError):
+                    original_value = 0
+                if original_value and original_value > price_value:
+                    price_line = (
+                        f"💰 {get_text(lang, 'label_price')}: "
+                        f"<s>{original_value:,}</s> → <b>{price_value:,}</b> {currency}"
+                    )
+                else:
+                    price_line = (
+                        f"💰 {get_text(lang, 'label_price')}: <b>{price_value:,}</b> {currency}"
+                    )
+                total = price_value * int(quantity or 1)
+                total_line = (
+                    f"🧾 {get_text(lang, 'label_total')}: <b>{total:,} {currency}</b>"
+                )
 
     # Fallback: legacy bookings by code/id
     booking = None
@@ -133,9 +178,7 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
                 booking = None
 
         if not booking:
-            await message.answer(
-                "❌ Бронирование/заказ не найдено" if lang == "ru" else "❌ Buyurtma topilmadi"
-            )
+            await message.answer(get_text(lang, "qr_not_found"))
             return
 
         entity_type = "booking"
@@ -163,9 +206,7 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
             offer_title = offer[2] if len(offer) > 2 else offer_title
 
     if not entity_id or not store_id:
-        await message.answer(
-            "❌ Неверные данные заказа" if lang == "ru" else "❌ Noto'g'ri buyurtma"
-        )
+        await message.answer(get_text(lang, "qr_invalid_order"))
         return
 
     store = db.get_store(store_id) if store_id else None
@@ -190,102 +231,75 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
     is_customer = user_id == customer_id
 
     status_info = {
-        "pending": ("⏳", "Ожидает подтверждения" if lang == "ru" else "Tasdiqlash kutilmoqda"),
-        "confirmed": ("✅", "Подтверждён" if lang == "ru" else "Tasdiqlangan"),
-        "preparing": ("👨‍🍳", "Готовится" if lang == "ru" else "Tayyorlanmoqda"),
-        "ready": ("📦", "Готово" if lang == "ru" else "Tayyor"),
-        "completed": ("🎉", "Выдан" if lang == "ru" else "Berilgan"),
-        "rejected": ("❌", "Отклонён" if lang == "ru" else "Rad etildi"),
-        "cancelled": ("❌", "Отменён" if lang == "ru" else "Bekor qilingan"),
+        "pending": ("⏳", get_text(lang, "status_pending")),
+        "confirmed": ("✅", get_text(lang, "status_confirmed")),
+        "preparing": ("👨‍🍳", get_text(lang, "status_preparing")),
+        "ready": ("📦", get_text(lang, "status_ready")),
+        "completed": ("🎉", get_text(lang, "status_completed")),
+        "rejected": ("❌", get_text(lang, "status_rejected")),
+        "cancelled": ("❌", get_text(lang, "status_cancelled")),
     }
     status_emoji, status_text = status_info.get(status, ("📦", str(status)))
 
     if status == "completed":
-        await message.answer(
-            f"✅ {'Этот заказ уже выдан' if lang == 'ru' else 'Bu buyurtma allaqachon berilgan'}"
-        )
+        await message.answer(get_text(lang, "qr_already_completed"))
         return
 
     if status in ("cancelled", "rejected"):
-        await message.answer(
-            f"❌ {'Этот заказ отменён' if lang == 'ru' else 'Bu buyurtma bekor qilingan'}"
-        )
+        await message.answer(get_text(lang, "qr_already_cancelled"))
         return
 
-    label_ru = "Заказ" if entity_type == "order" else "Бронь"
-    label_uz = "Buyurtma" if entity_type == "order" else "Bron"
+    label = (
+        get_text(lang, "label_order") if entity_type == "order" else get_text(lang, "label_booking")
+    )
+    label_lower = label.lower()
 
     if is_owner:
         kb = InlineKeyboardBuilder()
         kb.button(
-            text="✅ Выдано" if lang == "ru" else "✅ Berildi",
+            text=get_text(lang, "btn_mark_issued"),
             callback_data=f"order_complete_{entity_id}",
         )
         kb.adjust(1)
 
-        if lang == "ru":
-            text = (
-                f"📦 <b>СКАНИРОВАНИЕ КОДА</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"📦 {label_ru}: <b>#{entity_id}</b>\n"
-                f"📝 Код: <code>{pickup_code or code_input}</code>\n"
-                f"{status_emoji} Статус: <b>{status_text}</b>\n\n"
-                f"📦 Товар: <b>{offer_title}</b>\n"
-            )
-            if items_lines:
-                text += f"{items_lines}\n"
-            text += f"🔢 Количество: <b>{quantity}</b>\n\n"
-            text += f"👤 Клиент: {customer_name}\n"
-            if customer_phone:
-                text += f"📱 Телефон: <code>{customer_phone}</code>\n"
-            text += "\n━━━━━━━━━━━━━━━━━━\n"
-            text += "👆 Нажмите кнопку для подтверждения выдачи"
-        else:
-            text = (
-                f"📦 <b>KOD SKANERLASH</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n\n"
-                f"📦 {label_uz}: <b>#{entity_id}</b>\n"
-                f"📝 Kod: <code>{pickup_code or code_input}</code>\n"
-                f"{status_emoji} Holat: <b>{status_text}</b>\n\n"
-                f"📦 Mahsulot: <b>{offer_title}</b>\n"
-            )
-            if items_lines:
-                text += f"{items_lines}\n"
-            text += f"🔢 Miqdor: <b>{quantity}</b>\n\n"
-            text += f"👤 Mijoz: {customer_name}\n"
-            if customer_phone:
-                text += f"📱 Telefon: <code>{customer_phone}</code>\n"
-            text += "\n━━━━━━━━━━━━━━━━━━\n"
-            text += "👆 Berilganini tasdiqlash uchun tugmani bosing"
+        text = (
+            f"{get_text(lang, 'qr_scan_title')}\n"
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"📦 {label}: <b>#{entity_id}</b>\n"
+            f"📝 {get_text(lang, 'label_code')}: <code>{pickup_code or code_input}</code>\n"
+            f"{status_emoji} {get_text(lang, 'label_status')}: <b>{status_text}</b>\n\n"
+            f"📦 {get_text(lang, 'label_item')}: <b>{offer_title}</b>\n"
+        )
+        if items_lines:
+            text += f"{items_lines}\n"
+        if price_line:
+            text += f"{price_line}\n"
+        if total_line:
+            text += f"{total_line}\n"
+        text += f"🔢 {get_text(lang, 'label_quantity')}: <b>{quantity}</b>\n\n"
+        text += f"👤 {get_text(lang, 'label_customer')}: {customer_name}\n"
+        if customer_phone:
+            text += f"📱 {get_text(lang, 'phone')}: <code>{customer_phone}</code>\n"
+        text += "\n━━━━━━━━━━━━━━━━━━\n"
+        text += get_text(lang, "qr_action_prompt")
 
         await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
         return
 
     if is_customer:
-        if lang == "ru":
-            text = (
-                f"📦 <b>Ваш {label_ru.lower()} #{entity_id}</b>\n\n"
-                f"{status_emoji} Статус: <b>{status_text}</b>\n"
-                f"📦 Товар: {offer_title}\n"
-                f"🏪 Магазин: {store_name}\n\n"
-                f"💡 Покажите этот код продавцу для получения заказа."
-            )
-        else:
-            text = (
-                f"📦 <b>Sizning {label_uz.lower()} #{entity_id}</b>\n\n"
-                f"{status_emoji} Holat: <b>{status_text}</b>\n"
-                f"📦 Mahsulot: {offer_title}\n"
-                f"🏪 Do'kon: {store_name}\n\n"
-                f"💡 Kodni sotuvchiga ko'rsating."
-            )
+        text = (
+            f"{get_text(lang, 'qr_customer_title', label=label_lower, id=entity_id)}\n\n"
+            f"{status_emoji} {get_text(lang, 'label_status')}: <b>{status_text}</b>\n"
+            f"📦 {get_text(lang, 'label_item')}: {offer_title}\n"
+            f"{price_line + chr(10) if price_line else ''}"
+            f"{total_line + chr(10) if total_line else ''}"
+            f"🏪 {get_text(lang, 'label_store')}: {store_name}\n\n"
+            f"{get_text(lang, 'qr_customer_show_code')}"
+        )
         await message.answer(text, parse_mode="HTML")
         return
 
-    await message.answer(
-        "⚠️ Вы не являетесь владельцем этого заказа или магазина"
-        if lang == "ru"
-        else "⚠️ Siz bu buyurtma yoki do'kon egasi emassiz"
-    )
+    await message.answer(get_text(lang, "qr_not_owner"))
 
 
 @router.message(F.text.in_([get_text("ru", "my_city"), get_text("uz", "my_city")]))
@@ -311,18 +325,21 @@ async def change_city(
     try:
         stores_count = len(db.get_stores_by_city(stats_city))
         offers_count = len(db.get_active_offers(city=stats_city))
-        stats_text = (
-            f"\n\n📊 В вашем городе:\n🏪 Магазинов: {stores_count}\n🍽 Предложений: {offers_count}"
+        stats_text = get_text(
+            lang,
+            "city_stats",
+            stores_count=stores_count,
+            offers_count=offers_count,
         )
     except Exception as e:
         logger.debug("Could not load city stats: %s", e)
 
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="✏️ Изменить город" if lang == "ru" else "✏️ Shaharni o'zgartirish",
+        text=get_text(lang, "btn_change_city"),
         callback_data="change_city",
     )
-    builder.button(text="◀️ Назад" if lang == "ru" else "◀️ Orqaga", callback_data="back_to_menu")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="back_to_menu")
     builder.adjust(1)
 
     await message.answer(
@@ -395,9 +412,7 @@ async def handle_city_selection(
         for idx, (label, _value) in enumerate(district_options):
             builder.button(text=f"\U0001F4CD {label}", callback_data=f"select_district:{idx}")
         builder.adjust(2)
-        prompt = (
-            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
-        )
+        prompt = get_text(lang, "select_district_prompt")
         if callback.message:
             try:
                 await callback.message.edit_text(prompt, reply_markup=builder.as_markup())
@@ -524,10 +539,7 @@ async def cmd_code(message: types.Message, state: FSMContext, db: DatabaseProtoc
     # No code provided - ask for it
     await state.set_state(ConfirmOrder.booking_code)
 
-    prompt_ru = "📝 Введите код бронирования клиента:"
-    prompt_uz = "📝 Mijozning bron kodini kiriting:"
-
-    await message.answer(prompt_ru if lang == "ru" else prompt_uz)
+    await message.answer(get_text(lang, "prompt_booking_code"))
 
 
 @router.message(ConfirmOrder.booking_code)
@@ -605,9 +617,7 @@ async def change_city_text(
         for idx, (label, _value) in enumerate(district_options):
             builder.button(text=f"\U0001F4CD {label}", callback_data=f"select_district:{idx}")
         builder.adjust(2)
-        prompt = (
-            "🏘 Выберите район/город в области:" if lang == "ru" else "🏘 Viloyatdagi tuman/shaharni tanlang:"
-        )
+        prompt = get_text(lang, "select_district_prompt")
         await message.answer(prompt, reply_markup=builder.as_markup())
         return
 
@@ -725,8 +735,8 @@ def build_city_card(lang: str) -> str:
 def build_welcome_keyboard() -> types.InlineKeyboardMarkup:
     """Welcome keyboard with language buttons."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="Русский", callback_data="reg_lang_ru")
-    kb.button(text="O'zbekcha", callback_data="reg_lang_uz")
+    kb.button(text=LANGUAGES.get("ru", "Русский"), callback_data="reg_lang_ru")
+    kb.button(text=LANGUAGES.get("uz", "O'zbekcha"), callback_data="reg_lang_uz")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -836,7 +846,10 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
 
     await message.answer(
         get_text(
-            lang, "welcome_back", name=message.from_user.first_name, city=normalize_city(user_city) if user_city else "Ташкент"
+            lang,
+            "welcome_back",
+            name=message.from_user.first_name,
+            city=normalize_city(user_city) if user_city else get_cities(lang)[0],
         ),
         parse_mode="HTML",
         reply_markup=menu,
@@ -916,9 +929,9 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     db.update_user_language(callback.from_user.id, lang)
 
     try:
-        lang_name = "O'zbekcha" if lang == "uz" else "Русский"
+        lang_name = LANGUAGES.get(lang, lang)
         await callback.message.edit_text(
-            f"✅ {'Til oʻzgartirildi' if lang == 'uz' else 'Язык изменён'}: {lang_name}"
+            get_text(lang, "language_changed_named", lang_name=lang_name)
         )
     except Exception as e:
         logger.debug("Could not edit language confirmation: %s", e)
@@ -944,7 +957,10 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     )
     await callback.message.answer(
         get_text(
-            lang, "welcome_back", name=callback.from_user.first_name, city=normalize_city(user_city) if user_city else "Ташкент"
+            lang,
+            "welcome_back",
+            name=callback.from_user.first_name,
+            city=normalize_city(user_city) if user_city else get_cities(lang)[0],
         ),
         parse_mode="HTML",
         reply_markup=menu,
@@ -952,7 +968,9 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     await callback.answer()
 
 
-@router.message(F.text.in_(["❌ Отмена", "❌ Bekor qilish"]))
+@router.message(
+    F.text.in_([f"❌ {get_text('ru', 'cancel')}", f"❌ {get_text('uz', 'cancel')}"])
+)
 async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     if not message.from_user:
         return
@@ -965,9 +983,7 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
         user_phone = user.phone if user else None
         if not user or not user_phone:
             await message.answer(
-                "Регистрация нужна для доступа.\nОтправьте номер."
-                if lang == "ru"
-                else "Ro'yxatdan o'tish kerak.\nTelefon raqamingizni yuboring.",
+                get_text(lang, "registration_required_phone"),
                 reply_markup=phone_request_keyboard(lang),
             )
             return
@@ -1027,7 +1043,7 @@ async def cancel_offer_callback(
 
     if callback.message and hasattr(callback.message, "edit_text"):
         await callback.message.edit_text(
-            f"❌ {'Создание товара отменено' if lang == 'ru' else 'Mahsulot yaratish bekor qilindi'}",
+            get_text(lang, "offer_creation_cancelled"),
             parse_mode="HTML",
         )
         await callback.message.answer(
