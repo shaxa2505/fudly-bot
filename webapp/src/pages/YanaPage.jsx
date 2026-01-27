@@ -20,6 +20,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import { resolveImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
+import { deriveDisplayStatus as deriveStatus, displayStatusText, normalizeOrderStatus, resolveOrderType } from '../utils/orderStatus'
 import './YanaPage.css'
 
 const ACTIVE_STATUSES = new Set([
@@ -233,28 +234,8 @@ function YanaPage({ user }) {
     }
   }, [userId, notifications])
 
-  const normalizeOrderStatus = (status) => {
-    if (!status) return ''
-    const normalized = String(status).trim().toLowerCase()
-    if (normalized === 'confirmed') return 'preparing'
-    return normalized
-  }
-
-  const deriveDisplayStatus = (order) => {
-    const baseStatus = normalizeOrderStatus(order?.order_status || order?.status || 'pending')
-    if (COMPLETED_STATUSES.has(baseStatus)) {
-      return baseStatus
-    }
-    const paymentStatus = order?.payment_status
-    if (paymentStatus === 'awaiting_payment') return 'awaiting_payment'
-    if (paymentStatus === 'awaiting_proof') return 'awaiting_proof'
-    if (paymentStatus === 'proof_submitted') return 'proof_submitted'
-    if (paymentStatus === 'rejected') return 'payment_rejected'
-    return baseStatus || 'pending'
-  }
-
   const normalizeOrder = (order) => {
-    const displayStatus = deriveDisplayStatus(order)
+    const displayStatus = deriveStatus(order)
     const normalizedStatus = normalizeOrderStatus(order?.order_status || order?.status || 'pending')
     return {
       ...order,
@@ -338,7 +319,7 @@ function YanaPage({ user }) {
     window.open(link, '_blank', 'noopener,noreferrer')
   }
 
-  const getStatusInfo = (status) => {
+  const getStatusInfo = (status, orderType) => {
     const statusMap = {
       pending: { text: 'Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
       preparing: { text: 'Tayyorlanmoqda', color: '#FF9500', bg: '#FFF4E5' },
@@ -352,7 +333,8 @@ function YanaPage({ user }) {
       proof_submitted: { text: 'Tekshirilmoqda', color: '#007AFF', bg: '#E5F2FF' },
       payment_rejected: { text: "To'lov rad etildi", color: '#FF3B30', bg: '#FFEBEE' },
     }
-    return statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
+    const palette = statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
+    return { ...palette, text: displayStatusText(status, lang, orderType) }
   }
 
   const getOrderQuantity = (order) => {
@@ -611,7 +593,7 @@ function YanaPage({ user }) {
           <div className="active-orders-scroll">
             {activeOrders.map((order, idx) => {
               const summary = getOrderSummary(order)
-              const statusInfo = getStatusInfo(summary.status)
+              const statusInfo = getStatusInfo(summary.status, resolveOrderType(order))
               const canCancel = CANCELABLE_STATUSES.has(summary.orderStatus)
               return (
                 <div

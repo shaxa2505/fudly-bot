@@ -740,6 +740,66 @@ class OfferMixin:
                     )
             return count
 
+    def count_offers_by_category_grouped(
+        self,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+    ) -> dict[str, int]:
+        """Return counts of active offers grouped by category."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT COALESCE(o.category, 'other') AS category, COUNT(*)
+                FROM offers o
+                JOIN stores s ON o.store_id = s.store_id
+                WHERE o.status = 'active'
+                  AND COALESCE(o.stock_quantity, o.quantity) > 0
+                  AND (s.status = 'approved' OR s.status = 'active')
+                  AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+            """
+            params: list[Any] = []
+
+            if city:
+                condition, condition_params = self._build_location_filter(
+                    city, "city", "s", self._get_city_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
+
+            if region:
+                condition, condition_params = self._build_location_filter(
+                    region, "region", "s", self._get_location_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
+
+            if district:
+                condition, condition_params = self._build_location_filter(
+                    district, "district", "s", self._get_location_variants
+                )
+                if condition:
+                    query += f" AND {condition}"
+                    params.extend(condition_params)
+
+            query += " GROUP BY COALESCE(o.category, 'other')"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            result = {row[0]: int(row[1]) for row in rows}
+
+            if not result and city and not region and not district:
+                resolved_region, resolved_district = self._resolve_city_fallback(city)
+                if resolved_region or resolved_district:
+                    return self.count_offers_by_category_grouped(
+                        city=None,
+                        region=resolved_region,
+                        district=resolved_district,
+                    )
+
+            return result
+
     def get_nearby_offers(
         self,
         latitude: float,

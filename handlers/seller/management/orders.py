@@ -11,6 +11,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.domain.order_labels import status_label
 from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
@@ -44,17 +45,9 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         title = _get_field(item, "title") or "Товар"
         quantity = _get_field(item, "quantity") or 1
 
-        status_label = {
-            "pending": "Новый" if lang == "ru" else "Yangi",
-            "confirmed": "Подтверждён" if lang == "ru" else "Tasdiqlangan",
-            "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
-            "ready": "Готов" if lang == "ru" else "Tayyor",
-            "completed": "Завершён" if lang == "ru" else "Yakunlangan",
-            "cancelled": "Отменён" if lang == "ru" else "Bekor qilingan",
-            "rejected": "Отклонён" if lang == "ru" else "Rad etilgan",
-        }.get(status, status)
         pickup_label = "Самовывоз" if lang == "ru" else "Olib ketish"
-        return f"{idx}. {pickup_label} #{booking_id} • {title[:20]} ×{quantity} • {status_label}"
+        label = status_label(status, lang, "pickup")
+        return f"{idx}. {pickup_label} #{booking_id} • {title[:20]} ×{quantity} • {label}"
     else:
         order_id = _get_field(item, "order_id") or (
             item[0] if isinstance(item, (list, tuple)) else 0
@@ -70,17 +63,9 @@ def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
         )
         quantity = _get_field(item, "quantity") or 1
 
-        status_label = {
-            "pending": "Новый" if lang == "ru" else "Yangi",
-            "preparing": "Готовится" if lang == "ru" else "Tayyorlanmoqda",
-            "ready": "Готов" if lang == "ru" else "Tayyor",
-            "delivering": "В доставке" if lang == "ru" else "Yetkazilmoqda",
-            "completed": "Завершён" if lang == "ru" else "Yakunlangan",
-            "cancelled": "Отменён" if lang == "ru" else "Bekor qilingan",
-            "rejected": "Отклонён" if lang == "ru" else "Rad etilgan",
-        }.get(status, status)
         delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
-        return f"{idx}. {delivery_label} #{order_id} • {title[:20]} ×{quantity} • {status_label}"
+        label = status_label(status, lang, "delivery")
+        return f"{idx}. {delivery_label} #{order_id} • {title[:20]} ×{quantity} • {label}"
 
 
 def _build_list_text(

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { resolveImageUrl } from '../../utils/imageUtils'
+import { displayStatusText, resolveOrderType } from '../../utils/orderStatus'
 import { Package, ShoppingCart, Home } from 'lucide-react'
 
 const ORDER_FILTERS = [
@@ -8,22 +9,25 @@ const ORDER_FILTERS = [
   { id: 'completed', label: 'Yakunlangan' },
 ]
 
-const getStatusInfo = (status) => {
+const getStatusInfo = (status, orderType) => {
   const statusMap = {
-    pending: { text: '⏳ Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-    preparing: { text: '👨‍🍳 Tayyorlanmoqda', color: '#34C759', bg: '#E8F8ED' },
-    ready: { text: '📦 Tayyor', color: '#007AFF', bg: '#E5F2FF' },
-    delivering: { text: '🚚 Yo\'lda', color: '#007AFF', bg: '#E5F2FF' },
-    completed: { text: '🎉 Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
-    cancelled: { text: '❌ Bekor qilindi', color: '#FF3B30', bg: '#FFEBEE' },
-    rejected: { text: '❌ Rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
+    pending: { emoji: '⏳', color: '#FF9500', bg: '#FFF4E5' },
+    preparing: { emoji: '👨‍🍳', color: '#34C759', bg: '#E8F8ED' },
+    ready: { emoji: '📦', color: '#007AFF', bg: '#E5F2FF' },
+    delivering: { emoji: '🚚', color: '#007AFF', bg: '#E5F2FF' },
+    completed: { emoji: '🎉', color: '#53B175', bg: '#E8F5E9' },
+    cancelled: { emoji: '❌', color: '#FF3B30', bg: '#FFEBEE' },
+    rejected: { emoji: '❌', color: '#FF3B30', bg: '#FFEBEE' },
 
-    awaiting_payment: { text: '💳 To\'lov kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-    awaiting_proof: { text: '📸 Chek kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-    proof_submitted: { text: '🔍 Tekshirilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-    payment_rejected: { text: '❌ To\'lov rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
+    awaiting_payment: { emoji: '💳', color: '#FF9500', bg: '#FFF4E5' },
+    awaiting_proof: { emoji: '📸', color: '#FF9500', bg: '#FFF4E5' },
+    proof_submitted: { emoji: '🔍', color: '#FF9500', bg: '#FFF4E5' },
+    payment_rejected: { emoji: '❌', color: '#FF3B30', bg: '#FFEBEE' },
   }
-  return statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
+  const palette = statusMap[status] || { emoji: '', color: '#999', bg: '#F5F5F5' }
+  const label = displayStatusText(status, 'uz', orderType)
+  const text = palette.emoji ? `${palette.emoji} ${label}` : label
+  return { ...palette, text }
 }
 
 const formatDate = (dateStr) => {
@@ -96,7 +100,7 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
       ) : (
         <div className="orders-list">
           {orders.map((order, idx) => {
-            const statusInfo = getStatusInfo(order.status)
+            const statusInfo = getStatusInfo(order.status, resolveOrderType(order))
             const orderId = order.order_id || order.booking_id
             const photoUrl = resolveImageUrl(
               order.offer_photo,

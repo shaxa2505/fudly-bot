@@ -647,7 +647,7 @@ async def change_city_text(
     )
 
 
-@router.message(F.text)
+@router.message(F.text & ~F.text.startswith("/"))
 async def change_city_free_text(
     message: types.Message, state: FSMContext | None = None, db: DatabaseProtocol | None = None
 ):

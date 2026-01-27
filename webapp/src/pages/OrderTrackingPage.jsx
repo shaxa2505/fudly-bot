@@ -4,20 +4,20 @@ import api from '../api/client';
 import { useCart } from '../context/CartContext';
 import { getCurrentUser } from '../utils/auth';
 import { resolveOrderItemImageUrl } from '../utils/imageUtils';
+import { normalizeOrderStatus, paymentStatusText, resolveOrderType, statusText } from '../utils/orderStatus';
 import BottomNav from '../components/BottomNav';
 import PullToRefresh from '../components/PullToRefresh';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import './OrderTrackingPage.css';
 
-const STATUS_STEPS = {
-  'pending': { order: 1, label: { ru: 'Создан', uz: 'Yaratildi' } },
-  'confirmed': { order: 2, label: { ru: 'Принят', uz: 'Qabul qilindi' } }, // legacy
-  'preparing': { order: 2, label: { ru: 'Принят', uz: 'Qabul qilindi' } },
-  'ready': { order: 3, label: { ru: 'Готов', uz: 'Tayyor' } },
-  'delivering': { order: 4, label: { ru: 'В пути', uz: 'Yo\'lda' } },
-  'completed': { order: 5, label: { ru: 'Завершен', uz: 'Yakunlandi' } },
-  'cancelled': { order: -1, label: { ru: 'Отменен', uz: 'Bekor qilindi' } },
-  'rejected': { order: -1, label: { ru: 'Отклонен', uz: 'Rad etildi' } }
+const STATUS_ORDER = {
+  pending: 1,
+  preparing: 2,
+  ready: 3,
+  delivering: 4,
+  completed: 5,
+  cancelled: -1,
+  rejected: -1,
 };
 
 function OrderTrackingPage({ user }) {
@@ -100,9 +100,8 @@ function OrderTrackingPage({ user }) {
   const { containerRef, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh);
 
   const getStatusColor = (status) => {
-    switch (status) {
+    switch (normalizeOrderStatus(status)) {
       case 'pending': return '#FFA500';
-      case 'confirmed':
       case 'preparing': return '#4CAF50';
       case 'ready': return '#2196F3';
       case 'delivering': return '#2196F3';
@@ -114,9 +113,8 @@ function OrderTrackingPage({ user }) {
   };
 
   const getStatusIcon = (status) => {
-    switch (status) {
+    switch (normalizeOrderStatus(status)) {
       case 'pending': return '...';
-      case 'confirmed':
       case 'preparing': return 'OK';
       case 'ready': return 'RDY';
       case 'delivering': return 'WAY';
@@ -127,24 +125,7 @@ function OrderTrackingPage({ user }) {
     }
   };
 
-  const paymentStatusLabel = () => {
-    if (order?.payment_status === 'proof_submitted') {
-      return t('Чек yuborildi, tekshirilmoqda', "Chek yuborildi, tekshirilmoqda");
-    }
-    if (order?.payment_status === 'awaiting_proof') {
-      return t('Chek yuborilmadi', 'Chek yuborilmadi');
-    }
-    if (order?.payment_status === 'awaiting_payment') {
-      return t('To\'lov kutilmoqda', "To'lov kutilmoqda");
-    }
-    if (order?.payment_status === 'rejected') {
-      return t('To\'lov rad etildi', 'To\'lov rad etildi');
-    }
-    if (order?.payment_status === 'payment_rejected') {
-      return t('To\'lov rad etildi', 'To\'lov rad etildi');
-    }
-    return null;
-  };
+  const paymentStatusLabel = () => paymentStatusText(order?.payment_status, lang);
 
   if (loading) {
     return (
@@ -183,9 +164,11 @@ function OrderTrackingPage({ user }) {
     );
   }
 
-  const currentStatusOrder = STATUS_STEPS[order.status]?.order || 0;
-  const isCancelled = ['cancelled', 'rejected'].includes(order.status);
-  const canShowQR = ['confirmed', 'preparing', 'ready'].includes(order.status) && order.qr_code;
+  const normalizedStatus = normalizeOrderStatus(order.status);
+  const orderType = resolveOrderType(order);
+  const currentStatusOrder = STATUS_ORDER[normalizedStatus] || 0;
+  const isCancelled = ['cancelled', 'rejected'].includes(normalizedStatus);
+  const canShowQR = ['preparing', 'ready'].includes(normalizedStatus) && order.qr_code;
   const orderPhotoUrl = resolveOrderItemImageUrl(order);
   const orderCode = order.booking_code || order.booking_id || order.order_id || bookingId;
 
@@ -205,7 +188,7 @@ function OrderTrackingPage({ user }) {
       {/* Order Status Card */}
       <div className="order-status-card">
         <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
-          {getStatusIcon(order.status)} {STATUS_STEPS[order.status]?.label[lang] || order.status}
+          {getStatusIcon(normalizedStatus)} {statusText(normalizedStatus, lang, orderType)}
         </div>
         {paymentStatusLabel() && (
           <div className="payment-status-chip">
@@ -213,7 +196,7 @@ function OrderTrackingPage({ user }) {
           </div>
         )}
 
-        {timeline?.estimated_ready_time && ['confirmed', 'preparing'].includes(order.status) && (
+        {timeline?.estimated_ready_time && ['preparing'].includes(normalizedStatus) && (
           <div className="estimated-time">
             {t('Будет готов', 'Tayyor bo\'ladi')}: {timeline.estimated_ready_time}
           </div>
@@ -240,8 +223,9 @@ function OrderTrackingPage({ user }) {
           <h2>{t('История заказа', 'Buyurtma tarixi')}</h2>
           <div className="timeline">
             {timeline.timeline.map((item, index) => {
-              const isActive = STATUS_STEPS[item.status]?.order <= currentStatusOrder;
-              const isCurrent = item.status === order.status;
+              const itemStatus = normalizeOrderStatus(item.status);
+              const isActive = (STATUS_ORDER[itemStatus] || 0) <= currentStatusOrder;
+              const isCurrent = itemStatus === normalizedStatus;
 
               return (
                 <div key={index} className={`timeline-item ${isActive ? 'active' : ''} ${isCurrent ? 'current' : ''}`}>
@@ -250,7 +234,7 @@ function OrderTrackingPage({ user }) {
                     {index < timeline.timeline.length - 1 && <div className="timeline-line"></div>}
                   </div>
                   <div className="timeline-content">
-                    <h4>{STATUS_STEPS[item.status]?.label[lang] || item.status}</h4>
+                    <h4>{statusText(itemStatus, lang, orderType)}</h4>
                     <p className="timeline-message">{item.message}</p>
                     <p className="timeline-time">{new Date(item.timestamp).toLocaleString('ru-RU')}</p>
                   </div>

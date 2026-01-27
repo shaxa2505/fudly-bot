@@ -17,6 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
+from app.domain.order_labels import normalize_order_status, status_emoji, status_label
 from app.services.unified_order_service import (
     OrderStatus,
     get_unified_order_service,
@@ -52,49 +53,16 @@ def _t(lang: str, ru: str, uz: str) -> str:
     return ru if lang == "ru" else uz
 
 
-# =============================================================================
-# STATUS CONFIGS
-# =============================================================================
-
-ORDER_STATUSES = {
-    "pending": {"emoji": "•", "ru": "Ожидает подтверждения", "uz": "Tasdiqlanishi kutilmoqda"},
-    "preparing": {"emoji": "•", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
-    "ready": {"emoji": "•", "ru": "Готов", "uz": "Tayyor"},
-    "delivering": {"emoji": "•", "ru": "Курьер в пути", "uz": "Kuryer yo'lda"},
-    "completed": {"emoji": "•", "ru": "Завершён", "uz": "Yakunlangan"},
-    "rejected": {"emoji": "•", "ru": "Отклонён", "uz": "Rad etilgan"},
-    "cancelled": {"emoji": "•", "ru": "Отменён", "uz": "Bekor qilingan"},
-}
-
-BOOKING_STATUSES = {
-    "pending": {"emoji": "•", "ru": "Ожидает", "uz": "Kutilmoqda"},
-    "preparing": {"emoji": "•", "ru": "Готовится", "uz": "Tayyorlanmoqda"},
-    "ready": {"emoji": "•", "ru": "Готов", "uz": "Tayyor"},
-    "completed": {"emoji": "•", "ru": "Завершён", "uz": "Yakunlangan"},
-    "rejected": {"emoji": "•", "ru": "Отклонён", "uz": "Rad etilgan"},
-    "cancelled": {"emoji": "•", "ru": "Отменён", "uz": "Bekor qilingan"},
-}
-
-
 def _normalize_status(status: str | None) -> str:
     """Normalize legacy statuses to the fulfillment-only order_status model."""
-    if not status:
-        return OrderStatus.PENDING
-    status_str = str(status).strip().lower()
-    if status_str == "active":
-        return OrderStatus.PENDING
-    try:
-        return OrderStatus.normalize(status_str)
-    except Exception:
-        return status_str
+    return normalize_order_status(status)
 
 
 def _get_status_info(status: str, is_delivery: bool, lang: str) -> tuple[str, str]:
     """Get status emoji and text."""
-    statuses = ORDER_STATUSES if is_delivery else BOOKING_STATUSES
     status_norm = _normalize_status(status)
-    info = statuses.get(status_norm, {"emoji": "•", "ru": status_norm, "uz": status_norm})
-    return info["emoji"], info.get(lang, info["ru"])
+    order_type = "delivery" if is_delivery else "pickup"
+    return status_emoji(status_norm), status_label(status_norm, lang, order_type)
 
 
 def _format_price(amount: int | float, lang: str) -> str:

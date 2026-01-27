@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,12 +19,23 @@ from .common import (
     normalize_price,
 )
 from app.core.utils import normalize_city
+from app.core.caching import get_cache_service
 
 router = APIRouter()
 
 CATEGORY_ALIASES: dict[str, list[str]] = {
     "sweets": ["sweets", "snacks"],
 }
+
+
+def _get_cache_ttl(env_name: str, default: int) -> int:
+    raw = os.getenv(env_name)
+    if raw is None:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
 
 
 def expand_category_filter(category: str | None) -> list[str] | None:
@@ -140,6 +152,17 @@ async def get_categories(
     normalized_city = normalize_city(city) if city else None
     normalized_region = normalize_city(region) if region else None
     normalized_district = normalize_city(district) if district else None
+    cache_ttl = _get_cache_ttl("WEBAPP_CACHE_CATEGORIES_TTL", 60)
+    cache_key = None
+    cache = None
+    if cache_ttl > 0:
+        cache = get_cache_service(os.getenv("REDIS_URL"))
+        cache_key = (
+            f"webapp:categories:{normalized_city or ''}:{normalized_region or ''}:{normalized_district or ''}"
+        )
+        cached = await cache.get(cache_key)
+        if cached is not None:
+            return cached
 
     def _count_for_scope(
         category_filter: list[str] | None,
@@ -199,25 +222,54 @@ async def get_categories(
     if not scopes:
         scopes.append((None, None, None))
 
-    for cat in CATEGORIES:
-        count = 0
-        category_filter = expand_category_filter(cat["id"])
-        try:
-            for city_scope, region_scope, district_scope in scopes:
-                count = _count_for_scope(
-                    category_filter if cat["id"] != "all" else None,
-                    city_scope,
-                    region_scope,
-                    district_scope,
-                )
-                if count:
-                    break
-        except Exception:  # pragma: no cover - defensive
-            count = 0
+    if hasattr(db, "count_offers_by_category_grouped"):
+        counts_map: dict[str, int] = {}
+        total_count = 0
+        for city_scope, region_scope, district_scope in scopes:
+            try:
+                counts_map = db.count_offers_by_category_grouped(
+                    city=city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                ) or {}
+            except Exception:  # pragma: no cover - defensive
+                counts_map = {}
+            total_count = sum(counts_map.values()) if counts_map else 0
+            if total_count:
+                break
 
-        result.append(
-            CategoryResponse(id=cat["id"], name=cat["name"], emoji=cat["emoji"], count=count)
-        )
+        for cat in CATEGORIES:
+            if cat["id"] == "all":
+                count = total_count
+            else:
+                category_filter = expand_category_filter(cat["id"]) or []
+                count = sum(counts_map.get(item, 0) for item in category_filter)
+            result.append(
+                CategoryResponse(id=cat["id"], name=cat["name"], emoji=cat["emoji"], count=count)
+            )
+    else:
+        for cat in CATEGORIES:
+            count = 0
+            category_filter = expand_category_filter(cat["id"])
+            try:
+                for city_scope, region_scope, district_scope in scopes:
+                    count = _count_for_scope(
+                        category_filter if cat["id"] != "all" else None,
+                        city_scope,
+                        region_scope,
+                        district_scope,
+                    )
+                    if count:
+                        break
+            except Exception:  # pragma: no cover - defensive
+                count = 0
+
+            result.append(
+                CategoryResponse(id=cat["id"], name=cat["name"], emoji=cat["emoji"], count=count)
+            )
+
+    if cache and cache_key and cache_ttl > 0:
+        await cache.set(cache_key, result, ttl=cache_ttl)
 
     return result
 

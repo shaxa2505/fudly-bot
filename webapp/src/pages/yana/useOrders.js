@@ -1,22 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../../api/client'
-
-const deriveDisplayStatus = (order) => {
-  const paymentStatus = order?.payment_status
-  if (paymentStatus === 'awaiting_payment') return 'awaiting_payment'
-  if (paymentStatus === 'awaiting_proof') return 'awaiting_proof'
-  if (paymentStatus === 'proof_submitted') return 'proof_submitted'
-  if (paymentStatus === 'rejected') return 'payment_rejected'
-  if (paymentStatus === 'payment_rejected') return 'payment_rejected'
-  return order?.order_status || order?.status || 'pending'
-}
+import { deriveDisplayStatus, normalizeOrderStatus } from '../../utils/orderStatus'
 
 const normalizeOrders = (orders) => orders.map(order => ({
   booking_id: order.order_id || order.id,
   order_id: order.order_id || order.id,
   order_type: order.order_type,
   status: deriveDisplayStatus(order),
-  order_status: order.order_status || order.status,
+  order_status: normalizeOrderStatus(order.order_status || order.status),
   payment_status: order.payment_status,
   payment_method: order.payment_method,
   created_at: order.created_at,
@@ -34,8 +25,8 @@ const normalizeBookings = (bookings) => bookings.map(booking => ({
   ...booking,
   order_id: booking.booking_id,
   order_type: 'pickup',
-  status: booking.status === 'confirmed' ? 'preparing' : (booking.status || 'pending'),
-  order_status: booking.status === 'confirmed' ? 'preparing' : (booking.status || 'pending'),
+  status: normalizeOrderStatus(booking.status || 'pending'),
+  order_status: normalizeOrderStatus(booking.status || 'pending'),
   payment_status: null,
   payment_method: booking.payment_method || 'cash',
 }))

@@ -9,6 +9,7 @@ from __future__ import annotations
 import html
 from typing import Literal
 
+from app.domain.order_labels import status_label
 
 class NotificationBuilder:
     """
@@ -32,26 +33,7 @@ class NotificationBuilder:
         return "Buyurtma" if lang == "uz" else "Заказ"
 
     def _status_label(self, status: str, lang: str) -> str:
-        pickup = {
-            "pending": "Tasdiq kutilmoqda" if lang == "uz" else "Ожидает подтверждения",
-            "preparing": "Tayyorlanmoqda" if lang == "uz" else "Готовится",
-            "ready": "Tayyor" if lang == "uz" else "Готов к выдаче",
-            "delivering": "Yo'lda" if lang == "uz" else "В пути",
-            "completed": "Berildi" if lang == "uz" else "Выдано",
-            "rejected": "Rad etildi" if lang == "uz" else "Отклонён",
-            "cancelled": "Bekor qilindi" if lang == "uz" else "Отменён",
-        }
-        delivery = {
-            "pending": "Tasdiq kutilmoqda" if lang == "uz" else "Ожидает подтверждения",
-            "preparing": "Tayyorlanmoqda" if lang == "uz" else "Готовится",
-            "ready": "Tayyor" if lang == "uz" else "Собран",
-            "delivering": "Yo'lda" if lang == "uz" else "В пути",
-            "completed": "Yetkazildi" if lang == "uz" else "Доставлено",
-            "rejected": "Rad etildi" if lang == "uz" else "Отклонён",
-            "cancelled": "Bekor qilindi" if lang == "uz" else "Отменён",
-        }
-        table = delivery if self.order_type == "delivery" else pickup
-        return table.get(status, status)
+        return status_label(status, lang, self.order_type)
 
     def _build_message(
         self,

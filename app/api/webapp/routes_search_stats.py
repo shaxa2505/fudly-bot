@@ -1,11 +1,24 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .common import CATEGORIES, get_db, get_val, logger
 from app.core.utils import normalize_city
+from app.core.caching import get_cache_service
 
 router = APIRouter()
+
+
+def _get_cache_ttl(env_name: str, default: int) -> int:
+    raw = os.getenv(env_name)
+    if raw is None:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
 
 
 @router.get("/search/suggestions")
@@ -26,6 +39,19 @@ async def get_search_suggestions(
         normalized_city = normalize_city(city) if city else None
         normalized_region = normalize_city(region) if region else None
         normalized_district = normalize_city(district) if district else None
+        cache_ttl = _get_cache_ttl("WEBAPP_CACHE_SUGGESTIONS_TTL", 30)
+        cache_key = None
+        cache = None
+        if cache_ttl > 0:
+            cache = get_cache_service(os.getenv("REDIS_URL"))
+            cache_key = (
+                "webapp:suggest:"
+                f"{query.strip().lower()}:{normalized_city or ''}:{normalized_region or ''}:"
+                f"{normalized_district or ''}:{limit}"
+            )
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         if hasattr(db, "get_search_suggestions"):
             suggestions = (
@@ -66,7 +92,10 @@ async def get_search_suggestions(
                 )
                 suggestions.extend(titles[:limit])
 
-        return suggestions[:limit]
+        result = suggestions[:limit]
+        if cache and cache_key and cache_ttl > 0:
+            await cache.set(cache_key, result, ttl=cache_ttl)
+        return result
 
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Error getting search suggestions: {e}")
@@ -78,6 +107,15 @@ async def get_hot_deals_stats(city: str | None = Query(None), db=Depends(get_db)
     """Get statistics about hot deals."""
     try:
         normalized_city = normalize_city(city)
+        cache_ttl = _get_cache_ttl("WEBAPP_CACHE_STATS_TTL", 60)
+        cache_key = None
+        cache = None
+        if cache_ttl > 0:
+            cache = get_cache_service(os.getenv("REDIS_URL"))
+            cache_key = f"webapp:stats_hot:{normalized_city or ''}"
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
         stats = {
             "total_offers": 0,
             "total_stores": 0,
@@ -105,6 +143,8 @@ async def get_hot_deals_stats(city: str | None = Query(None), db=Depends(get_db)
             if stores:
                 stats["total_stores"] = len(stores)
 
+        if cache and cache_key and cache_ttl > 0:
+            await cache.set(cache_key, stats, ttl=cache_ttl)
         return stats
 
     except Exception as e:  # pragma: no cover - defensive

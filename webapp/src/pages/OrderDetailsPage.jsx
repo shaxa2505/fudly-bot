@@ -3,16 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
+import { deriveDisplayStatus, displayStatusText, normalizeOrderStatus, paymentStatusText, resolveOrderType } from '../utils/orderStatus'
 import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
-  const normalizeOrderStatus = (status) => {
-    if (!status) return ''
-    const normalized = String(status).trim().toLowerCase()
-    if (normalized === 'confirmed') return 'preparing'
-    return normalized
-  }
-
   const { orderId } = useParams()
   const navigate = useNavigate()
   const [order, setOrder] = useState(null)
@@ -36,15 +30,8 @@ export default function OrderDetailsPage() {
       const raw = all.find(o => (o.order_id || o.booking_id) === parseInt(orderId))
 
       if (raw) {
-        const ps = raw.payment_status
         const baseStatus = normalizeOrderStatus(raw.order_status || raw.status || 'pending')
-        const displayStatus =
-          ['completed', 'cancelled', 'rejected'].includes(baseStatus) ? baseStatus :
-          ps === 'awaiting_payment' ? 'awaiting_payment' :
-          ps === 'awaiting_proof' ? 'awaiting_proof' :
-          ps === 'proof_submitted' ? 'proof_submitted' :
-          ps === 'rejected' ? 'payment_rejected' :
-          (baseStatus || 'pending')
+        const displayStatus = deriveDisplayStatus(raw)
 
         foundOrder = {
           ...raw,
@@ -77,7 +64,7 @@ export default function OrderDetailsPage() {
 
   const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('ru-RU')
 
-  const getStatusInfo = (status) => {
+  const getStatusInfo = (status, orderType) => {
     const statusMap = {
       pending: { text: 'Kutilmoqda', color: '#F97316', bg: '#FFF4EB' },
       preparing: { text: 'Tayyorlanmoqda', color: '#10B981', bg: '#ECFDF5' },
@@ -91,20 +78,12 @@ export default function OrderDetailsPage() {
       proof_submitted: { text: 'Tekshirilmoqda', color: '#3B82F6', bg: '#EFF6FF' },
       payment_rejected: { text: "To'lov rad etildi", color: '#EF4444', bg: '#FEF2F2' },
     }
-    return statusMap[status] || { text: status, color: '#6B7280', bg: '#F3F4F6' }
+    const palette = statusMap[status] || { text: status, color: '#6B7280', bg: '#F3F4F6' }
+    return { ...palette, text: displayStatusText(status, 'uz', orderType) }
   }
 
   const getPaymentStatusLabel = (status) => {
-    const labels = {
-      awaiting_payment: "To'lov kutilmoqda",
-      awaiting_proof: 'Chek kutilmoqda',
-      proof_submitted: 'Chek tekshirilmoqda',
-      confirmed: "To'lov tasdiqlandi",
-      rejected: "To'lov rad etildi",
-      payment_rejected: "To'lov rad etildi",
-      not_required: "To'lov talab qilinmaydi",
-    }
-    return labels[status] || null
+    return paymentStatusText(status, 'uz')
   }
 
   const formatDate = (dateString) => {
@@ -191,8 +170,9 @@ export default function OrderDetailsPage() {
   }
 
   const fulfillmentStatus = order.fulfillment_status || normalizeOrderStatus(order.order_status || order.status)
-  const statusInfo = getStatusInfo(fulfillmentStatus || order.status)
-  const isDelivery = order.order_type === 'delivery' || order.delivery_address
+  const orderType = resolveOrderType(order)
+  const statusInfo = getStatusInfo(fulfillmentStatus || order.status, orderType)
+  const isDelivery = orderType === 'delivery'
   const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
   const canPayOnline = order.payment_method === 'click'
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
