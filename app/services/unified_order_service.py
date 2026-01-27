@@ -1902,13 +1902,18 @@ class UnifiedOrderService:
                             parse_mode="HTML",
                             reply_markup=kb.as_markup(),
                         )
-                    if static_map_url:
+                    if static_map_url and os.getenv("ENABLE_SELLER_MAP_PREVIEW", "0").strip().lower() in {
+                        "1",
+                        "true",
+                        "yes",
+                        "on",
+                    }:
                         try:
                             caption = "📍 Manzil xaritada" if seller_lang == "uz" else "📍 Адрес на карте"
                             await self.bot.send_photo(owner_id, photo=static_map_url, caption=caption)
                         except Exception as map_err:
-                            logger.warning(
-                                f"Failed to send map preview to seller {owner_id}: {map_err}"
+                            logger.debug(
+                                f"Map preview skipped for seller {owner_id}: {map_err}"
                             )
                     logger.info(
                         f"Sent order notification to seller {owner_id} for orders {order_ids}"
@@ -2586,6 +2591,8 @@ class UnifiedOrderService:
         offer_id: int | None,
         quantity: int,
         total_price: int | None,
+        item_title: str | None,
+        item_price: int | None,
         existing_message_id: int | None,
         user_id: int | None,
         target_status: str,
@@ -2599,8 +2606,8 @@ class UnifiedOrderService:
                 customer_lang=customer_lang,
                 total_price=total_price,
                 delivery_price=delivery_price,
-                item_title=ctx.item_title,
-                item_price=ctx.item_price,
+                item_title=item_title,
+                item_price=item_price,
             )
 
         group_order_ids, group_statuses = self._load_grouped_orders(
@@ -3218,6 +3225,8 @@ class UnifiedOrderService:
                 offer_id=offer_id,
                 quantity=quantity,
                 total_price=total_price,
+                item_title=ctx.item_title,
+                item_price=ctx.item_price,
                 existing_message_id=existing_message_id,
                 user_id=user_id,
                 target_status=target_status,

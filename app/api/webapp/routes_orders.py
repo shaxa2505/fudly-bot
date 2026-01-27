@@ -48,6 +48,23 @@ from .common import (
 router = APIRouter()
 
 
+def _bookings_archive_exists(db) -> bool:
+    """Check if bookings_archive table exists (optional migration)."""
+    try:
+        if hasattr(db, "get_connection"):
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT to_regclass('public.bookings_archive')")
+                row = cursor.fetchone()
+                return bool(row and row[0])
+        if hasattr(db, "execute"):
+            result = db.execute("SELECT to_regclass('public.bookings_archive')")
+            return bool(result and result[0] and result[0][0])
+    except Exception:
+        return False
+    return False
+
+
 def _delivery_cash_enabled() -> bool:
     return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "1").strip().lower() in {
         "1",
@@ -666,7 +683,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
             raw_bookings = []
 
-    if not bookings and hasattr(db, "get_connection"):
+    if not bookings and hasattr(db, "get_connection") and _bookings_archive_exists(db):
         try:
             with db.get_connection() as conn:
                 cursor = conn.cursor()

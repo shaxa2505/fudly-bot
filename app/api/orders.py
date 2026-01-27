@@ -65,6 +65,23 @@ def get_bot() -> Bot:
     return _bot_instance
 
 
+def _bookings_archive_exists(db) -> bool:
+    """Check if bookings_archive table exists (optional migration)."""
+    try:
+        if hasattr(db, "get_connection"):
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT to_regclass('public.bookings_archive')")
+                row = cursor.fetchone()
+                return bool(row and row[0])
+        if hasattr(db, "execute"):
+            result = db.execute("SELECT to_regclass('public.bookings_archive')")
+            return bool(result and result[0] and result[0][0])
+    except Exception:
+        return False
+    return False
+
+
 # ==================== MODELS ====================
 
 
@@ -690,19 +707,20 @@ async def get_order_status(
         # Convert order to booking format for compatibility
         return format_booking_to_order_status(order, db)
     
-    # Fallback: check archived bookings for old orders
-    try:
-        booking = db.execute(
-            "SELECT * FROM bookings_archive WHERE booking_id = %s",
-            (booking_id,)
-        )
-        if booking:
-            booking_dict = dict(booking[0]) if not isinstance(booking[0], dict) else booking[0]
-            if booking_dict.get("user_id") != user.get("id"):
-                raise HTTPException(status_code=403, detail="Access denied")
-            return format_booking_to_order_status(booking[0], db)
-    except:
-        pass
+    # Fallback: check archived bookings for old orders (optional table)
+    if _bookings_archive_exists(db):
+        try:
+            booking = db.execute(
+                "SELECT * FROM bookings_archive WHERE booking_id = %s",
+                (booking_id,)
+            )
+            if booking:
+                booking_dict = dict(booking[0]) if not isinstance(booking[0], dict) else booking[0]
+                if booking_dict.get("user_id") != user.get("id"):
+                    raise HTTPException(status_code=403, detail="Access denied")
+                return format_booking_to_order_status(booking[0], db)
+        except Exception:
+            pass
     
     raise HTTPException(status_code=404, detail="Заказ не найден")
 
@@ -726,7 +744,7 @@ async def get_order_timeline(
     """
     # v24+: try unified orders table first
     order = db.get_order(booking_id)
-    if not order:
+    if not order and _bookings_archive_exists(db):
         # Fallback: check archived bookings
         try:
             result = db.execute(
@@ -735,7 +753,7 @@ async def get_order_timeline(
             )
             if result:
                 order = result[0]
-        except:
+        except Exception:
             pass
     
     if not order:
@@ -885,7 +903,7 @@ async def get_order_qr_code(
     """
     # v24+: try unified orders table first
     order = db.get_order(booking_id)
-    if not order:
+    if not order and _bookings_archive_exists(db):
         # Fallback: check archived bookings
         try:
             result = db.execute(
@@ -894,7 +912,7 @@ async def get_order_qr_code(
             )
             if result:
                 order = result[0]
-        except:
+        except Exception:
             pass
     
     if not order:
