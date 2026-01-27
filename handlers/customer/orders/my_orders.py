@@ -17,7 +17,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
-from app.services.unified_order_service import OrderStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 from handlers.common.utils import fix_mojibake_text, is_my_orders_button
 
 try:
@@ -788,6 +792,8 @@ async def order_received_handler(callback: types.CallbackQuery) -> None:
             return
 
         service = get_unified_order_service()
+        if not service and callback.bot:
+            service = init_unified_order_service(db, callback.bot)
         if not service:
             await callback.answer(_t(lang, "Ошибка", "Xatolik"), show_alert=True)
             return

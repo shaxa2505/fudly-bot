@@ -20,6 +20,7 @@ from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
     get_unified_order_service,
+    init_unified_order_service,
 )
 from handlers.common.states import CourierHandover
 from handlers.common.utils import html_escape as _esc
@@ -28,12 +29,8 @@ from localization import get_text
 from .common import _get_db, _get_entity_field, _get_store_field, logger
 
 # Regex patterns for all supported callback formats
-CONFIRM_PATTERN = re.compile(
-    r"^(order_confirm_|partner_confirm_order_|confirm_order_|confirm_payment_)(\d+)$"
-)
-REJECT_PATTERN = re.compile(
-    r"^(order_reject_|partner_reject_order_|cancel_order_|reject_payment_)(\d+)$"
-)
+CONFIRM_PATTERN = re.compile(r"^(order_confirm_|partner_confirm_order_|confirm_order_)(\d+)$")
+REJECT_PATTERN = re.compile(r"^(order_reject_|partner_reject_order_|cancel_order_)(\d+)$")
 
 
 
@@ -104,6 +101,8 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         return
 
     order_service = get_unified_order_service()
+    if not order_service and callback.bot:
+        order_service = init_unified_order_service(db_instance, callback.bot)
     partner_id = callback.from_user.id
     lang = db_instance.get_user_language(partner_id)
 
@@ -304,6 +303,8 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         return
 
     order_service = get_unified_order_service()
+    if not order_service and callback.bot:
+        order_service = init_unified_order_service(db_instance, callback.bot)
     partner_id = callback.from_user.id
     lang = db_instance.get_user_language(partner_id)
 
@@ -407,6 +408,8 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         return
 
     order_service = get_unified_order_service()
+    if not order_service and callback.bot:
+        order_service = init_unified_order_service(db_instance, callback.bot)
     partner_id = callback.from_user.id
     lang = db_instance.get_user_language(partner_id)
 
@@ -661,6 +664,8 @@ async def _process_delivery_handover(
 
     lang = db_instance.get_user_language(user_id)
     order_service = get_unified_order_service()
+    if not order_service and callback.bot:
+        order_service = init_unified_order_service(db_instance, callback.bot)
 
     order = db_instance.get_order(order_id)
     if not order:
@@ -791,6 +796,8 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
         return
 
     order_service = get_unified_order_service()
+    if not order_service and callback.bot:
+        order_service = init_unified_order_service(db_instance, callback.bot)
     partner_id = callback.from_user.id
     lang = db_instance.get_user_language(partner_id)
 
@@ -962,6 +969,8 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
         return
 
     order_service = get_unified_order_service()
+    if not order_service and callback.bot:
+        order_service = init_unified_order_service(db_instance, callback.bot)
     partner_id = callback.from_user.id
     lang = db_instance.get_user_language(partner_id)
 

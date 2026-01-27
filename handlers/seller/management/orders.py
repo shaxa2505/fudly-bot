@@ -11,7 +11,12 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.services.unified_order_service import OrderStatus, PaymentStatus, get_unified_order_service
+from app.services.unified_order_service import (
+    OrderStatus,
+    PaymentStatus,
+    get_unified_order_service,
+    init_unified_order_service,
+)
 from localization import get_text
 from logging_config import logger
 
@@ -629,6 +634,8 @@ async def cancel_order_seller_handler(callback: types.CallbackQuery) -> None:
         return
 
     service = get_unified_order_service()
+    if not service and callback.bot:
+        service = init_unified_order_service(db, callback.bot)
     if not service:
         logger.error("UnifiedOrderService is not initialized for order_cancel_seller handler")
         await callback.answer(get_text(lang, "error") or "System error", show_alert=True)
