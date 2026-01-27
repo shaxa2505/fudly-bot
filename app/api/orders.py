@@ -9,7 +9,6 @@ from typing import Any
 
 import qrcode
 from aiogram import Bot
-from aiogram.types import BufferedInputFile
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -22,13 +21,6 @@ from app.core.order_math import (
     parse_cart_items,
 )
 from app.core.utils import normalize_city
-from app.application.orders.submit_payment_proof import submit_payment_proof
-from app.domain.order import PaymentStatus as DomainPaymentStatus
-from app.infra.db.orders_repo import OrdersRepository
-from app.interfaces.bot.presenters.payment_proof_messages import (
-    build_admin_payment_proof_caption,
-    build_admin_payment_proof_keyboard,
-)
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus, PaymentStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
@@ -532,153 +524,11 @@ async def upload_payment_proof(
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
-    """Upload payment proof for delivery orders (admin verification flow)."""
-    bot = get_bot()
-    user_id = int(user.get("id") or 0)
-    if user_id <= 0:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    photo_data = await photo.read()
-    if not photo_data:
-        raise HTTPException(status_code=400, detail="No photo provided")
-
-    order = db.get_order(order_id) if hasattr(db, "get_order") else None
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    if isinstance(order, dict):
-        order_type = order.get("order_type")
-        order_user_id = order.get("user_id")
-        delivery_address = order.get("delivery_address")
-        cart_items_json = order.get("cart_items")
-        store_name = order.get("store_name", "")
-        total_price = order.get("total_price", 0)
-        delivery_fee = order.get("delivery_fee") or order.get("delivery_price") or 0
-        payment_method = order.get("payment_method")
-        payment_status_raw = order.get("payment_status")
-        payment_proof_photo_id = order.get("payment_proof_photo_id")
-    else:
-        order_type = getattr(order, "order_type", None)
-        order_user_id = getattr(order, "user_id", None)
-        delivery_address = getattr(order, "delivery_address", None)
-        cart_items_json = getattr(order, "cart_items", None)
-        store_name = getattr(order, "store_name", "")
-        total_price = getattr(order, "total_price", 0)
-        delivery_fee = getattr(order, "delivery_fee", 0)
-        payment_method = getattr(order, "payment_method", None)
-        payment_status_raw = getattr(order, "payment_status", None)
-        payment_proof_photo_id = getattr(order, "payment_proof_photo_id", None)
-
-    try:
-        order_user_id_int = int(order_user_id) if order_user_id is not None else None
-    except Exception:
-        order_user_id_int = None
-
-    if order_user_id_int != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    if order_type != "delivery":
-        raise HTTPException(
-            status_code=400, detail=f"Order type is '{order_type}', not 'delivery'"
-        )
-
-    payment_status = DomainPaymentStatus.normalize(
-        payment_status_raw,
-        payment_method=payment_method,
-        payment_proof_photo_id=payment_proof_photo_id,
+    """Upload payment proof for delivery orders (disabled; Click-only)."""
+    raise HTTPException(
+        status_code=410,
+        detail="Payment proof uploads are disabled (Click-only payments)",
     )
-    if payment_status == DomainPaymentStatus.PROOF_SUBMITTED:
-        raise HTTPException(status_code=409, detail="Payment proof already submitted")
-    if payment_status == DomainPaymentStatus.CONFIRMED:
-        raise HTTPException(status_code=409, detail="Payment already confirmed")
-    if payment_status == DomainPaymentStatus.NOT_REQUIRED:
-        raise HTTPException(status_code=400, detail="Payment proof not required")
-    if payment_status not in (DomainPaymentStatus.AWAITING_PROOF, DomainPaymentStatus.REJECTED):
-        raise HTTPException(status_code=400, detail="Payment proof not allowed")
-
-    photo_file = BufferedInputFile(photo_data, filename=photo.filename or "payment_proof.jpg")
-
-    customer = db.get_user(order_user_id) if hasattr(db, "get_user") else None
-    customer_name = ""
-    customer_phone = ""
-    if customer:
-        if isinstance(customer, dict):
-            customer_name = customer.get("first_name", "")
-            customer_phone = customer.get("phone", "")
-        else:
-            customer_name = getattr(customer, "first_name", "")
-            customer_phone = getattr(customer, "phone", "")
-
-    cart_items = parse_cart_items(cart_items_json)
-
-    admin_msg = build_admin_payment_proof_caption(
-        order_id=order_id,
-        customer_name=customer_name,
-        customer_phone=customer_phone,
-        store_name=store_name,
-        delivery_address=delivery_address,
-        cart_items=cart_items,
-        total_price=total_price,
-        delivery_fee=delivery_fee,
-        lang="ru",
-    )
-
-    admin_keyboard = build_admin_payment_proof_keyboard(order_id)
-
-    admin_ids: list[int] = []
-    if hasattr(db, "get_all_users"):
-        all_users = db.get_all_users()
-        for u in all_users:
-            role = u.get("role") if isinstance(u, dict) else getattr(u, "role", None)
-            u_id = u.get("user_id") if isinstance(u, dict) else getattr(u, "user_id", None)
-            if role == "admin" and u_id:
-                admin_ids.append(u_id)
-
-    if not admin_ids:
-        admin_id_env = int(os.getenv("ADMIN_ID", "0"))
-        if admin_id_env:
-            admin_ids.append(admin_id_env)
-
-    if not admin_ids:
-        raise HTTPException(status_code=500, detail="No admin configured")
-
-    sent_count = 0
-    file_id = None
-    for admin_id in admin_ids:
-        try:
-            sent_msg = await bot.send_photo(
-                chat_id=admin_id,
-                photo=photo_file,
-                caption=admin_msg,
-                parse_mode="HTML",
-                reply_markup=admin_keyboard,
-            )
-            if not file_id and sent_msg.photo:
-                file_id = sent_msg.photo[-1].file_id
-            sent_count += 1
-        except Exception:
-            continue
-
-    if sent_count == 0:
-        raise HTTPException(status_code=500, detail="Failed to send to admins")
-
-    if not file_id:
-        raise HTTPException(status_code=500, detail="Failed to persist payment proof")
-
-    repo = OrdersRepository(db)
-    result = await submit_payment_proof(
-        order_id,
-        actor_user_id=user_id,
-        proof_file_id=file_id,
-        repo=repo,
-    )
-    if not result.ok:
-        raise HTTPException(status_code=500, detail="Failed to persist payment proof")
-
-    return {
-        "success": True,
-        "message": f"Payment proof sent to {sent_count} admin(s) for verification",
-    }
 
 
 @router.get("/{booking_id}/status", response_model=OrderStatus)

@@ -487,18 +487,6 @@ const api = {
     return data
   },
 
-  async uploadPaymentProof(orderId, photoFile) {
-    const formData = new FormData()
-    formData.append('photo', photoFile)
-
-    const { data } = await client.post(`/orders/${orderId}/payment-proof`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-    return data
-  },
-
   // Recently viewed endpoints
   async addRecentlyViewed(offerId) {
     try {

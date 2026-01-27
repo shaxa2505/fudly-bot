@@ -25,6 +25,7 @@ from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
     get_unified_order_service,
+    init_unified_order_service,
 )
 from app.core.idempotency import (
     build_request_hash,
@@ -46,6 +47,7 @@ from .common import (
 )
 
 router = APIRouter()
+_webapp_bot: Bot | None = None
 
 
 def _bookings_archive_exists(db) -> bool:
@@ -72,6 +74,22 @@ def _delivery_cash_enabled() -> bool:
         "yes",
         "on",
     }
+
+
+def _ensure_unified_service(db: Any):
+    service = get_unified_order_service()
+    if service is not None:
+        return service
+    token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("BOT_TOKEN")
+    if not token:
+        return None
+    global _webapp_bot
+    if _webapp_bot is None:
+        _webapp_bot = Bot(token)
+    try:
+        return init_unified_order_service(db, _webapp_bot)
+    except Exception:
+        return None
 
 
 class CancelOrderResponse(BaseModel):
@@ -802,7 +820,7 @@ async def cancel_order(
             detail="Order can only be cancelled while pending",
         )
 
-    order_service = get_unified_order_service()
+    order_service = _ensure_unified_service(db)
     if not order_service:
         raise HTTPException(status_code=500, detail="Order service unavailable")
 

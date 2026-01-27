@@ -451,7 +451,6 @@ def _register_handlers() -> None:
     # Import handler modules
     from handlers import bookings
     from handlers.admin import dashboard as admin_dashboard
-    from handlers.admin import delivery_orders as admin_delivery_orders
     from handlers.admin import legacy as admin_legacy
     from handlers.admin import panel as admin_panel
     from handlers.admin import stats as admin_stats
@@ -518,7 +517,6 @@ def _register_handlers() -> None:
     )
     user_features.setup(dp, db, get_text, booking_filters_keyboard, settings_keyboard)
     admin_dashboard.setup(bot, db, get_text, moderation_keyboard, get_uzb_time)
-    admin_delivery_orders.setup(db)
     admin_legacy.setup(bot, db, get_text, moderation_keyboard, get_uzb_time, ADMIN_ID, DATABASE_URL)
     admin_stats.setup(admin_service, logger)
 
@@ -555,7 +553,6 @@ def _register_handlers() -> None:
 
     # 3. Admin routers
     dp.include_router(admin_dashboard.router)
-    dp.include_router(admin_delivery_orders.router)
     dp.include_router(admin_legacy.router)
     dp.include_router(admin_panel.router)
     dp.include_router(admin_stats.router)

@@ -146,7 +146,6 @@ def _build_actions(
             actions.append(_action("pay_now", payload=payload))
             actions.append(_action("support", style="secondary", payload=payload))
         elif payment_status == "awaiting_proof":
-            actions.append(_action("upload_proof", payload=payload))
             actions.append(_action("support", style="secondary", payload=payload))
         elif payment_status == "rejected":
             actions.append(_action("retry_payment", payload=payload))

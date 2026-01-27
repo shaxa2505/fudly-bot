@@ -18,7 +18,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.services.unified_order_service import (
     NotificationTemplates,
     OrderStatus,
-    PaymentStatus,
     get_unified_order_service,
     init_unified_order_service,
 )
@@ -29,7 +28,9 @@ from localization import get_text
 from .common import _get_db, _get_entity_field, _get_store_field, logger
 
 # Regex patterns for all supported callback formats
-CONFIRM_PATTERN = re.compile(r"^(order_confirm_|partner_confirm_order_|confirm_order_)(\d+)$")
+CONFIRM_PATTERN = re.compile(
+    r"^(order_confirm_|partner_confirm_order_|confirm_order_)(\d+)$"
+)
 REJECT_PATTERN = re.compile(r"^(order_reject_|partner_reject_order_|cancel_order_)(\d+)$")
 
 
@@ -119,19 +120,6 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         msg = get_text(lang, "order_not_found")
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
-
-    if prefix == "confirm_payment_":
-        payment_status = _get_entity_field(entity, "payment_status")
-        payment_method = _get_entity_field(entity, "payment_method")
-        proof_photo = _get_entity_field(entity, "payment_proof_photo_id")
-        if not PaymentStatus.is_cleared(
-            payment_status,
-            payment_method=payment_method,
-            payment_proof_photo_id=proof_photo,
-        ):
-            msg = get_text(lang, "payment_not_confirmed")
-            await callback.answer(msg, show_alert=True)
-            return
 
     # Verify ownership
     store_id = _get_entity_field(entity, "store_id")
@@ -321,12 +309,6 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         msg = get_text(lang, "order_not_found")
         await callback.answer(f"❌ {msg}", show_alert=True)
         return
-
-    if prefix == "reject_payment_" and hasattr(db_instance, "update_payment_status"):
-        try:
-            db_instance.update_payment_status(entity_id, PaymentStatus.REJECTED)
-        except Exception:  # pragma: no cover - defensive
-            pass
 
     store_id = _get_entity_field(entity, "store_id")
     if not store_id:
@@ -664,8 +646,8 @@ async def _process_delivery_handover(
 
     lang = db_instance.get_user_language(user_id)
     order_service = get_unified_order_service()
-    if not order_service and callback.bot:
-        order_service = init_unified_order_service(db_instance, callback.bot)
+    if not order_service and getattr(event, "bot", None):
+        order_service = init_unified_order_service(db_instance, event.bot)
 
     order = db_instance.get_order(order_id)
     if not order:
@@ -752,7 +734,29 @@ async def _process_delivery_handover(
         courier_label = get_text(lang, "label_courier")
         seller_text += f"\n\n📞 {courier_label}: <code>{courier_phone}</code>"
 
-    if isinstance(event, types.CallbackQuery) and event.message:
+    edited = False
+    if seller_message_id and getattr(event, "bot", None) and user_id:
+        try:
+            await event.bot.edit_message_caption(
+                chat_id=user_id,
+                message_id=seller_message_id,
+                caption=seller_text,
+                parse_mode="HTML",
+            )
+            edited = True
+        except Exception:
+            try:
+                await event.bot.edit_message_text(
+                    chat_id=user_id,
+                    message_id=seller_message_id,
+                    text=seller_text,
+                    parse_mode="HTML",
+                )
+                edited = True
+            except Exception as e:  # pragma: no cover
+                logger.warning(f"Failed to edit delivering message: {e}")
+
+    if not edited and isinstance(event, types.CallbackQuery) and event.message:
         try:
             if getattr(event.message, "caption", None):
                 await event.message.edit_caption(

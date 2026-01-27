@@ -12,7 +12,6 @@ const apiMocks = vi.hoisted(() => ({
   createOrder: vi.fn(),
   getPaymentCard: vi.fn(),
   createPaymentLink: vi.fn(),
-  uploadPaymentProof: vi.fn(),
 }))
 
 vi.mock('../api/client', () => ({
@@ -25,7 +24,6 @@ vi.mock('../api/client', () => ({
     createOrder: apiMocks.createOrder,
     getPaymentCard: apiMocks.getPaymentCard,
     createPaymentLink: apiMocks.createPaymentLink,
-    uploadPaymentProof: apiMocks.uploadPaymentProof,
   },
 }))
 
