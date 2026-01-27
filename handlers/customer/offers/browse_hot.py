@@ -296,7 +296,7 @@ def register_hot(
 
         await callback.answer()
         data = await state.get_data()
-        page = int(data.get("hot_offers_page", 0) or 0)
+        page = int(data.get('hot_offers_page', 0) or 0)
         filter_mode = data.get("hot_filter_mode", "hot")
         category_id = data.get("hot_filter_value")
         category_label = data.get("hot_filter_label")
@@ -417,7 +417,7 @@ def register_hot(
 
         # Save current page for back navigation
         data = await state.get_data()
-        current_page = data.get("hot_offers_page", 0)
+        current_page = data.get('hot_offers_page', 0)
         await state.update_data(last_hot_page=current_page, source="hot")
 
         # Check availability
@@ -523,7 +523,7 @@ def register_hot(
             return
 
         # Hot offers context (default)
-        current_page = data.get("hot_offers_page", 0)
+        current_page = data.get('hot_offers_page', 0)
         await state.update_data(last_hot_page=current_page, source="hot")
         await _send_offer_details(message, details, lang, with_back=True)
 
