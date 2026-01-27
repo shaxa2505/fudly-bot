@@ -82,6 +82,13 @@ class OrderMixin:
             return None
 
         discount_price = offer.get("discount_price", 0) if isinstance(offer, dict) else offer[5]
+        if isinstance(offer, dict):
+            original_price = offer.get("original_price", discount_price) or discount_price or 0
+        else:
+            try:
+                original_price = offer[4]
+            except Exception:
+                original_price = discount_price or 0
         title = offer.get("title", "") if isinstance(offer, dict) else ""
 
         cart_items = [
@@ -89,6 +96,7 @@ class OrderMixin:
                 "offer_id": int(offer_id),
                 "quantity": int(quantity),
                 "price": int(discount_price or 0),
+                "original_price": int(original_price or discount_price or 0),
                 "title": title,
             }
         ]

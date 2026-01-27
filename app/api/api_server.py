@@ -52,7 +52,7 @@ class _PerfTracker:
         self._top_n = max(1, top_n)
         self._buckets: dict[str, dict[str, object]] = {}
         self._last_log = time.time()
-        self._logger = logging.getLogger("api.perf")
+        self._logger = logging.getLogger("fudly")
 
     def record(self, key: str, latency_s: float, status_code: int) -> None:
         bucket = self._buckets.get(key)

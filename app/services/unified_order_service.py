@@ -992,6 +992,7 @@ class UnifiedOrderService:
                 "store_id": item.store_id,
                 "quantity": item.quantity,
                 "price": item.price,
+                "original_price": item.original_price,
                 "delivery_price": item.delivery_price if is_delivery else 0,
                 "title": item.title,
                 "store_name": item.store_name,
@@ -1467,6 +1468,7 @@ class UnifiedOrderService:
                         "quantity": int(item.get("quantity", 1)),
                         "price": int(item.get("price", 0)),
                         "title": item.get("title", ""),
+                        "original_price": int(item.get("original_price") or item.get("price") or 0),
                     }
                     for item in items
                 ]
@@ -1553,6 +1555,7 @@ class UnifiedOrderService:
                 "quantity": int(item.get("quantity", 1)),
                 "price": int(item.get("price", 0)),
                 "title": item.get("title", ""),
+                "original_price": int(item.get("original_price") or item.get("price") or 0),
             }
             for item in items
         ]
