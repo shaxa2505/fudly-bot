@@ -321,19 +321,19 @@ function YanaPage({ user }) {
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
-      pending: { text: 'Kutilmoqda', color: '#FF9500', bg: '#FFF4E5' },
-      preparing: { text: 'Tayyorlanmoqda', color: '#FF9500', bg: '#FFF4E5' },
-      ready: { text: 'Tayyor', color: '#007AFF', bg: '#E5F2FF' },
-      delivering: { text: "Yo'lda", color: '#007AFF', bg: '#E5F2FF' },
-      completed: { text: 'Yakunlandi', color: '#53B175', bg: '#E8F5E9' },
-      cancelled: { text: 'Bekor', color: '#FF3B30', bg: '#FFEBEE' },
-      rejected: { text: 'Rad etildi', color: '#FF3B30', bg: '#FFEBEE' },
-      awaiting_payment: { text: "To'lov kutilmoqda", color: '#FF9500', bg: '#FFF4E5' },
-      awaiting_proof: { text: "Chek kutilmoqda", color: '#FF9500', bg: '#FFF4E5' },
-      proof_submitted: { text: 'Tekshirilmoqda', color: '#007AFF', bg: '#E5F2FF' },
-      payment_rejected: { text: "To'lov rad etildi", color: '#FF3B30', bg: '#FFEBEE' },
+      pending: { color: '#FF9500', bg: '#FFF4E5' },
+      preparing: { color: '#FF9500', bg: '#FFF4E5' },
+      ready: { color: '#007AFF', bg: '#E5F2FF' },
+      delivering: { color: '#007AFF', bg: '#E5F2FF' },
+      completed: { color: '#53B175', bg: '#E8F5E9' },
+      cancelled: { color: '#FF3B30', bg: '#FFEBEE' },
+      rejected: { color: '#FF3B30', bg: '#FFEBEE' },
+      awaiting_payment: { color: '#FF9500', bg: '#FFF4E5' },
+      awaiting_proof: { color: '#FF9500', bg: '#FFF4E5' },
+      proof_submitted: { color: '#007AFF', bg: '#E5F2FF' },
+      payment_rejected: { color: '#FF3B30', bg: '#FFEBEE' },
     }
-    const palette = statusMap[status] || { text: status, color: '#999', bg: '#F5F5F5' }
+    const palette = statusMap[status] || { color: '#999', bg: '#F5F5F5' }
     return { ...palette, text: displayStatusText(status, lang, orderType) }
   }
 

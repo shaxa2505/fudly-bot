@@ -320,6 +320,25 @@ async def get_offers(
         apply_slice = True
         max_distance = max_distance_km if max_distance_km is not None else 10.0
         extended_distance = max_distance if max_distance_km is not None else 25.0
+
+        cache_ttl = _get_cache_ttl(
+            "WEBAPP_CACHE_SEARCH_TTL" if search else "WEBAPP_CACHE_OFFERS_TTL",
+            15 if search else 30,
+        )
+        cache_key = None
+        cache = None
+        if cache_ttl > 0 and not (lat_val is not None and lon_val is not None):
+            cache = get_cache_service(os.getenv("REDIS_URL"))
+            cache_key = (
+                "webapp:offers:"
+                f"{search or ''}:{normalized_city or ''}:{region or ''}:{district or ''}:"
+                f"{category_filter or ''}:{store_id or ''}:{sort_key}:"
+                f"{storage_min_price or ''}:{storage_max_price or ''}:{min_discount or ''}:"
+                f"{limit}:{offset}:{int(include_meta)}"
+            )
+            cached = await cache.get(cache_key)
+            if cached is not None:
+                return cached
         if store_id:
             raw_offers = (
                 db.get_store_offers(
@@ -355,6 +374,7 @@ async def get_offers(
                         max_price=storage_max_price,
                         min_discount=min_discount,
                         category=category_filter,
+                        sort_by=sort_key,
                     )
                     if hasattr(db, "search_offers")
                     else []
@@ -383,7 +403,7 @@ async def get_offers(
                         break
 
             apply_filters = False
-            apply_sort = bool(sort_by)
+            apply_sort = False
             apply_slice = False
         else:
             # Prefer nearby offers when coordinates are available (TGTG proximity-first)
@@ -595,6 +615,10 @@ async def get_offers(
         if apply_slice:
             offers = offers[offset : offset + limit]
 
+        offers_payload: list[dict[str, Any]] | None = None
+        if cache and cache_key and cache_ttl > 0:
+            offers_payload = [o.model_dump() for o in offers]
+
         if include_meta:
             total: int | None = None
             if not store_id and not search and hasattr(db, "count_offers_by_filters"):
@@ -617,7 +641,7 @@ async def get_offers(
                 else (len(offers) == limit)
             )
             next_offset = offset + len(offers) if has_more else None
-            return OfferListResponse(
+            response = OfferListResponse(
                 items=offers,
                 total=total,
                 offset=offset,
@@ -625,7 +649,12 @@ async def get_offers(
                 has_more=has_more,
                 next_offset=next_offset,
             )
+            if cache and cache_key and cache_ttl > 0:
+                await cache.set(cache_key, response.model_dump(), ttl=cache_ttl)
+            return response
 
+        if cache and cache_key and cache_ttl > 0 and offers_payload is not None:
+            await cache.set(cache_key, offers_payload, ttl=cache_ttl)
         return offers
 
     except Exception as e:  # pragma: no cover - defensive

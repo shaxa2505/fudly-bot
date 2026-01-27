@@ -143,6 +143,26 @@ class SearchMixin:
             return None, None
         return region_name, district_name
 
+    def _build_search_order(self, sort_by: str | None, include_relevance: bool) -> str:
+        sort_key = (sort_by or "").strip().lower()
+        if sort_key == "price_asc":
+            return "o.discount_price ASC, o.created_at DESC"
+        if sort_key == "price_desc":
+            return "o.discount_price DESC, o.created_at DESC"
+        if sort_key == "discount":
+            return "discount_percent DESC, o.created_at DESC"
+        if sort_key == "new":
+            return "o.created_at DESC"
+        if sort_key == "urgent":
+            return (
+                "COALESCE(o.expiry_date, DATE '9999-12-31') ASC, "
+                "COALESCE(o.stock_quantity, o.quantity) ASC, "
+                "discount_percent DESC, o.created_at DESC"
+            )
+        if include_relevance:
+            return "relevance DESC, o.created_at DESC"
+        return "o.created_at DESC"
+
     def search_offers(
         self,
         query: str,
@@ -155,6 +175,7 @@ class SearchMixin:
         max_price: float | None = None,
         min_discount: float | None = None,
         category: str | list[str] | None = None,
+        sort_by: str | None = None,
     ) -> list[Any]:
         """Search offers by title or store name using advanced PostgreSQL full-text search."""
         tsquery = self._build_tsquery(query)
@@ -208,6 +229,7 @@ class SearchMixin:
             params.append(tsquery)
 
             where_clause = " AND ".join(where_parts)
+            order_by = self._build_search_order(sort_by, include_relevance=True)
             base_sql = f"""
                 SELECT
                     o.offer_id, o.store_id, o.title, o.description,
@@ -221,7 +243,7 @@ class SearchMixin:
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE {where_clause}
-                ORDER BY relevance DESC, o.created_at DESC
+                ORDER BY {order_by}
                 LIMIT %s OFFSET %s
             """
             select_params = [tsquery] + params + [limit, offset]
@@ -233,7 +255,8 @@ class SearchMixin:
                 if results:
                     return results
 
-        base_sql = """
+        order_by = self._build_search_order(sort_by, include_relevance=True)
+        base_sql = f"""
             SELECT
                 o.offer_id, o.store_id, o.title, o.description,
                 o.original_price, o.discount_price, o.quantity,
@@ -308,7 +331,7 @@ class SearchMixin:
                 LOWER(s.category) LIKE '%%' || LOWER(%s) || '%%' OR
                 TRANSLATE(LOWER(o.title), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
             )
-            ORDER BY relevance DESC, o.created_at DESC
+            ORDER BY {order_by}
             LIMIT %s OFFSET %s
         """
         params.extend([query, query, query, query, query])
@@ -333,6 +356,7 @@ class SearchMixin:
                     max_price=max_price,
                     min_discount=min_discount,
                     category=category,
+                    sort_by=sort_by,
                 )
 
         return results

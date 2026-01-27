@@ -95,6 +95,7 @@ def build_offer_store_handlers(bot: Any, db: Any):
                                 max_price=max_price,
                                 min_discount=min_discount,
                                 category=category_filter,
+                                sort_by=sort_by,
                             )
                             or []
                         )

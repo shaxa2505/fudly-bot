@@ -66,19 +66,19 @@ export default function OrderDetailsPage() {
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
-      pending: { text: 'Kutilmoqda', color: '#F97316', bg: '#FFF4EB' },
-      preparing: { text: 'Tayyorlanmoqda', color: '#10B981', bg: '#ECFDF5' },
-      ready: { text: 'Tayyor', color: '#8B5CF6', bg: '#FAF5FF' },
-      delivering: { text: "Yo'lda", color: '#3B82F6', bg: '#EFF6FF' },
-      completed: { text: 'Bajarildi', color: '#10B981', bg: '#ECFDF5' },
-      cancelled: { text: 'Bekor qilindi', color: '#EF4444', bg: '#FEF2F2' },
-      rejected: { text: 'Rad etildi', color: '#EF4444', bg: '#FEF2F2' },
-      awaiting_payment: { text: "To'lov kutilmoqda", color: '#F59E0B', bg: '#FFFBEB' },
-      awaiting_proof: { text: 'Chek kutilmoqda', color: '#F59E0B', bg: '#FFFBEB' },
-      proof_submitted: { text: 'Tekshirilmoqda', color: '#3B82F6', bg: '#EFF6FF' },
-      payment_rejected: { text: "To'lov rad etildi", color: '#EF4444', bg: '#FEF2F2' },
+      pending: { color: '#F97316', bg: '#FFF4EB' },
+      preparing: { color: '#10B981', bg: '#ECFDF5' },
+      ready: { color: '#8B5CF6', bg: '#FAF5FF' },
+      delivering: { color: '#3B82F6', bg: '#EFF6FF' },
+      completed: { color: '#10B981', bg: '#ECFDF5' },
+      cancelled: { color: '#EF4444', bg: '#FEF2F2' },
+      rejected: { color: '#EF4444', bg: '#FEF2F2' },
+      awaiting_payment: { color: '#F59E0B', bg: '#FFFBEB' },
+      awaiting_proof: { color: '#F59E0B', bg: '#FFFBEB' },
+      proof_submitted: { color: '#3B82F6', bg: '#EFF6FF' },
+      payment_rejected: { color: '#EF4444', bg: '#FEF2F2' },
     }
-    const palette = statusMap[status] || { text: status, color: '#6B7280', bg: '#F3F4F6' }
+    const palette = statusMap[status] || { color: '#6B7280', bg: '#F3F4F6' }
     return { ...palette, text: displayStatusText(status, 'uz', orderType) }
   }
 
