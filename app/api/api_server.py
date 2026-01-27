@@ -8,7 +8,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 import urllib.parse
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -33,6 +35,74 @@ from app.api.webapp_api import set_db_instance
 from app.api.merchant_webhooks import router as merchant_webhooks_router, set_merchant_db
 
 logger = logging.getLogger(__name__)
+
+
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes"}
+
+
+class _PerfTracker:
+    """Lightweight in-process latency tracker for API endpoints."""
+
+    def __init__(self, window: int, log_every: int, top_n: int) -> None:
+        self._window = max(10, window)
+        self._log_every = max(5, log_every)
+        self._top_n = max(1, top_n)
+        self._buckets: dict[str, dict[str, object]] = {}
+        self._last_log = time.time()
+        self._logger = logging.getLogger("api.perf")
+
+    def record(self, key: str, latency_s: float, status_code: int) -> None:
+        bucket = self._buckets.get(key)
+        if bucket is None:
+            bucket = {
+                "lat": deque(maxlen=self._window),
+                "count": 0,
+                "errors": 0,
+            }
+            self._buckets[key] = bucket
+        lat: deque[float] = bucket["lat"]  # type: ignore[assignment]
+        lat.append(latency_s)
+        bucket["count"] = int(bucket["count"]) + 1  # type: ignore[assignment]
+        if status_code >= 400:
+            bucket["errors"] = int(bucket["errors"]) + 1  # type: ignore[assignment]
+        self._maybe_log()
+
+    def _maybe_log(self) -> None:
+        now = time.time()
+        if (now - self._last_log) < self._log_every:
+            return
+        self._last_log = now
+
+        summaries: list[tuple[str, float, float, int, int]] = []
+        for key, bucket in self._buckets.items():
+            values = list(bucket["lat"])  # type: ignore[arg-type]
+            if not values:
+                continue
+            values.sort()
+            p50 = values[int((len(values) - 1) * 0.50)]
+            p95 = values[int((len(values) - 1) * 0.95)]
+            count = int(bucket["count"])  # type: ignore[arg-type]
+            errors = int(bucket["errors"])  # type: ignore[arg-type]
+            summaries.append((key, p50, p95, count, errors))
+
+        if not summaries:
+            return
+
+        summaries.sort(key=lambda item: item[2], reverse=True)
+        top = summaries[: self._top_n]
+        lines = [
+            "API perf (window=%s, log_every=%ss):" % (self._window, self._log_every)
+        ]
+        for key, p50, p95, count, errors in top:
+            err_pct = (errors / count * 100) if count else 0.0
+            lines.append(
+                f"{key} count={count} err%={err_pct:.1f} "
+                f"p50={p50*1000:.1f}ms p95={p95*1000:.1f}ms"
+            )
+        self._logger.info(" | ".join(lines))
 
 # Global reference to the bot's database
 _app_db = None
@@ -89,6 +159,28 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
     )
+
+    # Lightweight profiling middleware (disabled by default)
+    if _is_truthy(os.getenv("API_PROFILE", "0")):
+        window = int(os.getenv("API_PROFILE_WINDOW", "200"))
+        log_every = int(os.getenv("API_PROFILE_LOG_EVERY", "60"))
+        top_n = int(os.getenv("API_PROFILE_TOP_N", "6"))
+        tracker = _PerfTracker(window=window, log_every=log_every, top_n=top_n)
+
+        @app.middleware("http")
+        async def perf_middleware(request: Request, call_next):  # type: ignore[override]
+            start = time.perf_counter()
+            status_code = 500
+            try:
+                response = await call_next(request)
+                status_code = response.status_code
+                return response
+            finally:
+                route = request.scope.get("route")
+                route_path = getattr(route, "path", None)
+                path = route_path or request.url.path
+                key = f"{request.method} {path}"
+                tracker.record(key, time.perf_counter() - start, status_code)
 
     # Add rate limiter
     app.state.limiter = limiter
