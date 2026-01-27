@@ -566,10 +566,43 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
 
     prompt = get_text(lang, "courier_phone_prompt")
 
+    # Update the existing order card instead of sending a new one
     try:
-        await callback.message.answer(prompt, parse_mode="HTML", reply_markup=kb.as_markup())
+        if callback.message:
+            if getattr(callback.message, "caption", None):
+                await callback.message.edit_caption(
+                    caption=f"{callback.message.caption}\n\n{prompt}",
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+            else:
+                await callback.message.edit_text(
+                    text=f"{(callback.message.text or '').strip()}\n\n{prompt}".strip(),
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+        elif callback.bot and callback.from_user:
+            await callback.bot.send_message(
+                callback.from_user.id,
+                prompt,
+                parse_mode="HTML",
+                reply_markup=kb.as_markup(),
+            )
     except Exception:  # pragma: no cover
-        pass
+        try:
+            if callback.message:
+                await callback.message.answer(
+                    prompt, parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+            elif callback.bot and callback.from_user:
+                await callback.bot.send_message(
+                    callback.from_user.id,
+                    prompt,
+                    parse_mode="HTML",
+                    reply_markup=kb.as_markup(),
+                )
+        except Exception:
+            pass
 
     await callback.answer()
 
@@ -660,6 +693,12 @@ async def _process_delivery_handover(
 
     store_id = _get_entity_field(order, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
+
+    if seller_message_id and hasattr(db_instance, "set_order_seller_message_id"):
+        try:
+            db_instance.set_order_seller_message_id(order_id, int(seller_message_id))
+        except Exception:  # pragma: no cover
+            pass
 
     if order_service:
         success = await order_service.start_delivery(order_id, courier_phone=courier_phone)
