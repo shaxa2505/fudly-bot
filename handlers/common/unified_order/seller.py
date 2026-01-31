@@ -773,13 +773,14 @@ async def _process_delivery_handover(
         courier_label = get_text(lang, "label_courier")
         seller_text += f"\n\n📞 {courier_label}: <code>{courier_phone}</code>"
 
+    safe_caption = seller_text if len(seller_text) <= 1000 else seller_text[:1000].rstrip() + "..."
     edited = False
     if seller_message_id and getattr(event, "bot", None) and user_id:
         try:
             await event.bot.edit_message_caption(
                 chat_id=user_id,
                 message_id=seller_message_id,
-                caption=seller_text,
+                caption=safe_caption,
                 parse_mode="HTML",
             )
             edited = True
@@ -799,7 +800,7 @@ async def _process_delivery_handover(
         try:
             if getattr(event.message, "caption", None):
                 await event.message.edit_caption(
-                    caption=seller_text,
+                    caption=safe_caption,
                     parse_mode="HTML",
                 )
             else:
