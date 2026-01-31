@@ -486,15 +486,15 @@ async def dlv_to_address(
 
     if min_order > 0 and (price * quantity) < min_order:
         currency = "so'm" if lang == "uz" else "сум"
-            msg = get_text(
-                lang,
-                "cart_delivery_min_order",
-                min=f"{min_order:,}",
-                total=f"{price * quantity:,}",
-                currency=currency,
-            )
-            await callback.answer(msg, show_alert=True)
-            return
+        msg = get_text(
+            lang,
+            "cart_delivery_min_order",
+            min=f"{min_order:,}",
+            total=f"{price * quantity:,}",
+            currency=currency,
+        )
+        await callback.answer(msg, show_alert=True)
+        return
 
     await state.set_state(OrderDelivery.address)
 
