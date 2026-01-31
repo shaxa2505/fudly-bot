@@ -18,6 +18,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
 from app.domain.order_labels import normalize_order_status, status_emoji, status_label
+from app.services.notification_builder import NotificationBuilder
 from app.services.unified_order_service import (
     OrderStatus,
     get_unified_order_service,
@@ -426,43 +427,27 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
         }
 
     status = _normalize_status(data.get("status", "pending"))
-    status_label = _t(lang, "Статус", "Holat")
-    address_label = _t(lang, "Адрес", "Manzil")
-    emoji, status_text = _get_status_info(status, False, lang)
 
-    # Формируем текст
-    lines = []
-    lines.append(f"<b>{_t(lang, 'Самовывоз', 'Olib ketish')} #{data['booking_id']}</b>")
-    lines.append(f"{status_label}: <b>{status_text}</b>")
-    lines.append("")
-
-    # Магазин
-    lines.append(f"<b>{data.get('store_name', 'Магазин')}</b>")
-    if data.get("store_address"):
-        lines.append(f"{address_label}: {data['store_address']}")
-    lines.append("")
-
-    # Товары
-    lines.append(f"<b>{_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
-
-    # Bookings всегда одиночный товар (не корзина)
     title = data.get("offer_title", "Товар") or "Товар"
     qty = data.get("quantity") or 1
     price = data.get("discount_price") or 0
     total = data.get("total_price") or (price * qty)
-    lines.append(f"   • {title} × {qty} = {_format_price(price * qty, lang)}")
+    currency = "so'm" if lang == "uz" else "Сум"
 
-    lines.append("")
-    lines.append(f"<b>{_t(lang, 'Итого', 'Jami')}:</b> {_format_price(total, lang)}")
+    builder = NotificationBuilder("pickup")
+    card = builder.build(
+        status=status,
+        lang=lang,
+        order_id=int(data["booking_id"]),
+        store_name=str(data.get("store_name") or ""),
+        store_address=data.get("store_address"),
+        pickup_code=data.get("booking_code") if status in ("preparing", "ready") else None,
+        items=[{"title": title, "quantity": qty, "price": price}],
+        total=int(total or 0),
+        currency=currency,
+    )
 
-    # Код получения
-    if data.get("booking_code") and status in ("preparing", "ready"):
-        lines.append("")
-        lines.append(f"<b>{_t(lang, 'Код получения', 'Olish kodi')}:</b>")
-        lines.append(f"<code>{data['booking_code']}</code>")
-        lines.append(
-            f"<i>{_t(lang, 'Покажите код при получении', 'Olishda kodni ko''rsating')}</i>"
-        )
+    lines = [card]
 
     # Кнопки действий
     kb = InlineKeyboardBuilder()
@@ -476,9 +461,7 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
 
         # Показываем телефон магазина в тексте вместо кнопки (Telegram не поддерживает tel: URL)
         if data.get("store_phone"):
-            lines.append("")
-            lines.append(f"<b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
-            lines.append(f"<code>{data['store_phone']}</code>")
+            lines.append(f"{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}: <code>{data['store_phone']}</code>")
 
         kb.button(
             text=_t(lang, "Проблема", "Muammo"),
@@ -586,53 +569,16 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     status = _normalize_status(raw_status)
     order_type = data.get("order_type") or ("delivery" if data.get("delivery_address") else "pickup")
     is_delivery = order_type == "delivery"
-    status_label = _t(lang, "Статус", "Holat")
-    emoji, status_text = _get_status_info(status, is_delivery, lang)
-
-    # Формируем текст
-    lines = []
-    if is_delivery:
-        lines.append(f"<b>{_t(lang, 'Доставка', 'Yetkazish')} #{data['order_id']}</b>")
-    else:
-        lines.append(f"<b>{_t(lang, 'Самовывоз', 'Olib ketish')} #{data['order_id']}</b>")
-    lines.append(f"{status_label}: <b>{status_text}</b>")
-    lines.append("")
-
-    if is_delivery:
-        # Адрес доставки
-        if data.get("delivery_address"):
-            lines.append(f"<b>{_t(lang, 'Адрес доставки', 'Yetkazish manzili')}:</b>")
-            lines.append(f"{data['delivery_address']}")
-            lines.append("")
-    else:
-        pickup_code = data.get("pickup_code")
-        if pickup_code:
-            lines.append(f"<b>{_t(lang, 'Код', 'Kod')}:</b> <code>{pickup_code}</code>")
-            lines.append("")
-
-    # Магазин
-    lines.append(f"<b>{data.get('store_name', 'Магазин')}</b>")
-    lines.append("")
-
-    # Товары
-    lines.append(f"<b>{_t(lang, 'Товары', 'Mahsulotlar')}:</b>")
-
     is_cart = data.get("is_cart_order")
     cart_items_json = data.get("cart_items")
 
     subtotal = 0
+    items: list[dict[str, Any]] = []
     if is_cart and cart_items_json:
         items = parse_cart_items(cart_items_json)
         if items:
             subtotal = calc_items_total(items)
-            for item in items:
-                title = item.get("title", "Товар")
-                qty = item.get("quantity", 1)
-                price = item.get("price", 0)
-                item_total = int(price or 0) * int(qty or 1)
-                lines.append(f"   • {title} × {qty} = {_format_price(item_total, lang)}")
         else:
-            lines.append(f"   • {_t(lang, 'Корзина товаров', 'Savat')}")
             subtotal = data.get("total_price", 0) - int(data.get("delivery_price") or 0)
     else:
         title = data.get("item_title") or data.get("offer_title", "Товар")
@@ -641,11 +587,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         if price is None:
             price = data.get("discount_price", 0)
         subtotal = int(price or 0) * int(qty or 1)
-        lines.append(f"   • {title} × {qty} = {_format_price(subtotal, lang)}")
-
-    # Итоги
-    lines.append("")
-    lines.append(f"{_t(lang, 'Товары', 'Mahsulotlar')}: {_format_price(subtotal, lang)}")
+        items = [{"title": title, "quantity": qty, "price": price}]
 
     total_price = data.get("total_price") or 0
     delivery_fee = 0
@@ -656,17 +598,26 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
             delivery_price=data.get("delivery_price"),
             order_type="delivery",
         )
-        if delivery_fee > 0:
-            lines.append(f"{_t(lang, 'Доставка', 'Yetkazish')}: {_format_price(delivery_fee, lang)}")
-
     total = total_price or (subtotal + delivery_fee)
-    lines.append(f"<b>{_t(lang, 'Итого', 'Jami')}: {_format_price(total, lang)}</b>")
+    currency = "so'm" if lang == "uz" else "Сум"
 
-    # Курьер
-    if status == "delivering" and data.get("courier_phone"):
-        lines.append("")
-        lines.append(f"<b>{_t(lang, 'Курьер', 'Kuryer')}:</b>")
-        lines.append(f"{data['courier_phone']}")
+    builder = NotificationBuilder("delivery" if is_delivery else "pickup")
+    card = builder.build(
+        status=status,
+        lang=lang,
+        order_id=int(data["order_id"]),
+        store_name=str(data.get("store_name") or ""),
+        store_address=data.get("store_address"),
+        delivery_address=data.get("delivery_address"),
+        pickup_code=data.get("pickup_code") if not is_delivery else None,
+        courier_phone=data.get("courier_phone") if status == "delivering" else None,
+        items=items or None,
+        delivery_price=int(data.get("delivery_price") or 0),
+        total=int(total or 0),
+        currency=currency,
+    )
+
+    lines = [card]
 
     # Кнопки действий
     kb = InlineKeyboardBuilder()
@@ -679,9 +630,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
 
         # Показываем телефон магазина для связи при доставке
         if data.get("store_phone"):
-            lines.append("")
-            lines.append(f"<b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
-            lines.append(f"<code>{data['store_phone']}</code>")
+            lines.append(f"{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}: <code>{data['store_phone']}</code>")
 
         kb.button(
             text=_t(lang, "Проблема с заказом", "Buyurtma muammosi"),
@@ -691,9 +640,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     elif status in ("pending", "preparing", "ready"):
         # Показываем телефон магазина в тексте
         if data.get("store_phone"):
-            lines.append("")
-            lines.append(f"<b>{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}:</b>")
-            lines.append(f"<code>{data['store_phone']}</code>")
+            lines.append(f"{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}: <code>{data['store_phone']}</code>")
 
         if status == "pending":
             kb.button(
