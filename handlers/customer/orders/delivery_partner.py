@@ -28,6 +28,13 @@ from logging_config import logger
 router = Router()
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+MAX_CAPTION_LENGTH = 1000
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 3] + "..."
 
 
 def _get_order_field(order: Any, field: str, index: int = 0) -> Any:
@@ -92,7 +99,15 @@ async def cancel_order_customer(
 
     msg = "Bekor qilindi" if lang == "uz" else "Отменено"
     try:
-        await callback.message.edit_text(callback.message.text + f"\n\n❌ {msg}", parse_mode="HTML")
+        if getattr(callback.message, "caption", None):
+            await callback.message.edit_caption(
+                caption=_safe_caption(callback.message.caption + f"\n\n❌ {msg}"),
+                parse_mode="HTML",
+            )
+        else:
+            await callback.message.edit_text(
+                callback.message.text + f"\n\n❌ {msg}", parse_mode="HTML"
+            )
     except Exception:
         pass
 
@@ -247,7 +262,7 @@ async def partner_confirm_order_batch(
                         await bot.send_photo(
                             customer_id,
                             photo=customer_photo,
-                            caption=customer_msg,
+                            caption=_safe_caption(customer_msg),
                             parse_mode="HTML",
                         )
                     except Exception:
@@ -385,7 +400,7 @@ async def partner_reject_order_batch(
                         await bot.send_photo(
                             customer_id,
                             photo=customer_photo,
-                            caption=customer_msg,
+                            caption=_safe_caption(customer_msg),
                             parse_mode="HTML",
                         )
                     except Exception:

@@ -20,6 +20,13 @@ from .common import _get_db, _get_entity_field, _get_store_field, logger
 # Having them as constants allows tests to verify that they
 # actually match simple ids like "customer_received_123".
 CUSTOMER_RECEIVED_PATTERN = r"^customer_received_(\d+)$"
+MAX_CAPTION_LENGTH = 1000
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 1] + "…"
 
 
 async def customer_received_handler(callback: types.CallbackQuery) -> None:
@@ -116,7 +123,7 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
         if callback.message:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
-                    caption=completed_text,
+                    caption=_safe_caption(completed_text),
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )

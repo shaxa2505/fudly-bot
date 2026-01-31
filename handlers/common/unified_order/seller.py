@@ -33,6 +33,14 @@ CONFIRM_PATTERN = re.compile(
 )
 REJECT_PATTERN = re.compile(r"^(order_reject_|partner_reject_order_|cancel_order_)(\d+)$")
 
+MAX_CAPTION_LENGTH = 1000
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 3] + "..."
+
 
 
 def _determine_entity_type(prefix: str, entity_id: int, db_instance: Any) -> tuple[str, Any]:
@@ -258,7 +266,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         if callback.message:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
-                    caption=seller_text,
+                    caption=_safe_caption(seller_text),
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )
@@ -357,7 +365,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         if callback.message:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
-                    caption=f"{callback.message.caption}\n\n{rejected_text}",
+                    caption=_safe_caption(f"{callback.message.caption}\n\n{rejected_text}"),
                     parse_mode="HTML",
                 )
             elif getattr(callback.message, "text", None):
@@ -498,7 +506,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         if callback.message:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
-                    caption=seller_text,
+                    caption=_safe_caption(seller_text),
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )
@@ -571,7 +579,7 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
         if callback.message:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
-                    caption=f"{callback.message.caption}\n\n{prompt}",
+                    caption=_safe_caption(f"{callback.message.caption}\n\n{prompt}"),
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )
@@ -773,7 +781,7 @@ async def _process_delivery_handover(
         courier_label = get_text(lang, "label_courier")
         seller_text += f"\n\n📞 {courier_label}: <code>{courier_phone}</code>"
 
-    safe_caption = seller_text if len(seller_text) <= 1000 else seller_text[:1000].rstrip() + "..."
+    safe_caption = _safe_caption(seller_text)
     edited = False
     if seller_message_id and getattr(event, "bot", None) and user_id:
         try:
@@ -985,7 +993,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
         if callback.message:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
-                    caption=seller_text,
+                    caption=_safe_caption(seller_text),
                     parse_mode="HTML",
                 )
             else:

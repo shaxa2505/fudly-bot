@@ -26,6 +26,7 @@ router = Router(name="admin_delivery_orders")
 
 # Module dependencies
 db = None
+MAX_CAPTION_LENGTH = 1000
 
 
 def setup(database) -> None:
@@ -39,6 +40,35 @@ def _get_lang(user_id: int | None) -> str:
     if db and hasattr(db, "get_user_language") and user_id:
         return db.get_user_language(user_id)
     return "ru"
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 3] + "..."
+
+
+async def _append_admin_note(message: types.Message | None, note: str) -> None:
+    if not message:
+        return
+
+    if message.caption is not None:
+        caption = _safe_caption((message.caption + "\n\n" + note).strip())
+        try:
+            await message.edit_caption(caption=caption, parse_mode="HTML")
+            return
+        except Exception:
+            try:
+                await message.bot.send_message(chat_id=message.chat.id, text=note, parse_mode="HTML")
+            except Exception:
+                pass
+        return
+
+    if message.text is not None:
+        try:
+            await message.edit_text(text=(message.text + "\n\n" + note).strip(), parse_mode="HTML")
+        except Exception:
+            pass
 
 
 @router.callback_query(F.data.startswith("admin_confirm_payment_"))
@@ -102,17 +132,10 @@ async def admin_confirm_payment(callback: types.CallbackQuery) -> None:
         if callback.bot and user_id:
             await callback.bot.send_message(chat_id=user_id, text=customer_msg, parse_mode="HTML")
 
-        caption = callback.message.caption or ""
         admin_note = build_admin_payment_confirmed_caption(
             lang, callback.from_user.first_name or ""
         )
-        try:
-            await callback.message.edit_caption(
-                caption=(caption + "\n\n" + admin_note).strip(),
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
+        await _append_admin_note(callback.message, admin_note)
 
         await callback.answer(get_text(lang, "admin_payment_confirmed"))
         logger.info("Order #%s payment confirmed by admin", order_id)
@@ -180,17 +203,10 @@ async def admin_reject_payment(callback: types.CallbackQuery) -> None:
         if callback.bot and user_id:
             await callback.bot.send_message(chat_id=user_id, text=customer_msg, parse_mode="HTML")
 
-        caption = callback.message.caption or ""
         admin_note = build_admin_payment_rejected_caption(
             lang, callback.from_user.first_name or ""
         )
-        try:
-            await callback.message.edit_caption(
-                caption=(caption + "\n\n" + admin_note).strip(),
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
+        await _append_admin_note(callback.message, admin_note)
 
         await callback.answer(get_text(lang, "admin_payment_rejected"))
         logger.info("Order #%s payment rejected by admin", order_id)

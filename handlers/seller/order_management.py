@@ -21,6 +21,9 @@ from localization import get_text
 
 logger = logging.getLogger(__name__)
 
+# Keep captions under Telegram limits to avoid edit failures.
+MAX_CAPTION_LENGTH = 1000
+
 # Router for seller order management
 router = Router(name="seller_order_management")
 
@@ -39,6 +42,35 @@ def get_order_field(order, field: str, index: int):
     if isinstance(order, (list, tuple)) and len(order) > index:
         return order[index]
     return None
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 1] + "…"
+
+
+async def _append_status_message(
+    message: types.Message, append_text: str, reply_markup: types.InlineKeyboardMarkup | None = None
+):
+    if message.caption is not None:
+        new_caption = _safe_caption(f"{message.caption}\n\n{append_text}")
+        try:
+            await message.edit_caption(caption=new_caption, reply_markup=reply_markup)
+            return
+        except Exception as e:
+            logger.warning(f"Failed to edit caption, sending follow-up: {e}")
+            try:
+                await bot.send_message(message.chat.id, append_text, reply_markup=reply_markup)
+            except Exception as e2:
+                logger.error(f"Failed to send follow-up status message: {e2}")
+            return
+
+    if message.text is not None:
+        await message.edit_text(
+            message.text + f"\n\n{append_text}",
+            reply_markup=reply_markup,
+        )
 
 
 @router.callback_query(F.data.startswith("confirm_order_"))
@@ -74,9 +106,9 @@ async def confirm_order(callback: types.CallbackQuery):
     await service.confirm_order(order_id, "order")
 
     # Уведомляем продавца
-    await callback.message.edit_text(
-        callback.message.text
-        + f"\n\n{'Заказ подтверждён' if lang == 'ru' else 'Buyurtma tasdiqlandi'}"
+    await _append_status_message(
+        callback.message,
+        "Заказ подтверждён" if lang == "ru" else "Buyurtma tasdiqlandi",
     )
 
     await callback.answer()
@@ -115,9 +147,9 @@ async def cancel_order(callback: types.CallbackQuery):
     await service.cancel_order(order_id, "Отменено продавцом", "Seller cancelled")
 
     # Уведомляем продавца
-    await callback.message.edit_text(
-        callback.message.text
-        + f"\n\n{'Заказ отменён' if lang == 'ru' else 'Buyurtma bekor qilindi'}"
+    await _append_status_message(
+        callback.message,
+        "Заказ отменён" if lang == "ru" else "Buyurtma bekor qilindi",
     )
 
     await callback.answer()
@@ -163,18 +195,11 @@ async def confirm_payment(callback: types.CallbackQuery):
     # Уведомляем продавца с кнопкой
     payment_confirmed_text, next_step_text = build_seller_payment_confirmed(lang)
 
-    try:
-        await callback.message.edit_caption(
-            caption=callback.message.caption
-            + f"\n\n{payment_confirmed_text}\n\n{next_step_text}",
-            reply_markup=kb.as_markup(),
-        )
-    except Exception:
-        # Если нет caption (текстовое сообщение)
-        await callback.message.edit_text(
-            callback.message.text + f"\n\n{payment_confirmed_text}\n\n{next_step_text}",
-            reply_markup=kb.as_markup(),
-        )
+    await _append_status_message(
+        callback.message,
+        f"{payment_confirmed_text}\n\n{next_step_text}",
+        reply_markup=kb.as_markup(),
+    )
 
     await callback.answer()
 
@@ -216,9 +241,7 @@ async def reject_payment(callback: types.CallbackQuery):
 
     # Уведомляем продавца
     payment_rejected_text = build_seller_payment_rejected(lang)
-    await callback.message.edit_caption(
-        caption=callback.message.caption + f"\n\n{payment_rejected_text}"
-    )
+    await _append_status_message(callback.message, payment_rejected_text)
 
     await callback.answer()
 

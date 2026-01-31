@@ -22,6 +22,7 @@ from app.core.utils import (
 from localization import get_text
 
 logger = logging.getLogger("fudly")
+MAX_CAPTION_LENGTH = 1000
 
 
 def html_escape(val: Any) -> str:
@@ -30,6 +31,12 @@ def html_escape(val: Any) -> str:
     Use this instead of defining _esc() in each module.
     """
     return html.escape(str(val)) if val else ""
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 3] + "..."
 
 
 # Alias for backward compatibility
@@ -363,7 +370,7 @@ async def safe_edit_message(
     try:
         if hasattr(message, "photo") and message.photo:
             await message.edit_caption(
-                caption=text, parse_mode=parse_mode, reply_markup=reply_markup
+                caption=_safe_caption(text), parse_mode=parse_mode, reply_markup=reply_markup
             )
         else:
             await message.edit_text(text, parse_mode=parse_mode, reply_markup=reply_markup)

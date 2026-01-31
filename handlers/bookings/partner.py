@@ -42,6 +42,7 @@ router = Router()
 db: Any = None
 bot: Any = None
 bot_username: str = "fudlyuzbot"  # Default, will be updated from bot.get_me()
+MAX_CAPTION_LENGTH = 1000
 
 
 def setup_dependencies(database: Any, bot_instance: Any):
@@ -64,6 +65,12 @@ def _lang_code(user: types.User | None) -> str:
 
 def _service_unavailable(lang: str) -> str:
     return _t(lang, "Сервис временно недоступен. Попробуйте позже.", "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring.")
+
+
+def _safe_caption(text: str) -> str:
+    if len(text) <= MAX_CAPTION_LENGTH:
+        return text
+    return text[: MAX_CAPTION_LENGTH - 3] + "..."
 
 
 # ===================== PARTNER CONFIRM/REJECT =====================
@@ -154,7 +161,7 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
                 await bot.send_photo(
                     customer_id,
                     photo=offer_photo,
-                    caption=customer_msg,
+                    caption=_safe_caption(customer_msg),
                 )
             else:
                 await bot.send_message(customer_id, customer_msg)
@@ -479,7 +486,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
                     await bot.send_photo(
                         customer_id,
                         photo=offer_photo,
-                        caption=customer_msg,
+                        caption=_safe_caption(customer_msg),
                         parse_mode="HTML",
                     )
                 except Exception:
@@ -598,7 +605,7 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
                     await bot.send_photo(
                         customer_id,
                         photo=offer_photo,
-                        caption=customer_msg,
+                        caption=_safe_caption(customer_msg),
                         parse_mode="HTML",
                     )
                 except Exception:
