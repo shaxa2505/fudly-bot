@@ -234,9 +234,14 @@ class NotificationTemplates:
         builder = NotificationBuilder(normalized_type)  # type: ignore
         pickup_code = ", ".join(pickup_codes) if pickup_codes else None
         order_ids_int = [int(x) for x in order_ids if x]
+        order_id_value = (
+            int(order_ids_int[0])
+            if order_ids_int
+            else int(order_ids[0]) if order_ids else 0
+        )
         return builder.build_created(
             lang=lang,
-            order_id=int(order_ids_int[0]) if order_ids_int else int(order_ids[0]),
+            order_id=order_id_value,
             order_ids=order_ids_int or None,
             is_cart=len(order_ids_int) > 1,
             store_name="",
@@ -277,9 +282,14 @@ class NotificationTemplates:
         builder = NotificationBuilder(normalized_type)  # type: ignore
         pickup_code = ", ".join(pickup_codes) if pickup_codes else None
         order_ids_int = [int(x) for x in order_ids if x]
+        order_id_value = (
+            int(order_ids_int[0])
+            if order_ids_int
+            else int(order_ids[0]) if order_ids else 0
+        )
         return builder.build_created(
             lang=lang,
-            order_id=int(order_ids_int[0]) if order_ids_int else int(order_ids[0]),
+            order_id=order_id_value,
             order_ids=order_ids_int or None,
             is_cart=len(order_ids_int) > 1,
             store_name=store_name,

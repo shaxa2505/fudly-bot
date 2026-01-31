@@ -135,17 +135,18 @@ class NotificationBuilder:
 
         items_total = 0
         if items:
-            lines.append(f"{get_text(lang, 'label_items')}:")
+            items_parts: list[str] = []
             for item in items[:max_items]:
                 title = self._esc(item.get("title", ""))
                 qty = int(item.get("quantity", 1))
                 price = int(item.get("price", 0))
                 subtotal = price * qty
                 items_total += subtotal
-                lines.append(f"- {title} × {qty} = {subtotal:,} {currency}")
+                items_parts.append(f"{title} × {qty}")
             if len(items) > max_items:
                 extra = len(items) - max_items
-                lines.append(get_text(lang, "label_items_more", count=str(extra)))
+                items_parts.append(get_text(lang, "label_items_more", count=str(extra)))
+            lines.append(f"{get_text(lang, 'label_items')}: " + "; ".join(items_parts))
 
         total_value = int(total or 0)
         if total_value == 0 and items_total:
