@@ -172,7 +172,17 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
     order_id = tx.get("order_id")
     try:
         db.update_uzum_transaction_status(trans_id, "CONFIRMED", payload)
-        if hasattr(db, "update_payment_status") and order_id:
+        service = None
+        try:
+            from app.services.unified_order_service import get_unified_order_service
+
+            service = get_unified_order_service()
+        except Exception:
+            service = None
+
+        if service and order_id:
+            await service.confirm_payment(int(order_id))
+        elif hasattr(db, "update_payment_status") and order_id:
             db.update_payment_status(order_id, "confirmed")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update transaction")

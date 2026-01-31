@@ -121,7 +121,7 @@ def register(router: Router) -> None:
             [{"price": item.price, "quantity": item.quantity} for item in items]
         )
 
-        store_label = "Магазин" if lang == "ru" else "Do'kon"
+        store_label = get_text(lang, "cart_store_label")
 
         lines: list[str] = [
             f"<b>{get_text(lang, 'cart_order_title')}</b>",

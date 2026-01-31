@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from localization import get_text
+
 
 def build_cart_add_card_text(
     lang: str,
@@ -31,30 +33,26 @@ def build_cart_add_card_text(
 
     text_parts.append("")
 
+    currency = "so'm" if lang == "uz" else "сум"
+
     # Price
     if original_price and original_price > price:
         discount_pct = int(((original_price - price) / original_price) * 100)
         text_parts.append(
-            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} сум</b> <code>(-{discount_pct}%)</code>"
+            f"<s>{original_price:,.0f}</s> → <b>{price:,.0f} {currency}</b> <code>(-{discount_pct}%)</code>"
         )
     else:
-        text_parts.append(f"<b>{price:,.0f} сум</b>")
+        text_parts.append(f"<b>{price:,.0f} {currency}</b>")
 
     # Quantity
-    text_parts.append(
-        f"Количество: <b>{quantity} {unit}</b>"
-        if lang == "ru"
-        else f"Miqdor: <b>{quantity} {unit}</b>"
-    )
+    text_parts.append(f"{get_text(lang, 'cart_add_quantity_label')}: <b>{quantity} {unit}</b>")
 
     # Stock
-    stock_label = "В наличии" if lang == "ru" else "Omborda"
-    text_parts.append(f"{stock_label}: {max_qty} {unit}")
+    text_parts.append(f"{get_text(lang, 'cart_add_stock_label')}: {max_qty} {unit}")
 
     # Expiry
     if expiry_date:
-        expiry_label = "Годен до" if lang == "ru" else "Srok"
-        text_parts.append(f"{expiry_label}: {expiry_date}")
+        text_parts.append(f"{get_text(lang, 'cart_add_expiry_label')}: {expiry_date}")
 
     text_parts.append("")
 
@@ -68,9 +66,7 @@ def build_cart_add_card_text(
     # Total
     total = price * quantity
     text_parts.append(
-        f"<b>ИТОГО: {total:,.0f} сум</b>"
-        if lang == "ru"
-        else f"<b>JAMI: {total:,.0f} so'm</b>"
+        f"<b>{get_text(lang, 'cart_add_total_label')}: {total:,.0f} {currency}</b>"
     )
 
     return "\n".join(text_parts)
@@ -99,13 +95,13 @@ def build_cart_add_card_keyboard(
 
     # Add to cart button
     kb.button(
-        text="➕ В корзину" if lang == "ru" else "➕ Savatga",
+        text=get_text(lang, "cart_add_confirm_button"),
         callback_data=f"cart_add_confirm_{offer_id}",
     )
 
     # Cancel button
     kb.button(
-        text="Отмена" if lang == "ru" else "Bekor qilish",
+        text=get_text(lang, "cart_add_cancel_button"),
         callback_data=f"cart_add_cancel_{offer_id}",
     )
 
@@ -123,19 +119,19 @@ def build_cart_view_keyboard(
     if items_count > 0:
         # Checkout button
         kb.button(
-            text="✅ Оформить заказ" if lang == "ru" else "✅ Buyurtma berish",
+            text=get_text(lang, "cart_checkout_button"),
             callback_data="cart_checkout",
         )
 
         # Continue shopping
         kb.button(
-            text="Продолжить покупки" if lang == "ru" else "Xaridni davom ettirish",
-            callback_data="continue_shopping",
+            text=get_text(lang, "cart_continue_shopping_button"),
+            callback_data="hot_offers",
         )
 
         # Clear cart
         kb.button(
-            text="Очистить корзину" if lang == "ru" else "Savatni tozalash",
+            text=get_text(lang, "cart_clear_button"),
             callback_data="cart_clear",
         )
 
@@ -143,8 +139,8 @@ def build_cart_view_keyboard(
     else:
         # Empty cart - just continue shopping
         kb.button(
-            text="К покупкам" if lang == "ru" else "Xaridga",
-            callback_data="continue_shopping",
+            text=get_text(lang, "cart_empty_cta"),
+            callback_data="hot_offers",
         )
 
     return kb
@@ -160,18 +156,18 @@ def build_checkout_method_keyboard(
 
     if has_pickup:
         kb.button(
-            text="🏪 Самовывоз" if lang == "ru" else "🏪 O'zim olaman",
+            text=get_text(lang, "cart_pickup_button"),
             callback_data="cart_confirm_pickup",
         )
 
     if has_delivery:
         kb.button(
-            text="🚚 Доставка" if lang == "ru" else "🚚 Yetkazib berish",
+            text=get_text(lang, "cart_delivery_button"),
             callback_data="cart_confirm_delivery",
         )
 
     kb.button(
-        text="Назад" if lang == "ru" else "Orqaga",
+        text=get_text(lang, "cart_back_button"),
         callback_data="back_to_cart",
     )
 
@@ -187,12 +183,12 @@ def build_payment_method_keyboard(
     kb = InlineKeyboardBuilder()
 
     # Click payment
-    kb.button(text="💳 Click", callback_data="cart_pay_click")
+    kb.button(text=get_text(lang, "cart_delivery_payment_click"), callback_data="cart_pay_click")
 
     # Back button
     back_data = "cart_confirm_delivery" if order_type == "delivery" else "cart_confirm_pickup"
     kb.button(
-        text="Назад" if lang == "ru" else "Orqaga",
+        text=get_text(lang, "cart_back_button"),
         callback_data=back_data,
     )
 

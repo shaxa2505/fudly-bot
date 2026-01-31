@@ -1,10 +1,14 @@
 """User-specific keyboards."""
 from __future__ import annotations
 
+import os
+
 from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from localization import get_text
+
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
 
 
 def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
@@ -32,6 +36,26 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
     # Layout: 2 columns first row, 3 buttons second row
     builder.adjust(2, 3)
     return builder.as_markup(resize_keyboard=True)
+
+
+def registration_complete_keyboard(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
+    """Main menu with a WebApp button for registration completion."""
+    from aiogram.types import KeyboardButton, WebAppInfo
+
+    hot_offers_text = f"🛍 {get_text(lang, 'hot_offers')}"
+    search_text = f"🔍 {get_text(lang, 'search')}"
+    cart_text = f"🛒 {get_text(lang, 'my_cart')}"
+    if cart_count > 0:
+        cart_text = f"{cart_text} ({cart_count})"
+    orders_text = f"🧾 {get_text(lang, 'my_orders')}"
+    profile_text = f"👤 {get_text(lang, 'profile')}"
+
+    keyboard = [
+        [KeyboardButton(text=get_text(lang, "open_store_button"), web_app=WebAppInfo(url=WEBAPP_URL))],
+        [KeyboardButton(text=hot_offers_text), KeyboardButton(text=search_text)],
+        [KeyboardButton(text=cart_text), KeyboardButton(text=orders_text), KeyboardButton(text=profile_text)],
+    ]
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
 def search_cancel_keyboard(lang: str = "ru") -> ReplyKeyboardMarkup:

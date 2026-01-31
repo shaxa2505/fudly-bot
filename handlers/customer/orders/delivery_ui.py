@@ -9,6 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_total_price
 from handlers.common.utils import html_escape as _esc
+from localization import get_text
 
 
 # =============================================================================
@@ -34,7 +35,7 @@ def build_delivery_card_text(
     total = calc_total_price(subtotal, delivery_price)
 
     lines = [
-        f"🚚 <b>{'Yetkazib berish' if lang == 'uz' else 'Доставка'}</b>",
+        f"<b>{get_text(lang, 'delivery_card_title')}</b>",
         "",
         f"<b>{_esc(title)}</b>",
         _esc(store_name),
@@ -43,13 +44,13 @@ def build_delivery_card_text(
     ]
 
     # Price info
-    lines.append(f"{'Narxi' if lang == 'uz' else 'Цена'}: {price:,} {currency}")
+    lines.append(f"{get_text(lang, 'delivery_price_label')}: {price:,} {currency}")
     lines.append(
-        f"{'Miqdor' if lang == 'uz' else 'Кол-во'}: <b>{quantity}</b> {'dona' if lang == 'uz' else 'шт'}"
+        f"{get_text(lang, 'delivery_qty_label')}: <b>{quantity}</b> {'dona' if lang == 'uz' else 'шт'}"
     )
-    lines.append(f"{'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}")
+    lines.append(f"{get_text(lang, 'delivery_delivery_label')}: {delivery_price:,} {currency}")
     lines.append("-" * 24)
-    lines.append(f"<b>{'JAMI' if lang == 'uz' else 'ИТОГО'}: {total:,} {currency}</b>")
+    lines.append(f"<b>{get_text(lang, 'delivery_total_label')}: {total:,} {currency}</b>")
     lines.append("")
 
     # Address section
@@ -58,17 +59,13 @@ def build_delivery_card_text(
 
     # Step-specific hints
     if step == "qty":
-        hint = "Miqdorini tanlang" if lang == "uz" else "Выберите количество"
-        lines.append(f"\n<i>{hint}</i>")
+        lines.append(f"\n<i>{get_text(lang, 'delivery_qty_hint')}</i>")
     elif step == "address":
-        hint = "Manzilni kiriting yoki tanlang" if lang == "uz" else "Введите адрес или выберите"
-        lines.append(f"\n<i>{hint}</i>")
+        lines.append(f"\n<i>{get_text(lang, 'delivery_address_hint')}</i>")
     elif step == "payment":
-        hint = "To'lov usulini tanlang" if lang == "uz" else "Выберите способ оплаты"
-        lines.append(f"\n<i>{hint}</i>")
+        lines.append(f"\n<i>{get_text(lang, 'delivery_payment_hint')}</i>")
     elif step == "processing":
-        hint = "Jarayonda..." if lang == "uz" else "Обработка..."
-        lines.append(f"\n<i>{hint}</i>")
+        lines.append(f"\n<i>{get_text(lang, 'delivery_processing_hint')}</i>")
 
     return "\n".join(lines)
 
@@ -97,12 +94,11 @@ def build_delivery_qty_keyboard(
     )
 
     # Row 2: Continue
-    next_text = "📍 Davom etish" if lang == "uz" else "📍 Продолжить"
+    next_text = get_text(lang, "delivery_next_button")
     kb.button(text=next_text, callback_data=f"dlv_to_address_{offer_id}")
 
     # Row 3: Cancel
-    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
-    kb.button(text=cancel_text, callback_data="dlv_cancel")
+    kb.button(text=get_text(lang, "cancel"), callback_data="dlv_cancel")
 
     kb.adjust(3, 1, 1)
     return kb
@@ -122,14 +118,12 @@ def build_delivery_address_keyboard(
         kb.button(text=short_addr, callback_data=f"dlv_use_saved_{offer_id}")
 
     # Manual input button
-    manual_text = "✏️ Yangi manzil" if lang == "uz" else "✏️ Новый адрес"
+    manual_text = get_text(lang, "delivery_new_address_button")
     kb.button(text=manual_text, callback_data=f"dlv_new_address_{offer_id}")
 
     # Back and Cancel
-    back_text = "Orqaga" if lang == "uz" else "Назад"
-    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
-    kb.button(text=back_text, callback_data=f"dlv_back_qty_{offer_id}")
-    kb.button(text=cancel_text, callback_data="dlv_cancel")
+    kb.button(text=get_text(lang, "back"), callback_data=f"dlv_back_qty_{offer_id}")
+    kb.button(text=get_text(lang, "cancel"), callback_data="dlv_cancel")
 
     if saved_address:
         kb.adjust(1, 1, 2)
@@ -147,14 +141,14 @@ def build_delivery_payment_keyboard(
     kb = InlineKeyboardBuilder()
 
     # Payment options (Click only)
-    click_text = "💳 Click"
-    kb.button(text=click_text, callback_data=f"dlv_pay_click_{offer_id}")
+    kb.button(
+        text=get_text(lang, "delivery_payment_click_button"),
+        callback_data=f"dlv_pay_click_{offer_id}",
+    )
 
     # Back and Cancel
-    back_text = "Orqaga" if lang == "uz" else "Назад"
-    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
-    kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
-    kb.button(text=cancel_text, callback_data="dlv_cancel")
+    kb.button(text=get_text(lang, "back"), callback_data=f"dlv_back_address_{offer_id}")
+    kb.button(text=get_text(lang, "cancel"), callback_data="dlv_cancel")
 
     kb.adjust(1, 2)
     return kb

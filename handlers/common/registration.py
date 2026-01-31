@@ -14,10 +14,10 @@ from app.keyboards import (
     city_inline_keyboard,
     main_menu_customer,
     phone_request_keyboard,
+    registration_complete_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import Registration
-from handlers.common.webapp import webapp_keyboard
 from localization import get_cities, get_text
 
 router = Router(name="registration")
@@ -67,6 +67,18 @@ async def _after_phone_saved(
         await state.clear()
         return
 
+    pending_delivery_payload = data.get("pending_delivery_offer_id")
+    if pending_delivery_payload:
+        await state.update_data(pending_delivery_offer_id=None)
+        await message.answer(
+            get_text(lang, "phone_saved"),
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        from handlers.customer.orders.delivery import resume_delivery_after_phone
+
+        await resume_delivery_after_phone(message, state, db, str(pending_delivery_payload))
+        return
+
     if pending_order:
         await message.answer(
             get_text(lang, "phone_saved"),
@@ -110,40 +122,19 @@ async def _after_phone_saved(
         elif user_data and len(user_data) > 4:
             user_city_raw = user_data[4]
 
-    default_city = normalize_city(get_cities("ru")[0])
     user_city = normalize_city(user_city_raw) if user_city_raw else None
 
-    if user_city and user_city != default_city:
+    if user_city:
         await state.clear()
-        from app.keyboards import main_menu_customer
-
-        await message.answer(
-            get_text(lang, "phone_saved"),
-            reply_markup=ReplyKeyboardRemove(),
-        )
-
-        await message.answer(
-            get_text(lang, "registration_choose_action"),
-            reply_markup=main_menu_customer(lang),
-        )
+        await message.answer(get_text(lang, "phone_saved"), reply_markup=ReplyKeyboardRemove())
+        await _send_completion_menu(message, lang)
         return
 
-    city_text = "\n\n".join(
-        [
-            get_text(lang, "phone_saved"),
-            f"<b>{get_text(lang, 'registration_city_title')}</b>",
-            get_text(lang, "registration_city_hint"),
-        ]
-    )
-
     await state.set_state(Registration.city)
+    await message.answer(get_text(lang, "phone_saved"), reply_markup=ReplyKeyboardRemove())
     await message.answer(
-        city_text,
+        get_text(lang, "choose_city"),
         parse_mode="HTML",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await message.answer(
-        get_text(lang, "registration_city_title"),
         reply_markup=city_inline_keyboard(lang, allow_cancel=False),
     )
 
@@ -173,7 +164,7 @@ async def _save_phone(
     error_text: str,
 ) -> str | None:
     if not raw_phone:
-        await message.answer("System error")
+        await message.answer(get_text(lang, "system_error"))
         return None
 
     phone = sanitize_phone(raw_phone)
@@ -192,7 +183,7 @@ async def _save_phone(
 async def process_phone(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     """Process phone number - save and continue (order or city selection)."""
     if not db:
-        await message.answer("System error")
+        await message.answer(get_text("ru", "system_error"))
         return
 
     lang = db.get_user_language(message.from_user.id)
@@ -223,7 +214,7 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
 async def process_phone_text(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     """Process typed phone number - save and continue."""
     if not db:
-        await message.answer("System error")
+        await message.answer(get_text("ru", "system_error"))
         return
     if not message.text:
         return
@@ -248,7 +239,7 @@ async def registration_city_callback(
 ):
     """Handle city selection - complete registration."""
     if not db or not callback.message:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -289,7 +280,7 @@ async def registration_city_callback(
         )
         await state.set_state(Registration.district)
         keyboard = _build_district_keyboard(district_options)
-        prompt = "Выберите район." if lang == "ru" else "Tumanni tanlang."
+        prompt = get_text(lang, "select_district_prompt")
         if callback.message:
             try:
                 await callback.message.edit_text(prompt, reply_markup=keyboard)
@@ -323,22 +314,18 @@ async def registration_city_callback(
         name=name,
         city=city,
     )
-    webapp_markup = webapp_keyboard(lang)
 
-    try:
-        await callback.message.edit_text(
-            complete_text,
-            parse_mode="HTML",
-            reply_markup=webapp_markup,
-        )
-    except Exception:
-        await callback.message.answer(
-            complete_text,
-            parse_mode="HTML",
-            reply_markup=webapp_markup,
-        )
+    if callback.message:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
 
-    await _send_completion_menu(callback.message, lang)
+    await callback.message.answer(
+        complete_text,
+        parse_mode="HTML",
+        reply_markup=registration_complete_keyboard(lang),
+    )
     await callback.answer()
 
 
@@ -348,7 +335,7 @@ async def registration_district_callback(
 ):
     """Handle district selection - complete registration."""
     if not db or not callback.message:
-        await callback.answer("System error", show_alert=True)
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
         return
 
     lang = db.get_user_language(callback.from_user.id)
@@ -406,22 +393,18 @@ async def registration_district_callback(
         name=name,
         city=city_display,
     )
-    webapp_markup = webapp_keyboard(lang)
 
-    try:
-        await callback.message.edit_text(
-            complete_text,
-            parse_mode="HTML",
-            reply_markup=webapp_markup,
-        )
-    except Exception:
-        await callback.message.answer(
-            complete_text,
-            parse_mode="HTML",
-            reply_markup=webapp_markup,
-        )
+    if callback.message:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
 
-    await _send_completion_menu(callback.message, lang)
+    await callback.message.answer(
+        complete_text,
+        parse_mode="HTML",
+        reply_markup=registration_complete_keyboard(lang),
+    )
     await callback.answer()
 
 

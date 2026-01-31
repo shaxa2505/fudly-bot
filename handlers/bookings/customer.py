@@ -265,8 +265,12 @@ async def book_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     # Get offer details
-    offer_price = get_offer_field(offer, "discount_price", 0)
-    original_price = get_offer_field(offer, "original_price", 0)
+    offer_price = (
+        get_offer_field(offer, "discount_price", 0)
+        or get_offer_field(offer, "price", 0)
+        or get_offer_field(offer, "original_price", 0)
+    )
+    original_price = get_offer_field(offer, "original_price", 0) or get_offer_field(offer, "price", 0)
     offer_title = get_offer_field(offer, "title", "Товар")
     offer_description = get_offer_field(offer, "description", "")
     offer_unit = get_offer_field(offer, "unit", "")

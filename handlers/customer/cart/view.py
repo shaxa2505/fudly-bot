@@ -34,8 +34,8 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         return empty_text, kb
 
     currency = "so'm" if lang == "uz" else "сум"
-    store_label = "Магазин" if lang == "ru" else "Do'kon"
-    remove_label = "Удалить" if lang == "ru" else "O'chirish"
+    store_label = get_text(lang, "cart_store_label")
+    remove_label = get_text(lang, "cart_remove_button")
     lines: list[str] = [get_text(lang, "cart_title"), ""]
 
     cart_items = []
@@ -174,9 +174,7 @@ def register(router: Router) -> None:
 
         if item.quantity >= item.max_quantity:
             await callback.answer(
-                f"Максимум: {item.max_quantity}"
-                if lang == "ru"
-                else f"Maksimal: {item.max_quantity}",
+                get_text(lang, "cart_max_quantity_alert", max=item.max_quantity),
                 show_alert=True,
             )
             return

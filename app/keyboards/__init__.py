@@ -94,6 +94,7 @@ from .user import (
     business_type_keyboard,
     main_menu_customer,
     offers_category_filter,
+    registration_complete_keyboard,
     search_cancel_keyboard,
     settings_keyboard,
     stores_list_keyboard,
@@ -113,6 +114,7 @@ __all__ = [
     "product_categories_keyboard",
     # User
     "main_menu_customer",
+    "registration_complete_keyboard",
     "search_cancel_keyboard",
     "settings_keyboard",
     "booking_filters_keyboard",

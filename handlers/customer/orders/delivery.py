@@ -69,16 +69,8 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     return _get_appropriate_menu(user_id, lang, db)
 
 
-def _t(lang: str, ru: str, uz: str) -> str:
-    return ru if lang == "ru" else uz
-
-
 def _service_unavailable(lang: str) -> str:
-    return _t(
-        lang,
-        "Сервис временно недоступен. Попробуйте позже.",
-        "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring.",
-    )
+    return get_text(lang, "delivery_service_unavailable")
 
 
 def _lang_code(user: types.User | None) -> str:
@@ -108,6 +100,76 @@ async def _send_delivery_card(
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
 
+async def resume_delivery_after_phone(
+    message: types.Message, state: FSMContext, db: DatabaseProtocol, pending_payload: str
+) -> None:
+    """Resume delivery flow after phone collection."""
+    lang = db.get_user_language(message.from_user.id) if message.from_user else "ru"
+    try:
+        offer_id = int(pending_payload.split("_")[2])
+    except (ValueError, IndexError, AttributeError):
+        await message.answer(get_text(lang, "system_error"))
+        return
+
+    offer = db.get_offer(offer_id)
+    if not offer:
+        await message.answer(get_text(lang, "offer_not_found"))
+        return
+
+    max_qty = get_offer_field(offer, "quantity", 0)
+    if max_qty <= 0:
+        await message.answer(get_text(lang, "no_offers"))
+        return
+
+    store_id = get_offer_field(offer, "store_id")
+    store = db.get_store(store_id)
+    if not store:
+        await message.answer(get_text(lang, "error"))
+        return
+    if not get_store_field(store, "delivery_enabled", 0):
+        await message.answer(get_text(lang, "delivery_unavailable"))
+        return
+
+    price = (
+        get_offer_field(offer, "discount_price", 0)
+        or get_offer_field(offer, "price", 0)
+        or get_offer_field(offer, "original_price", 0)
+    )
+    title = get_offer_field(offer, "title", "")
+    store_name = get_store_field(store, "name", "")
+    delivery_price = get_store_field(store, "delivery_price", 15000)
+    min_order = get_store_field(store, "min_order_amount", 0)
+    offer_photo = get_offer_field(offer, "photo", None) or get_offer_field(offer, "photo_id", None)
+
+    saved_address = None
+    try:
+        saved_address = db.get_last_delivery_address(message.from_user.id)
+    except Exception:
+        pass
+
+    await state.update_data(
+        offer_id=offer_id,
+        store_id=store_id,
+        quantity=1,
+        max_qty=max_qty,
+        price=int(price or 0),
+        title=title,
+        store_name=store_name,
+        delivery_price=delivery_price,
+        min_order=min_order,
+        saved_address=saved_address,
+        address=None,
+        offer_photo=offer_photo,
+    )
+    await state.set_state(OrderDelivery.quantity)
+
+    text = build_delivery_card_text(
+        lang, title, int(price or 0), 1, max_qty, store_name, delivery_price, None, "qty"
+    )
+    kb = build_delivery_qty_keyboard(lang, offer_id, 1, max_qty)
+    await _send_delivery_card(message, text, kb, offer_photo)
+
+
 # =============================================================================
 # CUSTOMER HANDLERS
 # =============================================================================
@@ -124,6 +186,21 @@ async def start_delivery_order(
 
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
+
+    user_row = db.get_user(user_id) if hasattr(db, "get_user") else None
+    user_phone = user_row.get("phone") if isinstance(user_row, dict) else None
+    if not user_phone:
+        from app.keyboards import phone_request_keyboard
+        from handlers.common.states import Registration
+
+        await state.update_data(pending_delivery_offer_id=callback.data)
+        await state.set_state(Registration.phone)
+        await callback.message.answer(
+            get_text(lang, "cart_phone_required"),
+            reply_markup=phone_request_keyboard(lang),
+        )
+        await callback.answer()
+        return
 
     try:
         offer_id = int(callback.data.split("_")[2])
@@ -149,12 +226,15 @@ async def start_delivery_order(
 
     # Check delivery enabled
     if not get_store_field(store, "delivery_enabled", 0):
-        msg = "Yetkazib berish mavjud emas" if lang == "uz" else "Доставка недоступна"
-        await callback.answer(msg, show_alert=True)
+        await callback.answer(get_text(lang, "delivery_unavailable"), show_alert=True)
         return
 
     # Get details
-    price = get_offer_field(offer, "discount_price", 0)
+    price = (
+        get_offer_field(offer, "discount_price", 0)
+        or get_offer_field(offer, "price", 0)
+        or get_offer_field(offer, "original_price", 0)
+    )
     title = get_offer_field(offer, "title", "")
     store_name = get_store_field(store, "name", "")
     delivery_price = get_store_field(store, "delivery_price", 15000)
@@ -168,7 +248,7 @@ async def start_delivery_order(
         pass
 
     # Get offer photo
-    offer_photo = get_offer_field(offer, "photo", None)
+    offer_photo = get_offer_field(offer, "photo", None) or get_offer_field(offer, "photo_id", None)
 
     # Save to state
     await state.update_data(
@@ -176,7 +256,7 @@ async def start_delivery_order(
         store_id=store_id,
         quantity=1,
         max_qty=max_qty,
-        price=price,
+        price=int(price or 0),
         title=title,
         store_name=store_name,
         delivery_price=delivery_price,
@@ -258,8 +338,10 @@ async def dlv_cancel_order(
     except Exception:
         pass
 
-    msg = "Bekor qilindi." if lang == "uz" else "Отменено."
-    await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
+    await callback.message.answer(
+        get_text(lang, "delivery_cancelled"),
+        reply_markup=main_menu_customer(lang),
+    )
     await callback.answer()
 
 
@@ -308,8 +390,10 @@ async def dlv_cancel(
 
     if not result.items:
         # No offers - show main menu
-        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
-        await callback.message.answer(msg, reply_markup=main_menu_customer(lang))
+        await callback.message.answer(
+            get_text(lang, "delivery_cancelled"),
+            reply_markup=main_menu_customer(lang),
+        )
         await callback.answer()
         return
 
@@ -402,13 +486,15 @@ async def dlv_to_address(
 
     if min_order > 0 and (price * quantity) < min_order:
         currency = "so'm" if lang == "uz" else "сум"
-        msg = _t(
-            lang,
-            f"Минимальная сумма доставки: {min_order:,} {currency}",
-            f"Minimal summa: {min_order:,} {currency}",
-        )
-        await callback.answer(msg, show_alert=True)
-        return
+            msg = get_text(
+                lang,
+                "cart_delivery_min_order",
+                min=f"{min_order:,}",
+                total=f"{price * quantity:,}",
+                currency=currency,
+            )
+            await callback.answer(msg, show_alert=True)
+            return
 
     await state.set_state(OrderDelivery.address)
 
@@ -565,12 +651,13 @@ async def dlv_new_address(
     )
 
     # Show input hint
-    if lang == "uz":
-        hint = "\n\n<b>Manzilni yozing:</b>\n<i>Misol: Chilanzar, 5-mavze, 10-uy</i>"
-    else:
-        hint = "\n\n<b>Введите адрес:</b>\n<i>Пример: Чиланзар, 5-массив, дом 10</i>"
-
-    text += hint
+    text += (
+        "\n\n<b>"
+        + get_text(lang, "delivery_address_input_title")
+        + "</b>\n<i>"
+        + get_text(lang, "delivery_address_input_example")
+        + "</i>"
+    )
 
     # Keyboard: Back to address options + full cancel
     kb = InlineKeyboardBuilder()
@@ -579,11 +666,9 @@ async def dlv_new_address(
     except (ValueError, IndexError):
         offer_id = 0
 
-    back_text = "Orqaga" if lang == "uz" else "Назад"
-    cancel_text = "Bekor qilish" if lang == "uz" else "Отмена"
     if offer_id:
-        kb.button(text=back_text, callback_data=f"dlv_back_address_{offer_id}")
-    kb.button(text=cancel_text, callback_data="dlv_cancel")
+        kb.button(text=get_text(lang, "back"), callback_data=f"dlv_back_address_{offer_id}")
+    kb.button(text=get_text(lang, "cancel"), callback_data="dlv_cancel")
 
     if offer_id:
         kb.adjust(1, 1)
@@ -626,14 +711,15 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     # Check cancel
     if any(c in text.lower() for c in ["отмена", "bekor"]) or text.startswith("/"):
         await state.clear()
-        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
-        await message.answer(msg, reply_markup=main_menu_customer(lang))
+        await message.answer(
+            get_text(lang, "delivery_cancelled"),
+            reply_markup=main_menu_customer(lang),
+        )
         return
 
     # Validate address length
     if len(text) < 10:
-        msg = "Manzil juda qisqa." if lang == "uz" else "Адрес слишком короткий."
-        await message.answer(msg)
+        await message.answer(get_text(lang, "delivery_address_too_short"))
         return
 
     # Save address
@@ -731,6 +817,11 @@ async def dlv_pay_click(
     user_id = callback.from_user.id
     lang = db.get_user_language(user_id)
 
+    if data.get("delivery_payment_in_progress"):
+        await callback.answer(get_text(lang, "cart_confirm_in_progress"), show_alert=True)
+        return
+    await state.update_data(delivery_payment_in_progress=True)
+
     logger.info(f"User {user_id} selected Click payment")
     logger.info(f"FSM data: {data}")
 
@@ -747,11 +838,8 @@ async def dlv_pay_click(
         credentials = None
 
     if not credentials and not payment_service.click_enabled:
-        msg = (
-            "Click временно недоступен. Попробуйте позже."
-            if lang != "uz"
-            else "Click vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        )
+        msg = get_text(lang, "delivery_click_unavailable")
+        await state.update_data(delivery_payment_in_progress=False)
         await callback.answer(msg, show_alert=True)
         return
 
@@ -760,6 +848,7 @@ async def dlv_pay_click(
     if not address:
         logger.error("? No address in state for Click payment")
         await _return_to_address_step(callback.message, state, data, lang)
+        await state.update_data(delivery_payment_in_progress=False)
         await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
         return
 
@@ -771,6 +860,7 @@ async def dlv_pay_click(
             order_service = init_unified_order_service(db, bot)
         if not order_service:
             logger.warning("UnifiedOrderService unavailable for Click")
+            await state.update_data(delivery_payment_in_progress=False)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
@@ -784,7 +874,11 @@ async def dlv_pay_click(
             store = db.get_store(store_id)
 
             title = get_offer_field(offer, "title", "")
-            price = int(get_offer_field(offer, "discount_price", 0))
+            price = int(
+                get_offer_field(offer, "discount_price", 0)
+                or get_offer_field(offer, "price", 0)
+                or get_offer_field(offer, "original_price", 0)
+            )
             offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
             store_name = get_store_field(store, "name", "")
             store_address = get_store_field(store, "address", "")
@@ -817,6 +911,7 @@ async def dlv_pay_click(
                 logger.error(
                     "Failed to create order before Click link: %s", result.error_message
                 )
+                await state.update_data(delivery_payment_in_progress=False)
                 await callback.answer(get_text(lang, "system_error"), show_alert=True)
                 return
 
@@ -825,6 +920,7 @@ async def dlv_pay_click(
             logger.info(f"Created order #{order_id} before generating Click link")
         except Exception as e:
             logger.error(f"Error creating order before Click link: {e}", exc_info=True)
+            await state.update_data(delivery_payment_in_progress=False)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
@@ -863,16 +959,13 @@ async def dlv_pay_click(
         )
     except Exception as e:
         logger.error(f"Failed to generate Click link: {e}", exc_info=True)
-        msg = (
-            "Click временно недоступен. Попробуйте позже."
-            if lang != "uz"
-            else "Click vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        )
+        await state.update_data(delivery_payment_in_progress=False)
+        msg = get_text(lang, "delivery_click_unavailable")
         await callback.answer(msg, show_alert=True)
         return
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="💳 Click", url=payment_url)
+    kb.button(text=get_text(lang, "delivery_payment_click_button"), url=payment_url)
 
     # Remove inline keyboard to prevent duplicate taps and clear state
     try:
@@ -882,11 +975,7 @@ async def dlv_pay_click(
     await state.clear()
 
     # Notify user to pay via Click link
-    notify_text = (
-        "Нажмите кнопку ниже, чтобы оплатить через Click."
-        if lang != "uz"
-        else "Click orqali to'lash uchun pastdagi tugmani bosing."
-    )
+    notify_text = get_text(lang, "delivery_pay_click_prompt")
     try:
         await callback.message.answer(notify_text, reply_markup=kb.as_markup())
     except Exception:
@@ -943,8 +1032,10 @@ async def dlv_quantity_text(
 
     if any(c in text.lower() for c in ["отмена", "bekor"]) or text.startswith("/"):
         await state.clear()
-        msg = "Bekor qilindi." if lang == "uz" else "Отменено."
-        await message.answer(msg, reply_markup=main_menu_customer(lang))
+        await message.answer(
+            get_text(lang, "delivery_cancelled"),
+            reply_markup=main_menu_customer(lang),
+        )
         return
 
     # Try to parse quantity
@@ -961,10 +1052,12 @@ async def dlv_quantity_text(
 
         if min_order > 0 and (price * qty) < min_order:
             currency = "so'm" if lang == "uz" else "сум"
-            msg = _t(
+            msg = get_text(
                 lang,
-                f"Минимальная сумма доставки: {min_order:,} {currency}",
-                f"Minimal summa: {min_order:,} {currency}",
+                "cart_delivery_min_order",
+                min=f"{min_order:,}",
+                total=f"{price * qty:,}",
+                currency=currency,
             )
             await message.answer(msg)
             return
@@ -993,5 +1086,4 @@ async def dlv_quantity_text(
         await _send_delivery_card(message, card_text, kb, offer_photo)
 
     except ValueError:
-        msg = "Raqam kiriting." if lang == "uz" else "Введите число."
-        await message.answer(msg)
+        await message.answer(get_text(lang, "delivery_quantity_invalid"))

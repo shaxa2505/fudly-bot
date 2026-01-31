@@ -241,6 +241,32 @@ class BookingMixin:
         )
         return cursor.rowcount > 0
 
+    def _release_pickup_slot(self, cursor, store_id: int, pickup_time: str, quantity: int) -> bool:
+        """Release pickup slot capacity (best-effort)."""
+        try:
+            cursor.execute(
+                """
+                UPDATE pickup_slots
+                SET reserved = GREATEST(reserved - %s, 0)
+                WHERE store_id = %s AND slot_ts = %s
+                """,
+                (quantity, store_id, pickup_time),
+            )
+            return cursor.rowcount > 0
+        except Exception:
+            logger.debug("pickup_slots table missing or release failed; skipping slot release")
+            return False
+
+    def release_pickup_slot(self, store_id: int, pickup_time: str, quantity: int) -> bool:
+        """Release pickup slot capacity using a standalone connection."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                return self._release_pickup_slot(cursor, store_id, pickup_time, quantity)
+        except Exception:
+            logger.debug("pickup_slots release failed")
+            return False
+
     def get_booking(self, booking_id: int):
         """Get booking by ID."""
         with self.get_connection() as conn:
@@ -451,7 +477,12 @@ class BookingMixin:
 
             # Lock booking row
             cursor.execute(
-                "SELECT status, offer_id, quantity, is_cart_booking, cart_items FROM bookings WHERE booking_id = %s FOR UPDATE",
+                """
+                SELECT status, offer_id, quantity, is_cart_booking, cart_items, pickup_time, store_id
+                FROM bookings
+                WHERE booking_id = %s
+                FOR UPDATE
+                """,
                 (booking_id,),
             )
             row = cursor.fetchone()
@@ -462,6 +493,8 @@ class BookingMixin:
             status, offer_id, qty = row[0], row[1], row[2]
             is_cart_booking = int(row[3] or 0)
             cart_items = row[4]
+            pickup_time = row[5]
+            store_id = row[6]
             if status in ("cancelled", "completed", "rejected"):
                 conn.rollback()
                 return False
@@ -517,6 +550,10 @@ class BookingMixin:
                 "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s",
                 ("cancelled", booking_id),
             )
+
+            # Release pickup slot capacity if applicable (best-effort)
+            if pickup_time and store_id:
+                self._release_pickup_slot(cursor, int(store_id), pickup_time, int(qty_to_return))
 
             conn.commit()
             return True

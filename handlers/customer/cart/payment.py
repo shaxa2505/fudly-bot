@@ -29,6 +29,11 @@ def register(router: Router) -> None:
         lang = common.db.get_user_language(user_id)
 
         data = await state.get_data()
+        if data.get("cart_payment_in_progress"):
+            await callback.answer(get_text(lang, "cart_confirm_in_progress"), show_alert=True)
+            return
+        await state.update_data(cart_payment_in_progress=True)
+
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
         address = data.get("address", "")
@@ -50,11 +55,13 @@ def register(router: Router) -> None:
             credentials = None
 
         if not credentials and not payment_service.click_enabled:
+            await state.update_data(cart_payment_in_progress=False)
             await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
             return
 
         order_service = get_unified_order_service()
         if not order_service:
+            await state.update_data(cart_payment_in_progress=False)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
@@ -89,10 +96,12 @@ def register(router: Router) -> None:
             from logging_config import logger
 
             logger.error(f"Failed to create cart order for Click: {e}")
+            await state.update_data(cart_payment_in_progress=False)
             await callback.answer(get_text(lang, "system_error"), show_alert=True)
             return
 
         if not result.success or not result.order_ids:
+            await state.update_data(cart_payment_in_progress=False)
             await callback.answer(
                 get_text(lang, "cart_payment_order_failed"),
                 show_alert=True,
@@ -100,6 +109,7 @@ def register(router: Router) -> None:
             return
 
         order_id = result.order_ids[0]
+        await state.update_data(order_id=order_id)
         order_total = None
         try:
             if hasattr(common.db, "get_order"):
@@ -135,6 +145,11 @@ def register(router: Router) -> None:
             from logging_config import logger
 
             logger.error(f"Failed to generate Click link for cart order #{order_id}: {e}")
+            try:
+                await order_service.cancel_order(int(order_id), "order")
+            except Exception:
+                pass
+            await state.update_data(cart_payment_in_progress=False)
             await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
             return
 
@@ -157,11 +172,7 @@ def register(router: Router) -> None:
 
         await state.clear()
 
-        notify_text = (
-            "Нажмите кнопку ниже, чтобы оплатить через Click."
-            if lang != "uz"
-            else "Click orqali to'lash uchun pastdagi tugmani bosing."
-        )
+        notify_text = get_text(lang, "cart_payment_click_prompt")
         try:
             await callback.message.answer(notify_text, reply_markup=kb.as_markup())
         except Exception:

@@ -831,8 +831,8 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
             parse_mode="HTML",
             reply_markup=city_inline_keyboard(lang, allow_cancel=False),
         )
-        # DON'T set state - city is selected via inline buttons only
-        await state.clear()
+        # City is selected via inline buttons; keep state for reg_city_ handler
+        await state.set_state(Registration.city)
         return
 
     # Registered user - show menu

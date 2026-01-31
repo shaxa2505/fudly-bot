@@ -2501,6 +2501,7 @@ class UnifiedOrderService:
 
         return [
             {
+                "offer_id": int(offer_id),
                 "title": item_title,
                 "quantity": int(quantity or 1),
                 "price": int(item_price or 0),
@@ -2709,7 +2710,10 @@ class UnifiedOrderService:
         should_force_send: bool,
         should_notify: bool,
         existing_message_id: int | None,
+        group_order_ids: list[int] | None = None,
     ) -> None:
+        # Telegram caption limit is 1024 chars; keep photo updates from failing on long text.
+        safe_caption = msg if len(msg) <= 1000 else msg[:1000].rstrip() + "..."
         allow_telegram_updates = (
             self.telegram_order_notifications or should_edit or should_force_send
         )
@@ -2728,7 +2732,7 @@ class UnifiedOrderService:
                 await self.bot.edit_message_caption(
                     chat_id=user_id,
                     message_id=existing_message_id,
-                    caption=msg,
+                    caption=safe_caption,
                     parse_mode="HTML",
                     reply_markup=reply_markup,
                 )
@@ -2766,7 +2770,7 @@ class UnifiedOrderService:
                         message_sent = await self.bot.send_photo(
                             user_id,
                             photo=customer_photo,
-                            caption=msg,
+                            caption=safe_caption,
                             parse_mode="HTML",
                             reply_markup=reply_markup,
                         )
@@ -2783,12 +2787,21 @@ class UnifiedOrderService:
                     if entity_type == "order" and hasattr(
                         self.db, "set_order_customer_message_id"
                     ):
-                        self.db.set_order_customer_message_id(
-                            entity_id, message_sent.message_id
-                        )
+                        target_ids = group_order_ids or [entity_id]
+                        for order_id in target_ids:
+                            try:
+                                self.db.set_order_customer_message_id(
+                                    int(order_id), message_sent.message_id
+                                )
+                            except Exception as save_err:
+                                logger.warning(
+                                    "Failed to update customer_message_id for order %s: %s",
+                                    order_id,
+                                    save_err,
+                                )
                         logger.info(
-                            "Saved message_id={} for order#{}".format(
-                                message_sent.message_id, entity_id
+                            "Saved message_id={} for order_ids={}".format(
+                                message_sent.message_id, target_ids
                             )
                         )
                     elif entity_type == "booking" and hasattr(
@@ -2995,12 +3008,14 @@ class UnifiedOrderService:
         seller_photo: BufferedInputFile | str | None,
         entity_id: int,
     ) -> None:
+        # Telegram caption limit is 1024 chars; avoid edit/send failures on long text.
+        safe_caption = seller_text if len(seller_text) <= 1000 else seller_text[:1000].rstrip() + "..."
         if seller_message_id:
             try:
                 await self.bot.edit_message_caption(
                     chat_id=owner_id,
                     message_id=seller_message_id,
-                    caption=seller_text,
+                    caption=safe_caption,
                     parse_mode="HTML",
                     reply_markup=reply_markup,
                 )
@@ -3029,7 +3044,7 @@ class UnifiedOrderService:
                     sent_msg = await self.bot.send_photo(
                         owner_id,
                         photo=seller_photo,
-                        caption=seller_text,
+                        caption=safe_caption,
                         parse_mode="HTML",
                         reply_markup=reply_markup,
                     )
@@ -3384,6 +3399,7 @@ class UnifiedOrderService:
                 should_force_send=should_force_send,
                 should_notify=should_notify,
                 existing_message_id=existing_message_id,
+                group_order_ids=group_order_ids,
             )
 
         # Update seller message in Telegram if it exists (partner bot sync) if it exists (partner bot sync)
@@ -3561,6 +3577,8 @@ class UnifiedOrderService:
                 cart_items_json = entity.get("cart_items")
                 offer_id = entity.get("offer_id")
                 quantity = entity.get("quantity", 1)
+                pickup_time = entity.get("pickup_time")
+                store_id = entity.get("store_id")
             else:
                 is_cart = (
                     getattr(entity, "is_cart_order", 0) == 1
@@ -3569,6 +3587,8 @@ class UnifiedOrderService:
                 cart_items_json = getattr(entity, "cart_items", None)
                 offer_id = getattr(entity, "offer_id", None)
                 quantity = getattr(entity, "quantity", 1)
+                pickup_time = getattr(entity, "pickup_time", None)
+                store_id = getattr(entity, "store_id", None)
 
             if is_cart and cart_items_json:
                 cart_items = (
@@ -3587,6 +3607,18 @@ class UnifiedOrderService:
             elif offer_id:
                 try:
                     self.db.increment_offer_quantity_atomic(offer_id, int(quantity))
+                except Exception:
+                    pass
+
+            # Release pickup slot capacity for bookings (best-effort).
+            if (
+                entity_type == "booking"
+                and pickup_time
+                and store_id
+                and hasattr(self.db, "release_pickup_slot")
+            ):
+                try:
+                    self.db.release_pickup_slot(int(store_id), pickup_time, int(quantity or 0))
                 except Exception:
                     pass
 
