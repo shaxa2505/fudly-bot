@@ -298,8 +298,8 @@ function LocationPickerModal({
       <div className={`location-picker ${mode === 'map' ? 'map-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
         <div className="location-picker-header">
           <div className="location-picker-title">
-            <span>Manzil</span>
-            <p>{mode === 'map' ? "Xaritadan tanlang" : "Manzilingizni kiriting"}</p>
+            <span>MANZIL</span>
+            <p>{mode === 'map' ? "Xaritadan tanlang" : "Manzilni tanlang"}</p>
           </div>
           <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -394,6 +394,10 @@ function LocationPickerModal({
             </div>
 
             <div className="location-picker-results">
+              <div className="location-picker-results-header">
+                <span>Natijalar</span>
+                <span className="location-picker-results-hint">Tanlash uchun bosing</span>
+              </div>
               {searchLoading && (
                 <div className="location-picker-loading">Qidirilmoqda...</div>
               )}
@@ -472,7 +476,7 @@ function LocationPickerModal({
                   onClick={() => onDetectLocation?.()}
                   disabled={!canDetect || isLocating}
                 >
-                  {isLocating ? 'GPS...' : 'GPS'}
+                  {isLocating ? 'Aniqlanmoqda...' : 'Joylashuvim'}
                 </button>
             </div>
 
@@ -497,7 +501,7 @@ function LocationPickerModal({
                 </span>
               </div>
               <button type="button" className="location-picker-confirm" onClick={handleConfirmMap}>
-                Tayyor
+                Saqlash
               </button>
             </div>
           </div>
