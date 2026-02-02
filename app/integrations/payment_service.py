@@ -1103,8 +1103,13 @@ class PaymentService:
                     order_service = get_unified_order_service()
                     if order_service:
                         await order_service.cancel_order(int(order_id), "order")
-                    elif self._db and hasattr(self._db, "update_order_status"):
-                        self._db.update_order_status(int(order_id), "cancelled")
+                    elif self._db:
+                        try:
+                            from app.services.unified_order_service import set_order_status_direct
+
+                            set_order_status_direct(self._db, int(order_id), "cancelled")
+                        except Exception:
+                            pass
                 except Exception:
                     pass
             return self._click_response(

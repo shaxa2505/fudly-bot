@@ -8,7 +8,7 @@ import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
 import { calcTotalPrice } from '../utils/orderMath'
 import { getCurrentUser } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
-import { buildLocationFromReverseGeocode, saveLocation } from '../utils/cityUtils'
+import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
 import { getCurrentLocation } from '../utils/geolocation'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
@@ -30,6 +30,7 @@ function CartPage({ user }) {
     isEmpty,
     addToCart,
     updateQuantity,
+    updateOfferData,
     removeItem,
     clearCart
   } = useCart()
@@ -39,6 +40,8 @@ function CartPage({ user }) {
   const canonicalPhone = (user?.phone || cachedUser?.phone || '').toString().trim()
 
   const [orderLoading, setOrderLoading] = useState(false)
+  const [cartValidationLoading, setCartValidationLoading] = useState(false)
+  const [deliveryValidationLoading, setDeliveryValidationLoading] = useState(false)
   const addressInputRef = useRef(null)
   const commentInputRef = useRef(null)
 
@@ -59,6 +62,7 @@ function CartPage({ user }) {
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
+  const [storeCity, setStoreCity] = useState('')
 
   // Payment step for delivery
   const [checkoutStep, setCheckoutStep] = useState('details') // details only (no manual proof)
@@ -573,6 +577,7 @@ function CartPage({ user }) {
         setStoreDeliveryEnabled(false)
         setDeliveryFee(0)
         setMinOrderAmount(0)
+        setStoreCity('')
         return
       }
 
@@ -583,6 +588,13 @@ function CartPage({ user }) {
           setStoreDeliveryEnabled(!!cartStore.delivery_enabled)
           setDeliveryFee(cartStore.delivery_price || 0)
           setMinOrderAmount(cartStore.min_order_amount || 0)
+          setStoreCity(
+            cartStore.city ||
+            cartStore.store_city ||
+            cartStore.region ||
+            cartStore.city_name ||
+            ''
+          )
         }
       } catch (e) {
         console.warn('Could not fetch store info:', e)
@@ -590,6 +602,7 @@ function CartPage({ user }) {
           setStoreDeliveryEnabled(false)
           setDeliveryFee(0)
           setMinOrderAmount(0)
+          setStoreCity('')
         }
       }
     }
@@ -728,7 +741,7 @@ function CartPage({ user }) {
   }
 
   const closeCheckout = () => {
-    if (orderLoading) return
+    if (orderLoading || cartValidationLoading || deliveryValidationLoading) return
     setShowCheckout(false)
     setShowPaymentSheet(false)
     setOrderTypeTouched(false)
@@ -805,6 +818,197 @@ function CartPage({ user }) {
     }
     return verifiedPhone
   }
+
+  const resolveDeliveryCity = useCallback(() => {
+    const savedLocation = getSavedLocation()
+    const candidate =
+      savedLocation?.city ||
+      user?.city ||
+      cachedUser?.city ||
+      storeCity ||
+      ''
+    return String(candidate || '').trim()
+  }, [cachedUser?.city, storeCity, user?.city])
+
+  const validateCartWithServer = useCallback(async () => {
+    if (isEmpty) {
+      return { ok: false, reason: 'empty' }
+    }
+
+    const payload = cartItems
+      .map((item) => ({
+        offerId: item.offer?.id,
+        quantity: item.quantity,
+      }))
+      .filter((item) => item.offerId && item.quantity > 0)
+
+    if (payload.length === 0) {
+      toast.error("Savat bo'sh yoki mahsulotlar topilmadi")
+      return { ok: false, reason: 'invalid' }
+    }
+
+    try {
+      const response = await api.calculateCart(payload)
+      const serverItems = Array.isArray(response?.items) ? response.items : []
+
+      if (serverItems.length === 0) {
+        toast.error("Savatdagi mahsulotlar endi mavjud emas")
+        return { ok: false, reason: 'missing' }
+      }
+
+      const serverMap = new Map(
+        serverItems.map((item) => [String(item.offer_id), item])
+      )
+
+      const missingIds = []
+      const updates = []
+
+      cartItems.forEach((item) => {
+        const offerId = item.offer?.id
+        if (!offerId) return
+        const serverItem = serverMap.get(String(offerId))
+        if (!serverItem) {
+          missingIds.push(offerId)
+          return
+        }
+
+        const serverPrice = Number(serverItem.price ?? 0)
+        const localPrice = Number(
+          item.offer?.discount_price ?? item.offer?.original_price ?? 0
+        )
+
+        if (Number.isFinite(serverPrice) && serverPrice > 0) {
+          const priceChanged =
+            !Number.isFinite(localPrice) || Math.round(serverPrice) !== Math.round(localPrice)
+          if (priceChanged) {
+            updates.push({
+              offerId,
+              patch: {
+                discount_price: serverPrice,
+                title: serverItem.title || item.offer?.title,
+                photo: serverItem.photo || item.offer?.photo,
+              },
+            })
+          }
+        }
+      })
+
+      if (missingIds.length > 0) {
+        missingIds.forEach((id) => removeItem(id))
+      }
+      if (updates.length > 0) {
+        updateOfferData(updates)
+      }
+
+      if (missingIds.length > 0 || updates.length > 0) {
+        toast.warning("Savat yangilandi. Iltimos, qayta tekshiring.")
+        return { ok: false, reason: 'updated' }
+      }
+
+      return { ok: true }
+    } catch (error) {
+      console.warn('Cart validation failed:', error)
+      toast.error("Savatni tekshirib bo'lmadi. Qayta urinib ko'ring.")
+      return { ok: false, reason: 'error' }
+    }
+  }, [cartItems, isEmpty, removeItem, toast, updateOfferData])
+
+  const validateDeliveryWithServer = useCallback(async () => {
+    if (orderType !== 'delivery') {
+      return { ok: true }
+    }
+    if (!storeDeliveryEnabled) {
+      toast.error('Yetkazib berish mavjud emas')
+      return { ok: false, reason: 'disabled' }
+    }
+    if (!cartStoreId) {
+      toast.error('Do\'kon topilmadi')
+      return { ok: false, reason: 'store' }
+    }
+
+    const trimmedAddress = address.trim()
+    if (!trimmedAddress) {
+      toast.warning('Yetkazib berish manzilini kiriting')
+      return { ok: false, reason: 'address' }
+    }
+
+    const city = resolveDeliveryCity()
+    if (!city) {
+      toast.warning('Shaharni tanlang')
+      return { ok: false, reason: 'city' }
+    }
+
+    try {
+      const response = await api.calculateDelivery({
+        city,
+        address: trimmedAddress,
+        store_id: cartStoreId,
+      })
+
+      const canDeliver = Boolean(
+        response?.can_deliver ??
+        response?.canDeliver ??
+        response?.ok
+      )
+
+      if (!canDeliver) {
+        toast.error(response?.message || 'Yetkazib berish mavjud emas')
+        return { ok: false, reason: 'unavailable' }
+      }
+
+      const serverFee = Number(
+        response?.delivery_cost ??
+        response?.delivery_fee ??
+        response?.deliveryPrice ??
+        response?.delivery_price ??
+        deliveryFee
+      )
+      const serverMin = Number(
+        response?.min_order_amount ??
+        response?.minOrderAmount ??
+        minOrderAmount
+      )
+
+      let updated = false
+      if (Number.isFinite(serverFee) && Math.round(serverFee) !== Math.round(Number(deliveryFee || 0))) {
+        setDeliveryFee(serverFee)
+        updated = true
+      }
+      if (Number.isFinite(serverMin) && Math.round(serverMin) !== Math.round(Number(minOrderAmount || 0))) {
+        setMinOrderAmount(serverMin)
+        updated = true
+      }
+
+      if (updated) {
+        toast.warning("Yetkazib berish shartlari yangilandi. Iltimos, qayta tekshiring.")
+        return { ok: false, reason: 'updated' }
+      }
+
+      if (Number.isFinite(serverMin) && serverMin > 0 && subtotal < serverMin) {
+        toast.warning(
+          `Yetkazib berish uchun minimum ${formatSum(serverMin)} so'm buyurtma qiling`
+        )
+        return { ok: false, reason: 'min' }
+      }
+
+      return { ok: true }
+    } catch (error) {
+      console.warn('Delivery validation failed:', error)
+      toast.error("Yetkazib berish narxini tekshirib bo'lmadi. Qayta urinib ko'ring.")
+      return { ok: false, reason: 'error' }
+    }
+  }, [
+    address,
+    cartStoreId,
+    deliveryFee,
+    formatSum,
+    minOrderAmount,
+    orderType,
+    resolveDeliveryCity,
+    storeDeliveryEnabled,
+    subtotal,
+    toast,
+  ])
 
   const handleCheckout = async () => {
     if (isEmpty) return
@@ -885,12 +1089,6 @@ function CartPage({ user }) {
     if (!resolvedPhone) {
       return
     }
-    if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
-      toast.warning(
-        `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
-      )
-      return
-    }
     if (orderType === 'delivery' && !address.trim()) {
       toast.warning('Yetkazib berish manzilini kiriting')
       return
@@ -898,6 +1096,23 @@ function CartPage({ user }) {
     if (deliveryRequiresPrepay && !hasOnlineProviders) {
       toast.error('Yetkazib berish uchun to\'lov usullari mavjud emas')
       return
+    }
+
+    if (orderLoading || cartValidationLoading || deliveryValidationLoading) return
+    setCartValidationLoading(true)
+    const validation = await validateCartWithServer()
+    setCartValidationLoading(false)
+    if (!validation.ok) {
+      return
+    }
+
+    if (orderType === 'delivery') {
+      setDeliveryValidationLoading(true)
+      const deliveryValidation = await validateDeliveryWithServer()
+      setDeliveryValidationLoading(false)
+      if (!deliveryValidation.ok) {
+        return
+      }
     }
 
     if (selectedPaymentMethod === 'click') {
@@ -1713,7 +1928,7 @@ function CartPage({ user }) {
                 <button
                   className="checkout-confirm"
                   onClick={proceedToPayment}
-                  disabled={orderLoading || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
+                  disabled={orderLoading || cartValidationLoading || deliveryValidationLoading || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
                 >
                   <span>Buyurtmani tasdiqlash</span>
                   <span className="checkout-confirm-total">{formatSum(checkoutTotal)} so'm</span>

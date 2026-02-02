@@ -1,7 +1,7 @@
 ﻿"""Offer-related domain services and data transfer objects."""
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -252,7 +252,7 @@ class OfferService:
                 resolved = self._db.resolve_geo_location(region=None, district=city, city=city)
             except Exception:
                 resolved = None
-            if resolved:
+            if resolved and isinstance(resolved, Mapping):
                 resolved_region = resolved.get("region_name_ru")
                 resolved_district = resolved.get("district_name_ru")
                 if resolved_district:

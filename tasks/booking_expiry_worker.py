@@ -15,12 +15,15 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
     ready_expiry_hours = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
 
     order_service = None
+    set_order_status_direct = None
+    set_booking_status_direct = None
     order_status_cancelled = "cancelled"
     try:
         from app.services.unified_order_service import (
             OrderStatus,
             get_unified_order_service,
             init_unified_order_service,
+            set_order_status_direct,
         )
 
         order_service = get_unified_order_service()
@@ -29,6 +32,11 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
         order_status_cancelled = OrderStatus.CANCELLED
     except Exception as e:
         logger.error(f"Failed to init UnifiedOrderService for order auto-cancel: {e}")
+
+    try:
+        from app.services.booking_service import set_booking_status_direct
+    except Exception:
+        set_booking_status_direct = None
 
     # 1) Reminders: bookings with expiry_time within next 1 hour and reminder_sent = 0
     try:
@@ -307,8 +315,8 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                     try:
                         if order_service:
                             await order_service.cancel_order(order_id, entity_type="order")
-                        elif hasattr(db, "update_order_status"):
-                            db.update_order_status(order_id, order_status_cancelled)
+                        elif set_order_status_direct:
+                            set_order_status_direct(db, order_id, order_status_cancelled)
                     except Exception as e:
                         logger.error(f"Failed to auto-cancel delivery order {order_id}: {e}")
 
@@ -361,8 +369,8 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
 
                     # Update status to cancelled/expired
                     try:
-                        if hasattr(db, "update_booking_status"):
-                            db.update_booking_status(booking_id, order_status_cancelled)
+                        if set_booking_status_direct:
+                            set_booking_status_direct(db, booking_id, order_status_cancelled)
                     except Exception as e:
                         logger.error(f"Failed to expire ready booking {booking_id}: {e}")
 
@@ -412,8 +420,8 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
 
                     # Update status to cancelled/expired
                     try:
-                        if hasattr(db, "update_booking_status"):
-                            db.update_booking_status(booking_id, order_status_cancelled)
+                        if set_booking_status_direct:
+                            set_booking_status_direct(db, booking_id, order_status_cancelled)
                     except Exception as e:
                         logger.error(f"Failed to expire pending booking {booking_id}: {e}")
 

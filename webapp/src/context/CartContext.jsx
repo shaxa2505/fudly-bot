@@ -207,6 +207,29 @@ export function CartProvider({ children }) {
     });
   }, []);
 
+  const updateOfferData = useCallback((updates) => {
+    if (!Array.isArray(updates) || updates.length === 0) return;
+    setCart((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      updates.forEach((update) => {
+        const key = String(update.offerId);
+        const existing = prev[key];
+        if (!existing) return;
+        const patch = update.patch || {};
+        next[key] = {
+          ...existing,
+          offer: {
+            ...existing.offer,
+            ...patch,
+          },
+        };
+        changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
   // Remove item completely
   const removeItem = useCallback((offerId) => {
     setCart((prev) => {
@@ -257,6 +280,7 @@ export function CartProvider({ children }) {
       addToCart,
       removeFromCart,
       updateQuantity,
+      updateOfferData,
       removeItem,
       clearCart,
       getQuantity,
@@ -270,6 +294,7 @@ export function CartProvider({ children }) {
       addToCart,
       removeFromCart,
       updateQuantity,
+      updateOfferData,
       removeItem,
       clearCart,
       getQuantity,

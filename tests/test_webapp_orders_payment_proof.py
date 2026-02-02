@@ -4,9 +4,9 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_webapp_order_requires_proof_for_delivery_card(aiohttp_client, app, mocker):
+async def test_webapp_order_rejects_delivery_card(aiohttp_client, app, mocker):
     """
-    POST /api/v1/orders (Mini App webhook API) should reject delivery card orders without proof.
+    POST /api/v1/orders should reject delivery card orders (card not supported).
     """
     client = await aiohttp_client(app)
 
@@ -40,14 +40,13 @@ async def test_webapp_order_requires_proof_for_delivery_card(aiohttp_client, app
     resp = await client.post("/api/v1/orders", data=json.dumps(payload))
     assert resp.status == 400
     data = await resp.json()
-    assert "payment_proof" in data.get("error", "")
+    assert "Unsupported payment method" in data.get("error", "")
 
 
 @pytest.mark.asyncio
-async def test_webapp_order_accepts_card_with_proof(aiohttp_client, app, mocker):
+async def test_webapp_order_rejects_card_with_proof(aiohttp_client, app, mocker):
     """
-    POST /api/v1/orders should accept delivery card orders when payment_proof is provided
-    and pass it through to UnifiedOrderService.
+    POST /api/v1/orders should reject card payments even when payment_proof is provided.
     """
     client = await aiohttp_client(app)
 
@@ -89,12 +88,6 @@ async def test_webapp_order_accepts_card_with_proof(aiohttp_client, app, mocker)
     }
 
     resp = await client.post("/api/v1/orders", data=json.dumps(payload))
-    assert resp.status == 201
+    assert resp.status == 400
     data = await resp.json()
-    assert data.get("success") is True
-    assert data.get("order_id") == 111 or 111 in data.get("order_ids", [])
-
-    # Ensure proof passed through to service
-    service.create_order.assert_awaited()
-    kwargs = service.create_order.await_args.kwargs
-    assert kwargs.get("payment_proof") == "data:image/png;base64,xxx"
+    assert "Unsupported payment method" in data.get("error", "")

@@ -12,13 +12,18 @@ UZB_TZ = timezone(timedelta(hours=5))
 # Словарь для преобразования узбекских названий городов в русские
 CITY_UZ_TO_RU = {
     "toshkent": "Ташкент",
+    "Toshkent": "Ташкент",
     "tashkent": "Ташкент",
     "samarqand": "Самарканд",
+    "Samarqand": "Самарканд",
     "samarkand": "Самарканд",
     "buxoro": "Бухара",
+    "Buxoro": "Бухара",
     "bukhara": "Бухара",
     "andijon": "Андижан",
+    "Andijon": "Андижан",
     "namangan": "Наманган",
+    "Namangan": "Наманган",
     "farg'ona": "Фергана",
     "fargona": "Фергана",
     "fergana": "Фергана",

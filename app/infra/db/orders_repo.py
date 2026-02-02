@@ -37,9 +37,12 @@ class OrdersRepository:
         elif photo_id and hasattr(self._db, "update_order_payment_proof"):
             self._db.update_order_payment_proof(order_id, photo_id)
 
-    def update_order_status(self, order_id: int, status: str) -> None:
-        if hasattr(self._db, "update_order_status"):
-            self._db.update_order_status(order_id, status)
+    def set_order_status(self, order_id: int, status: str) -> bool:
+        try:
+            from app.services.unified_order_service import set_order_status_direct
+        except Exception:
+            return False
+        return set_order_status_direct(self._db, order_id, status)
 
     def get_store(self, store_id: int | None) -> Any | None:
         if not store_id or not hasattr(self._db, "get_store"):

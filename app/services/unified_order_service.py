@@ -61,6 +61,18 @@ def _delivery_cash_enabled() -> bool:
     }
 
 
+def set_order_status_direct(db: Any, order_id: int, status: str) -> bool:
+    """Update order status directly via DB adapter (legacy fallback)."""
+    if not db or not hasattr(db, "update_order_status"):
+        return False
+    try:
+        db.update_order_status(order_id, status)
+        return True
+    except Exception as exc:
+        logger.error(f"Direct order status update failed for #{order_id}: {exc}")
+        return False
+
+
 # =============================================================================
 # DATA CLASSES
 # =============================================================================

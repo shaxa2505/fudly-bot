@@ -198,6 +198,18 @@ class BookingService:
         except Exception as e:
             logger.error(f"update_delivery_details failed for booking {booking_id}: {e}")
 
+
+def set_booking_status_direct(db: DatabaseProtocol, booking_id: int, status: str) -> bool:
+    """Update booking status directly via DB adapter (legacy fallback)."""
+    if not db or not hasattr(db, "update_booking_status"):
+        return False
+    try:
+        db.update_booking_status(booking_id, status)
+        return True
+    except Exception as exc:
+        logger.error(f"Direct booking status update failed for #{booking_id}: {exc}")
+        return False
+
     # -------------------- Convenience create + delivery --------------------
     def finalize_booking(
         self,
