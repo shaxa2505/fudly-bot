@@ -509,6 +509,7 @@ function HomePage() {
         params.sort_by = 'urgent'
       }
 
+      let usedFallback = false
       let data = await api.getOffers(params, { force })
       let items = Array.isArray(data?.items)
         ? data.items
@@ -522,11 +523,11 @@ function HomePage() {
         : items.length === OFFERS_LIMIT
       let nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
 
-      if (
-        trimmedSearchValue &&
-        items.length === 0 &&
-        (params.city || params.region || params.district || params.lat || params.lon)
-      ) {
+      const hasLocationFilters = Boolean(
+        params.city || params.region || params.district || params.lat || params.lon
+      )
+      if (trimmedSearchValue && items.length === 0 && hasLocationFilters) {
+        usedFallback = true
         const fallbackParams = { ...params }
         delete fallbackParams.city
         delete fallbackParams.region
@@ -567,15 +568,7 @@ function HomePage() {
 
       setHasMore(hasMoreResult)
       if (reset) {
-        // If we had coordinates but got empty list, assume we fell back to broader scope
-        if (
-          (location.coordinates?.lat != null && location.coordinates?.lon != null) &&
-          items.length === 0
-        ) {
-          setHasNearbyFallback(true)
-        } else {
-          setHasNearbyFallback(false)
-        }
+        setHasNearbyFallback(usedFallback && items.length > 0)
       }
     } catch (error) {
       console.error('Error loading offers:', error)

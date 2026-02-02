@@ -128,12 +128,13 @@ function StoreMap({
       center: center,
       zoom: 13,
       zoomControl: true,
-      attributionControl: false,
+      attributionControl: true,
     });
 
     // Add tile layer (OpenStreetMap)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
     mapInstance.current = map;
@@ -332,3 +333,4 @@ function StoreMap({
 }
 
 export default StoreMap;
+

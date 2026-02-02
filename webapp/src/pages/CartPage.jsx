@@ -148,46 +148,15 @@ function CartPage({ user }) {
       }
     }, 8000)
 
-    const fetchApi = async () => {
-      try {
-        return await api.reverseGeocode(lat, lon, 'uz')
-      } catch (error) {
-        console.error('Reverse geocode error:', error)
-        return null
-      }
-    }
-
     let resolved = null
 
     try {
-      const apiData = await fetchApi()
+      const apiData = await api.reverseGeocode(lat, lon, 'uz')
       if (apiData) {
         resolved = buildLocationFromReverseGeocode(apiData, lat, lon)
       }
     } catch (error) {
       console.warn('API reverse error:', error)
-    }
-
-    if (!resolved?.address) {
-      try {
-        const params = new URLSearchParams({
-          format: 'jsonv2',
-          lat: String(lat),
-          lon: String(lon),
-          zoom: '18',
-          addressdetails: '1',
-          'accept-language': 'uz',
-        })
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`)
-        if (response.ok) {
-          const nominatimData = await response.json()
-          if (nominatimData) {
-            resolved = buildLocationFromReverseGeocode(nominatimData, lat, lon)
-          }
-        }
-      } catch (error) {
-        console.warn('Nominatim reverse error:', error)
-      }
     }
 
     if (requestId !== mapResolveSeqRef.current) {
@@ -248,31 +217,22 @@ function CartPage({ user }) {
     }
 
     let isActive = true
-    const controller = new AbortController()
     const timeout = setTimeout(async () => {
       setMapSearchLoading(true)
       try {
-        const params = new URLSearchParams({
-          format: 'jsonv2',
-          q: query,
-          limit: '6',
-          addressdetails: '1',
-          'accept-language': 'uz',
+        const response = await api.searchLocations(query, {
+          lang: 'uz',
+          limit: 6,
+          lat: deliveryCoords?.lat,
+          lon: deliveryCoords?.lon,
         })
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-          signal: controller.signal,
-          headers: { 'Accept-Language': 'uz' },
-        })
-        if (!response.ok) {
-          throw new Error('Search failed')
-        }
-        const data = await response.json()
+        const data = Array.isArray(response?.items)
+          ? response.items
+          : (Array.isArray(response) ? response : [])
         if (!isActive) return
-        setMapSearchResults(Array.isArray(data) ? data : [])
+        setMapSearchResults(data)
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.warn('Map search error:', error)
-        }
+        console.warn('Map search error:', error)
         if (isActive) {
           setMapSearchResults([])
         }
@@ -286,9 +246,8 @@ function CartPage({ user }) {
     return () => {
       isActive = false
       clearTimeout(timeout)
-      controller.abort()
     }
-  }, [mapEnabled, mapQuery, mapSearchOpen])
+  }, [mapEnabled, mapQuery, mapSearchOpen, deliveryCoords?.lat, deliveryCoords?.lon])
 
   useEffect(() => {
     if (!mapEnabled) return
@@ -378,12 +337,13 @@ function CartPage({ user }) {
       center: [startLat, startLon],
       zoom: startZoom,
       zoomControl: false,
-      attributionControl: false,
+      attributionControl: true,
       tap: false,
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
     checkoutMapInstanceRef.current = map
@@ -925,6 +885,12 @@ function CartPage({ user }) {
     if (!resolvedPhone) {
       return
     }
+    if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
+      toast.warning(
+        `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+      )
+      return
+    }
     if (orderType === 'delivery' && !address.trim()) {
       toast.warning('Yetkazib berish manzilini kiriting')
       return
@@ -945,6 +911,12 @@ function CartPage({ user }) {
   // Place order (cash/pickup)
   const placeOrder = async () => {
     if (isEmpty) return
+    if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
+      toast.warning(
+        `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+      )
+      return
+    }
 
     setOrderLoading(true)
 
@@ -1023,6 +995,12 @@ function CartPage({ user }) {
   const handleOnlinePayment = async () => {
     if (!isProviderAvailable('click')) {
       toast.error("Click to'lovi vaqtincha mavjud emas. Boshqa to'lov usulini tanlang.")
+      return
+    }
+    if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
+      toast.warning(
+        `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+      )
       return
     }
 

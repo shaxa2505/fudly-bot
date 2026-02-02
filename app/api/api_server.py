@@ -404,5 +404,24 @@ if __name__ == "__main__":
         .replace("/app/api/api_server.py", ""),
     )
 
-    app = create_api_app()
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    db = None
+    offer_service = None
+    bot_token = None
+    try:
+        from app.core.cache import CacheManager
+        from app.core.config import load_settings
+        from app.core.database import create_database
+        from app.services.offer_service import OfferService
+
+        settings = load_settings()
+        bot_token = settings.bot_token
+        db = create_database(settings.database_url)
+        cache = CacheManager(db, redis_url=settings.redis_url)
+        offer_service = OfferService(db, cache)
+        logger.info("✅ API server initialized with DB bindings")
+    except Exception as exc:
+        logger.warning("⚠️ API running without DB bindings: %s", exc)
+
+    app = create_api_app(db, offer_service, bot_token)
+    port = int(os.getenv("API_PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)

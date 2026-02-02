@@ -26,7 +26,12 @@ class RedisCache:
     """Redis-based cache implementation."""
 
     def __init__(
-        self, host: str = "localhost", port: int = 6379, db: int = 0, password: str | None = None
+        self,
+        host: str = "localhost",
+        port: int = 6379,
+        db: int = 0,
+        password: str | None = None,
+        redis_url: str | None = None,
     ):
         """Initialize Redis connection.
 
@@ -35,6 +40,7 @@ class RedisCache:
             port: Redis port
             db: Redis database number
             password: Redis password (if required)
+            redis_url: Full Redis URL (overrides host/port/db/password when provided)
         """
         # If redis package explicitly marked unavailable, fail fast
         if not REDIS_AVAILABLE:
@@ -45,15 +51,25 @@ class RedisCache:
             raise ImportError("redis package not installed. Install with: pip install redis")
 
         # Use Any for client type to avoid runtime/type issues if redis is patched in tests
-        self._client: Any = redis.Redis(
-            host=host,
-            port=port,
-            db=db,
-            password=password,
-            decode_responses=True,
-            socket_connect_timeout=5,
-            socket_timeout=5,
-        )
+        if redis_url:
+            if not hasattr(redis, "from_url"):
+                raise ImportError("redis package not installed. Install with: pip install redis")
+            self._client = redis.from_url(
+                redis_url,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+            )
+        else:
+            self._client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
+            )
         self._default_ttl = CACHE_TTL_LONG  # 1 hour
 
     def get(self, key: str) -> Any:

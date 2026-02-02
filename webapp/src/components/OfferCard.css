@@ -153,6 +153,10 @@
   transition: transform 0.2s ease;
 }
 
+.offer-favorite.is-active {
+  background: rgba(244, 63, 94, 0.16);
+}
+
 .offer-favorite:active {
   transform: scale(0.96);
 }

@@ -10,6 +10,7 @@ Supports:
 import asyncio
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -473,4 +474,6 @@ class NotificationService:
 # Global instance getter
 def get_notification_service(redis_url: str | None = None) -> NotificationService:
     """Get the notification service singleton."""
+    if redis_url is None:
+        redis_url = os.getenv("REDIS_URL")
     return NotificationService.get_instance(redis_url)

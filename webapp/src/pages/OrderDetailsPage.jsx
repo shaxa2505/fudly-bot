@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import apiClient from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
@@ -12,44 +12,85 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const enrichmentAttemptedRef = useRef(false)
 
   useEffect(() => {
-    loadOrderDetails()
+    loadOrderDetails({ allowEnrich: true })
     // Auto-refresh every 30 seconds
-    const interval = setInterval(loadOrderDetails, 30000)
+    const interval = setInterval(() => loadOrderDetails({ allowEnrich: false }), 30000)
     return () => clearInterval(interval)
   }, [orderId])
 
-  const loadOrderDetails = async () => {
+  const loadOrderDetails = async ({ allowEnrich } = {}) => {
     try {
       setLoading(true)
-      const response = await apiClient.getOrders()
-
-      const all = [...(response.orders || []), ...(response.bookings || [])]
-      let foundOrder = null
-      const raw = all.find(o => (o.order_id || o.booking_id) === parseInt(orderId))
-
-      if (raw) {
-        const baseStatus = normalizeOrderStatus(raw.order_status || raw.status || 'pending')
-        const displayStatus = deriveDisplayStatus(raw)
-
-        foundOrder = {
-          ...raw,
-          order_id: raw.order_id || raw.booking_id,
-          status: displayStatus,
-          fulfillment_status: baseStatus,
-          offer_title: raw.items?.[0]?.offer_title || raw.offer_title || 'Buyurtma',
-          offer_photo: resolveOrderItemImageUrl(raw.items?.[0]) || resolveOrderItemImageUrl(raw),
-          store_name: raw.store_name || raw.items?.[0]?.store_name,
-          quantity: raw.quantity || raw.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1,
-          items: raw.items || [],
-          booking_code: raw.booking_code || raw.pickup_code || raw.booking_code,
-        }
-      }
-
-      if (!foundOrder) {
+      const numericOrderId = Number(orderId)
+      if (!Number.isFinite(numericOrderId)) {
         setError('Buyurtma topilmadi')
         return
+      }
+
+      const statusPayload = await apiClient.getOrderStatus(numericOrderId)
+      if (!statusPayload) {
+        setError('Buyurtma topilmadi')
+        return
+      }
+
+      const statusValue = statusPayload.status || statusPayload.order_status || 'pending'
+      const baseStatus = normalizeOrderStatus(statusValue)
+      const displayStatus = deriveDisplayStatus({
+        ...statusPayload,
+        order_status: statusValue,
+        status: statusValue,
+      })
+
+      let foundOrder = {
+        ...statusPayload,
+        order_id: statusPayload.booking_id || statusPayload.order_id || numericOrderId,
+        status: displayStatus,
+        fulfillment_status: baseStatus,
+        order_status: baseStatus,
+        offer_title: statusPayload.offer_title || 'Buyurtma',
+        offer_photo: statusPayload.offer_photo,
+        store_name: statusPayload.store_name,
+        store_address: statusPayload.store_address,
+        store_phone: statusPayload.store_phone,
+        quantity: statusPayload.quantity || 1,
+        items: Array.isArray(statusPayload.items) ? statusPayload.items : [],
+        booking_code: statusPayload.booking_code || statusPayload.pickup_code || '',
+        delivery_fee: statusPayload.delivery_cost ?? statusPayload.delivery_fee,
+      }
+
+      if (allowEnrich && !enrichmentAttemptedRef.current && foundOrder.items.length === 0) {
+        enrichmentAttemptedRef.current = true
+        try {
+          const response = await apiClient.getOrders({ force: true })
+          const all = [...(response.orders || []), ...(response.bookings || [])]
+          const raw = all.find(o => (o.order_id || o.booking_id) === numericOrderId)
+          if (raw) {
+            foundOrder = {
+              ...raw,
+              ...foundOrder,
+              items: Array.isArray(raw.items) && raw.items.length > 0 ? raw.items : foundOrder.items,
+              offer_title: foundOrder.offer_title || raw.items?.[0]?.offer_title || raw.offer_title || 'Buyurtma',
+              offer_photo: foundOrder.offer_photo ||
+                resolveOrderItemImageUrl(raw.items?.[0]) ||
+                resolveOrderItemImageUrl(raw),
+              store_name: foundOrder.store_name || raw.store_name || raw.items?.[0]?.store_name,
+              store_address: foundOrder.store_address || raw.store_address,
+              store_phone: foundOrder.store_phone || raw.store_phone,
+              payment_method: foundOrder.payment_method || raw.payment_method,
+              payment_status: foundOrder.payment_status || raw.payment_status,
+              order_type: foundOrder.order_type || raw.order_type,
+              total_price: foundOrder.total_price ?? raw.total_price,
+              quantity: foundOrder.quantity || raw.quantity ||
+                raw.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 1,
+              booking_code: foundOrder.booking_code || raw.booking_code || raw.pickup_code || '',
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to enrich order details:', err)
+        }
       }
 
       setOrder(foundOrder)

@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
+import { useFavorites } from '../context/FavoritesContext'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import './OfferCard.css'
 
@@ -14,6 +15,7 @@ const OfferCard = memo(function OfferCard({
 }) {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { isFavorite, toggleFavorite } = useFavorites()
   const [isAdding, setIsAdding] = useState(false)
 
   // Get photo URL (handles Telegram file_id conversion)
@@ -113,6 +115,8 @@ const OfferCard = memo(function OfferCard({
   }) || 'Mahsulot'
   const titleText = productTitle
   const showStoreName = Boolean(storeNameNormalized && storeNameNormalized !== normalizeText(titleText).toLowerCase())
+  const offerId = offer?.id ?? offer?.offer_id ?? offer?.offerId
+  const isFav = offerId ? isFavorite(offerId) : false
   const ratingValue = Number(
     offer.store_rating ??
     offer.rating ??
@@ -134,7 +138,9 @@ const OfferCard = memo(function OfferCard({
 
   const handleFavoriteClick = useCallback((e) => {
     e.stopPropagation()
-  }, [])
+    if (!offerId) return
+    toggleFavorite(offer)
+  }, [offer, offerId, toggleFavorite])
 
   return (
     <div
@@ -182,11 +188,18 @@ const OfferCard = memo(function OfferCard({
         </div>
         <button
           type="button"
-          className="offer-favorite"
+          className={`offer-favorite ${isFav ? 'is-active' : ''}`}
           onClick={handleFavoriteClick}
-          aria-label="Sevimlilarga qo'shish"
+          aria-label={isFav ? "Sevimlilardan o'chirish" : "Sevimlilarga qo'shish"}
+          aria-pressed={isFav}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill={isFav ? 'currentColor' : 'none'}
+            aria-hidden="true"
+          >
             <path d="M12 21s-7-4.35-7-10a4 4 0 017-2.4A4 4 0 0119 11c0 5.65-7 10-7 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>

@@ -1,6 +1,7 @@
 """Webhook server for production deployment."""
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -279,159 +280,170 @@ async def create_webhook_app(
     app.router.add_get("/docs", docs_handler)
     app.router.add_get("/openapi.yaml", openapi_spec_handler)
 
+    enable_webapp_api = os.getenv("WEBHOOK_EMBED_API", "1").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
     # Mini App API routes
-    app.router.add_options("/api/v1/payment-card/{store_id}", cors_preflight)
-    app.router.add_get("/api/v1/payment-card/{store_id}", api_get_payment_card)
-    app.router.add_get("/api/v1/debug", api_debug)
+    if enable_webapp_api:
+        app.router.add_options("/api/v1/payment-card/{store_id}", cors_preflight)
+        app.router.add_get("/api/v1/payment-card/{store_id}", api_get_payment_card)
+        app.router.add_get("/api/v1/debug", api_debug)
 
-    # User history routes (recently viewed, search history)
-    app.router.add_options("/api/v1/user/recently-viewed", cors_preflight)
-    app.router.add_post("/api/v1/user/recently-viewed", api_add_recently_viewed)
-    app.router.add_get("/api/v1/user/recently-viewed", api_get_recently_viewed)
-    app.router.add_options("/api/v1/user/search-history", cors_preflight)
-    app.router.add_post("/api/v1/user/search-history", api_add_search_history)
-    app.router.add_get("/api/v1/user/search-history", api_get_search_history)
-    app.router.add_delete("/api/v1/user/search-history", api_clear_search_history)
+        # User history routes (recently viewed, search history)
+        app.router.add_options("/api/v1/user/recently-viewed", cors_preflight)
+        app.router.add_post("/api/v1/user/recently-viewed", api_add_recently_viewed)
+        app.router.add_get("/api/v1/user/recently-viewed", api_get_recently_viewed)
+        app.router.add_options("/api/v1/user/search-history", cors_preflight)
+        app.router.add_post("/api/v1/user/search-history", api_add_search_history)
+        app.router.add_get("/api/v1/user/search-history", api_get_search_history)
+        app.router.add_delete("/api/v1/user/search-history", api_clear_search_history)
 
-    # Payment routes
-    app.router.add_options("/api/v1/payment/providers", cors_preflight)
-    app.router.add_get("/api/v1/payment/providers", api_get_payment_providers)
-    app.router.add_options("/api/v1/payment/create", cors_preflight)
-    app.router.add_post("/api/v1/payment/create", api_create_payment)
-    app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
-    app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
+        # Payment routes
+        app.router.add_options("/api/v1/payment/providers", cors_preflight)
+        app.router.add_get("/api/v1/payment/providers", api_get_payment_providers)
+        app.router.add_options("/api/v1/payment/create", cors_preflight)
+        app.router.add_post("/api/v1/payment/create", api_create_payment)
+        app.router.add_post("/api/v1/payment/click/callback", api_click_callback)
+        app.router.add_post("/api/v1/payment/payme/callback", api_payme_callback)
 
-    fastapi_handler = None
+        fastapi_handler = None
 
-    # Partner Panel API - FastAPI integration via direct ASGI
-    if offer_service and bot_token:
-        try:
-            from app.api.api_server import create_api_app
+        # Partner Panel API - FastAPI integration via direct ASGI
+        if offer_service and bot_token:
+            try:
+                from app.api.api_server import create_api_app
 
-            # Create FastAPI app with real Partner Panel endpoints
-            fastapi_app = create_api_app(db, offer_service, bot_token)
+                # Create FastAPI app with real Partner Panel endpoints
+                fastapi_app = create_api_app(db, offer_service, bot_token)
 
-            # Create ASGI handler that calls FastAPI directly
-            async def fastapi_handler(request: web.Request) -> web.Response:
-                """Forward requests to FastAPI ASGI app"""
-                # Read body
-                body = await request.read()
+                # Create ASGI handler that calls FastAPI directly
+                async def fastapi_handler(request: web.Request) -> web.Response:
+                    """Forward requests to FastAPI ASGI app"""
+                    # Read body
+                    body = await request.read()
 
-                # Build ASGI scope
-                scope = {
-                    "type": "http",
-                    "asgi": {"version": "3.0"},
-                    "http_version": "1.1",
-                    "method": request.method,
-                    "scheme": request.url.scheme,
-                    "path": request.path,
-                    "query_string": request.query_string.encode(),
-                    "root_path": "",
-                    "headers": [
-                        (k.encode().lower(), v.encode()) for k, v in request.headers.items()
-                    ],
-                    "server": (request.host.split(":")[0], request.url.port or 80),
-                }
+                    # Build ASGI scope
+                    scope = {
+                        "type": "http",
+                        "asgi": {"version": "3.0"},
+                        "http_version": "1.1",
+                        "method": request.method,
+                        "scheme": request.url.scheme,
+                        "path": request.path,
+                        "query_string": request.query_string.encode(),
+                        "root_path": "",
+                        "headers": [
+                            (k.encode().lower(), v.encode()) for k, v in request.headers.items()
+                        ],
+                        "server": (request.host.split(":")[0], request.url.port or 80),
+                    }
 
-                # Collect response
-                response_started = False
-                status_code = 200
-                headers = []
-                body_parts = []
+                    # Collect response
+                    response_started = False
+                    status_code = 200
+                    headers = []
+                    body_parts = []
 
-                async def receive():
-                    return {"type": "http.request", "body": body}
+                    async def receive():
+                        return {"type": "http.request", "body": body}
 
-                async def send(message):
-                    nonlocal response_started, status_code, headers, body_parts
-                    if message["type"] == "http.response.start":
-                        response_started = True
-                        status_code = message["status"]
-                        headers = [(k.decode(), v.decode()) for k, v in message.get("headers", [])]
-                    elif message["type"] == "http.response.body":
-                        body_parts.append(message.get("body", b""))
+                    async def send(message):
+                        nonlocal response_started, status_code, headers, body_parts
+                        if message["type"] == "http.response.start":
+                            response_started = True
+                            status_code = message["status"]
+                            headers = [
+                                (k.decode(), v.decode()) for k, v in message.get("headers", [])
+                            ]
+                        elif message["type"] == "http.response.body":
+                            body_parts.append(message.get("body", b""))
 
-                # Call FastAPI
-                await fastapi_app(scope, receive, send)
+                    # Call FastAPI
+                    await fastapi_app(scope, receive, send)
 
-                # Build response
-                response_body = b"".join(body_parts)
-                return web.Response(body=response_body, status=status_code, headers=dict(headers))
+                    # Build response
+                    response_body = b"".join(body_parts)
+                    return web.Response(body=response_body, status=status_code, headers=dict(headers))
 
-            # Register handler for Partner Panel API routes
-            app.router.add_route("*", "/api/partner{path:.*}", fastapi_handler)
+                # Register handler for Partner Panel API routes
+                app.router.add_route("*", "/api/partner{path:.*}", fastapi_handler)
 
-            logger.info("✅ Partner Panel API endpoints registered (FastAPI direct ASGI)")
-        except Exception as e:
-            logger.error(f"❌ Failed to mount FastAPI app: {e}", exc_info=True)
-            logger.warning("⚠️ Partner Panel API will not be available")
+                logger.info("✅ Partner Panel API endpoints registered (FastAPI direct ASGI)")
+            except Exception as e:
+                logger.error(f"❌ Failed to mount FastAPI app: {e}", exc_info=True)
+                logger.warning("⚠️ Partner Panel API will not be available")
+        else:
+            logger.warning("⚠️ Partner Panel API disabled (missing offer_service or bot_token)")
+
+        if fastapi_handler:
+            app.router.add_route("*", "/api/merchant{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/auth{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/orders{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/user/orders{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/user/bookings{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/user/profile{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/user/notifications{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/cart{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/categories{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/favorites{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/flash-deals{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/offers{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/search{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/stats{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/stores{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/photo{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/location{path:.*}", fastapi_handler)
+            app.router.add_route("*", "/api/v1/health{path:.*}", fastapi_handler)
+            logger.info("✅ /api/v1/orders routed to FastAPI")
+        else:
+            app.router.add_options("/api/v1/categories", cors_preflight)
+            app.router.add_get("/api/v1/categories", api_categories)
+            app.router.add_options("/api/v1/search/suggestions", cors_preflight)
+            app.router.add_get("/api/v1/search/suggestions", api_search_suggestions)
+            app.router.add_options("/api/v1/stats/hot-deals", cors_preflight)
+            app.router.add_get("/api/v1/stats/hot-deals", api_hot_deals_stats)
+            app.router.add_options("/api/v1/location/reverse", cors_preflight)
+            app.router.add_get("/api/v1/location/reverse", api_reverse_geocode)
+            app.router.add_options("/api/v1/flash-deals", cors_preflight)
+            app.router.add_get("/api/v1/flash-deals", api_flash_deals)
+            app.router.add_options("/api/v1/offers", cors_preflight)
+            app.router.add_get("/api/v1/offers", api_offers)
+            app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)
+            app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
+            app.router.add_options("/api/v1/stores", cors_preflight)
+            app.router.add_get("/api/v1/stores", api_stores)
+            app.router.add_options("/api/v1/stores/{store_id}", cors_preflight)
+            app.router.add_get("/api/v1/stores/{store_id}", api_store_detail)
+            app.router.add_options("/api/v1/cart/calculate", cors_preflight)
+            app.router.add_get("/api/v1/cart/calculate", api_calculate_cart)
+            app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
+            app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
+            app.router.add_get("/api/v1/health", api_health)
+            app.router.add_options("/api/v1/orders", cors_preflight)
+            app.router.add_post("/api/v1/orders", api_create_order)
+            app.router.add_get("/api/v1/orders", api_user_orders)
+            app.router.add_options("/api/v1/orders/{order_id}/status", cors_preflight)
+            app.router.add_get("/api/v1/orders/{order_id}/status", api_order_status)
+            app.router.add_options("/api/v1/orders/{order_id}/timeline", cors_preflight)
+            app.router.add_get("/api/v1/orders/{order_id}/timeline", api_order_timeline)
+            app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
+            app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
+            app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
+            app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
+            app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
+            app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
+
+        # Setup WebSocket routes for real-time notifications
+        setup_websocket_routes(app)
     else:
-        logger.warning("⚠️ Partner Panel API disabled (missing offer_service or bot_token)")
-
-    if fastapi_handler:
-        app.router.add_route("*", "/api/merchant{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/auth{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/orders{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/user/orders{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/user/bookings{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/user/profile{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/user/notifications{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/cart{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/categories{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/favorites{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/flash-deals{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/offers{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/search{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/stats{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/stores{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/photo{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/location{path:.*}", fastapi_handler)
-        app.router.add_route("*", "/api/v1/health{path:.*}", fastapi_handler)
-        logger.info("✅ /api/v1/orders routed to FastAPI")
-    else:
-        app.router.add_options("/api/v1/categories", cors_preflight)
-        app.router.add_get("/api/v1/categories", api_categories)
-        app.router.add_options("/api/v1/search/suggestions", cors_preflight)
-        app.router.add_get("/api/v1/search/suggestions", api_search_suggestions)
-        app.router.add_options("/api/v1/stats/hot-deals", cors_preflight)
-        app.router.add_get("/api/v1/stats/hot-deals", api_hot_deals_stats)
-        app.router.add_options("/api/v1/location/reverse", cors_preflight)
-        app.router.add_get("/api/v1/location/reverse", api_reverse_geocode)
-        app.router.add_options("/api/v1/flash-deals", cors_preflight)
-        app.router.add_get("/api/v1/flash-deals", api_flash_deals)
-        app.router.add_options("/api/v1/offers", cors_preflight)
-        app.router.add_get("/api/v1/offers", api_offers)
-        app.router.add_options("/api/v1/offers/{offer_id}", cors_preflight)
-        app.router.add_get("/api/v1/offers/{offer_id}", api_offer_detail)
-        app.router.add_options("/api/v1/stores", cors_preflight)
-        app.router.add_get("/api/v1/stores", api_stores)
-        app.router.add_options("/api/v1/stores/{store_id}", cors_preflight)
-        app.router.add_get("/api/v1/stores/{store_id}", api_store_detail)
-        app.router.add_options("/api/v1/cart/calculate", cors_preflight)
-        app.router.add_get("/api/v1/cart/calculate", api_calculate_cart)
-        app.router.add_options("/api/v1/photo/{file_id}", cors_preflight)
-        app.router.add_get("/api/v1/photo/{file_id}", api_get_photo)
-        app.router.add_get("/api/v1/health", api_health)
-        app.router.add_options("/api/v1/orders", cors_preflight)
-        app.router.add_post("/api/v1/orders", api_create_order)
-        app.router.add_get("/api/v1/orders", api_user_orders)
-        app.router.add_options("/api/v1/orders/{order_id}/status", cors_preflight)
-        app.router.add_get("/api/v1/orders/{order_id}/status", api_order_status)
-        app.router.add_options("/api/v1/orders/{order_id}/timeline", cors_preflight)
-        app.router.add_get("/api/v1/orders/{order_id}/timeline", api_order_timeline)
-        app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
-        app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
-        app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
-        app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
-        app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
-        app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
-
-    # Setup WebSocket routes for real-time notifications
-    setup_websocket_routes(app)
+        logger.info("Mini App API endpoints disabled for webhook server (WEBHOOK_EMBED_API=0)")
 
     # Initialize notification service
-    redis_url = None  # Can be configured via env
-    notification_service = get_notification_service(redis_url)
+    notification_service = get_notification_service()
     notification_service.set_telegram_bot(bot)
 
     # Initialize WebSocket manager

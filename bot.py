@@ -49,11 +49,20 @@ SECRET_TOKEN: str = settings.webhook.secret_token
 
 # Lock configuration (prevent multiple instances)
 LOCK_PORT: int = int(os.getenv("LOCK_PORT", "8444"))
-DISABLE_LOCK: bool = os.getenv("DISABLE_LOCK", "0").strip().lower() in {"1", "true", "yes"}
-POLLING_HEALTH_PORT: int = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
-ENABLE_INTERNAL_BOOKING_WORKER: bool = (
-    os.getenv("ENABLE_INTERNAL_BOOKING_WORKER", "1").strip().lower() in {"1", "true", "yes"}
+MULTI_INSTANCE: bool = os.getenv("ALLOW_MULTI_INSTANCE", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+} or os.getenv("MULTI_INSTANCE", "0").strip().lower() in {"1", "true", "yes"}
+DISABLE_LOCK: bool = (
+    os.getenv("DISABLE_LOCK", "0").strip().lower() in {"1", "true", "yes"} or MULTI_INSTANCE
 )
+POLLING_HEALTH_PORT: int = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
+_booking_worker_env = os.getenv("ENABLE_INTERNAL_BOOKING_WORKER")
+if _booking_worker_env is None:
+    ENABLE_INTERNAL_BOOKING_WORKER = not MULTI_INSTANCE
+else:
+    ENABLE_INTERNAL_BOOKING_WORKER = _booking_worker_env.strip().lower() in {"1", "true", "yes"}
 ENABLE_RATING_REMINDERS: bool = (
     os.getenv("ENABLE_RATING_REMINDERS", "0").strip().lower() in {"1", "true", "yes"}
 )

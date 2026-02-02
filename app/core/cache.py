@@ -38,6 +38,7 @@ class CacheManager:
         redis_port: int = 6379,
         redis_db: int = 0,
         redis_password: str | None = None,
+        redis_url: str | None = None,
     ):
         self._db = db
         self._user_cache: dict[int, dict[str, Any]] = {}
@@ -47,7 +48,16 @@ class CacheManager:
 
         # Try to initialize Redis cache if connection details provided
         self._redis: RedisCache | None = None
-        if redis_host:
+        if redis_url:
+            try:
+                self._redis = RedisCache(redis_url=redis_url)
+                # Test connection
+                if not self._redis.ping():
+                    self._redis = None
+            except Exception:
+                # Fall back to in-memory cache
+                self._redis = None
+        elif redis_host:
             try:
                 self._redis = RedisCache(
                     host=redis_host,

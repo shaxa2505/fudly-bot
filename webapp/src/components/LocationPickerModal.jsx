@@ -213,11 +213,12 @@ function LocationPickerModal({
       center: [center.lat, center.lon],
       zoom: 15,
       zoomControl: true,
-      attributionControl: false,
+      attributionControl: true,
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
     mapInstanceRef.current = map

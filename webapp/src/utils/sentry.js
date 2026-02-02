@@ -26,8 +26,8 @@ export function initSentry() {
         Sentry.browserTracingIntegration(),
         Sentry.replayIntegration({
           // Capture 10% of sessions for replay
-          maskAllText: false,
-          blockAllMedia: false,
+          maskAllText: true,
+          blockAllMedia: true,
         }),
       ],
       // Performance monitoring

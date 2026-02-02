@@ -5,7 +5,7 @@ import OrderDetailsPage from './OrderDetailsPage'
 import { renderWithProviders } from '../test/renderWithProviders'
 
 const apiMocks = vi.hoisted(() => ({
-  getOrders: vi.fn(),
+  getOrderStatus: vi.fn(),
   getPhotoUrl: vi.fn(),
   getPaymentProviders: vi.fn(),
   createPaymentLink: vi.fn(),
@@ -13,7 +13,7 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('../api/client', () => ({
   default: {
-    getOrders: apiMocks.getOrders,
+    getOrderStatus: apiMocks.getOrderStatus,
     getPhotoUrl: apiMocks.getPhotoUrl,
     getPaymentProviders: apiMocks.getPaymentProviders,
     createPaymentLink: apiMocks.createPaymentLink,
@@ -23,7 +23,7 @@ vi.mock('../api/client', () => ({
 describe('OrderDetailsPage', () => {
   beforeEach(() => {
     localStorage.clear()
-    apiMocks.getOrders.mockReset()
+    apiMocks.getOrderStatus.mockReset()
     apiMocks.getPhotoUrl.mockReset()
     apiMocks.getPaymentProviders.mockReset()
     apiMocks.createPaymentLink.mockReset()
@@ -31,26 +31,34 @@ describe('OrderDetailsPage', () => {
   })
 
   it('renders order details from API response', async () => {
-    apiMocks.getOrders.mockResolvedValueOnce({
-      orders: [
+    apiMocks.getOrderStatus.mockResolvedValueOnce({
+      booking_id: 123,
+      booking_code: 'ABC123',
+      status: 'pending',
+      payment_status: 'pending',
+      order_type: 'pickup',
+      created_at: '2025-01-01T10:00:00Z',
+      items: [
         {
-          order_id: 123,
-          payment_status: 'pending',
-          items: [
-            {
-              offer_title: 'Milk',
-              store_name: 'Store A',
-              price: 4000,
-              quantity: 2,
-            },
-          ],
-          total_price: 8000,
-          created_at: '2025-01-01T10:00:00Z',
-          order_type: 'pickup',
-          payment_method: 'cash',
+          offer_title: 'Milk',
+          store_name: 'Store A',
+          price: 4000,
+          quantity: 2,
         },
       ],
-      bookings: [],
+      offer_title: 'Milk',
+      offer_photo: '',
+      quantity: 2,
+      total_price: 8000,
+      store_id: 10,
+      store_name: 'Store A',
+      store_address: 'Main street',
+      store_phone: '+998901234567',
+      pickup_time: null,
+      pickup_address: null,
+      delivery_address: null,
+      delivery_cost: null,
+      qr_code: null,
     })
 
     renderWithProviders(
@@ -60,11 +68,12 @@ describe('OrderDetailsPage', () => {
       { initialEntries: ['/order/123/details'] }
     )
 
-    expect(await screen.findByText('Buyurtma #123')).toBeInTheDocument()
+    expect(await screen.findByText('#123')).toBeInTheDocument()
+    expect(screen.getByText('Buyurtma')).toBeInTheDocument()
     expect(screen.getByText('Milk')).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(apiMocks.getOrders).toHaveBeenCalled()
+      expect(apiMocks.getOrderStatus).toHaveBeenCalled()
     })
   })
 })

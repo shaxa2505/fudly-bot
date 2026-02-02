@@ -50,6 +50,6 @@ def build_application(settings: Settings):
         logger.info("Using SQLite for local development with MemoryStorage")
 
     dispatcher = Dispatcher(storage=storage)
-    cache = CacheManager(db)
+    cache = CacheManager(db, redis_url=settings.redis_url)
 
     return bot, dispatcher, db, cache
