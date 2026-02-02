@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from typing import Any
 
 from arq import cron
@@ -38,12 +39,61 @@ async def shutdown(ctx: dict[str, Any]) -> None:
             pass
 
 
+async def _acquire_lock(ctx: dict[str, Any], key: str, ttl: int) -> str | None:
+    redis = ctx.get("redis")
+    if not redis:
+        return None
+    token = str(uuid.uuid4())
+    try:
+        ok = await redis.set(key, token, ex=ttl, nx=True)
+        return token if ok else None
+    except Exception:
+        return None
+
+
+async def _release_lock(ctx: dict[str, Any], key: str, token: str) -> None:
+    redis = ctx.get("redis")
+    if not redis:
+        return
+    # Release only if token matches
+    lua = """
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+        return redis.call("del", KEYS[1])
+    else
+        return 0
+    end
+    """
+    try:
+        await redis.eval(lua, 1, key, token)
+    except Exception:
+        try:
+            current = await redis.get(key)
+            if current == token:
+                await redis.delete(key)
+        except Exception:
+            pass
+
+
 async def booking_expiry(ctx: dict[str, Any]) -> None:
-    await run_booking_expiry_cycle(ctx["db"], ctx["bot"])
+    ttl = int(os.getenv("ARQ_BOOKING_LOCK_TTL", "360"))
+    token = await _acquire_lock(ctx, "locks:booking_expiry", ttl)
+    if not token:
+        return
+    try:
+        await run_booking_expiry_cycle(ctx["db"], ctx["bot"])
+    finally:
+        await _release_lock(ctx, "locks:booking_expiry", token)
 
 
 async def rating_reminder(ctx: dict[str, Any]) -> None:
-    await run_rating_reminder_cycle(ctx["db"], ctx["bot"])
+    ttl = int(os.getenv("ARQ_RATING_LOCK_TTL", "2100"))
+    token = await _acquire_lock(ctx, "locks:rating_reminder", ttl)
+    if not token:
+        return
+    try:
+        await run_rating_reminder_cycle(ctx["db"], ctx["bot"])
+    finally:
+        await _release_lock(ctx, "locks:rating_reminder", token)
 
 
 def _redis_settings() -> RedisSettings:
@@ -60,4 +110,3 @@ class WorkerSettings:
     ]
     on_startup = startup
     on_shutdown = shutdown
-

@@ -148,9 +148,7 @@ export default function OrderDetailsPage() {
       const storeId = order.store_id || null
       const available = await apiClient.getPaymentProviders(storeId)
       if (!available.includes('click')) {
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.showAlert('Bu to\'lov usuli hozircha mavjud emas.')
-        }
+        window.Telegram?.WebApp?.showAlert?.('Bu to\'lov usuli hozircha mavjud emas.')
         return
       }
 
@@ -164,8 +162,8 @@ export default function OrderDetailsPage() {
       )
 
       if (paymentData?.payment_url) {
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.openLink(paymentData.payment_url)
+        if (window.Telegram?.WebApp?.openLink) {
+          window.Telegram?.WebApp?.openLink?.(paymentData.payment_url)
         } else {
           window.location.href = paymentData.payment_url
         }
@@ -437,6 +435,8 @@ export default function OrderDetailsPage() {
                         src={itemPhoto}
                         alt={itemTitle}
                         className="item-image"
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           e.target.style.display = 'none'
                         }}
@@ -468,6 +468,8 @@ export default function OrderDetailsPage() {
                     src={orderPhotoUrl}
                     alt={order.offer_title}
                     className="item-image"
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.target.style.display = 'none'
                     }}
@@ -594,9 +596,7 @@ export default function OrderDetailsPage() {
         <button
           className="support-btn"
           onClick={() => {
-            if (window.Telegram?.WebApp) {
-              window.Telegram.WebApp.openTelegramLink('https://t.me/fudly_support')
-            }
+            window.Telegram?.WebApp?.openTelegramLink?.('https://t.me/fudly_support')
           }}
         >
           Qo'llab-quvvatlash

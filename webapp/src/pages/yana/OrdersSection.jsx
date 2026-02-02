@@ -128,6 +128,8 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
                         src={photoUrl}
                         alt={order.offer_title}
                         className="order-image"
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           e.target.style.display = 'none'
                           e.target.parentElement.classList.add('no-image')

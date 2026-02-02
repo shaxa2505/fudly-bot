@@ -437,10 +437,21 @@ async def create_webhook_app(
             app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)
             app.router.add_get("/api/v1/stores/{store_id}/reviews", api_get_store_reviews)
 
+        # WebSocket routes are configured below (can be enabled without full API).
+    else:
+        logger.info("Mini App API endpoints disabled for webhook server (WEBHOOK_EMBED_API=0)")
+
+    enable_ws = os.getenv("WEBHOOK_WS_ENABLED", "1").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if enable_ws:
         # Setup WebSocket routes for real-time notifications
         setup_websocket_routes(app)
     else:
-        logger.info("Mini App API endpoints disabled for webhook server (WEBHOOK_EMBED_API=0)")
+        logger.info("WebSocket routes disabled for webhook server (WEBHOOK_WS_ENABLED=0)")
 
     # Initialize notification service
     notification_service = get_notification_service()

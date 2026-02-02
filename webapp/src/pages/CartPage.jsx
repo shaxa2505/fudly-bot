@@ -973,14 +973,12 @@ function CartPage({ user }) {
       // Haptic feedback
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
 
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.sendData(JSON.stringify({
-          action: 'order_placed',
-          order_id: orderId,
-          total: total,
-          order_type: orderType,
-        }))
-      }
+      window.Telegram?.WebApp?.sendData?.(JSON.stringify({
+        action: 'order_placed',
+        order_id: orderId,
+        total: total,
+        order_type: orderType,
+      }))
 
     } catch (error) {
       console.error('Error placing order:', error)
@@ -1053,8 +1051,8 @@ function CartPage({ user }) {
         setShowCheckout(false)
         setShowPaymentSheet(false)
         // Open payment
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.openLink(paymentData.payment_url)
+        if (window.Telegram?.WebApp?.openLink) {
+          window.Telegram?.WebApp?.openLink?.(paymentData.payment_url)
         } else {
           window.location.href = paymentData.payment_url
         }
@@ -1212,6 +1210,8 @@ function CartPage({ user }) {
                       src={photoUrl}
                       alt={item.offer.title}
                       className="cart-item-image"
+                      loading="lazy"
+                      decoding="async"
                       onError={(e) => {
                         if (!e.target.dataset.fallback) {
                           e.target.dataset.fallback = 'true'
@@ -1281,6 +1281,8 @@ function CartPage({ user }) {
                       <img
                         src={photoUrl}
                         alt={offer.title || 'Offer'}
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           if (!e.target.dataset.fallback) {
                             e.target.dataset.fallback = 'true'
@@ -1664,7 +1666,12 @@ function CartPage({ user }) {
                         return (
                           <div key={item.offer.id} className="checkout-order-item">
                             <div className="checkout-order-info">
-                              <img src={photoUrl} alt={item.offer.title} />
+                              <img
+                                src={photoUrl}
+                                alt={item.offer.title}
+                                loading="lazy"
+                                decoding="async"
+                              />
                               <div>
                                 <p className="checkout-order-title">{item.offer.title}</p>
                                 <p className="checkout-order-qty">{item.quantity} dona</p>

@@ -61,13 +61,13 @@ export function ToastProvider({ children }) {
     const id = Date.now() + Math.random()
 
     // Haptic feedback based on type
-    if (window.Telegram?.WebApp?.HapticFeedback) {
+    if (window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred) {
       if (type === 'success') {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success')
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success')
       } else if (type === 'error') {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error')
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('error')
       } else if (type === 'warning') {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning')
+        window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
       }
     }
 

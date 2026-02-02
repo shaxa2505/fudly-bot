@@ -28,6 +28,7 @@ from fastapi import (
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.core.async_db import AsyncDBProxy
 from app.core.utils import normalize_city
 from database_pg_module.mixins.offers import canonicalize_geo_slug
 from app.api.websocket_manager import get_connection_manager
@@ -43,7 +44,16 @@ from app.services.unified_order_service import (
 from database_protocol import DatabaseProtocol
 
 router = APIRouter(tags=["partner-panel"])
-limiter = Limiter(key_func=get_remote_address)
+
+def _rate_limit_storage_uri() -> str | None:
+    return os.getenv("RATE_LIMIT_REDIS_URL") or os.getenv("REDIS_URL") or None
+
+
+_rl_storage = _rate_limit_storage_uri()
+if _rl_storage:
+    limiter = Limiter(key_func=get_remote_address, storage_uri=_rl_storage)
+else:
+    limiter = Limiter(key_func=get_remote_address)
 
 # Global database instance (set by api_server.py)
 _db: DatabaseProtocol | None = None
@@ -70,7 +80,12 @@ def _is_dev_env() -> bool:
 def set_partner_db(db: DatabaseProtocol, bot_token: str = None):
     """Set database instance and bot token for partner panel."""
     global _db, _bot_token
-    _db = db
+    if db is None:
+        _db = None
+    else:
+        if not isinstance(db, AsyncDBProxy):
+            db = AsyncDBProxy(db)
+        _db = db
     if bot_token:
         _bot_token = bot_token
     elif not _bot_token:
@@ -92,12 +107,13 @@ def _ensure_unified_service(db: DatabaseProtocol):
     if not _bot_token:
         return None
     try:
-        return init_unified_order_service(db, Bot(_bot_token))
+        sync_db = db.sync if hasattr(db, "sync") else db
+        return init_unified_order_service(sync_db, Bot(_bot_token))
     except Exception:
         return None
 
 
-def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
+async def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     """
     Get user and their store by telegram_id.
     A partner is defined by having a store (in stores table), not by role in users table.
@@ -113,14 +129,14 @@ def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     if _is_dev_env():
         logging.debug(f"get_partner_with_store called for telegram_id={telegram_id}")
 
-    user = db.get_user(telegram_id)
+    user = await db.get_user(telegram_id)
 
     if not user:
         logging.error(f"❌ User not found: telegram_id={telegram_id}")
         raise HTTPException(status_code=403, detail="User not found")
 
     # users.user_id = telegram_id, stores.owner_id = users.user_id = telegram_id
-    store = db.get_store_by_owner(telegram_id)
+    store = await db.get_store_by_owner(telegram_id)
 
     if not store:
         logging.error(f"❌ No store found for telegram_id={telegram_id}")
@@ -407,7 +423,7 @@ async def get_profile(authorization: str = Header(None)):
     telegram_id = verify_telegram_webapp(authorization)
     logging.info(f"✅ Auth verified, telegram_id: {telegram_id}")
 
-    user, store_info = get_partner_with_store(telegram_id)
+    user, store_info = await get_partner_with_store(telegram_id)
     logging.info(f"✅ Got partner with store: {store_info.get('name') if store_info else 'None'}")
 
     user_city = normalize_city(user.get("city") or "Toshkent")
@@ -466,7 +482,7 @@ async def websocket_partner(
             await websocket.close(code=1008)
             return
         telegram_id = verify_telegram_webapp(authorization)
-        _, store = get_partner_with_store(telegram_id)
+        _, store = await get_partner_with_store(telegram_id)
         if int(store.get("store_id", 0) or 0) != int(store_id):
             await websocket.accept()
             await websocket.close(code=1008)
@@ -518,7 +534,7 @@ async def websocket_partner(
 async def get_store_info(authorization: str = Header(None)):
     """Get store information for partner panel"""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
 
     # Prices stored in sums (PRICE_STORAGE_UNIT = 'sums' by default)
     delivery_price = int(store.get("delivery_price") or 0)
@@ -553,11 +569,11 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
     Maps DB fields to frontend expectations: offer_id→id, title→name, quantity→stock, etc.
     """
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     # Partner panel: show ALL products (including out-of-stock and expired)
-    offers = db.get_offers_by_store(store["store_id"], include_all=True)
+    offers = await db.get_offers_by_store(store["store_id"], include_all=True)
 
     # Filter by status if provided
     if status and status != "all":
@@ -644,7 +660,7 @@ async def create_product(
     logger.info(f"📦 Create product - received prices: original={original_price}, discount={discount_price}")
 
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     payload = await _load_json_payload(request)
@@ -729,7 +745,7 @@ async def create_product(
         )
 
         # Save to database (Pydantic ensures correct types)
-        offer_id = db.add_offer(
+        offer_id = await db.add_offer(
             store_id=offer_data.store_id,
             title=offer_data.title,
             description=offer_data.description,
@@ -785,11 +801,11 @@ async def update_product(
     )
 
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     # Verify ownership
-    offer = db.get_offer(product_id)
+    offer = await db.get_offer(product_id)
     if not offer or offer.get("store_id") != store["store_id"]:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -855,7 +871,7 @@ async def update_product(
             update_values.append("out_of_stock")
         elif quantity > 0 and status is None:
             # Restore to active if was out_of_stock
-            current_offer = db.get_offer(product_id)
+            current_offer = await db.get_offer(product_id)
             if current_offer and current_offer.get("status") == "out_of_stock":
                 update_fields.append("status = %s")
                 update_values.append("active")
@@ -898,11 +914,9 @@ async def update_product(
         raise HTTPException(status_code=400, detail="No fields to update")
 
     # Execute update
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        query = f"UPDATE offers SET {', '.join(update_fields)} WHERE offer_id = %s"
-        update_values.append(product_id)
-        cursor.execute(query, tuple(update_values))
+    query = f"UPDATE offers SET {', '.join(update_fields)} WHERE offer_id = %s"
+    update_values.append(product_id)
+    await db.execute(query, tuple(update_values))
 
     return {"offer_id": product_id, "status": "updated"}
 
@@ -913,7 +927,7 @@ async def update_product_status(
 ):
     """Update product status (toggle active/hidden)"""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     # Parse request body
@@ -926,16 +940,14 @@ async def update_product_status(
         raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
 
     # Verify ownership
-    offer = db.get_offer(product_id)
+    offer = await db.get_offer(product_id)
     if not offer or offer.get("store_id") != store["store_id"]:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Update status
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE offers SET status = %s WHERE offer_id = %s", (new_status, product_id)
-        )
+    await db.execute(
+        "UPDATE offers SET status = %s WHERE offer_id = %s", (new_status, product_id)
+    )
 
     return {"offer_id": product_id, "status": new_status}
 
@@ -944,16 +956,16 @@ async def update_product_status(
 async def delete_product(product_id: int, authorization: str = Header(None)):
     """Delete product (soft delete)"""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     # Verify ownership
-    offer = db.get_offer(product_id)
+    offer = await db.get_offer(product_id)
     if not offer or offer["store_id"] != store["store_id"]:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Soft delete
-    db.deactivate_offer(product_id)
+    await db.deactivate_offer(product_id)
 
     return {"offer_id": product_id, "status": "deleted"}
 
@@ -976,7 +988,7 @@ async def cancel_order(
     - other: Другая причина
     """
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     # Parse request body
@@ -1007,28 +1019,29 @@ async def cancel_order(
         raise HTTPException(status_code=400, detail=f"Invalid request body: {e}")
 
     # Get order and verify ownership
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT o.order_id, o.user_id, o.order_status, o.store_id
-            FROM orders o
-            WHERE o.order_id = %s
-            """,
-            (order_id,),
-        )
-        order = cursor.fetchone()
+    order_rows = await db.execute(
+        """
+        SELECT o.order_id, o.user_id, o.order_status, o.store_id
+        FROM orders o
+        WHERE o.order_id = %s
+        """,
+        (order_id,),
+    )
+    order = order_rows[0] if order_rows else None
 
-        if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
 
-        # Verify store ownership
-        if order[3] != store["store_id"]:
-            raise HTTPException(status_code=403, detail="Not your order")
+    store_id_val = order.get("store_id") if hasattr(order, "get") else order[3]
+    status_val = order.get("order_status") if hasattr(order, "get") else order[2]
 
-        # Check if already cancelled
-        if order[2] == "cancelled":
-            raise HTTPException(status_code=400, detail="Order already cancelled")
+    # Verify store ownership
+    if store_id_val != store["store_id"]:
+        raise HTTPException(status_code=403, detail="Not your order")
+
+    # Check if already cancelled
+    if status_val == "cancelled":
+        raise HTTPException(status_code=400, detail="Order already cancelled")
 
     unified_service = _ensure_unified_service(db)
     if not unified_service:
@@ -1038,18 +1051,15 @@ async def cancel_order(
     if not ok:
         raise HTTPException(status_code=400, detail="Status transition not allowed")
 
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE orders
-            SET cancel_reason = %s,
-                cancel_comment = %s
-            WHERE order_id = %s
-            """,
-            (cancel_reason, cancel_comment, order_id),
-        )
-        conn.commit()
+    await db.execute(
+        """
+        UPDATE orders
+        SET cancel_reason = %s,
+            cancel_comment = %s
+        WHERE order_id = %s
+        """,
+        (cancel_reason, cancel_comment, order_id),
+    )
 
     return {
         "order_id": order_id,
@@ -1066,7 +1076,7 @@ async def import_csv(
 ):
     """Import products from CSV"""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     if not file.filename.endswith(".csv"):
@@ -1094,7 +1104,7 @@ async def import_csv(
             now = datetime.now().isoformat()
             until = (datetime.now() + timedelta(days=7)).isoformat()
 
-            db.add_offer(
+            await db.add_offer(
                 store_id=store_id,
                 title=row["title"],
                 description=row.get("description", row["title"]),
@@ -1122,11 +1132,11 @@ async def list_orders(authorization: str = Header(None), status: Optional[str] =
     After v24 migration, all orders (pickup + delivery) are in orders table.
     """
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     # Get all orders from unified orders table
-    orders = db.get_store_orders(store["store_id"])
+    orders = await db.get_store_orders(store["store_id"])
 
     result = []
 
@@ -1279,12 +1289,12 @@ async def confirm_order(
     Works for both pickup and delivery orders.
     """
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = _ensure_unified_service(db)
 
     # Get order from unified orders table
-    order = db.get_order(order_id)
+    order = await db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -1298,7 +1308,7 @@ async def confirm_order(
         await unified_service.confirm_order(order_id, "order")
     else:
         if hasattr(db, "update_order_status"):
-            db.update_order_status(order_id, OrderStatus.PREPARING)
+            await db.update_order_status(order_id, OrderStatus.PREPARING)
 
     # Return type based on order_type for frontend
     db_order_type = (
@@ -1326,12 +1336,12 @@ async def update_order_status(
     Works for both pickup and delivery orders.
     """
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
     unified_service = _ensure_unified_service(db)
 
     # Get order from unified orders table
-    order = db.get_order(order_id)
+    order = await db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -1367,11 +1377,11 @@ async def update_order_status(
         if not hasattr(db, "update_order_status"):
             raise HTTPException(status_code=500, detail="Order service unavailable")
         if status == "ready":
-            db.update_order_status(order_id, OrderStatus.READY)
+            await db.update_order_status(order_id, OrderStatus.READY)
         elif status == "delivering":
-            db.update_order_status(order_id, OrderStatus.DELIVERING)
+            await db.update_order_status(order_id, OrderStatus.DELIVERING)
         elif status == "completed":
-            db.update_order_status(order_id, OrderStatus.COMPLETED)
+            await db.update_order_status(order_id, OrderStatus.COMPLETED)
         else:
             raise HTTPException(status_code=400, detail="Unsupported status transition")
         ok = True
@@ -1395,7 +1405,7 @@ async def update_order_status(
 async def get_stats(authorization: str = Header(None), period: str = "today"):
     """Get partner statistics with daily breakdown for charts."""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     store_id = store["store_id"]
@@ -1422,14 +1432,20 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
 
     period_obj = Period(start=start, end=end, tz="Asia/Tashkent")
 
-    stats = get_partner_stats(
-        db=db, partner_id=user["user_id"], period=period_obj, tz="Asia/Tashkent", store_id=store_id
+    sync_db = db.sync if hasattr(db, "sync") else db
+    stats = await db.run(
+        get_partner_stats,
+        sync_db,
+        partner_id=user["user_id"],
+        period=period_obj,
+        tz="Asia/Tashkent",
+        store_id=store_id,
     )
 
     # Count active products
     active_products = 0
     if store_id:
-        offers = db.get_offers_by_store(store_id)
+        offers = await db.get_offers_by_store(store_id)
         active_products = len([o for o in offers if o.get("status") == "active"])
 
     # Get daily breakdown for charts (last 7 days)
@@ -1438,50 +1454,62 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
     top_products = []
 
     try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
+        def _fetch_breakdown(sync_db, store_id_val, now_val):
+            revenue = []
+            orders = []
+            top = []
+            with sync_db.get_connection() as conn:
+                cursor = conn.cursor()
 
-            # Revenue and orders by day (last 7 days)
-            for i in range(6, -1, -1):
-                day_start = (now - timedelta(days=i)).replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                )
-                day_end = day_start.replace(hour=23, minute=59, second=59)
+                # Revenue and orders by day (last 7 days)
+                for i in range(6, -1, -1):
+                    day_start = (now_val - timedelta(days=i)).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
+                    day_end = day_start.replace(hour=23, minute=59, second=59)
 
+                    cursor.execute(
+                        """
+                        SELECT
+                            COALESCE(SUM(o.discount_price * b.quantity), 0) AS revenue,
+                            COUNT(DISTINCT b.booking_id) AS orders
+                        FROM bookings b
+                        JOIN offers o ON b.offer_id = o.offer_id
+                        WHERE o.store_id = %s
+                        AND b.status IN ('completed', 'confirmed')
+                        AND b.created_at >= %s AND b.created_at < %s
+                        """,
+                        (store_id_val, day_start, day_end),
+                    )
+                    row = cursor.fetchone()
+                    revenue.append(float(row[0]) if row else 0)
+                    orders.append(int(row[1]) if row else 0)
+
+                # Top products (last 30 days)
                 cursor.execute(
                     """
-                    SELECT
-                        COALESCE(SUM(o.discount_price * b.quantity), 0) AS revenue,
-                        COUNT(DISTINCT b.booking_id) AS orders
+                    SELECT o.title, SUM(b.quantity) as qty, SUM(o.discount_price * b.quantity) as revenue
                     FROM bookings b
                     JOIN offers o ON b.offer_id = o.offer_id
                     WHERE o.store_id = %s
                     AND b.status IN ('completed', 'confirmed')
-                    AND b.created_at >= %s AND b.created_at < %s
+                    AND b.created_at >= %s
+                    GROUP BY o.offer_id, o.title
+                    ORDER BY qty DESC
+                    LIMIT 5
                     """,
-                    (store_id, day_start, day_end),
+                    (store_id_val, now_val - timedelta(days=30)),
                 )
-                row = cursor.fetchone()
-                revenue_by_day.append(float(row[0]) if row else 0)
-                orders_by_day.append(int(row[1]) if row else 0)
+                for row in cursor.fetchall():
+                    top.append(
+                        {"name": row[0], "qty": int(row[1]), "revenue": float(row[2])}
+                    )
+            return revenue, orders, top
 
-            # Top products (last 30 days)
-            cursor.execute(
-                """
-                SELECT o.title, SUM(b.quantity) as qty, SUM(o.discount_price * b.quantity) as revenue
-                FROM bookings b
-                JOIN offers o ON b.offer_id = o.offer_id
-                WHERE o.store_id = %s
-                AND b.status IN ('completed', 'confirmed')
-                AND b.created_at >= %s
-                GROUP BY o.offer_id, o.title
-                ORDER BY qty DESC
-                LIMIT 5
-                """,
-                (store_id, now - timedelta(days=30)),
-            )
-            for row in cursor.fetchall():
-                top_products.append({"name": row[0], "qty": int(row[1]), "revenue": float(row[2])})
+        sync_db = db.sync if hasattr(db, "sync") else db
+        revenue_by_day, orders_by_day, top_products = await db.run(
+            _fetch_breakdown, sync_db, store_id, now
+        )
     except Exception as e:
         import logging
 
@@ -1511,7 +1539,7 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
 async def update_store(settings: dict, authorization: str = Header(None)):
     """Update store settings"""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     def _parse_bool(value, fallback=False):
@@ -1555,10 +1583,11 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     region_id_value = store.get("region_id")
     district_id_value = store.get("district_id")
 
-    resolver = getattr(db, "resolve_geo_location", None)
+    sync_db = db.sync if hasattr(db, "sync") else db
+    resolver = getattr(sync_db, "resolve_geo_location", None)
     if resolver and (region_value is not None or district_value is not None):
         try:
-            resolved = resolver(region=region_value, district=district_value)
+            resolved = await db.run(resolver, region=region_value, district=district_value)
         except Exception as exc:
             logger.warning("Geo resolve failed in partner settings: %s", exc)
             resolved = None
@@ -1576,43 +1605,41 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     district_slug = canonicalize_geo_slug(district_value) if district_value else None
 
     # Update existing store via SQL
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            UPDATE stores
-            SET name = %s,
-                address = %s,
-                region = %s,
-                region_slug = %s,
-                district = %s,
-                district_slug = %s,
-                region_id = %s,
-                district_id = %s,
-                phone = %s,
-                description = %s,
-                delivery_enabled = %s,
-                delivery_price = %s,
-                min_order_amount = %s
-            WHERE store_id = %s
+    await db.execute(
+        """
+        UPDATE stores
+        SET name = %s,
+            address = %s,
+            region = %s,
+            region_slug = %s,
+            district = %s,
+            district_slug = %s,
+            region_id = %s,
+            district_id = %s,
+            phone = %s,
+            description = %s,
+            delivery_enabled = %s,
+            delivery_price = %s,
+            min_order_amount = %s
+        WHERE store_id = %s
         """,
-            (
-                settings.get("name", store.get("name")),
-                settings.get("address", store.get("address")),
-                region_value,
-                region_slug,
-                district_value,
-                district_slug,
-                region_id_value,
-                district_id_value,
-                settings.get("phone", store.get("phone")),
-                settings.get("description", store.get("description")),
-                int(delivery_enabled),
-                delivery_price_value,
-                min_order_value,
-                store["store_id"],
-            ),
-        )
+        (
+            settings.get("name", store.get("name")),
+            settings.get("address", store.get("address")),
+            region_value,
+            region_slug,
+            district_value,
+            district_slug,
+            region_id_value,
+            district_id_value,
+            settings.get("phone", store.get("phone")),
+            settings.get("description", store.get("description")),
+            int(delivery_enabled),
+            delivery_price_value,
+            min_order_value,
+            store["store_id"],
+        ),
+    )
 
     return {"status": "updated"}
 
@@ -1621,16 +1648,14 @@ async def update_store(settings: dict, authorization: str = Header(None)):
 async def toggle_store_status(is_open: bool = Form(...), authorization: str = Header(None)):
     """Toggle store open/closed status"""
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
     db = get_db()
 
     new_status = "approved" if is_open else "closed"
 
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE stores SET status = %s WHERE store_id = %s", (new_status, store["store_id"])
-        )
+    await db.execute(
+        "UPDATE stores SET status = %s WHERE store_id = %s", (new_status, store["store_id"])
+    )
 
     return {"status": new_status, "is_open": is_open}
 
@@ -1645,7 +1670,7 @@ async def upload_photo(photo: UploadFile = File(...), authorization: str = Heade
     import aiohttp
 
     telegram_id = verify_telegram_webapp(authorization)
-    user, store = get_partner_with_store(telegram_id)
+    user, store = await get_partner_with_store(telegram_id)
 
     # Read photo content
     content = await photo.read()

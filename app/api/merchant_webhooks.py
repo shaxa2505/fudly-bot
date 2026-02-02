@@ -15,6 +15,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+from app.core.async_db import AsyncDBProxy
+
 router = APIRouter(prefix="/api/merchant", tags=["merchant"])
 security = HTTPBasic()
 _db: Any = None
@@ -60,6 +62,11 @@ def _require_db():
 def set_merchant_db(db: Any) -> None:
     """Called from api_server to inject DB."""
     global _db
+    if db is None:
+        _db = None
+        return
+    if not isinstance(db, AsyncDBProxy):
+        db = AsyncDBProxy(db)
     _db = db
 
 
@@ -76,9 +83,9 @@ def _extract_order_id(params: dict) -> int | None:
         return None
 
 
-def _fetch_transaction(db, trans_id: str):
+async def _fetch_transaction(db, trans_id: str):
     try:
-        return db.get_uzum_transaction(trans_id)
+        return await db.get_uzum_transaction(trans_id)
     except Exception:
         return None
 
@@ -94,7 +101,7 @@ async def check(payload: dict, _: str = Depends(_require_auth), db=Depends(_requ
     if not (service_id and order_id):
         raise HTTPException(status_code=400, detail="Missing serviceId or account (order_id)")
 
-    order = db.get_order(order_id)
+    order = await db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=400, detail="Order not found")
 
@@ -118,17 +125,17 @@ async def create(payload: dict, _: str = Depends(_require_auth), db=Depends(_req
     if not (service_id and trans_id and order_id and amount):
         raise HTTPException(status_code=400, detail="Missing required fields")
 
-    order = db.get_order(order_id)
+    order = await db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=400, detail="Order not found")
 
     # Prevent duplicate transId
-    existing = _fetch_transaction(db, trans_id)
+    existing = await _fetch_transaction(db, trans_id)
     if existing:
         raise HTTPException(status_code=400, detail="Transaction already exists")
 
     try:
-        db.create_uzum_transaction(
+        await db.create_uzum_transaction(
             trans_id=trans_id,
             order_id=order_id,
             service_id=service_id,
@@ -159,7 +166,7 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
     if not (service_id and trans_id and amount):
         raise HTTPException(status_code=400, detail="Missing required fields")
 
-    tx = _fetch_transaction(db, trans_id)
+    tx = await _fetch_transaction(db, trans_id)
     if not tx:
         raise HTTPException(status_code=400, detail="Transaction not found")
 
@@ -171,7 +178,7 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
 
     order_id = tx.get("order_id")
     try:
-        db.update_uzum_transaction_status(trans_id, "CONFIRMED", payload)
+        await db.update_uzum_transaction_status(trans_id, "CONFIRMED", payload)
         service = None
         try:
             from app.services.unified_order_service import get_unified_order_service
@@ -183,7 +190,7 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
         if service and order_id:
             await service.confirm_payment(int(order_id))
         elif hasattr(db, "update_payment_status") and order_id:
-            db.update_payment_status(order_id, "confirmed")
+            await db.update_payment_status(order_id, "confirmed")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update transaction")
 
@@ -206,15 +213,15 @@ async def reverse(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
     if not (service_id and trans_id):
         raise HTTPException(status_code=400, detail="Missing required fields")
 
-    tx = _fetch_transaction(db, trans_id)
+    tx = await _fetch_transaction(db, trans_id)
     if not tx:
         raise HTTPException(status_code=400, detail="Transaction not found")
 
     order_id = tx.get("order_id")
     try:
-        db.update_uzum_transaction_status(trans_id, "REVERSED", payload)
+        await db.update_uzum_transaction_status(trans_id, "REVERSED", payload)
         if hasattr(db, "update_payment_status") and order_id:
-            db.update_payment_status(order_id, "rejected")
+            await db.update_payment_status(order_id, "rejected")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update transaction")
 
@@ -237,7 +244,7 @@ async def status_check(payload: dict, _: str = Depends(_require_auth), db=Depend
     if not (service_id and trans_id):
         raise HTTPException(status_code=400, detail="Missing required fields")
 
-    tx = _fetch_transaction(db, trans_id)
+    tx = await _fetch_transaction(db, trans_id)
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 

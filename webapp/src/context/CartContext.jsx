@@ -1,13 +1,48 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { calcItemsTotal, calcQuantity } from '../utils/orderMath';
 
 const STORAGE_KEY = 'fudly_cart_v2';
+const STORAGE_PREFIX = 'fudly_cart_user_';
+
+const getSessionStorage = () => {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+};
+
+const getStorageKey = () => {
+  const tgUserId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+  if (tgUserId) {
+    return `${STORAGE_PREFIX}${tgUserId}`;
+  }
+  const storage = getSessionStorage();
+  const lastUserId =
+    storage?.getItem('fudly_last_user_id') || localStorage.getItem('fudly_last_user_id');
+  if (lastUserId) {
+    return `${STORAGE_PREFIX}${lastUserId}`;
+  }
+  return STORAGE_KEY;
+};
 
 // Helper to read cart from localStorage
 const getCartFromStorage = () => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
+    const storageKey = getStorageKey();
+    let saved = localStorage.getItem(storageKey);
+    if (!saved && storageKey !== STORAGE_KEY) {
+      saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        localStorage.setItem(storageKey, saved);
+      }
+    }
+    if (!saved) return {};
+    const parsed = JSON.parse(saved);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed;
   } catch {
     return {};
   }
@@ -16,7 +51,8 @@ const getCartFromStorage = () => {
 // Helper to save cart to localStorage
 const saveCartToStorage = (cart) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
+    const storageKey = getStorageKey();
+    localStorage.setItem(storageKey, JSON.stringify(cart));
   } catch (error) {
     console.error('Error saving cart to localStorage:', error);
   }
@@ -28,11 +64,30 @@ const CartContext = createContext(null);
 // Cart Provider component
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(getCartFromStorage);
+  const storageKeyRef = useRef(getStorageKey());
 
   // Save to localStorage whenever cart changes
   useEffect(() => {
     saveCartToStorage(cart);
   }, [cart]);
+
+  useEffect(() => {
+    const syncStorageKey = () => {
+      const nextKey = getStorageKey();
+      if (storageKeyRef.current !== nextKey) {
+        storageKeyRef.current = nextKey;
+        setCart(getCartFromStorage());
+      }
+    };
+
+    syncStorageKey();
+    window.addEventListener('focus', syncStorageKey);
+    document.addEventListener('visibilitychange', syncStorageKey);
+    return () => {
+      window.removeEventListener('focus', syncStorageKey);
+      document.removeEventListener('visibilitychange', syncStorageKey);
+    };
+  }, []);
 
   // Add item to cart
   const addToCart = useCallback((offer) => {
@@ -43,7 +98,7 @@ export function CartProvider({ children }) {
         window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
         const message = "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
         if (window.Telegram?.WebApp?.showAlert) {
-          window.Telegram.WebApp.showAlert(message)
+          window.Telegram?.WebApp?.showAlert?.(message)
         } else {
           // eslint-disable-next-line no-alert
           alert(message)

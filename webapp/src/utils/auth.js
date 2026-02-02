@@ -36,11 +36,7 @@ export const initializeTelegramAuth = async () => {
 
   try {
     // Validate with backend
-    const response = await api.post('/auth/validate', {
-      init_data: initData
-    })
-
-    const profile = response.data
+    const profile = await api.validateAuth(initData)
     
     // Check if user is registered
     if (!profile.registered || !profile.phone) {
@@ -136,9 +132,30 @@ export const getUserLanguage = () => {
 export const logout = () => {
   const user = getCurrentUser()
   const userId = user?.user_id || user?.id
+  const clearByPrefix = (storage, prefix) => {
+    if (!storage) return
+    const keys = []
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i)
+      if (key && key.startsWith(prefix)) {
+        keys.push(key)
+      }
+    }
+    keys.forEach((key) => storage.removeItem(key))
+  }
+
+  const clearKey = (storage, key) => {
+    if (!storage) return
+    storage.removeItem(key)
+  }
+
   localStorage.removeItem('fudly_user')
   localStorage.removeItem('fudly_init_data')
   localStorage.removeItem('fudly_last_user_id')
+  clearKey(localStorage, 'fudly_cart_v2')
+  clearKey(localStorage, 'fudly_favorites')
+  clearByPrefix(localStorage, 'fudly_cart_user_')
+  clearByPrefix(localStorage, 'fudly_favorites_user_')
   if (userId) {
     localStorage.removeItem(`fudly_init_data_${userId}`)
   }
@@ -148,6 +165,10 @@ export const logout = () => {
     storage.removeItem('fudly_init_data')
     storage.removeItem('fudly_init_data_ts')
     storage.removeItem('fudly_last_user_id')
+    clearKey(storage, 'fudly_cart_v2')
+    clearKey(storage, 'fudly_favorites')
+    clearByPrefix(storage, 'fudly_cart_user_')
+    clearByPrefix(storage, 'fudly_favorites_user_')
     if (userId) {
       storage.removeItem(`fudly_init_data_${userId}`)
       storage.removeItem(`fudly_init_data_ts_${userId}`)

@@ -63,8 +63,8 @@ export function useAsyncOperation() {
       }
 
       // Show success toast
-      if (showToast && successMessage && window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showPopup({
+      if (showToast && successMessage) {
+        window.Telegram?.WebApp?.showPopup?.({
           message: successMessage,
           buttons: [{ type: 'ok' }],
         })
@@ -93,9 +93,9 @@ export function useAsyncOperation() {
       }
 
       // Show error toast
-      if (showToast && window.Telegram?.WebApp) {
+      if (showToast) {
         const message = errorMessage || errorMsg
-        window.Telegram.WebApp.showPopup({
+        window.Telegram?.WebApp?.showPopup?.({
           message,
           buttons: [{ type: 'ok' }],
         })

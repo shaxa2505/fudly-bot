@@ -213,7 +213,13 @@ function OrderTrackingPage({ user }) {
         </div>
 
         {orderPhotoUrl && (
-          <img src={orderPhotoUrl} alt={order.offer_title} className="order-photo" />
+          <img
+            src={orderPhotoUrl}
+            alt={order.offer_title}
+            className="order-photo"
+            loading="lazy"
+            decoding="async"
+          />
         )}
       </div>
 
@@ -298,7 +304,13 @@ function OrderTrackingPage({ user }) {
             <p className="qr-instruction">
               {t('Покажите этот код в магазине', 'Bu kodni do\'konda ko\'rsating')}
             </p>
-            <img src={order.qr_code} alt="QR Code" className="qr-code-image" />
+            <img
+              src={order.qr_code}
+              alt="QR Code"
+              className="qr-code-image"
+              loading="eager"
+              decoding="async"
+            />
             <p className="booking-code">{order.booking_code}</p>
           </div>
         </div>

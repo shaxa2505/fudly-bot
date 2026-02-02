@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Store,
@@ -182,6 +182,9 @@ function StoresPage() {
   const [locationLoading, setLocationLoading] = useState(false)
   const searchInputRef = useRef(null)
 
+  const deferredQuery = useDeferredValue(searchQuery)
+  const normalizedQuery = deferredQuery.trim().toLowerCase()
+
   const cityLatin = getLatinCity(location)
   const cityRaw = getCyrillicCity(location.city)
   const regionRaw = location.region || ''
@@ -280,9 +283,9 @@ function StoresPage() {
       setStores(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error loading stores:', error)
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('Do\'konlarni yuklashda xatolik. Iltimos, qaytadan urinib ko\'ring.')
-      }
+      window.Telegram?.WebApp?.showAlert?.(
+        'Do\'konlarni yuklashda xatolik. Iltimos, qaytadan urinib ko\'ring.'
+      )
       setStores([])
     } finally {
       setLoading(false)
@@ -307,9 +310,7 @@ function StoresPage() {
       setStoreReviews(reviews || { reviews: [], average_rating: 0, total_reviews: 0 })
     } catch (error) {
       console.error('Error loading store data:', error)
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('Ma\'lumotlarni yuklashda xatolik')
-      }
+      window.Telegram?.WebApp?.showAlert?.('Ma\'lumotlarni yuklashda xatolik')
       setStoreOffers([])
       setStoreReviews({ reviews: [], average_rating: 0, total_reviews: 0 })
     } finally {
@@ -357,9 +358,7 @@ function StoresPage() {
       saveLocation(nextLocation)
     } catch (error) {
       console.error('Location error:', error)
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('Joylashuvni aniqlab bo\'lmadi')
-      }
+      window.Telegram?.WebApp?.showAlert?.('Joylashuvni aniqlab bo\'lmadi')
     } finally {
       setLocationLoading(false)
     }
@@ -410,24 +409,28 @@ function StoresPage() {
       })
     } catch (error) {
       console.error('Favorite toggle error:', error)
-      if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.showAlert('Sevimlilarni yangilab bo\'lmadi')
-      }
+      window.Telegram?.WebApp?.showAlert?.('Sevimlilarni yangilab bo\'lmadi')
     }
   }
 
-  const baseStores = activeFilter === 'favorites' ? favoriteStores : stores
-  const filteredStores = baseStores.filter((store) => {
-    const query = searchQuery.toLowerCase()
-    return (
-      store.name?.toLowerCase().includes(query) ||
-      store.address?.toLowerCase().includes(query)
-    )
-  })
+  const baseStores = useMemo(
+    () => (activeFilter === 'favorites' ? favoriteStores : stores),
+    [activeFilter, favoriteStores, stores]
+  )
 
-  const visibleStores = userLocation
-    ? addDistanceToStores(filteredStores, userLocation)
-    : filteredStores
+  const filteredStores = useMemo(() => {
+    if (!normalizedQuery) return baseStores
+    return baseStores.filter((store) => {
+      const name = (store.name || '').toLowerCase()
+      const address = (store.address || '').toLowerCase()
+      return name.includes(normalizedQuery) || address.includes(normalizedQuery)
+    })
+  }, [baseStores, normalizedQuery])
+
+  const visibleStores = useMemo(() => {
+    if (!userLocation) return filteredStores
+    return addDistanceToStores(filteredStores, userLocation)
+  }, [filteredStores, userLocation])
 
   const isLoading = activeFilter === 'favorites' ? favoritesLoading : loading
 

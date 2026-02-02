@@ -94,7 +94,28 @@ function YanaPage({ user }) {
   const notificationsStorageKey = userId ? `fudly_notifications_${userId}` : 'fudly_notifications'
 
   const getWsUrl = () => {
-    const base = API_BASE_URL.replace(/^http/, 'ws').replace(/\/api\/v1$/, '')
+    const envBase = import.meta.env.VITE_WS_URL
+    const baseSource = (envBase || API_BASE_URL || '').trim()
+    if (!baseSource) return ''
+
+    let base = baseSource
+    // Ensure ws:// or wss:// scheme
+    if (!base.startsWith('ws://') && !base.startsWith('wss://')) {
+      base = base.replace(/^http/, 'ws')
+    }
+    // Strip API suffix if present
+    base = base.replace(/\/api\/v1\/?$/, '')
+    base = base.replace(/\/+$/, '')
+
+    let wsEndpoint = ''
+    if (base.endsWith('/ws/notifications')) {
+      wsEndpoint = base
+    } else if (base.endsWith('/ws')) {
+      wsEndpoint = `${base}/notifications`
+    } else {
+      wsEndpoint = `${base}/ws/notifications`
+    }
+
     const params = new URLSearchParams()
     if (userId) {
       params.set('user_id', userId)
@@ -104,7 +125,7 @@ function YanaPage({ user }) {
       params.set('init_data', initData)
     }
     const query = params.toString()
-    return `${base}/ws/notifications${query ? `?${query}` : ''}`
+    return `${wsEndpoint}${query ? `?${query}` : ''}`
   }
 
   const loadNotificationSettings = async () => {
@@ -278,7 +299,7 @@ function YanaPage({ user }) {
       'fudlyuzbot'
     const link = `https://t.me/${botUsername}`
     if (window.Telegram?.WebApp?.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(link)
+      window.Telegram?.WebApp?.openTelegramLink?.(link)
       return
     }
     window.open(link, '_blank', 'noopener,noreferrer')
@@ -304,7 +325,7 @@ function YanaPage({ user }) {
 
   const handleLogout = () => {
     if (window.Telegram?.WebApp?.close) {
-      window.Telegram.WebApp.close()
+      window.Telegram?.WebApp?.close?.()
       return
     }
     toast.info('Chiqish uchun Telegram oynasini yoping')
@@ -313,7 +334,7 @@ function YanaPage({ user }) {
   const handleSupport = () => {
     const link = 'https://t.me/fudly_support'
     if (window.Telegram?.WebApp?.openTelegramLink) {
-      window.Telegram.WebApp.openTelegramLink(link)
+      window.Telegram?.WebApp?.openTelegramLink?.(link)
       return
     }
     window.open(link, '_blank', 'noopener,noreferrer')
@@ -545,7 +566,12 @@ function YanaPage({ user }) {
         <div className="profile-avatar-wrap">
           <div className={`profile-avatar ${avatarUrl ? 'has-photo' : ''}`}>
             {avatarUrl ? (
-              <img src={avatarUrl} alt={profileName} />
+              <img
+                src={avatarUrl}
+                alt={profileName}
+                loading="eager"
+                decoding="async"
+              />
             ) : (
               <span className="profile-initial">{profileInitial}</span>
             )}
@@ -608,6 +634,8 @@ function YanaPage({ user }) {
                       <img
                         src={summary.photoUrl}
                         alt={summary.offerTitle}
+                        loading="lazy"
+                        decoding="async"
                         onError={(event) => {
                           event.currentTarget.style.display = 'none'
                           event.currentTarget.parentElement.classList.remove('has-image')
@@ -718,13 +746,15 @@ function YanaPage({ user }) {
                   <div className="order-history-left">
                     <div className={`order-history-thumb ${summary.photoUrl ? 'has-image' : ''}`}>
                       <span>IMG</span>
-                      {summary.photoUrl && (
-                        <img
-                          src={summary.photoUrl}
-                          alt={summary.offerTitle}
-                          onError={(event) => {
-                            event.currentTarget.style.display = 'none'
-                            event.currentTarget.parentElement.classList.remove('has-image')
+                    {summary.photoUrl && (
+                      <img
+                        src={summary.photoUrl}
+                        alt={summary.offerTitle}
+                        loading="lazy"
+                        decoding="async"
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none'
+                          event.currentTarget.parentElement.classList.remove('has-image')
                           }}
                         />
                       )}

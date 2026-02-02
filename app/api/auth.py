@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from app.core.config import load_settings
+from app.core.async_db import AsyncDBProxy
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,11 @@ def get_db():
 def set_auth_db(db):
     """Set database instance for auth module."""
     global _db_instance
+    if db is None:
+        _db_instance = None
+        return
+    if not isinstance(db, AsyncDBProxy):
+        db = AsyncDBProxy(db)
     _db_instance = db
 
 
@@ -180,12 +186,12 @@ def _get_authenticated_user_id(x_telegram_init_data: str | None) -> int:
     return int(user_id)
 
 
-def _get_notifications_enabled(db, user_id: int) -> bool:
+async def _get_notifications_enabled(db, user_id: int) -> bool:
     user = None
     if hasattr(db, "get_user_model"):
-        user = db.get_user_model(user_id)
+        user = await db.get_user_model(user_id)
     elif hasattr(db, "get_user"):
-        user = db.get_user(user_id)
+        user = await db.get_user(user_id)
     if not user:
         return True
     if isinstance(user, dict):
@@ -219,7 +225,7 @@ async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile
     user_id = telegram_user["id"]
 
     # Check if user exists in database
-    user = db.get_user_model(user_id)
+    user = await db.get_user_model(user_id)
 
     if not user:
         # User not registered yet
@@ -261,7 +267,7 @@ async def get_profile(
     if user_id is not None:
         _ensure_self_access(authenticated_user_id, user_id, "profile")
 
-    user = db.get_user_model(effective_user_id)
+    user = await db.get_user_model(effective_user_id)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -290,7 +296,9 @@ async def get_notifications(
     effective_user_id = user_id or authenticated_user_id
     if user_id is not None:
         _ensure_self_access(authenticated_user_id, user_id, "notifications")
-    return NotificationSettingsResponse(enabled=_get_notifications_enabled(db, effective_user_id))
+    return NotificationSettingsResponse(
+        enabled=await _get_notifications_enabled(db, effective_user_id)
+    )
 
 
 @router.post("/user/notifications", response_model=NotificationSettingsResponse)
@@ -305,10 +313,10 @@ async def set_notifications(
     effective_user_id = user_id or authenticated_user_id
     if user_id is not None:
         _ensure_self_access(authenticated_user_id, user_id, "notifications")
-    current = _get_notifications_enabled(db, effective_user_id)
+    current = await _get_notifications_enabled(db, effective_user_id)
     target = bool(request.enabled)
     if current != target and hasattr(db, "toggle_notifications"):
-        db.toggle_notifications(effective_user_id)
+        await db.toggle_notifications(effective_user_id)
     return NotificationSettingsResponse(enabled=target)
 
 
@@ -366,9 +374,9 @@ async def get_user_orders(
     try:
         # Get all bookings
         if status:
-            bookings = db.get_user_bookings_by_status(effective_user_id, status)
+            bookings = await db.get_user_bookings_by_status(effective_user_id, status)
         else:
-            bookings = db.get_user_bookings(effective_user_id)
+            bookings = await db.get_user_bookings(effective_user_id)
 
         if not bookings:
             return OrdersHistoryResponse(
@@ -401,7 +409,7 @@ async def get_user_orders(
                 created_at = booking[7] if len(booking) > 7 else None
 
             # Get offer details
-            offer = db.get_offer(offer_id)
+            offer = await db.get_offer(offer_id)
             if not offer:
                 continue
 
@@ -415,7 +423,7 @@ async def get_user_orders(
                 store_id = offer[10] if len(offer) > 10 else None
 
             # Get store details
-            store = db.get_store(store_id) if store_id else None
+            store = await db.get_store(store_id) if store_id else None
             if store:
                 if isinstance(store, dict):
                     store_name = store.get("name", "Магазин")

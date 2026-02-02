@@ -109,6 +109,7 @@ function FlashDeals({ city = '', region = '', district = '' }) {
                     src={photoUrl}
                     alt={deal.title}
                     loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.target.src = PLACEHOLDER_IMAGE
                     }}

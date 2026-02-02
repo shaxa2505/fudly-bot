@@ -59,6 +59,7 @@ function RecentlyViewed({ showSeeAll = false }) {
                 src={resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE}
                 alt={offer.name || offer.title}
                 loading="lazy"
+                decoding="async"
                 onError={(e) => {
                   e.target.src = PLACEHOLDER_IMAGE
                 }}

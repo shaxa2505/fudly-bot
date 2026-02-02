@@ -109,7 +109,19 @@ _app_db = None
 _app_offer_service = None
 
 # Rate limiter configuration
-limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+def _rate_limit_storage_uri() -> str | None:
+    return os.getenv("RATE_LIMIT_REDIS_URL") or os.getenv("REDIS_URL") or None
+
+
+_rl_storage = _rate_limit_storage_uri()
+if _rl_storage:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["100/minute"],
+        storage_uri=_rl_storage,
+    )
+else:
+    limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 
 def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = None) -> FastAPI:

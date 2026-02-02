@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.api.webapp.common import get_current_user, get_optional_user
+from app.core.async_db import AsyncDBProxy
 from app.core.order_math import (
     calc_delivery_fee,
     calc_items_total,
@@ -40,7 +41,12 @@ def get_db():
 def set_orders_db(db, bot_token: str | None = None):
     """Set database instance (and optional bot token) for orders module."""
     global _db_instance, _bot_instance
-    _db_instance = db
+    if db is None:
+        _db_instance = None
+    else:
+        if not isinstance(db, AsyncDBProxy):
+            db = AsyncDBProxy(db)
+        _db_instance = db
     if bot_token and _bot_instance is None:
         _bot_instance = Bot(bot_token)
 
@@ -57,18 +63,21 @@ def get_bot() -> Bot:
     return _bot_instance
 
 
-def _bookings_archive_exists(db) -> bool:
+async def _bookings_archive_exists(db) -> bool:
     """Check if bookings_archive table exists (optional migration)."""
     try:
-        if hasattr(db, "get_connection"):
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT to_regclass('public.bookings_archive')")
-                row = cursor.fetchone()
-                return bool(row and row[0])
         if hasattr(db, "execute"):
-            result = db.execute("SELECT to_regclass('public.bookings_archive')")
+            result = await db.execute("SELECT to_regclass('public.bookings_archive')")
             return bool(result and result[0] and result[0][0])
+        if hasattr(db, "sync") and hasattr(db.sync, "get_connection"):
+            def _check(sync_db) -> bool:
+                with sync_db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT to_regclass('public.bookings_archive')")
+                    row = cursor.fetchone()
+                    return bool(row and row[0])
+
+            return bool(await db.run(_check, db.sync))
     except Exception:
         return False
     return False
@@ -177,9 +186,9 @@ def generate_qr_code(booking_code: str) -> str:
     return f"data:image/png;base64,{img_base64}"
 
 
-def calculate_delivery_cost(city: str, address: str, store_id: int, db) -> DeliveryResult:
+async def calculate_delivery_cost(city: str, address: str, store_id: int, db) -> DeliveryResult:
     """Calculate delivery cost based on distance and city."""
-    store = db.get_store(store_id)
+    store = await db.get_store(store_id)
     if not store:
         return DeliveryResult(
             can_deliver=False,
@@ -229,7 +238,7 @@ def calculate_delivery_cost(city: str, address: str, store_id: int, db) -> Deliv
     )
 
 
-def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
+async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     """Convert database booking row to OrderStatus model.
 
     Args:
@@ -307,12 +316,12 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
             )
 
         if first_offer_id:
-            offer = db.get_offer(int(first_offer_id))
+            offer = await db.get_offer(int(first_offer_id))
             offer_dict = dict(offer) if offer and not isinstance(offer, dict) else offer or {}
     else:
         # Single-item booking/order
         if offer_id:
-            offer = db.get_offer(int(offer_id))
+            offer = await db.get_offer(int(offer_id))
             offer_dict = dict(offer) if offer and not isinstance(offer, dict) else offer or {}
 
         # If total_price is stored on orders table, prefer it
@@ -330,7 +339,7 @@ def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
             store_id = int(offer_dict.get("store_id") or 0)
 
     if store_id:
-        store = db.get_store(store_id)
+        store = await db.get_store(store_id)
         store_dict = dict(store) if store and not isinstance(store, dict) else store or {}
 
     # Generate QR code only for pickup orders when the code is available
@@ -381,43 +390,47 @@ async def get_user_orders(
     raw_orders: list[Any] = []
 
     try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT
-                    o.order_id,
-                    o.order_status,
-                    o.order_type,
-                    o.pickup_code,
-                    o.delivery_address,
-                    o.total_price,
-                    o.quantity,
-                    o.payment_method,
-                    o.payment_status,
-                    o.payment_proof_photo_id,
-                    o.is_cart_order,
-                    o.cart_items,
-                    o.created_at,
-                    o.updated_at,
-                    o.store_id,
-                    s.name AS store_name,
-                    s.address AS store_address,
-                    s.phone AS store_phone,
-                    off.offer_id AS offer_id,
-                    off.title AS offer_title,
-                    off.discount_price AS offer_price,
-                    off.photo_id AS offer_photo_id
-                FROM orders o
-                LEFT JOIN stores s ON o.store_id = s.store_id
-                LEFT JOIN offers off ON o.offer_id = off.offer_id
-                WHERE o.user_id = %s
-                ORDER BY o.created_at DESC
-                LIMIT 100
-                """,
-                (int(user_id),),
-            )
-            raw_orders = cursor.fetchall() or []
+        def _fetch_orders(sync_db, uid: int) -> list[Any]:
+            with sync_db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    SELECT
+                        o.order_id,
+                        o.order_status,
+                        o.order_type,
+                        o.pickup_code,
+                        o.delivery_address,
+                        o.total_price,
+                        o.quantity,
+                        o.payment_method,
+                        o.payment_status,
+                        o.payment_proof_photo_id,
+                        o.is_cart_order,
+                        o.cart_items,
+                        o.created_at,
+                        o.updated_at,
+                        o.store_id,
+                        s.name AS store_name,
+                        s.address AS store_address,
+                        s.phone AS store_phone,
+                        off.offer_id AS offer_id,
+                        off.title AS offer_title,
+                        off.discount_price AS offer_price,
+                        off.photo_id AS offer_photo_id
+                    FROM orders o
+                    LEFT JOIN stores s ON o.store_id = s.store_id
+                    LEFT JOIN offers off ON o.offer_id = off.offer_id
+                    WHERE o.user_id = %s
+                    ORDER BY o.created_at DESC
+                    LIMIT 100
+                    """,
+                    (int(uid),),
+                )
+                return cursor.fetchall() or []
+
+        sync_db = db.sync if hasattr(db, "sync") else db
+        raw_orders = await db.run(_fetch_orders, sync_db, int(user_id))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -549,18 +562,18 @@ async def get_order_status(
         404: Order not found
     """
     # v24+: try unified orders table first
-    order = db.get_order(booking_id)
+    order = await db.get_order(booking_id)
     if order:
         order_dict = dict(order) if not isinstance(order, dict) else order
         if order_dict.get("user_id") != user.get("id"):
             raise HTTPException(status_code=403, detail="Access denied")
         # Convert order to booking format for compatibility
-        return format_booking_to_order_status(order, db)
+        return await format_booking_to_order_status(order, db)
     
     # Fallback: check archived bookings for old orders (optional table)
-    if _bookings_archive_exists(db):
+    if await _bookings_archive_exists(db):
         try:
-            booking = db.execute(
+            booking = await db.execute(
                 "SELECT * FROM bookings_archive WHERE booking_id = %s",
                 (booking_id,)
             )
@@ -568,7 +581,7 @@ async def get_order_status(
                 booking_dict = dict(booking[0]) if not isinstance(booking[0], dict) else booking[0]
                 if booking_dict.get("user_id") != user.get("id"):
                     raise HTTPException(status_code=403, detail="Access denied")
-                return format_booking_to_order_status(booking[0], db)
+                return await format_booking_to_order_status(booking[0], db)
         except Exception:
             pass
     
@@ -593,11 +606,11 @@ async def get_order_timeline(
         404: Order not found
     """
     # v24+: try unified orders table first
-    order = db.get_order(booking_id)
-    if not order and _bookings_archive_exists(db):
+    order = await db.get_order(booking_id)
+    if not order and await _bookings_archive_exists(db):
         # Fallback: check archived bookings
         try:
-            result = db.execute(
+            result = await db.execute(
                 "SELECT * FROM bookings_archive WHERE booking_id = %s",
                 (booking_id,)
             )
@@ -730,7 +743,7 @@ async def calculate_delivery(
     Returns:
         DeliveryResult with cost and availability
     """
-    return calculate_delivery_cost(request.city, request.address, request.store_id, db)
+    return await calculate_delivery_cost(request.city, request.address, request.store_id, db)
 
 
 @router.get("/{booking_id}/qr")
@@ -752,11 +765,11 @@ async def get_order_qr_code(
         400: QR code not available for this status
     """
     # v24+: try unified orders table first
-    order = db.get_order(booking_id)
-    if not order and _bookings_archive_exists(db):
+    order = await db.get_order(booking_id)
+    if not order and await _bookings_archive_exists(db):
         # Fallback: check archived bookings
         try:
-            result = db.execute(
+            result = await db.execute(
                 "SELECT * FROM bookings_archive WHERE booking_id = %s",
                 (booking_id,)
             )

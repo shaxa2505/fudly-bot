@@ -48,8 +48,8 @@ function ErrorFallback({ error, resetErrorBoundary }) {
           <button
             className="error-fallback-btn secondary"
             onClick={() => {
-              if (window.Telegram?.WebApp) {
-                window.Telegram.WebApp.close()
+              if (window.Telegram?.WebApp?.close) {
+                window.Telegram?.WebApp?.close?.()
               } else {
                 window.location.href = '/'
               }

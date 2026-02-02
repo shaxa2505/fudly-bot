@@ -270,6 +270,9 @@ function ProductDetailPage() {
               src={imageUrl}
               alt={offer.title}
               className="pdp-image"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
               onError={() => setImgError(true)}
             />
           ) : (

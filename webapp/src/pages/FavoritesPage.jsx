@@ -65,6 +65,8 @@ function FavoritesPage() {
               src={resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE}
               alt={offer.title}
               className="favorite-image"
+              loading="lazy"
+              decoding="async"
               onClick={() => navigate('/product', { state: { offer } })}
               onError={(e) => { e.target.src = PLACEHOLDER_IMAGE }}
             />
