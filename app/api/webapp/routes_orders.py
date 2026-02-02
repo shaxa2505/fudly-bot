@@ -50,18 +50,18 @@ router = APIRouter()
 _webapp_bot: Bot | None = None
 
 
-def _bookings_archive_exists(db) -> bool:
+async def _bookings_archive_exists(db) -> bool:
     """Check if bookings_archive table exists (optional migration)."""
     try:
-        if hasattr(db, "get_connection"):
-            with db.get_connection() as conn:
+        if hasattr(db, "execute"):
+            result = await db.execute("SELECT to_regclass('public.bookings_archive')")
+            return bool(result and result[0] and result[0][0])
+        if hasattr(db, "sync") and hasattr(db.sync, "get_connection"):
+            with db.sync.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT to_regclass('public.bookings_archive')")
                 row = cursor.fetchone()
                 return bool(row and row[0])
-        if hasattr(db, "execute"):
-            result = db.execute("SELECT to_regclass('public.bookings_archive')")
-            return bool(result and result[0] and result[0][0])
     except Exception:
         return False
     return False
@@ -87,7 +87,8 @@ def _ensure_unified_service(db: Any):
     if _webapp_bot is None:
         _webapp_bot = Bot(token)
     try:
-        return init_unified_order_service(db, _webapp_bot)
+        sync_db = db.sync if hasattr(db, "sync") else db
+        return init_unified_order_service(sync_db, _webapp_bot)
     except Exception:
         return None
 
@@ -114,23 +115,23 @@ def _normalize_phone(raw_phone: str | None) -> str:
     return sanitized
 
 
-def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None:
+async def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None:
     sanitized_phone = _normalize_phone(raw_phone)
     if not sanitized_phone:
         return
     try:
         if hasattr(db, "update_user_phone"):
-            user_model = db.get_user_model(user_id)
+            user_model = await db.get_user_model(user_id)
             current_phone = get_val(user_model, "phone") if user_model else None
             if not current_phone or current_phone != sanitized_phone:
-                db.update_user_phone(user_id, sanitized_phone)
+                await db.update_user_phone(user_id, sanitized_phone)
     except Exception as e:  # pragma: no cover - defensive
         logger.warning(f"Could not update user phone for {user_id}: {e}")
 
 
-def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
+async def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
     """Return canonical phone: use DB if present, otherwise allow first-time set."""
-    user_model = db.get_user_model(user_id) if hasattr(db, "get_user_model") else None
+    user_model = await db.get_user_model(user_id) if hasattr(db, "get_user_model") else None
     stored_phone = _normalize_phone((get_val(user_model, "phone") if user_model else None))
     candidate = _normalize_phone(raw_phone)
 
@@ -143,7 +144,7 @@ def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str
         return stored_phone
 
     if candidate:
-        _update_phone_if_valid(db, user_id, candidate)
+        await _update_phone_if_valid(db, user_id, candidate)
         return candidate
 
     raise HTTPException(status_code=400, detail="Phone is required")
@@ -157,13 +158,13 @@ def _status_for_creation_error(detail: str) -> int:
     return 400
 
 
-def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], int]:
+async def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], int]:
     if not items:
         raise HTTPException(status_code=400, detail="No items provided")
     offers_by_id: dict[int, Any] = {}
     store_ids: set[int] = set()
     for item in items:
-        offer = db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
+        offer = await db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
         if not offer or not is_offer_active(offer):
             raise HTTPException(status_code=400, detail=f"Offer not found: {item.offer_id}")
         offers_by_id[item.offer_id] = offer
@@ -179,7 +180,7 @@ def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, Any], i
     return offers_by_id, next(iter(store_ids))
 
 
-def _validate_min_order(
+async def _validate_min_order(
     db: Any,
     store_id: int,
     items: list[Any],
@@ -195,7 +196,7 @@ def _validate_min_order(
 
     total_check = calc_items_total(calc_items)
 
-    store_check = db.get_store(store_id) if hasattr(db, "get_store") else None
+    store_check = await db.get_store(store_id) if hasattr(db, "get_store") else None
     if not store_check:
         return
     min_order = normalize_price(get_val(store_check, "min_order_amount", 0))
@@ -257,16 +258,17 @@ async def create_order(
                 "order_type": "delivery" if is_delivery else "pickup",
             }
             idem_hash = build_request_hash(idem_payload)
-            idem_result = check_or_reserve_key(db, idem_key, user_id, idem_hash)
+            idem_db = db.sync if hasattr(db, "sync") else db
+            idem_result = check_or_reserve_key(idem_db, idem_key, user_id, idem_hash)
             if idem_result.get("status") in ("cached", "conflict", "in_progress"):
                 return JSONResponse(
                     content=idem_result.get("payload", {}),
                     status_code=int(idem_result.get("status_code", 409)),
                 )
 
-        resolved_phone = _resolve_required_phone(db, user_id, order.phone)
+        resolved_phone = await _resolve_required_phone(db, user_id, order.phone)
 
-        offers_by_id, store_id = _load_offers_and_store(order.items, db)
+        offers_by_id, store_id = await _load_offers_and_store(order.items, db)
 
         if payment_method not in ("cash", "click"):
             raise HTTPException(status_code=400, detail="Unsupported payment method")
@@ -278,7 +280,7 @@ async def create_order(
             )
 
         if is_delivery:
-            _validate_min_order(db, store_id, order.items, offers_by_id)
+            await _validate_min_order(db, store_id, order.items, offers_by_id)
 
         created_items: list[dict[str, Any]] = []
 
@@ -295,7 +297,7 @@ async def create_order(
                 price = int(normalize_price(get_val(offer, "discount_price", 0)))
                 offer_store_id = int(get_val(offer, "store_id"))
                 offer_title = get_val(offer, "title", "Tovar")
-                store = db.get_store(offer_store_id) if hasattr(db, "get_store") else None
+                store = await db.get_store(offer_store_id) if hasattr(db, "get_store") else None
                 store_name = get_val(store, "name", "") if store else ""
                 store_address = get_val(store, "address", "") if store else ""
                 delivery_price = 0
@@ -408,8 +410,9 @@ async def create_order(
             order_id=order_id, status="pending", total=total_amount, items_count=total_items
         ).model_dump()
         if idem_key and idem_hash:
+            idem_db = db.sync if hasattr(db, "sync") else db
             store_idempotency_response(
-                db,
+                idem_db,
                 idem_key,
                 user_id,
                 idem_hash,
@@ -420,8 +423,9 @@ async def create_order(
 
     except HTTPException as exc:
         if "idem_key" in locals() and idem_key and idem_hash:
+            idem_db = db.sync if hasattr(db, "sync") else db
             store_idempotency_response(
-                db,
+                idem_db,
                 idem_key,
                 user_id,
                 idem_hash,
@@ -445,97 +449,101 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
     raw_orders: list[Any] = []
 
     try:
-        if hasattr(db, "get_connection"):
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                orders_query = """
-                    SELECT
-                        o.order_id,
-                        o.order_status,
-                        o.order_type,
-                        o.pickup_code,
-                        o.delivery_address,
-                        o.total_price,
-                        o.delivery_price,
-                        o.item_title,
-                        o.item_price,
-                        o.item_original_price,
-                        o.quantity,
-                        o.payment_method,
-                        o.payment_status,
-                        o.payment_proof_photo_id,
-                        o.is_cart_order,
-                        o.cart_items,
-                        o.created_at,
-                        o.updated_at,
-                        o.store_id,
-                        s.name AS store_name,
-                        s.address AS store_address,
-                        s.phone AS store_phone,
-                        off.offer_id AS offer_id,
-                        off.title AS offer_title,
-                        off.discount_price AS offer_price,
-                        off.photo_id AS offer_photo_id
-                    FROM orders o
-                    LEFT JOIN stores s ON o.store_id = s.store_id
-                    LEFT JOIN offers off ON o.offer_id = off.offer_id
-                    WHERE o.user_id = %s
-                    ORDER BY o.created_at DESC
-                    LIMIT 100
-                """
-                fallback_query = """
-                    SELECT
-                        o.order_id,
-                        o.order_status,
-                        NULL AS order_type,
-                        o.pickup_code,
-                        o.delivery_address,
-                        o.total_price,
-                        NULL AS delivery_price,
-                        o.item_title,
-                        o.item_price,
-                        o.item_original_price,
-                        o.quantity,
-                        o.payment_method,
-                        o.payment_status,
-                        o.payment_proof_photo_id,
-                        o.is_cart_order,
-                        o.cart_items,
-                        o.created_at,
-                        NULL AS updated_at,
-                        o.store_id,
-                        s.name AS store_name,
-                        s.address AS store_address,
-                        s.phone AS store_phone,
-                        off.offer_id AS offer_id,
-                        off.title AS offer_title,
-                        off.discount_price AS offer_price,
-                        off.photo_id AS offer_photo_id
-                    FROM orders o
-                    LEFT JOIN stores s ON o.store_id = s.store_id
-                    LEFT JOIN offers off ON o.offer_id = off.offer_id
-                    WHERE o.user_id = %s
-                    ORDER BY o.created_at DESC
-                    LIMIT 100
-                """
-                try:
-                    cursor.execute(orders_query, (int(user_id),))
-                except Exception as e:
-                    message = str(e)
-                    if "delivery_price" in message or "order_type" in message or "updated_at" in message:
-                        logger.warning(
-                            "Orders query fallback (missing columns): %s", message
-                        )
-                        cursor.execute(fallback_query, (int(user_id),))
-                    else:
-                        raise
-                raw_orders = cursor.fetchall() or []
-                if raw_orders and not hasattr(raw_orders[0], "get"):
-                    columns = [col[0] for col in cursor.description or []]
-                    raw_orders = [dict(zip(columns, row)) for row in raw_orders]
-                logger.info(
-                    f"📦 Fetched {len(raw_orders)} raw orders from database for user {user_id}"
-                )
+        if hasattr(db, "sync") and hasattr(db.sync, "get_connection"):
+            def _fetch_orders_sync(sync_db, uid: int) -> list[Any]:
+                with sync_db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    orders_query = """
+                        SELECT
+                            o.order_id,
+                            o.order_status,
+                            o.order_type,
+                            o.pickup_code,
+                            o.delivery_address,
+                            o.total_price,
+                            o.delivery_price,
+                            o.item_title,
+                            o.item_price,
+                            o.item_original_price,
+                            o.quantity,
+                            o.payment_method,
+                            o.payment_status,
+                            o.payment_proof_photo_id,
+                            o.is_cart_order,
+                            o.cart_items,
+                            o.created_at,
+                            o.updated_at,
+                            o.store_id,
+                            s.name AS store_name,
+                            s.address AS store_address,
+                            s.phone AS store_phone,
+                            off.offer_id AS offer_id,
+                            off.title AS offer_title,
+                            off.discount_price AS offer_price,
+                            off.photo_id AS offer_photo_id
+                        FROM orders o
+                        LEFT JOIN stores s ON o.store_id = s.store_id
+                        LEFT JOIN offers off ON o.offer_id = off.offer_id
+                        WHERE o.user_id = %s
+                        ORDER BY o.created_at DESC
+                        LIMIT 100
+                    """
+                    fallback_query = """
+                        SELECT
+                            o.order_id,
+                            o.order_status,
+                            NULL AS order_type,
+                            o.pickup_code,
+                            o.delivery_address,
+                            o.total_price,
+                            NULL AS delivery_price,
+                            o.item_title,
+                            o.item_price,
+                            o.item_original_price,
+                            o.quantity,
+                            o.payment_method,
+                            o.payment_status,
+                            o.payment_proof_photo_id,
+                            o.is_cart_order,
+                            o.cart_items,
+                            o.created_at,
+                            NULL AS updated_at,
+                            o.store_id,
+                            s.name AS store_name,
+                            s.address AS store_address,
+                            s.phone AS store_phone,
+                            off.offer_id AS offer_id,
+                            off.title AS offer_title,
+                            off.discount_price AS offer_price,
+                            off.photo_id AS offer_photo_id
+                        FROM orders o
+                        LEFT JOIN stores s ON o.store_id = s.store_id
+                        LEFT JOIN offers off ON o.offer_id = off.offer_id
+                        WHERE o.user_id = %s
+                        ORDER BY o.created_at DESC
+                        LIMIT 100
+                    """
+                    try:
+                        cursor.execute(orders_query, (int(uid),))
+                    except Exception as e:
+                        message = str(e)
+                        if "delivery_price" in message or "order_type" in message or "updated_at" in message:
+                            logger.warning(
+                                "Orders query fallback (missing columns): %s", message
+                            )
+                            cursor.execute(fallback_query, (int(uid),))
+                        else:
+                            raise
+                    rows = cursor.fetchall() or []
+                    if rows and not hasattr(rows[0], "get"):
+                        columns = [col[0] for col in cursor.description or []]
+                        rows = [dict(zip(columns, row)) for row in rows]
+                    return rows
+
+            raw_orders = await db.run(_fetch_orders_sync, db.sync, int(user_id))
+            logger.info(
+                f"📦 Fetched {len(raw_orders)} raw orders from database for user {user_id}"
+            )
     except Exception as e:
         logger.warning(f"Webapp get_orders failed to fetch orders: {e}")
         raw_orders = []
@@ -655,13 +663,13 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
     bookings = []
     if hasattr(db, "get_user_bookings"):
         try:
-            raw_bookings = db.get_user_bookings(int(user_id)) or []
+            raw_bookings = await db.get_user_bookings(int(user_id)) or []
             for b in raw_bookings:
                 if isinstance(b, tuple):
                     offer_photo = None
                     if len(b) > 1 and b[1] and hasattr(db, "get_offer"):
                         try:
-                            offer = db.get_offer(b[1])
+                            offer = await db.get_offer(b[1])
                             if offer:
                                 offer_photo = get_val(offer, "photo") or get_val(offer, "photo_id")
                         except Exception:
@@ -701,36 +709,39 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
             raw_bookings = []
 
-    if not bookings and hasattr(db, "get_connection") and _bookings_archive_exists(db):
+    if not bookings and await _bookings_archive_exists(db) and hasattr(db, "sync"):
         try:
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    """
-                    SELECT
-                        b.booking_id,
-                        b.offer_id,
-                        b.user_id,
-                        b.status,
-                        b.booking_code,
-                        b.pickup_time,
-                        COALESCE(b.quantity, 1) as quantity,
-                        b.created_at,
-                        COALESCE(o.title, 'Tovar') as title,
-                        COALESCE(o.discount_price, 0) as discount_price,
-                        o.available_until,
-                        COALESCE(s.name, 'Dokon') as name,
-                        COALESCE(s.address, '') as address,
-                        s.city
-                    FROM bookings_archive b
-                    LEFT JOIN offers o ON b.offer_id = o.offer_id
-                    LEFT JOIN stores s ON o.store_id = s.store_id
-                    WHERE b.user_id = %s
-                    ORDER BY b.created_at DESC
-                    """,
-                    (int(user_id),),
-                )
-                raw_bookings = cursor.fetchall() or []
+            def _fetch_archived_bookings(sync_db, uid: int) -> list[Any]:
+                with sync_db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        """
+                        SELECT
+                            b.booking_id,
+                            b.offer_id,
+                            b.user_id,
+                            b.status,
+                            b.booking_code,
+                            b.pickup_time,
+                            COALESCE(b.quantity, 1) as quantity,
+                            b.created_at,
+                            COALESCE(o.title, 'Tovar') as title,
+                            COALESCE(o.discount_price, 0) as discount_price,
+                            o.available_until,
+                            COALESCE(s.name, 'Dokon') as name,
+                            COALESCE(s.address, '') as address,
+                            s.city
+                        FROM bookings_archive b
+                        LEFT JOIN offers o ON b.offer_id = o.offer_id
+                        LEFT JOIN stores s ON o.store_id = s.store_id
+                        WHERE b.user_id = %s
+                        ORDER BY b.created_at DESC
+                        """,
+                        (int(uid),),
+                    )
+                    return cursor.fetchall() or []
+
+            raw_bookings = await db.run(_fetch_archived_bookings, db.sync, int(user_id))
         except Exception as e:
             # bookings_archive is optional (only exists after v24 migration)
             logger.debug(f"Webapp get_orders fallback bookings_archive skipped: {e}")
@@ -741,7 +752,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 offer_photo = None
                 if len(b) > 1 and b[1] and hasattr(db, "get_offer"):
                     try:
-                        offer = db.get_offer(b[1])
+                        offer = await db.get_offer(b[1])
                         if offer:
                             offer_photo = get_val(offer, "photo") or get_val(offer, "photo_id")
                     except Exception:
@@ -797,13 +808,13 @@ async def cancel_order(
     entity_type = "order"
 
     if hasattr(db, "get_order"):
-        entity = db.get_order(order_id)
+        entity = await db.get_order(order_id)
         if entity and int(get_val(entity, "user_id", 0)) != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
     if entity is None and hasattr(db, "get_booking"):
         entity_type = "booking"
-        entity = db.get_booking(order_id)
+        entity = await db.get_booking(order_id)
         if entity and int(get_val(entity, "user_id", 0)) != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -847,8 +858,10 @@ async def notify_partner_webapp_order(
 ) -> None:
     """Send notification to partner about new webapp order."""
 
-    partner_lang = db.get_user_language(owner_id) if hasattr(db, "get_user_language") else "uz"
-    user = db.get_user(user_id) if hasattr(db, "get_user") else None
+    partner_lang = (
+        await db.get_user_language(owner_id) if hasattr(db, "get_user_language") else "uz"
+    )
+    user = await db.get_user(user_id) if hasattr(db, "get_user") else None
 
     def get_user_val(obj: Any, key: str, default: Any | None = None) -> Any | None:
         if isinstance(obj, dict):
@@ -933,7 +946,7 @@ async def notify_partner_webapp_order(
 
         if sent_msg and hasattr(db, "set_order_seller_message_id"):
             try:
-                db.set_order_seller_message_id(entity_id, sent_msg.message_id)
+                await db.set_order_seller_message_id(entity_id, sent_msg.message_id)
                 logger.info(
                     "Saved seller_message_id=%s for order#%s",
                     sent_msg.message_id,

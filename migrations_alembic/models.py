@@ -98,6 +98,7 @@ class User(Base):
     bookings = relationship("Booking", back_populates="user")
     orders = relationship("Order", back_populates="user")
     favorites = relationship("Favorite", back_populates="user")
+    favorite_offers = relationship("FavoriteOffer", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
     ratings = relationship("Rating", back_populates="user")
 
@@ -190,6 +191,7 @@ class Offer(Base):
     store = relationship("Store", back_populates="offers")
     bookings = relationship("Booking", back_populates="offer")
     orders = relationship("Order", back_populates="offer")
+    favorite_entries = relationship("FavoriteOffer", back_populates="offer")
 
     # Indexes
     __table_args__ = (
@@ -380,6 +382,26 @@ class Favorite(Base):
 
     # Constraints
     __table_args__ = (UniqueConstraint("user_id", "store_id", name="uq_favorites_user_store"),)
+
+
+class FavoriteOffer(Base):
+    """Favorite offers model."""
+
+    __tablename__ = "favorite_offers"
+
+    favorite_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"), nullable=False)
+    offer_id = Column(Integer, ForeignKey("offers.offer_id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="favorite_offers")
+    offer = relationship("Offer", back_populates="favorite_entries")
+
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("user_id", "offer_id", name="uq_favorite_offers_user_offer"),
+    )
 
 
 class Promocode(Base):

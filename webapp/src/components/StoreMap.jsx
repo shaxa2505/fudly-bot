@@ -38,6 +38,13 @@ function StoreMap({
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? parsed : null;
   };
+
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
   const resolveCoords = (store) => {
     if (!store) return null;
     const lat = toNumber(
@@ -133,7 +140,7 @@ function StoreMap({
 
     // Add tile layer (OpenStreetMap)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+      maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
@@ -178,8 +185,8 @@ function StoreMap({
 
       const popupContent = `
         <div class="store-popup">
-          <strong>${store.name}</strong>
-          <p>${store.address || ''}</p>
+          <strong>${escapeHtml(store.name)}</strong>
+          <p>${escapeHtml(store.address || '')}</p>
           ${distance ? `<p class="distance">Masofa: ${distance}</p>` : ''}
         </div>
       `;
@@ -333,4 +340,4 @@ function StoreMap({
 }
 
 export default StoreMap;
-
+

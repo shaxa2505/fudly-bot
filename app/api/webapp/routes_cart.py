@@ -29,7 +29,7 @@ async def calculate_cart(
             offer_id = int(offer_id_str)
             quantity = int(qty_str)
 
-            offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+            offer = await db.get_offer(offer_id) if hasattr(db, "get_offer") else None
             if offer and is_offer_active(offer):
                 price = normalize_price(get_val(offer, "discount_price", 0))
                 items.append(

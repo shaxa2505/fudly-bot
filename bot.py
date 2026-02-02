@@ -54,13 +54,18 @@ MULTI_INSTANCE: bool = os.getenv("ALLOW_MULTI_INSTANCE", "0").strip().lower() in
     "true",
     "yes",
 } or os.getenv("MULTI_INSTANCE", "0").strip().lower() in {"1", "true", "yes"}
+USE_ARQ_WORKER: bool = os.getenv("USE_ARQ_WORKER", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 DISABLE_LOCK: bool = (
     os.getenv("DISABLE_LOCK", "0").strip().lower() in {"1", "true", "yes"} or MULTI_INSTANCE
 )
 POLLING_HEALTH_PORT: int = int(os.getenv("POLLING_HEALTH_PORT", "0") or 0)
 _booking_worker_env = os.getenv("ENABLE_INTERNAL_BOOKING_WORKER")
 if _booking_worker_env is None:
-    ENABLE_INTERNAL_BOOKING_WORKER = not MULTI_INSTANCE
+    ENABLE_INTERNAL_BOOKING_WORKER = not MULTI_INSTANCE and not USE_ARQ_WORKER
 else:
     ENABLE_INTERNAL_BOOKING_WORKER = _booking_worker_env.strip().lower() in {"1", "true", "yes"}
 ENABLE_RATING_REMINDERS: bool = (

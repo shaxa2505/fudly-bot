@@ -798,7 +798,7 @@ function CartPage({ user }) {
         if (tg?.openTelegramLink) {
           tg.openTelegramLink(url)
         } else {
-          window.open(url, '_blank')
+          window.open(url, '_blank', 'noopener,noreferrer')
         }
       }
       return ''
@@ -844,7 +844,7 @@ function CartPage({ user }) {
         if (tg?.openTelegramLink) {
           tg.openTelegramLink(url)
         } else {
-          window.open(url, '_blank')
+          window.open(url, '_blank', 'noopener,noreferrer')
         }
       }
       return ''

@@ -19,6 +19,8 @@ services:
       - SECRET_TOKEN=${SECRET_TOKEN}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - REDIS_URL=redis://redis:6379/0
+      - WEBHOOK_EMBED_API=0
+      - USE_ARQ_WORKER=1
       - SENTRY_DSN=${SENTRY_DSN:-}
     volumes:
       - ./data:/app/data
@@ -51,6 +53,64 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fudly-api
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-fudly}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fudly}
+      - API_PORT=8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fudly-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    command: ["python", "app/api/api_server.py"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fudly-worker
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-fudly}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fudly}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fudly-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    command: ["arq", "app.worker.arq_worker.WorkerSettings"]
 
   postgres:
     image: postgres:15-alpine

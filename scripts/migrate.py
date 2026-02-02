@@ -43,14 +43,14 @@ def upgrade(revision="head"):
     """Apply migrations up to revision."""
     config = get_alembic_config()
     command.upgrade(config, revision)
-    print(f"✅ Upgraded to: {revision}")
+    print(f"OK Upgraded to: {revision}")
 
 
 def downgrade(revision="-1"):
     """Rollback migrations."""
     config = get_alembic_config()
     command.downgrade(config, revision)
-    print(f"✅ Downgraded by: {revision}")
+    print(f"OK Downgraded by: {revision}")
 
 
 def current():
@@ -69,7 +69,7 @@ def revision(message: str, autogenerate: bool = False):
     """Create new migration."""
     config = get_alembic_config()
     command.revision(config, message=message, autogenerate=autogenerate)
-    print(f"✅ Created new migration: {message}")
+    print(f"OK Created new migration: {message}")
 
 
 def stamp(revision: str = "head"):
@@ -79,7 +79,7 @@ def stamp(revision: str = "head"):
     """
     config = get_alembic_config()
     command.stamp(config, revision)
-    print(f"✅ Stamped database at: {revision}")
+    print(f"OK Stamped database at: {revision}")
 
 
 def heads():

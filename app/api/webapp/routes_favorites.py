@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .common import (
     FavoriteRequest,
+    OfferResponse,
     StoreResponse,
     get_current_user,
     get_optional_user,
@@ -13,6 +14,7 @@ from .common import (
     logger,
     normalize_price,
 )
+from .routes_offers import _to_offer_response
 
 router = APIRouter()
 
@@ -39,12 +41,12 @@ def _to_store_response(store: object) -> StoreResponse:
     )
 
 
-def _resolve_store_id(request: FavoriteRequest, db: object) -> int:
+async def _resolve_store_id(request: FavoriteRequest, db: object) -> int:
     if request.store_id:
         return int(request.store_id)
     if not request.offer_id:
         raise HTTPException(status_code=400, detail="store_id or offer_id is required")
-    offer = db.get_offer(request.offer_id) if hasattr(db, "get_offer") else None
+    offer = await db.get_offer(request.offer_id) if hasattr(db, "get_offer") else None
     if not offer:
         raise HTTPException(status_code=404, detail="Offer not found")
     store_id = int(get_val(offer, "store_id", 0) or 0)
@@ -65,7 +67,7 @@ async def get_favorites(db=Depends(get_db), user: dict | None = Depends(get_opti
         seen_ids: set[int] = set()
 
         if hasattr(db, "get_favorites"):
-            raw_favorites = db.get_favorites(user_id) or []
+            raw_favorites = await db.get_favorites(user_id) or []
             for store in raw_favorites:
                 store_id = int(get_val(store, "store_id", 0) or get_val(store, "id", 0) or 0)
                 if not store_id or store_id in seen_ids:
@@ -73,16 +75,16 @@ async def get_favorites(db=Depends(get_db), user: dict | None = Depends(get_opti
                 seen_ids.add(store_id)
                 stores.append(_to_store_response(store))
         elif hasattr(db, "get_user_favorite_offers"):
-            favorite_ids = db.get_user_favorite_offers(user_id) or []
+            favorite_ids = await db.get_user_favorite_offers(user_id) or []
             for offer_id in favorite_ids:
                 try:
-                    offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+                    offer = await db.get_offer(offer_id) if hasattr(db, "get_offer") else None
                     if not offer or not is_offer_active(offer):
                         continue
                     store_id = int(get_val(offer, "store_id", 0) or 0)
                     if not store_id or store_id in seen_ids:
                         continue
-                    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                    store = await db.get_store(store_id) if hasattr(db, "get_store") else None
                     if not store:
                         continue
                     seen_ids.add(store_id)
@@ -108,11 +110,11 @@ async def add_favorite(
         if user_id == 0:
             raise HTTPException(status_code=401, detail="Authentication required")
 
-        store_id = _resolve_store_id(request, db)
+        store_id = await _resolve_store_id(request, db)
         if hasattr(db, "add_to_favorites"):
-            db.add_to_favorites(user_id, store_id)
+            await db.add_to_favorites(user_id, store_id)
         elif hasattr(db, "add_favorite"):
-            db.add_favorite(user_id, store_id)
+            await db.add_favorite(user_id, store_id)
 
         return {"status": "ok", "store_id": store_id}
 
@@ -133,11 +135,11 @@ async def remove_favorite(
         if user_id == 0:
             raise HTTPException(status_code=401, detail="Authentication required")
 
-        store_id = _resolve_store_id(request, db)
+        store_id = await _resolve_store_id(request, db)
         if hasattr(db, "remove_from_favorites"):
-            db.remove_from_favorites(user_id, store_id)
+            await db.remove_from_favorites(user_id, store_id)
         elif hasattr(db, "remove_favorite"):
-            db.remove_favorite(user_id, store_id)
+            await db.remove_favorite(user_id, store_id)
 
         return {"status": "ok", "store_id": store_id}
 
@@ -145,4 +147,96 @@ async def remove_favorite(
         raise
     except Exception as e:  # pragma: no cover - defensive
         logger.error(f"Error removing favorite: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/favorites/offers", response_model=list[OfferResponse])
+async def get_favorite_offers(db=Depends(get_db), user: dict | None = Depends(get_optional_user)):
+    """Get user's favorite offers."""
+    try:
+        user_id = user.get("id", 0) if isinstance(user, dict) else 0
+        if user_id <= 0:
+            return []
+
+        offers: list[OfferResponse] = []
+
+        if hasattr(db, "get_favorite_offers"):
+            raw_offers = await db.get_favorite_offers(user_id) or []
+            for offer in raw_offers:
+                if not is_offer_active(offer):
+                    continue
+                offers.append(_to_offer_response(offer))
+        elif hasattr(db, "get_favorite_offer_ids"):
+            offer_ids = await db.get_favorite_offer_ids(user_id) or []
+            for offer_id in offer_ids:
+                offer = await db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+                if not offer or not is_offer_active(offer):
+                    continue
+                store = (
+                    await db.get_store(get_val(offer, "store_id"))
+                    if hasattr(db, "get_store")
+                    else None
+                )
+                offers.append(_to_offer_response(offer, store))
+
+        return offers
+
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error getting favorite offers: {e}")
+        return []
+
+
+@router.post("/favorites/offers/add")
+async def add_favorite_offer(
+    request: FavoriteRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
+):
+    """Add offer to favorites."""
+    try:
+        user_id = user.get("id", 0)
+        if user_id == 0:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        offer_id = request.offer_id
+        if not offer_id:
+            raise HTTPException(status_code=400, detail="offer_id is required")
+
+        offer = await db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+        if not offer or not is_offer_active(offer):
+            raise HTTPException(status_code=404, detail="Offer not found")
+
+        if hasattr(db, "add_offer_favorite"):
+            await db.add_offer_favorite(user_id, int(offer_id))
+
+        return {"status": "ok", "offer_id": int(offer_id)}
+
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error adding favorite offer: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/favorites/offers/remove")
+async def remove_favorite_offer(
+    request: FavoriteRequest, db=Depends(get_db), user: dict = Depends(get_current_user)
+):
+    """Remove offer from favorites."""
+    try:
+        user_id = user.get("id", 0)
+        if user_id == 0:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        offer_id = request.offer_id
+        if not offer_id:
+            raise HTTPException(status_code=400, detail="offer_id is required")
+
+        if hasattr(db, "remove_offer_favorite"):
+            await db.remove_offer_favorite(user_id, int(offer_id))
+
+        return {"status": "ok", "offer_id": int(offer_id)}
+
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover - defensive
+        logger.error(f"Error removing favorite offer: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

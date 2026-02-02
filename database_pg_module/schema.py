@@ -770,6 +770,21 @@ class SchemaMixin:
             """
             )
 
+            # Favorite offers table
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS favorite_offers (
+                    favorite_id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    offer_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id),
+                    FOREIGN KEY (offer_id) REFERENCES offers(offer_id),
+                    UNIQUE(user_id, offer_id)
+                )
+            """
+            )
+
             # Promocodes table
             cursor.execute(
                 """
@@ -962,6 +977,12 @@ class SchemaMixin:
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_favorites_store ON favorites(store_id)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorite_offers_user ON favorite_offers(user_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorite_offers_offer ON favorite_offers(offer_id)"
+        )
 
         # Search optimization indexes
         cursor.execute(

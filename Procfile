@@ -1,2 +1,3 @@
 web: python bot.py
-worker: python scripts/run_booking_worker.py
+api: python app/api/api_server.py
+worker: arq app.worker.arq_worker.WorkerSettings

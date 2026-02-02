@@ -128,9 +128,13 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     # Initialize database connections immediately (for ASGI adapter usage)
     # This ensures db is available even when lifespan events are not triggered
     if _app_db:
-        set_db_instance(_app_db, _app_offer_service)
+        from app.core.async_db import AsyncDBProxy
+
+        async_db = AsyncDBProxy(_app_db)
+        set_db_instance(async_db, _app_offer_service)
         set_auth_db(_app_db)
         set_orders_db(_app_db, bot_token)
+        # Partner panel + merchant webhooks can remain sync for now
         set_partner_db(_app_db, bot_token)
         set_merchant_db(_app_db)
         logger.info("✅ Database connected to API (immediate init)")
@@ -140,7 +144,10 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         # Startup - also set here for standalone FastAPI usage
         logger.info("🚀 Mini App API starting...")
         if _app_db:
-            set_db_instance(_app_db, _app_offer_service)
+            from app.core.async_db import AsyncDBProxy
+
+            async_db = AsyncDBProxy(_app_db)
+            set_db_instance(async_db, _app_offer_service)
             set_auth_db(_app_db)
             set_orders_db(_app_db, bot_token)
             set_partner_db(_app_db, bot_token)

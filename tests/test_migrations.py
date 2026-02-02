@@ -93,6 +93,7 @@ class TestAlembicModels:
             "Notification",
             "Rating",
             "Favorite",
+            "FavoriteOffer",
             "Promocode",
             "PromoUsage",
             "Referral",

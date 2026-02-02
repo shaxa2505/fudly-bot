@@ -13,6 +13,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 logger = logging.getLogger(__name__)
 
 
+async def run_rating_reminder_cycle(db: Any, bot: Bot) -> None:
+    """Run a single rating reminder cycle."""
+    await _send_rating_reminders(db, bot)
+
+
 async def start_rating_reminder_worker(db: Any, bot: Bot) -> None:
     """Send rating reminders for unrated completed orders/bookings.
 
@@ -22,7 +27,7 @@ async def start_rating_reminder_worker(db: Any, bot: Bot) -> None:
 
     while True:
         try:
-            await _send_rating_reminders(db, bot)
+            await run_rating_reminder_cycle(db, bot)
         except Exception as e:
             logger.error(f"Rating reminder worker error: {e}")
 

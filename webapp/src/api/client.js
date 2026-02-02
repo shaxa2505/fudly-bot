@@ -100,6 +100,19 @@ export const getTelegramInitData = () => {
   return readStoredInitData()
 }
 
+const getCacheScopeKey = () => {
+  const tgUserId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+  if (tgUserId) {
+    return `u:${tgUserId}`
+  }
+  const storage = getSessionStorage()
+  const lastUserId = storage?.getItem('fudly_last_user_id')
+  if (lastUserId) {
+    return `u:${lastUserId}`
+  }
+  return 'u:anon'
+}
+
 // Helper function to delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -176,7 +189,7 @@ const serializeParams = (params) => {
   return entries.map(([key, value]) => `${key}:${JSON.stringify(value)}`).join('&')
 }
 
-const buildCacheKey = (url, params) => `${url}?${serializeParams(params)}`
+const buildCacheKey = (url, params) => `${getCacheScopeKey()}|${url}?${serializeParams(params)}`
 
 const getCachedEntry = (cacheKey) => {
   const cached = requestCache.get(cacheKey)
@@ -412,8 +425,17 @@ const api = {
     }
   },
 
+  async getFavoriteOffers() {
+    try {
+      const { data } = await client.get('/favorites/offers')
+      return data
+    } catch {
+      return []
+    }
+  },
+
   async addFavorite(offerId) {
-    const { data } = await client.post('/favorites/add', { offer_id: offerId })
+    const { data } = await client.post('/favorites/offers/add', { offer_id: offerId })
     return data
   },
 
@@ -423,7 +445,7 @@ const api = {
   },
 
   async removeFavorite(offerId) {
-    const { data } = await client.post('/favorites/remove', { offer_id: offerId })
+    const { data } = await client.post('/favorites/offers/remove', { offer_id: offerId })
     return data
   },
 
