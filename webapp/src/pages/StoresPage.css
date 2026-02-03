@@ -374,10 +374,17 @@
 }
 
 .sp-store-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s ease;
+  opacity: 0;
+  transition: transform 0.6s ease, opacity 0.3s ease;
+}
+
+.sp-store-media.is-loaded .sp-store-image {
+  opacity: 1;
 }
 
 @media (hover: hover) {
@@ -387,13 +394,33 @@
 }
 
 .sp-store-placeholder {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #94A3B8;
   background: #F3F4F6;
+  transition: opacity 0.3s ease;
+}
+
+.sp-store-media.is-loaded .sp-store-placeholder {
+  opacity: 0;
+}
+
+.sp-store-image-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, #f5f5f5 8%, #e8e8e8 18%, #f5f5f5 33%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s linear infinite;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.sp-store-media.is-loaded .sp-store-image-skeleton,
+.sp-store-media.is-error .sp-store-image-skeleton {
+  opacity: 0;
 }
 
 .sp-store-status {

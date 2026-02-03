@@ -12,7 +12,22 @@ import './PageLoader.css'
 const PageLoader = memo(function PageLoader({ message }) {
   return (
     <div className="page-loader">
-      <div className="page-loader-content">
+      <div className="page-loader-shell" aria-hidden="true">
+        <div className="page-loader-header skeleton-box"></div>
+        <div className="page-loader-search skeleton-box"></div>
+        <div className="page-loader-grid">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="page-loader-card">
+              <div className="page-loader-card-image skeleton-box"></div>
+              <div className="page-loader-card-lines">
+                <div className="page-loader-card-line skeleton-box"></div>
+                <div className="page-loader-card-line short skeleton-box"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="page-loader-overlay">
         <div className="page-loader-spinner">
           <div className="spinner-ring"></div>
           <div className="spinner-icon">F</div>

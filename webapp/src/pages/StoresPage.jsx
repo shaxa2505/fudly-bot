@@ -28,6 +28,7 @@ import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
 import BottomNav from '../components/BottomNav'
 import StoreMap from '../components/StoreMap'
+import ScrollTopButton from '../components/ScrollTopButton'
 import './StoresPage.css'
 
 const FILTER_CHIPS = [
@@ -472,7 +473,9 @@ function StoresPage() {
                 onClick={() => setSearchQuery('')}
                 aria-label="Qidiruvni tozalash"
               >
-                ?
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               </button>
             )}
           </div>
@@ -587,21 +590,29 @@ function StoresPage() {
                   onClick={() => loadStoreOffers(store)}
                 >
                   <div className="sp-store-media">
-                    {storePhotoUrl ? (
-                      <img
-                        src={storePhotoUrl}
-                        alt={store.name}
-                        className="sp-store-image"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                        }}
-                      />
-                    ) : (
-                      <div className="sp-store-placeholder">
-                        <Icon size={32} strokeWidth={1.5} />
-                      </div>
+                    <div className="sp-store-placeholder" aria-hidden="true">
+                      <Icon size={32} strokeWidth={1.5} />
+                    </div>
+                    {storePhotoUrl && (
+                      <>
+                        <img
+                          src={storePhotoUrl}
+                          alt={store.name}
+                          className="sp-store-image"
+                          loading="lazy"
+                          decoding="async"
+                          onLoad={(event) => {
+                            event.currentTarget.parentElement?.classList.add('is-loaded')
+                          }}
+                          onError={(event) => {
+                            const parent = event.currentTarget.parentElement
+                            event.currentTarget.classList.add('is-error')
+                            parent?.classList.add('is-error')
+                            parent?.classList.remove('is-loaded')
+                          }}
+                        />
+                        <div className="sp-store-image-skeleton" aria-hidden="true" />
+                      </>
                     )}
 
                     {status && (
@@ -865,6 +876,7 @@ function StoresPage() {
         </div>
       )}
 
+      <ScrollTopButton />
       <BottomNav currentPage="stores" cartCount={cartCount} />
     </div>
   )

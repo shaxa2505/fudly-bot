@@ -9,6 +9,7 @@ import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
+import ScrollTopButton from '../components/ScrollTopButton'
 import LocationPickerModal from '../components/LocationPickerModal'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
@@ -1332,6 +1333,7 @@ function HomePage() {
       )}
 
       {/* Bottom Navigation */}
+      <ScrollTopButton />
       <BottomNav
         currentPage="home"
         cartCount={cartCount}

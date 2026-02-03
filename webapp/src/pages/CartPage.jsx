@@ -69,6 +69,7 @@ function CartPage({ user }) {
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
   const [storeCity, setStoreCity] = useState('')
+  const [storeInfoLoading, setStoreInfoLoading] = useState(false)
 
   // Payment step for delivery
   const [checkoutStep, setCheckoutStep] = useState('details') // details only (no manual proof)
@@ -96,6 +97,7 @@ function CartPage({ user }) {
     return null
   })
   const [storeOffers, setStoreOffers] = useState([])
+  const [storeOffersLoading, setStoreOffersLoading] = useState(false)
   const checkoutMapRef = useRef(null)
   const checkoutMapInstanceRef = useRef(null)
   const checkoutMapMarkerRef = useRef(null)
@@ -193,6 +195,8 @@ function CartPage({ user }) {
 
   const showCheckoutSheet = showCheckout || isCheckoutRoute
   const mapEnabled = showCheckoutSheet && orderType === 'delivery'
+  const isMapLoading = mapEnabled && !mapLoaded && !mapError
+  const isMapResolving = mapEnabled && mapResolving
 
   useEffect(() => {
     if (!mapEnabled) {
@@ -584,9 +588,11 @@ function CartPage({ user }) {
         setDeliveryFee(0)
         setMinOrderAmount(0)
         setStoreCity('')
+        setStoreInfoLoading(false)
         return
       }
 
+      setStoreInfoLoading(true)
       try {
         const cartStore = await api.getStore(cartStoreId)
 
@@ -610,6 +616,10 @@ function CartPage({ user }) {
           setMinOrderAmount(0)
           setStoreCity('')
         }
+      } finally {
+        if (isActive) {
+          setStoreInfoLoading(false)
+        }
       }
     }
 
@@ -624,8 +634,10 @@ function CartPage({ user }) {
     const loadStoreOffers = async () => {
       if (!cartStoreId) {
         setStoreOffers([])
+        setStoreOffersLoading(false)
         return
       }
+      setStoreOffersLoading(true)
       try {
         const offers = await api.getStoreOffers(cartStoreId)
         if (!isActive) return
@@ -637,6 +649,10 @@ function CartPage({ user }) {
         console.warn('Could not fetch store offers:', error)
         if (isActive) {
           setStoreOffers([])
+        }
+      } finally {
+        if (isActive) {
+          setStoreOffersLoading(false)
         }
       }
     }
@@ -679,10 +695,11 @@ function CartPage({ user }) {
   ]
   const deliverySlotLabel = deliveryOptions.find(option => option.id === deliverySlot)?.time || ''
   const autoOrderType = useMemo(() => {
+    if (storeInfoLoading) return orderType
     if (!storeDeliveryEnabled) return 'pickup'
     return subtotal >= AUTO_DELIVERY_THRESHOLD ? 'delivery' : 'pickup'
-  }, [storeDeliveryEnabled, subtotal])
-  const deliveryOptionDisabled = !storeDeliveryEnabled || subtotal < AUTO_DELIVERY_THRESHOLD
+  }, [storeDeliveryEnabled, storeInfoLoading, subtotal, orderType])
+  const deliveryOptionDisabled = storeInfoLoading || !storeDeliveryEnabled || subtotal < AUTO_DELIVERY_THRESHOLD
   const deliverySummaryCost = deliveryCheck?.deliveryCost ?? (Number.isFinite(deliveryFee) ? deliveryFee : null)
   const deliverySummaryMin = deliveryCheck?.minOrderAmount ?? (Number.isFinite(minOrderAmount) ? minOrderAmount : null)
   const deliverySummaryEta = deliveryCheck?.estimatedTime || ''
@@ -721,6 +738,14 @@ function CartPage({ user }) {
     click: 'Click',
     cash: 'Naqd',
   }
+  const checkoutBusy = orderLoading || cartValidationLoading || deliveryValidationLoading
+  const checkoutButtonLabel = orderLoading
+    ? 'Buyurtma yuborilmoqda...'
+    : cartValidationLoading
+      ? 'Savat tekshirilmoqda...'
+      : deliveryValidationLoading
+        ? 'Manzil tekshirilmoqda...'
+        : 'Buyurtmani tasdiqlash'
 
   useEffect(() => {
     if (!deliveryRequiresPrepay) return
@@ -731,6 +756,7 @@ function CartPage({ user }) {
   }, [deliveryRequiresPrepay, hasOnlineProviders, selectedPaymentMethod])
 
   useEffect(() => {
+    if (storeInfoLoading) return
     if (!storeDeliveryEnabled && orderType === 'delivery') {
       setOrderType('pickup')
       setOrderTypeTouched(false)
@@ -740,7 +766,7 @@ function CartPage({ user }) {
     if (orderType !== autoOrderType) {
       setOrderType(autoOrderType)
     }
-  }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled])
+  }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled, storeInfoLoading])
 
   useEffect(() => {
     if (!isCheckoutRoute) {
@@ -1780,7 +1806,25 @@ function CartPage({ user }) {
           </div>
         </section>
 
-        {recommendedOffers.length > 0 && (
+        {storeOffersLoading && (
+          <section className="cart-recommendations" aria-hidden="true">
+            <h3 className="cart-recommendations-title">Tavsiya etamiz</h3>
+            <div className="cart-recommendations-list">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="cart-recommendation-card is-skeleton">
+                  <div className="cart-recommendation-thumb skeleton-box"></div>
+                  <div className="cart-recommendation-line skeleton-box"></div>
+                  <div className="cart-recommendation-meta">
+                    <div className="cart-recommendation-price skeleton-box"></div>
+                    <div className="cart-recommendation-add skeleton-box"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!storeOffersLoading && recommendedOffers.length > 0 && (
           <section className="cart-recommendations">
             <h3 className="cart-recommendations-title">Tavsiya etamiz</h3>
             <div className="cart-recommendations-list">
@@ -1900,13 +1944,16 @@ function CartPage({ user }) {
                       >
                         <span className="order-type-icon" aria-hidden="true"></span>
                         <span className="order-type-text">Yetkazib berish</span>
-                        <span className="order-type-desc">Kuryer orqali</span>
+                        <span className="order-type-desc">{storeInfoLoading ? 'Ma\'lumot yuklanmoqda' : 'Kuryer orqali'}</span>
                       </button>
                     </div>
-                    {!storeDeliveryEnabled && (
+                    {storeInfoLoading && (
+                      <p className="checkout-hint neutral">Yetkazib berish shartlari tekshirilmoqda...</p>
+                    )}
+                    {!storeInfoLoading && !storeDeliveryEnabled && (
                       <p className="checkout-hint">Yetkazib berish mavjud emas</p>
                     )}
-                    {storeDeliveryEnabled && subtotal < AUTO_DELIVERY_THRESHOLD && (
+                    {!storeInfoLoading && storeDeliveryEnabled && subtotal < AUTO_DELIVERY_THRESHOLD && (
                       <p className="checkout-hint">
                         Yetkazib berish {formatSum(AUTO_DELIVERY_THRESHOLD)} so'mdan boshlab
                       </p>
@@ -1925,7 +1972,10 @@ function CartPage({ user }) {
                       </button>
                     </div>
                     <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
-                      <div className="checkout-map">
+                      <div
+                        className={`checkout-map${isMapLoading ? ' is-loading' : ''}${isMapResolving ? ' is-resolving' : ''}`}
+                        aria-busy={isMapLoading || isMapResolving}
+                      >
                         <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
                         <div className="checkout-map-search">
                           <Search size={16} strokeWidth={2} aria-hidden="true" />
@@ -1960,15 +2010,46 @@ function CartPage({ user }) {
                             }}
                             disabled={!mapEnabled}
                           />
+                          {mapQuery && mapEnabled && (
+                            <button
+                              type="button"
+                              className="checkout-map-search-clear"
+                              onClick={() => {
+                                setMapQuery('')
+                                setAddress('')
+                                setMapSearchResults([])
+                                setMapSearchLoading(false)
+                                setMapSearchOpen(true)
+                                mapUserEditingRef.current = true
+                              }}
+                              aria-label="Qidiruvni tozalash"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          )}
                           {mapSearchLoading && mapSearchOpen && mapEnabled && (
                             <span className="checkout-map-search-loading">Izlanmoqda...</span>
                           )}
                         </div>
+                        {mapEnabled && mapSearchOpen && mapQuery.trim().length > 0 && mapQuery.trim().length < 3 && (
+                          <div className="checkout-map-search-hint">
+                            Kamida 3 ta belgi kiriting
+                          </div>
+                        )}
                         {mapEnabled && mapSearchOpen && mapQuery.trim().length >= 3 && (
                           <div
                             className="checkout-map-search-results"
                             onPointerDown={(event) => event.preventDefault()}
                           >
+                            {mapSearchLoading && (
+                              <div className="checkout-map-search-skeleton" aria-hidden="true">
+                                {Array.from({ length: 3 }).map((_, index) => (
+                                  <div key={index} className="checkout-map-search-item skeleton"></div>
+                                ))}
+                              </div>
+                            )}
                             {mapSearchResults.length === 0 && !mapSearchLoading && (
                               <button
                                 type="button"
@@ -2161,15 +2242,15 @@ function CartPage({ user }) {
                         onChange={e => setPhone(e.target.value)}
                       />
                     )}
-                    {orderType === 'delivery' && !storeDeliveryEnabled && (
+                    {orderType === 'delivery' && !storeInfoLoading && !storeDeliveryEnabled && (
                       <p className="checkout-hint">Yetkazib berish mavjud emas</p>
                     )}
-                    {orderType === 'delivery' && storeDeliveryEnabled && !canDelivery && (
+                    {orderType === 'delivery' && !storeInfoLoading && storeDeliveryEnabled && !canDelivery && (
                       <p className="checkout-hint">
                         Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
                       </p>
                     )}
-                    {orderType === 'delivery' && storeDeliveryEnabled && canDelivery && deliveryRequiresPrepay && !hasPrepayProviders && (
+                    {orderType === 'delivery' && !storeInfoLoading && storeDeliveryEnabled && canDelivery && deliveryRequiresPrepay && !hasPrepayProviders && (
                       <p className="checkout-hint">
                         Yetkazib berish uchun to'lov usullari mavjud emas
                       </p>
@@ -2284,12 +2365,15 @@ function CartPage({ user }) {
             {checkoutStep === 'details' && (
               <div className="checkout-footer">
                 <button
-                  className="checkout-confirm"
+                  className={`checkout-confirm${checkoutBusy ? ' is-loading' : ''}`}
                   onClick={proceedToPayment}
-                  disabled={orderLoading || cartValidationLoading || deliveryValidationLoading || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
+                  disabled={checkoutBusy || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
                 >
-                  <span>Buyurtmani tasdiqlash</span>
-                  <span className="checkout-confirm-total">{formatSum(checkoutTotal)} so'm</span>
+                  {checkoutBusy && <span className="checkout-confirm-spinner" aria-hidden="true"></span>}
+                  <span>{checkoutButtonLabel}</span>
+                  {!checkoutBusy && (
+                    <span className="checkout-confirm-total">{formatSum(checkoutTotal)} so'm</span>
+                  )}
                 </button>
               </div>
             )}
@@ -2347,6 +2431,7 @@ function CartPage({ user }) {
       {showPaymentSheet && (
         <div className="cart-modal-overlay cart-payment-sheet-overlay" onClick={() => setShowPaymentSheet(false)}>
           <div className="cart-modal cart-payment-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-handle"></div>
             <div className="cart-payment-sheet-header">
               <h3>To'lov usullari</h3>
               <button className="cart-modal-close" onClick={() => setShowPaymentSheet(false)}>x</button>

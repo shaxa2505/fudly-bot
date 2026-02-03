@@ -4,6 +4,7 @@ import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
+import ScrollTopButton from '../components/ScrollTopButton'
 import { blurOnEnter } from '../utils/helpers'
 import { getSavedLocation, transliterateCity } from '../utils/cityUtils'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
@@ -459,6 +460,8 @@ function CategoryProductsPage() {
           ))
         )}
       </div>
+
+      <ScrollTopButton />
     </div>
   )
 }
