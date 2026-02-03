@@ -154,8 +154,10 @@ export const logout = () => {
   localStorage.removeItem('fudly_last_user_id')
   clearKey(localStorage, 'fudly_cart_v2')
   clearKey(localStorage, 'fudly_favorites')
+  clearKey(localStorage, 'fudly_pending_payment')
   clearByPrefix(localStorage, 'fudly_cart_user_')
   clearByPrefix(localStorage, 'fudly_favorites_user_')
+  clearByPrefix(localStorage, 'fudly_pending_payment_user_')
   if (userId) {
     localStorage.removeItem(`fudly_init_data_${userId}`)
   }
@@ -167,8 +169,10 @@ export const logout = () => {
     storage.removeItem('fudly_last_user_id')
     clearKey(storage, 'fudly_cart_v2')
     clearKey(storage, 'fudly_favorites')
+    clearKey(storage, 'fudly_pending_payment')
     clearByPrefix(storage, 'fudly_cart_user_')
     clearByPrefix(storage, 'fudly_favorites_user_')
+    clearByPrefix(storage, 'fudly_pending_payment_user_')
     if (userId) {
       storage.removeItem(`fudly_init_data_${userId}`)
       storage.removeItem(`fudly_init_data_ts_${userId}`)

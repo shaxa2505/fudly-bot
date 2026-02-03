@@ -4,6 +4,7 @@ import apiClient from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import { deriveDisplayStatus, displayStatusText, normalizeOrderStatus, paymentStatusText, resolveOrderType } from '../utils/orderStatus'
+import { readPendingPayment, clearPendingPayment } from '../utils/pendingPayment'
 import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
@@ -20,6 +21,21 @@ export default function OrderDetailsPage() {
     const interval = setInterval(() => loadOrderDetails({ allowEnrich: false }), 30000)
     return () => clearInterval(interval)
   }, [orderId])
+
+  useEffect(() => {
+    if (!order) return
+    const pending = readPendingPayment()
+    if (!pending?.orderId) return
+    if (Number(pending.orderId) !== Number(order.order_id || order.booking_id || orderId)) return
+
+    const baseStatus = normalizeOrderStatus(order.order_status || order.status)
+    const paymentStatus = String(order.payment_status || '').toLowerCase()
+    const doneStatuses = new Set(['completed', 'cancelled', 'rejected', 'delivering', 'ready', 'preparing'])
+
+    if ((paymentStatus && paymentStatus !== 'awaiting_payment') || doneStatuses.has(baseStatus)) {
+      clearPendingPayment()
+    }
+  }, [order, orderId])
 
   const loadOrderDetails = async ({ allowEnrich } = {}) => {
     try {

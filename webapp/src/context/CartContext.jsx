@@ -230,6 +230,26 @@ export function CartProvider({ children }) {
     });
   }, []);
 
+  const replaceCart = useCallback((nextCart) => {
+    if (!nextCart || typeof nextCart !== 'object' || Array.isArray(nextCart)) {
+      setCart({});
+      return;
+    }
+    const normalized = {};
+    Object.values(nextCart).forEach((item) => {
+      if (!item || !item.offer) return;
+      const offerId = item.offer.id ?? item.offer.offer_id ?? item.offer.offerId;
+      if (!offerId) return;
+      const qty = Number(item.quantity ?? 0);
+      if (!Number.isFinite(qty) || qty <= 0) return;
+      normalized[String(offerId)] = {
+        offer: item.offer,
+        quantity: qty,
+      };
+    });
+    setCart(normalized);
+  }, []);
+
   // Remove item completely
   const removeItem = useCallback((offerId) => {
     setCart((prev) => {
@@ -281,6 +301,7 @@ export function CartProvider({ children }) {
       removeFromCart,
       updateQuantity,
       updateOfferData,
+      replaceCart,
       removeItem,
       clearCart,
       getQuantity,
@@ -295,6 +316,7 @@ export function CartProvider({ children }) {
       removeFromCart,
       updateQuantity,
       updateOfferData,
+      replaceCart,
       removeItem,
       clearCart,
       getQuantity,

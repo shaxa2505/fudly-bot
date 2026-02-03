@@ -10,6 +10,7 @@ import { getCurrentUser } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
 import { getCurrentLocation } from '../utils/geolocation'
+import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../utils/pendingPayment'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -31,6 +32,7 @@ function CartPage({ user }) {
     addToCart,
     updateQuantity,
     updateOfferData,
+    replaceCart,
     removeItem,
     clearCart
   } = useCart()
@@ -42,8 +44,12 @@ function CartPage({ user }) {
   const [orderLoading, setOrderLoading] = useState(false)
   const [cartValidationLoading, setCartValidationLoading] = useState(false)
   const [deliveryValidationLoading, setDeliveryValidationLoading] = useState(false)
+  const [deliveryCheck, setDeliveryCheck] = useState(null)
+  const [pendingPayment, setPendingPayment] = useState(() => readPendingPayment())
+  const [pendingActionLoading, setPendingActionLoading] = useState(false)
   const addressInputRef = useRef(null)
   const commentInputRef = useRef(null)
+  const lastDeliveryCheckRef = useRef({ address: '', storeId: null, city: '' })
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(() => isCheckoutRoute)
@@ -677,6 +683,15 @@ function CartPage({ user }) {
     return subtotal >= AUTO_DELIVERY_THRESHOLD ? 'delivery' : 'pickup'
   }, [storeDeliveryEnabled, subtotal])
   const deliveryOptionDisabled = !storeDeliveryEnabled || subtotal < AUTO_DELIVERY_THRESHOLD
+  const deliverySummaryCost = deliveryCheck?.deliveryCost ?? (Number.isFinite(deliveryFee) ? deliveryFee : null)
+  const deliverySummaryMin = deliveryCheck?.minOrderAmount ?? (Number.isFinite(minOrderAmount) ? minOrderAmount : null)
+  const deliverySummaryEta = deliveryCheck?.estimatedTime || ''
+  const pendingItemsCount = useMemo(() => {
+    const cart = pendingPayment?.cart
+    if (!cart || typeof cart !== 'object') return 0
+    return Object.values(cart).reduce((sum, item) => sum + Number(item?.quantity || 0), 0)
+  }, [pendingPayment])
+  const hasPendingPayment = Boolean(pendingPayment?.orderId)
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
@@ -736,6 +751,17 @@ function CartPage({ user }) {
     setShowPaymentSheet(false)
   }, [isCheckoutRoute])
 
+  useEffect(() => {
+    const syncPending = () => setPendingPayment(readPendingPayment())
+    syncPending()
+    window.addEventListener('focus', syncPending)
+    document.addEventListener('visibilitychange', syncPending)
+    return () => {
+      window.removeEventListener('focus', syncPending)
+      document.removeEventListener('visibilitychange', syncPending)
+    }
+  }, [])
+
   const selectPaymentMethod = (method) => {
     setSelectedPaymentMethod(method)
   }
@@ -766,6 +792,124 @@ function CartPage({ user }) {
       clearCart()
     }
   }, [clearCart])
+
+  const handleRestorePendingCart = useCallback(() => {
+    if (!pendingPayment?.cart) {
+      toast.error("Savatni tiklab bo'lmadi")
+      return
+    }
+    if (!isEmpty) {
+      const message = "Joriy savat almashtiriladi. Davom etasizmi?"
+      const tg = window.Telegram?.WebApp
+      if (tg?.showConfirm) {
+        tg.showConfirm(message, (confirmed) => {
+          if (!confirmed) return
+          replaceCart(pendingPayment.cart)
+          clearPendingPayment()
+          setPendingPayment(null)
+          toast.success("Savat tiklandi")
+        })
+        return
+      }
+      if (!window.confirm(message)) {
+        return
+      }
+    }
+    replaceCart(pendingPayment.cart)
+    clearPendingPayment()
+    setPendingPayment(null)
+    toast.success("Savat tiklandi")
+  }, [pendingPayment, replaceCart, toast, isEmpty])
+
+  const handleResumePayment = useCallback(async () => {
+    if (!pendingPayment?.orderId) return
+    if (pendingActionLoading) return
+    setPendingActionLoading(true)
+    try {
+      const status = await api.getOrderStatus(pendingPayment.orderId)
+      const orderStatus = String(status?.status || status?.order_status || '').toLowerCase()
+      const paymentStatus = String(status?.payment_status || '').toLowerCase()
+      const doneStatuses = new Set(['completed', 'delivering', 'ready', 'preparing'])
+      if (paymentStatus && paymentStatus !== 'awaiting_payment') {
+        clearPendingPayment()
+        setPendingPayment(null)
+        toast.info("To'lov allaqachon yakunlangan")
+        return
+      }
+      if (['cancelled', 'rejected'].includes(orderStatus)) {
+        toast.error("Buyurtma bekor qilingan")
+        return
+      }
+      if (doneStatuses.has(orderStatus)) {
+        clearPendingPayment()
+        setPendingPayment(null)
+        toast.info("Buyurtma allaqachon tasdiqlangan")
+        return
+      }
+
+      const storeId = pendingPayment.storeId || cartItems[0]?.offer?.store_id || null
+      const returnUrl = `${window.location.origin}/order/${pendingPayment.orderId}/details`
+      const paymentData = await api.createPaymentLink(
+        pendingPayment.orderId,
+        pendingPayment.provider || 'click',
+        returnUrl,
+        storeId,
+        pendingPayment.total ?? null
+      )
+      if (paymentData?.payment_url) {
+        if (window.Telegram?.WebApp?.openLink) {
+          window.Telegram?.WebApp?.openLink?.(paymentData.payment_url)
+        } else {
+          window.location.href = paymentData.payment_url
+        }
+      } else {
+        toast.error("To'lov havolasi olinmadi")
+      }
+    } catch (error) {
+      toast.error("To'lovni davom ettirib bo'lmadi")
+    } finally {
+      setPendingActionLoading(false)
+    }
+  }, [pendingActionLoading, pendingPayment, toast, cartItems])
+
+  const buildCartSnapshot = useCallback(() => {
+    const snapshot = {}
+    cartItems.forEach((item) => {
+      const offerId = item.offer?.id
+      if (!offerId) return
+      snapshot[String(offerId)] = {
+        offer: item.offer,
+        quantity: item.quantity,
+      }
+    })
+    return snapshot
+  }, [cartItems])
+
+  useEffect(() => {
+    let isActive = true
+    const checkPendingStatus = async () => {
+      if (!pendingPayment?.orderId) return
+      try {
+        const data = await api.getOrderStatus(pendingPayment.orderId)
+        if (!isActive) return
+        const orderStatus = String(data?.status || data?.order_status || '').toLowerCase()
+        const paymentStatus = String(data?.payment_status || '').toLowerCase()
+        const awaiting = paymentStatus === 'awaiting_payment' || orderStatus === 'awaiting_payment'
+        const doneStatuses = new Set(['completed', 'cancelled', 'rejected', 'delivering', 'ready', 'preparing'])
+        if (!awaiting && (doneStatuses.has(orderStatus) || paymentStatus === 'confirmed')) {
+          clearPendingPayment()
+          setPendingPayment(null)
+        }
+      } catch (error) {
+        // ignore status check errors
+      }
+    }
+
+    checkPendingStatus()
+    return () => {
+      isActive = false
+    }
+  }, [pendingPayment?.orderId])
 
   // Handle quantity change with delta (+1 or -1)
   const handleQuantityChange = (offerId, delta) => {
@@ -829,6 +973,15 @@ function CartPage({ user }) {
       ''
     return String(candidate || '').trim()
   }, [cachedUser?.city, storeCity, user?.city])
+
+  useEffect(() => {
+    if (orderType !== 'delivery') {
+      setDeliveryCheck(null)
+      return
+    }
+    setDeliveryCheck(null)
+  }, [address, orderType, cartStoreId])
+
 
   const validateCartWithServer = useCallback(async () => {
     if (isEmpty) {
@@ -919,24 +1072,46 @@ function CartPage({ user }) {
     }
     if (!storeDeliveryEnabled) {
       toast.error('Yetkazib berish mavjud emas')
+      setDeliveryCheck({
+        status: 'error',
+        canDeliver: false,
+        message: 'Yetkazib berish mavjud emas',
+      })
       return { ok: false, reason: 'disabled' }
     }
     if (!cartStoreId) {
       toast.error('Do\'kon topilmadi')
+      setDeliveryCheck({
+        status: 'error',
+        canDeliver: false,
+        message: 'Do\'kon topilmadi',
+      })
       return { ok: false, reason: 'store' }
     }
 
     const trimmedAddress = address.trim()
     if (!trimmedAddress) {
       toast.warning('Yetkazib berish manzilini kiriting')
+      setDeliveryCheck({
+        status: 'error',
+        canDeliver: false,
+        message: 'Manzil kiritilmagan',
+      })
       return { ok: false, reason: 'address' }
     }
 
     const city = resolveDeliveryCity()
     if (!city) {
       toast.warning('Shaharni tanlang')
+      setDeliveryCheck({
+        status: 'error',
+        canDeliver: false,
+        message: 'Shahar tanlanmagan',
+      })
       return { ok: false, reason: 'city' }
     }
+
+    lastDeliveryCheckRef.current = { address: trimmedAddress, storeId: cartStoreId, city }
 
     try {
       const response = await api.calculateDelivery({
@@ -953,6 +1128,11 @@ function CartPage({ user }) {
 
       if (!canDeliver) {
         toast.error(response?.message || 'Yetkazib berish mavjud emas')
+        setDeliveryCheck({
+          status: 'error',
+          canDeliver: false,
+          message: response?.message || 'Yetkazib berish mavjud emas',
+        })
         return { ok: false, reason: 'unavailable' }
       }
 
@@ -968,6 +1148,11 @@ function CartPage({ user }) {
         response?.minOrderAmount ??
         minOrderAmount
       )
+      const estimatedTime =
+        response?.estimated_time ??
+        response?.estimatedTime ??
+        response?.eta ??
+        ''
 
       let updated = false
       if (Number.isFinite(serverFee) && Math.round(serverFee) !== Math.round(Number(deliveryFee || 0))) {
@@ -979,6 +1164,15 @@ function CartPage({ user }) {
         updated = true
       }
 
+      setDeliveryCheck({
+        status: updated ? 'warn' : 'ok',
+        canDeliver: true,
+        deliveryCost: Number.isFinite(serverFee) ? serverFee : null,
+        minOrderAmount: Number.isFinite(serverMin) ? serverMin : null,
+        estimatedTime,
+        message: response?.message || '',
+      })
+
       if (updated) {
         toast.warning("Yetkazib berish shartlari yangilandi. Iltimos, qayta tekshiring.")
         return { ok: false, reason: 'updated' }
@@ -988,6 +1182,11 @@ function CartPage({ user }) {
         toast.warning(
           `Yetkazib berish uchun minimum ${formatSum(serverMin)} so'm buyurtma qiling`
         )
+        setDeliveryCheck((prev) => ({
+          ...(prev || {}),
+          status: 'warn',
+          message: 'Minimal buyurtma talab qilinadi',
+        }))
         return { ok: false, reason: 'min' }
       }
 
@@ -995,6 +1194,11 @@ function CartPage({ user }) {
     } catch (error) {
       console.warn('Delivery validation failed:', error)
       toast.error("Yetkazib berish narxini tekshirib bo'lmadi. Qayta urinib ko'ring.")
+      setDeliveryCheck({
+        status: 'error',
+        canDeliver: false,
+        message: "Tekshirib bo'lmadi",
+      })
       return { ok: false, reason: 'error' }
     }
   }, [
@@ -1008,6 +1212,90 @@ function CartPage({ user }) {
     storeDeliveryEnabled,
     subtotal,
     toast,
+  ])
+
+  const handleDeliveryCheck = useCallback(async () => {
+    if (deliveryValidationLoading || orderLoading) return
+    setDeliveryValidationLoading(true)
+    await validateDeliveryWithServer()
+    setDeliveryValidationLoading(false)
+  }, [deliveryValidationLoading, orderLoading, validateDeliveryWithServer])
+
+  const pendingPaymentCard = hasPendingPayment ? (
+    <div className="pending-payment-card">
+      <div className="pending-payment-header">
+        <div>
+          <p className="pending-payment-title">To'lov kutilmoqda</p>
+          <p className="pending-payment-subtitle">
+            Buyurtma #{pendingPayment.orderId}
+            {pendingItemsCount > 0 ? ` - ${pendingItemsCount} dona` : ''}
+            {pendingPayment.total ? ` - ${formatSum(pendingPayment.total)} so'm` : ''}
+          </p>
+        </div>
+        <span className="pending-payment-badge">
+          {String(pendingPayment.provider || 'click').toUpperCase()}
+        </span>
+      </div>
+      <div className="pending-payment-actions">
+        <button
+          type="button"
+          className="pending-payment-btn primary"
+          onClick={handleResumePayment}
+          disabled={pendingActionLoading}
+        >
+          {pendingActionLoading ? "Tekshirilmoqda..." : "To'lovni davom ettirish"}
+        </button>
+        <button
+          type="button"
+          className="pending-payment-btn secondary"
+          onClick={handleRestorePendingCart}
+          disabled={pendingActionLoading}
+        >
+          Savatni tiklash
+        </button>
+      </div>
+    </div>
+  ) : null
+
+  useEffect(() => {
+    if (!showCheckoutSheet) return
+    if (orderType !== 'delivery') return
+    if (!storeDeliveryEnabled || !cartStoreId) return
+    if (deliveryValidationLoading || orderLoading) return
+
+    const trimmedAddress = address.trim()
+    if (trimmedAddress.length < 3) return
+
+    const city = resolveDeliveryCity()
+    if (!city) return
+
+    const lastCheck = lastDeliveryCheckRef.current
+    if (
+      lastCheck.address === trimmedAddress &&
+      lastCheck.storeId === cartStoreId &&
+      lastCheck.city === city
+    ) {
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      if (deliveryValidationLoading || orderLoading) return
+      setDeliveryValidationLoading(true)
+      await validateDeliveryWithServer()
+      setDeliveryValidationLoading(false)
+    }, 650)
+
+    return () => clearTimeout(timer)
+  }, [
+    address,
+    cartStoreId,
+    deliveryValidationLoading,
+    orderLoading,
+    orderType,
+    resolveDeliveryCity,
+    showCheckoutSheet,
+    storeDeliveryEnabled,
+    validateDeliveryWithServer,
   ])
 
   const handleCheckout = async () => {
@@ -1257,6 +1545,14 @@ function CartPage({ user }) {
       orderId = result.order_id || result.bookings?.[0]?.booking_id
       const storeId = cartItems[0]?.offer?.store_id || null
       const returnUrl = `${window.location.origin}/order/${orderId}/details`
+      const pendingPayload = savePendingPayment({
+        orderId,
+        storeId,
+        total,
+        provider: 'click',
+        cart: buildCartSnapshot(),
+      })
+      setPendingPayment(pendingPayload)
 
       // Create payment link
       const paymentData = await api.createPaymentLink(orderId, 'click', returnUrl, storeId, total)
@@ -1306,7 +1602,9 @@ function CartPage({ user }) {
           </div>
         </header>
 
-        <main className="cart-empty">
+      <main className="cart-empty">
+        <div className="cart-empty-content">
+          {pendingPaymentCard}
           <div className="empty-card">
             <div className="empty-icon">
               <ShoppingCart size={72} strokeWidth={1.5} color="#0F766E" aria-hidden="true" />
@@ -1326,7 +1624,8 @@ function CartPage({ user }) {
               </button>
             </div>
           </div>
-        </main>
+        </div>
+      </main>
 
         <BottomNav currentPage="cart" cartCount={0} />
       </div>
@@ -1352,6 +1651,7 @@ function CartPage({ user }) {
       </header>
 
       <main className="cart-main">
+        {pendingPaymentCard}
         {hasMultipleStores && (
           <div className="cart-alert" role="status">
             <p>{multiStoreMessage}</p>
@@ -1785,6 +2085,64 @@ function CartPage({ user }) {
                         </div>
                       </div>
                     </div>
+
+                    {orderType === 'delivery' && (
+                      <>
+                        <div className="checkout-delivery-check">
+                          <button
+                            type="button"
+                            className="checkout-delivery-check-btn"
+                            onClick={handleDeliveryCheck}
+                            disabled={!mapEnabled || deliveryValidationLoading}
+                          >
+                            {deliveryValidationLoading ? 'Tekshirilmoqda...' : 'Yetkazib berishni tekshirish'}
+                          </button>
+                          {deliveryValidationLoading && (
+                            <span className="checkout-delivery-check-status">Manzil tekshirilmoqda...</span>
+                          )}
+                        </div>
+
+                        {(deliveryValidationLoading || deliveryCheck) && (
+                          <div className={`checkout-delivery-result ${deliveryCheck?.status || (deliveryValidationLoading ? 'pending' : '')}`}>
+                            <div className="checkout-delivery-result-row">
+                              <span>Holat</span>
+                              <strong>
+                                {deliveryValidationLoading
+                                  ? 'Tekshirilmoqda...'
+                                  : (deliveryCheck?.canDeliver ? 'Mavjud' : 'Mavjud emas')}
+                              </strong>
+                            </div>
+
+                            {deliveryCheck?.message && (
+                              <div className="checkout-delivery-message">{deliveryCheck.message}</div>
+                            )}
+
+                            {deliveryCheck?.canDeliver && (
+                              <div className="checkout-delivery-meta">
+                                {deliverySummaryCost != null && (
+                                  <div className="checkout-delivery-result-row">
+                                    <span>Narx</span>
+                                    <strong>{formatSum(deliverySummaryCost)} so'm</strong>
+                                  </div>
+                                )}
+                                {deliverySummaryMin != null && deliverySummaryMin > 0 && (
+                                  <div className="checkout-delivery-result-row">
+                                    <span>Minimal buyurtma</span>
+                                    <strong>{formatSum(deliverySummaryMin)} so'm</strong>
+                                  </div>
+                                )}
+                                {deliverySummaryEta && (
+                                  <div className="checkout-delivery-result-row">
+                                    <span>Vaqt</span>
+                                    <strong>{deliverySummaryEta}</strong>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
 
                     <input
                       className="checkout-input"
