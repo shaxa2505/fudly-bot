@@ -27,7 +27,18 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     bot = bot_instance
 
 
-@router.message(F.text.in_(["Аналитика", "Analitika", "📊 Аналитика", "📊 Analitika"]))
+@router.message(
+    F.text.in_(
+        {
+            get_text("ru", "analytics"),
+            get_text("uz", "analytics"),
+            "?????????",
+            "Analitika",
+            "?? ?????????",
+            "?? Analitika",
+        }
+    )
+)
 async def show_analytics(message: types.Message) -> None:
     """Show analytics menu for seller."""
     if not db:

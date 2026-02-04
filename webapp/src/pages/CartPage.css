@@ -2500,7 +2500,7 @@
 
 .checkout-map-search-hint {
   position: absolute;
-  top: 54px;
+  top: 10px;
   left: 10px;
   right: 10px;
   padding: 8px 12px;
@@ -2517,7 +2517,7 @@
 
 .checkout-map-search-results {
   position: absolute;
-  top: 54px;
+  top: 10px;
   left: 10px;
   right: 10px;
   max-height: 160px;

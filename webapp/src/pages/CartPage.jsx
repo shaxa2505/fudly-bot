@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, Search, LocateFixed } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, LocateFixed } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -17,6 +17,23 @@ import './CartPage.css'
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
 const DEFAULT_MAP_CENTER = { lat: 41.2995, lon: 69.2401 }
 const AUTO_DELIVERY_THRESHOLD = 30000
+
+const normalizeAddressLabel = (value) => {
+  if (!value) return ''
+  const parts = String(value)
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean)
+  const seen = new Set()
+  const unique = []
+  for (const part of parts) {
+    const key = part.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(part)
+  }
+  return unique.join(', ')
+}
 
 function CartPage({ user }) {
   const navigate = useNavigate()
@@ -57,7 +74,7 @@ function CartPage({ user }) {
   const [address, setAddress] = useState(() => {
     try {
       const loc = JSON.parse(localStorage.getItem('fudly_location') || '{}')
-      return loc.address || ''
+      return normalizeAddressLabel(loc.address || '')
     } catch { return '' }
   })
   const [comment, setComment] = useState('')
@@ -176,11 +193,12 @@ function CartPage({ user }) {
     }
 
     if (resolved?.address) {
-      setAddress(resolved.address)
+      const normalizedAddress = normalizeAddressLabel(resolved.address)
+      setAddress(normalizedAddress)
       if (!mapUserEditingRef.current || force) {
-        setMapQuery(resolved.address)
+        setMapQuery(normalizedAddress)
       }
-      saveLocation(resolved)
+      saveLocation({ ...resolved, address: normalizedAddress })
     } else {
       setMapError('Manzilni aniqlab bo\'lmadi')
       saveCoordsFallback(lat, lon)
@@ -486,8 +504,9 @@ function CartPage({ user }) {
     const lon = Number(result?.lon)
     const label = result?.display_name || ''
     if (label) {
-      setAddress(label)
-      setMapQuery(label)
+      const normalizedLabel = normalizeAddressLabel(label)
+      setAddress(normalizedLabel)
+      setMapQuery(normalizedLabel)
     }
     setMapSearchOpen(false)
     setMapSearchResults([])
@@ -1096,8 +1115,11 @@ function CartPage({ user }) {
     if (orderType !== 'delivery') {
       return { ok: true }
     }
+    const shouldToast = !showCheckoutSheet
     if (!storeDeliveryEnabled) {
-      toast.error('Yetkazib berish mavjud emas')
+      if (shouldToast) {
+        toast.error('Yetkazib berish mavjud emas')
+      }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
@@ -1106,7 +1128,9 @@ function CartPage({ user }) {
       return { ok: false, reason: 'disabled' }
     }
     if (!cartStoreId) {
-      toast.error('Do\'kon topilmadi')
+      if (shouldToast) {
+        toast.error('Do\'kon topilmadi')
+      }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
@@ -1117,7 +1141,9 @@ function CartPage({ user }) {
 
     const trimmedAddress = address.trim()
     if (!trimmedAddress) {
-      toast.warning('Yetkazib berish manzilini kiriting')
+      if (shouldToast) {
+        toast.warning('Yetkazib berish manzilini kiriting')
+      }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
@@ -1128,7 +1154,9 @@ function CartPage({ user }) {
 
     const city = resolveDeliveryCity()
     if (!city) {
-      toast.warning('Shaharni tanlang')
+      if (shouldToast) {
+        toast.warning('Shaharni tanlang')
+      }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
@@ -1153,7 +1181,9 @@ function CartPage({ user }) {
       )
 
       if (!canDeliver) {
-        toast.error(response?.message || 'Yetkazib berish mavjud emas')
+        if (shouldToast) {
+          toast.error(response?.message || 'Yetkazib berish mavjud emas')
+        }
         setDeliveryCheck({
           status: 'error',
           canDeliver: false,
@@ -1200,14 +1230,18 @@ function CartPage({ user }) {
       })
 
       if (updated) {
-        toast.warning("Yetkazib berish shartlari yangilandi. Iltimos, qayta tekshiring.")
+        if (shouldToast) {
+          toast.warning("Yetkazib berish shartlari yangilandi. Iltimos, qayta tekshiring.")
+        }
         return { ok: false, reason: 'updated' }
       }
 
       if (Number.isFinite(serverMin) && serverMin > 0 && subtotal < serverMin) {
-        toast.warning(
-          `Yetkazib berish uchun minimum ${formatSum(serverMin)} so'm buyurtma qiling`
-        )
+        if (shouldToast) {
+          toast.warning(
+            `Yetkazib berish uchun minimum ${formatSum(serverMin)} so'm buyurtma qiling`
+          )
+        }
         setDeliveryCheck((prev) => ({
           ...(prev || {}),
           status: 'warn',
@@ -1219,7 +1253,9 @@ function CartPage({ user }) {
       return { ok: true }
     } catch (error) {
       console.warn('Delivery validation failed:', error)
-      toast.error("Yetkazib berish narxini tekshirib bo'lmadi. Qayta urinib ko'ring.")
+      if (shouldToast) {
+        toast.error("Yetkazib berish narxini tekshirib bo'lmadi. Qayta urinib ko'ring.")
+      }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
@@ -1235,6 +1271,7 @@ function CartPage({ user }) {
     minOrderAmount,
     orderType,
     resolveDeliveryCity,
+    showCheckoutSheet,
     storeDeliveryEnabled,
     subtotal,
     toast,
@@ -1977,62 +2014,6 @@ function CartPage({ user }) {
                         aria-busy={isMapLoading || isMapResolving}
                       >
                         <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
-                        <div className="checkout-map-search">
-                          <Search size={16} strokeWidth={2} aria-hidden="true" />
-                          <input
-                            className="checkout-map-search-input"
-                            placeholder="Manzilni qidiring"
-                            value={mapQuery}
-                            onChange={(event) => {
-                              const nextValue = event.target.value
-                              setMapQuery(nextValue)
-                              setAddress(nextValue)
-                              if (!mapSearchOpen) {
-                                setMapSearchOpen(true)
-                              }
-                            }}
-                            onFocus={() => {
-                              if (mapSearchCloseTimeoutRef.current) {
-                                clearTimeout(mapSearchCloseTimeoutRef.current)
-                                mapSearchCloseTimeoutRef.current = null
-                              }
-                              mapUserEditingRef.current = true
-                              setMapSearchOpen(true)
-                            }}
-                            onBlur={() => {
-                              if (mapSearchCloseTimeoutRef.current) {
-                                clearTimeout(mapSearchCloseTimeoutRef.current)
-                              }
-                              mapSearchCloseTimeoutRef.current = setTimeout(() => {
-                                setMapSearchOpen(false)
-                              }, 180)
-                              mapUserEditingRef.current = false
-                            }}
-                            disabled={!mapEnabled}
-                          />
-                          {mapQuery && mapEnabled && (
-                            <button
-                              type="button"
-                              className="checkout-map-search-clear"
-                              onClick={() => {
-                                setMapQuery('')
-                                setAddress('')
-                                setMapSearchResults([])
-                                setMapSearchLoading(false)
-                                setMapSearchOpen(true)
-                                mapUserEditingRef.current = true
-                              }}
-                              aria-label="Qidiruvni tozalash"
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              </svg>
-                            </button>
-                          )}
-                          {mapSearchLoading && mapSearchOpen && mapEnabled && (
-                            <span className="checkout-map-search-loading">Izlanmoqda...</span>
-                          )}
-                        </div>
                         {mapEnabled && mapSearchOpen && mapQuery.trim().length > 0 && mapQuery.trim().length < 3 && (
                           <div className="checkout-map-search-hint">
                             Kamida 3 ta belgi kiriting
