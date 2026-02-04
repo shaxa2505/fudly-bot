@@ -34,7 +34,6 @@ from handlers.common.utils import (
     is_profile_button,
     set_user_view_mode,
 )
-from handlers.seller.dashboard import send_partner_dashboard
 from localization import get_cities, get_text
 from logging_config import logger
 
@@ -482,7 +481,6 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
                 "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
                 reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id),
             )
-            await send_partner_dashboard(callback.message, user_id, lang)
             await callback.answer()
         except Exception as e:
             logger.error(f"❌ Error sending seller menu to user {user_id}: {e}", exc_info=True)

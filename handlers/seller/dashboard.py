@@ -73,14 +73,11 @@ def _get_dashboard_stats(user_id: int) -> tuple[int, dict[str, int]]:
 
 def _build_dashboard_keyboard(lang: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text=get_text(lang, "orders"), callback_data="seller_dashboard_orders")
-    kb.button(text=get_text(lang, "my_items"), callback_data="seller_dashboard_items")
-    kb.button(text=get_text(lang, "add_item"), callback_data="seller_dashboard_add_full")
-    kb.button(text=get_text(lang, "quick_add"), callback_data="seller_dashboard_add_quick")
-    kb.button(text=get_text(lang, "bulk_import"), callback_data="seller_dashboard_add_import")
     kb.button(text=get_text(lang, "today_stats"), callback_data="seller_dashboard_stats")
+    kb.button(text=get_text(lang, "analytics"), callback_data="seller_dashboard_analytics")
+    kb.button(text=get_text(lang, "bulk_import"), callback_data="seller_dashboard_add_import")
     kb.button(text=get_text(lang, "store_settings"), callback_data="my_store_settings")
-    kb.adjust(2, 2, 2, 1)
+    kb.adjust(2, 2)
     return kb.as_markup()
 
 
@@ -108,6 +105,26 @@ async def send_partner_dashboard(message: types.Message, user_id: int, lang: str
 
     text = _build_dashboard_text(lang, store_count, counts)
     await message.answer(text, parse_mode="HTML", reply_markup=_build_dashboard_keyboard(lang))
+
+
+@router.message(
+    F.text.in_(
+        {
+            get_text("ru", "partner_panel"),
+            get_text("uz", "partner_panel"),
+        }
+    )
+)
+async def partner_panel(message: types.Message, state: FSMContext) -> None:
+    """Open partner dashboard on demand."""
+    await state.clear()
+    if not message.from_user:
+        return
+    if not db:
+        await message.answer(get_text("ru", "system_error"))
+        return
+    lang = db.get_user_language(message.from_user.id)
+    await send_partner_dashboard(message, message.from_user.id, lang)
 
 
 @router.callback_query(F.data == "seller_dashboard_orders")
@@ -161,4 +178,13 @@ async def dashboard_stats(callback: types.CallbackQuery) -> None:
     from handlers.seller.stats import partner_stats_today
 
     await partner_stats_today(_MessageProxy(callback))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "seller_dashboard_analytics")
+async def dashboard_analytics(callback: types.CallbackQuery) -> None:
+    """Open partner analytics from dashboard."""
+    from handlers.seller.analytics import show_analytics
+
+    await show_analytics(_MessageProxy(callback))
     await callback.answer()

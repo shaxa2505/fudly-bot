@@ -32,10 +32,8 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
         {
             get_text("ru", "analytics"),
             get_text("uz", "analytics"),
-            "?????????",
+            "\u0410\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430",
             "Analitika",
-            "?? ?????????",
-            "?? Analitika",
         }
     )
 )
@@ -63,7 +61,7 @@ async def show_analytics(message: types.Message) -> None:
         # Dict-compatible access
         store_id = store.get("store_id") if isinstance(store, dict) else store[0]
         store_name = store.get("name") if isinstance(store, dict) else store[2]
-        label = "Аналитика" if lang == "ru" else "Analitika"
+        label = get_text(lang, "analytics")
         keyboard.button(text=f"{label}: {store_name}", callback_data=f"analytics_{store_id}")
     keyboard.adjust(1)
 

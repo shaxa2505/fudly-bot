@@ -210,6 +210,10 @@ MAIN_MENU_BUTTONS = {
     "📥 Import",
     "🏠 Мой магазин",
     "🏠 Mening do'konim",
+    "\U0001F4CA \u041F\u0430\u043D\u0435\u043B\u044C",
+    "\U0001F4CA Panel",
+    "\U0001F5A5 \u0412\u0435\u0431-\u043F\u0430\u043D\u0435\u043B\u044C",
+    "\U0001F5A5 Veb-panel",
     # Common
     "❌ Отмена",
     "❌ Bekor qilish",
