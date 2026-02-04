@@ -16,7 +16,6 @@ import './CartPage.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
 const DEFAULT_MAP_CENTER = { lat: 41.2995, lon: 69.2401 }
-const AUTO_DELIVERY_THRESHOLD = 30000
 
 const normalizeAddressLabel = (value) => {
   if (!value) return ''
@@ -716,12 +715,92 @@ function CartPage({ user }) {
   const autoOrderType = useMemo(() => {
     if (storeInfoLoading) return orderType
     if (!storeDeliveryEnabled) return 'pickup'
-    return subtotal >= AUTO_DELIVERY_THRESHOLD ? 'delivery' : 'pickup'
-  }, [storeDeliveryEnabled, storeInfoLoading, subtotal, orderType])
-  const deliveryOptionDisabled = storeInfoLoading || !storeDeliveryEnabled || subtotal < AUTO_DELIVERY_THRESHOLD
+    return 'delivery'
+  }, [storeDeliveryEnabled, storeInfoLoading, orderType])
+  const deliveryOptionDisabled = storeInfoLoading || !storeDeliveryEnabled
   const deliverySummaryCost = deliveryCheck?.deliveryCost ?? (Number.isFinite(deliveryFee) ? deliveryFee : null)
   const deliverySummaryMin = deliveryCheck?.minOrderAmount ?? (Number.isFinite(minOrderAmount) ? minOrderAmount : null)
   const deliverySummaryEta = deliveryCheck?.estimatedTime || ''
+  const deliveryMinNotMet = Number.isFinite(minOrderAmount) && minOrderAmount > 0 && subtotal < minOrderAmount
+  const deliveryStatus = useMemo(() => {
+    if (orderType !== 'delivery') return null
+    if (deliveryValidationLoading) {
+      return {
+        status: 'pending',
+        label: 'Tekshirilmoqda...',
+        message: 'Manzil tekshirilmoqda...',
+      }
+    }
+
+    if (!storeInfoLoading && !storeDeliveryEnabled) {
+      return {
+        status: 'error',
+        label: 'Mavjud emas',
+        message: 'Yetkazib berish mavjud emas',
+      }
+    }
+
+    const trimmedAddress = address.trim()
+    if (!trimmedAddress) {
+      return {
+        status: 'warn',
+        label: 'Manzil kiritilmagan',
+        message: 'Manzil kiritilmagan',
+      }
+    }
+
+    if (deliveryCheck) {
+      if (!deliveryCheck.canDeliver) {
+        return {
+          status: 'error',
+          label: 'Mavjud emas',
+          message: deliveryCheck.message || 'Yetkazib berish mavjud emas',
+        }
+      }
+      if (deliveryMinNotMet) {
+        return {
+          status: 'warn',
+          label: 'Minimal buyurtma talab qilinadi',
+          message: deliveryCheck.message || 'Minimal buyurtma talab qilinadi',
+        }
+      }
+      return {
+        status: deliveryCheck.status || 'ok',
+        label: 'Mavjud',
+        message: deliveryCheck.message || '',
+      }
+    }
+
+    if (deliveryMinNotMet) {
+      return {
+        status: 'warn',
+        label: 'Minimal buyurtma talab qilinadi',
+        message: 'Minimal buyurtma talab qilinadi',
+      }
+    }
+
+    if (storeInfoLoading) {
+      return {
+        status: 'pending',
+        label: 'Tekshirilmoqda...',
+        message: 'Yetkazib berish shartlari tekshirilmoqda...',
+      }
+    }
+
+    return {
+      status: 'pending',
+      label: 'Tekshirilmoqda...',
+      message: 'Manzil tekshirilmoqda...',
+    }
+  }, [
+    address,
+    deliveryCheck,
+    deliveryMinNotMet,
+    deliveryValidationLoading,
+    orderType,
+    storeDeliveryEnabled,
+    storeInfoLoading,
+  ])
   const pendingItemsCount = useMemo(() => {
     const cart = pendingPayment?.cart
     if (!cart || typeof cart !== 'object') return 0
@@ -1276,13 +1355,6 @@ function CartPage({ user }) {
     subtotal,
     toast,
   ])
-
-  const handleDeliveryCheck = useCallback(async () => {
-    if (deliveryValidationLoading || orderLoading) return
-    setDeliveryValidationLoading(true)
-    await validateDeliveryWithServer()
-    setDeliveryValidationLoading(false)
-  }, [deliveryValidationLoading, orderLoading, validateDeliveryWithServer])
 
   const pendingPaymentCard = hasPendingPayment ? (
     <div className="pending-payment-card">
@@ -1981,20 +2053,13 @@ function CartPage({ user }) {
                       >
                         <span className="order-type-icon" aria-hidden="true"></span>
                         <span className="order-type-text">Yetkazib berish</span>
-                        <span className="order-type-desc">{storeInfoLoading ? 'Ma\'lumot yuklanmoqda' : 'Kuryer orqali'}</span>
+                        <span className="order-type-desc">
+                          {storeInfoLoading
+                            ? 'Ma\'lumot yuklanmoqda'
+                            : (storeDeliveryEnabled ? 'Kuryer orqali' : 'Mavjud emas')}
+                        </span>
                       </button>
                     </div>
-                    {storeInfoLoading && (
-                      <p className="checkout-hint neutral">Yetkazib berish shartlari tekshirilmoqda...</p>
-                    )}
-                    {!storeInfoLoading && !storeDeliveryEnabled && (
-                      <p className="checkout-hint">Yetkazib berish mavjud emas</p>
-                    )}
-                    {!storeInfoLoading && storeDeliveryEnabled && subtotal < AUTO_DELIVERY_THRESHOLD && (
-                      <p className="checkout-hint">
-                        Yetkazib berish {formatSum(AUTO_DELIVERY_THRESHOLD)} so'mdan boshlab
-                      </p>
-                    )}
                   </section>
                   <section className="checkout-block">
                     <div className="checkout-block-header">
@@ -2148,62 +2213,40 @@ function CartPage({ user }) {
                       </div>
                     </div>
 
-                    {orderType === 'delivery' && (
-                      <>
-                        <div className="checkout-delivery-check">
-                          <button
-                            type="button"
-                            className="checkout-delivery-check-btn"
-                            onClick={handleDeliveryCheck}
-                            disabled={!mapEnabled || deliveryValidationLoading}
-                          >
-                            {deliveryValidationLoading ? 'Tekshirilmoqda...' : 'Yetkazib berishni tekshirish'}
-                          </button>
-                          {deliveryValidationLoading && (
-                            <span className="checkout-delivery-check-status">Manzil tekshirilmoqda...</span>
-                          )}
+                    {orderType === 'delivery' && deliveryStatus && (
+                      <div className={`checkout-delivery-result ${deliveryStatus.status || ''}`}>
+                        <div className="checkout-delivery-result-row">
+                          <span>Holat</span>
+                          <strong>{deliveryStatus.label}</strong>
                         </div>
 
-                        {(deliveryValidationLoading || deliveryCheck) && (
-                          <div className={`checkout-delivery-result ${deliveryCheck?.status || (deliveryValidationLoading ? 'pending' : '')}`}>
-                            <div className="checkout-delivery-result-row">
-                              <span>Holat</span>
-                              <strong>
-                                {deliveryValidationLoading
-                                  ? 'Tekshirilmoqda...'
-                                  : (deliveryCheck?.canDeliver ? 'Mavjud' : 'Mavjud emas')}
-                              </strong>
-                            </div>
+                        {deliveryStatus.message && deliveryStatus.message !== deliveryStatus.label && (
+                          <div className="checkout-delivery-message">{deliveryStatus.message}</div>
+                        )}
 
-                            {deliveryCheck?.message && (
-                              <div className="checkout-delivery-message">{deliveryCheck.message}</div>
+                        {storeDeliveryEnabled && (deliverySummaryCost != null || deliverySummaryMin != null || deliverySummaryEta) && (
+                          <div className="checkout-delivery-meta">
+                            {deliverySummaryCost != null && (
+                              <div className="checkout-delivery-result-row">
+                                <span>Narx</span>
+                                <strong>{formatSum(deliverySummaryCost)} so'm</strong>
+                              </div>
                             )}
-
-                            {deliveryCheck?.canDeliver && (
-                              <div className="checkout-delivery-meta">
-                                {deliverySummaryCost != null && (
-                                  <div className="checkout-delivery-result-row">
-                                    <span>Narx</span>
-                                    <strong>{formatSum(deliverySummaryCost)} so'm</strong>
-                                  </div>
-                                )}
-                                {deliverySummaryMin != null && deliverySummaryMin > 0 && (
-                                  <div className="checkout-delivery-result-row">
-                                    <span>Minimal buyurtma</span>
-                                    <strong>{formatSum(deliverySummaryMin)} so'm</strong>
-                                  </div>
-                                )}
-                                {deliverySummaryEta && (
-                                  <div className="checkout-delivery-result-row">
-                                    <span>Vaqt</span>
-                                    <strong>{deliverySummaryEta}</strong>
-                                  </div>
-                                )}
+                            {deliverySummaryMin != null && deliverySummaryMin > 0 && (
+                              <div className="checkout-delivery-result-row">
+                                <span>Minimal buyurtma</span>
+                                <strong>{formatSum(deliverySummaryMin)} so'm</strong>
+                              </div>
+                            )}
+                            {deliverySummaryEta && (
+                              <div className="checkout-delivery-result-row">
+                                <span>Vaqt</span>
+                                <strong>{deliverySummaryEta}</strong>
                               </div>
                             )}
                           </div>
                         )}
-                      </>
+                      </div>
                     )}
 
                     <input
@@ -2223,38 +2266,26 @@ function CartPage({ user }) {
                         onChange={e => setPhone(e.target.value)}
                       />
                     )}
-                    {orderType === 'delivery' && !storeInfoLoading && !storeDeliveryEnabled && (
-                      <p className="checkout-hint">Yetkazib berish mavjud emas</p>
-                    )}
-                    {orderType === 'delivery' && !storeInfoLoading && storeDeliveryEnabled && !canDelivery && (
-                      <p className="checkout-hint">
-                        Yetkazib berish uchun minimum {Math.round(minOrderAmount).toLocaleString()} so'm buyurtma qiling
-                      </p>
-                    )}
-                    {orderType === 'delivery' && !storeInfoLoading && storeDeliveryEnabled && canDelivery && deliveryRequiresPrepay && !hasPrepayProviders && (
-                      <p className="checkout-hint">
-                        Yetkazib berish uchun to'lov usullari mavjud emas
-                      </p>
-                    )}
                   </section>
 
-                  <section className="checkout-block">
-                    <h3>Yetkazib berish vaqti</h3>
-                    <div className="checkout-time-scroll">
-                      {deliveryOptions.map(option => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className={`checkout-time-card ${deliverySlot === option.id ? 'active' : ''}`}
-                          onClick={() => setDeliverySlot(option.id)}
-                          disabled={orderType !== 'delivery'}
-                        >
-                          <span className="checkout-time-label">{option.label}</span>
-                          <span className="checkout-time-value">{option.time}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
+                  {orderType === 'delivery' && (
+                    <section className="checkout-block">
+                      <h3>Yetkazib berish vaqti</h3>
+                      <div className="checkout-time-scroll">
+                        {deliveryOptions.map(option => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            className={`checkout-time-card ${deliverySlot === option.id ? 'active' : ''}`}
+                            onClick={() => setDeliverySlot(option.id)}
+                          >
+                            <span className="checkout-time-label">{option.label}</span>
+                            <span className="checkout-time-value">{option.time}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
 
                   <section className="checkout-block">
                     <h3>To'lov turi</h3>
@@ -2283,6 +2314,11 @@ function CartPage({ user }) {
                         )
                       })}
                     </div>
+                    {orderType === 'delivery' && deliveryRequiresPrepay && !hasPrepayProviders && (
+                      <p className="checkout-hint">
+                        Yetkazib berish uchun to'lov usullari mavjud emas
+                      </p>
+                    )}
                   </section>
 
                   <section className="checkout-block checkout-block--last">
