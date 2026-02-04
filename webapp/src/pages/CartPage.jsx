@@ -2217,7 +2217,9 @@ function CartPage({ user }) {
                       <div className={`checkout-delivery-result ${deliveryStatus.status || ''}`}>
                         <div className="checkout-delivery-result-row">
                           <span>Holat</span>
-                          <strong>{deliveryStatus.label}</strong>
+                          <span className={`checkout-delivery-badge ${deliveryStatus.status || ''}`}>
+                            {deliveryStatus.label}
+                          </span>
                         </div>
 
                         {deliveryStatus.message && deliveryStatus.message !== deliveryStatus.label && (

@@ -1,362 +1,335 @@
-<?xml version="1.0" encoding="windows-1251"?>
-<ROOT>	
-	<version>2.0.0.2</version>
-	<scenario>		
-		<scenario_id>1</scenario_id>            
-		<scenario_name>Сценарий 1</scenario_name>           
-		<scenario_desc>Ошибка в подписе при подготовке платежа</scenario_desc>           
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>0</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>     
-		<req_secret_key>5555somewrongsole</req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-1</rep_error>	  	          
-		<rep_error_note>SIGN CHECK FAILED!</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>2</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>2</scenario_id>            
-		<scenario_name>Сценарий 2</scenario_name>           
-		<scenario_desc>Успешная подготовка платежа</scenario_desc>           
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>0</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>0</rep_error>	  	          
-		<rep_error_note>Success</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>3</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>3</scenario_id>            
-		<scenario_name>Сценарий 3</scenario_name>           
-		<scenario_desc>Ошибка в подписе при подтверждении платежа</scenario_desc>           
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>     
-		<req_secret_key>5555somewrongsole</req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-1</rep_error>	  	          
-		<rep_error_note>SIGN CHECK FAILED!</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>4</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>4</scenario_id>            
-		<scenario_name>Сценарий 4</scenario_name>           
-		<scenario_desc>Ошибка в сумме при подтверждение платежа</scenario_desc>           
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>1500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-2</rep_error>	  	          
-		<rep_error_note>Incorrect parameter amount</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>5</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>5</scenario_id>            
-		<scenario_name>Сценарий 5</scenario_name>           
-		<scenario_desc>Успешное подтверждение платежа</scenario_desc>           
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>0</rep_error>	  	          
-		<rep_error_note>Success</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>6</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>6</scenario_id>            
-		<scenario_name>Сценарий 6</scenario_name>           
-		<scenario_desc>Повторное подтверждение ранее успешного платежа</scenario_desc>           
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-4</rep_error>	  	          
-		<rep_error_note>Already paid</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>7</goto>
-	</scenario>
-	<scenario>
-		<scenario_id>7</scenario_id>
-		<scenario_name>Сценарий 7</scenario_name>
-		<scenario_desc>Попытка отмены ранее успешного платежа</scenario_desc>
-		<req_click_trans_id>14566027</req_click_trans_id>
-		<req_amount>500</req_amount>
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>
-		<req_error>-1</req_error>
-		<req_error_note>Ошибка в банке</req_error_note>
-		<req_click_paydoc_id>16853761</req_click_paydoc_id>
-		<req_secret_key></req_secret_key>
-
-		<rep_click_trans_id>%s</rep_click_trans_id>
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>
-		<rep_error>-4</rep_error>
-		<rep_error_note>Already paid</rep_error_note>
-		<scenario_result>0</scenario_result>
-		<goto>0</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>8</scenario_id>
-		<scenario_name>Сценарий 8</scenario_name>
-		<scenario_desc>Не найдет пользователь/заказ</scenario_desc>           
-		<req_click_trans_id>14566030</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id>55550000000000000000555555</req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>0</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853764</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-5</rep_error>	  	          
-		<rep_error_note>User does not exist</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>9</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>9</scenario_id>
-		<scenario_name>Сценарий 9</scenario_name>
-		<scenario_desc>Успешная подготовка платежа</scenario_desc>           
-		<req_click_trans_id>14566030</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>0</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853764</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>0</rep_error>	  	          
-		<rep_error_note>Success</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>10</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>10</scenario_id>
-		<scenario_name>Сценарий 10</scenario_name>
-		<scenario_desc>Не найдена транзакция (проверка параметра merchant_prepare_id)</scenario_desc>           
-		<req_click_trans_id>14566030</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>77777777777777</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853764</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-6</rep_error>	  	          
-		<rep_error_note>Transaction does not exist</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>11</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>11</scenario_id>
-		<scenario_name>Сценарий 11</scenario_name>
-		<scenario_desc>Успешное подтверждение платежа, Complete</scenario_desc>           
-		<req_click_trans_id>14566030</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853764</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>0</rep_error>	  	          
-		<rep_error_note>Success</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>0</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>12</scenario_id>
-		<scenario_name>Сценарий 12</scenario_name>
-		<scenario_desc>Успешная подготовка платежа</scenario_desc>           
-		<req_click_trans_id>14566033</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>0</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853765</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>0</rep_error>	  	          
-		<rep_error_note>Success</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>13</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>13</scenario_id>
-		<scenario_name>Сценарий 13</scenario_name>
-		<scenario_desc>Отмена платежа</scenario_desc>           
-		<req_click_trans_id>14566033</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>-5017</req_error>               
-		<req_error_note>Нехватка средств</req_error_note>          
-		<req_click_paydoc_id>16853765</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-9</rep_error>	  	          
-		<rep_error_note>Transaction cancelled</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>14</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>14</scenario_id>
-		<scenario_name>Сценарий 14</scenario_name>
-		<scenario_desc>Повторная отмена платежа</scenario_desc>           
-		<req_click_trans_id>14566033</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>-5017</req_error>               
-		<req_error_note>Нехватка средств</req_error_note>          
-		<req_click_paydoc_id>16853765</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-9</rep_error>	  	          
-		<rep_error_note>Transaction cancelled</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>15</goto>
-	</scenario>
-	<scenario>		
-		<scenario_id>15</scenario_id>
-		<scenario_name>Сценарий 15</scenario_name>
-		<scenario_desc>Повторное подтверждение ранее отменного платежа</scenario_desc>           
-		<req_click_trans_id>14566033</req_click_trans_id>
-		<req_amount>500</req_amount>     
-		<req_merchant_trans_id></req_merchant_trans_id>
-		<req_merchant_prepare_id>%s</req_merchant_prepare_id>
-		<req_action>1</req_action>              
-		<req_error>0</req_error>               
-		<req_error_note>Ok</req_error_note>          
-		<req_click_paydoc_id>16853765</req_click_paydoc_id>     
-		<req_secret_key></req_secret_key>   
-		
-		<rep_click_trans_id>%s</rep_click_trans_id>      
-		<rep_merchant_trans_id>%s</rep_merchant_trans_id>	  
-		<rep_merchant_prepare_id></rep_merchant_prepare_id>	
-		<rep_merchant_confirm_id></rep_merchant_confirm_id>	
-		<rep_error>-9</rep_error>	  	          
-		<rep_error_note>Transaction cancelled</rep_error_note>	        
-		<scenario_result>0</scenario_result>
-		<goto>0</goto>
-	</scenario>
-	<sign>AEIHSY2YS/Q1yg1yO161DvkPFm8zOIiuLWoFh9yghCRTXOQ4gXPtFVLb75Rz5hI1
-+RZJMC3Gt9Y4RXnv1vnOvstCwsI7hkwp8DeLr5Qk3ycv3IvXer/0GaHNmyzPo/yQ
-+D6P9uG+xF3PVpg0cvcSn8D4MVKKF7XlLGuUXjHbhxdVMeJmnSkP1BNv3jCWxkD8
-anXQGb/WCtJJTqF78CI72+fsQ28/dmqMUVTbX0nrSD3yJ3bWjE1cR81XInUrzfQ1
-tsevIa6Xcqqc+LgIB1DcXodIiDCQ3WF+MReJ6cYwXvHREPu08bI1h9MaYLNCs7Jp
-s5RMRDiPVNBACBuJkDq4kzwbXwufVFE69ZOtmciB0aYn0+6+qV7MjxgIkJWlnuvE
-TaQIDsMFS5PHiA09puEMCbyoFyHswik5O5RLUYiqLSMCCBJ0au4Evf+vq5VcqosR
-sjlib3gAceBLsGkyMe40QJvt2DsrFZ02/6fYT4A0MDLN54B4I8jtKd5EPtZqMPNE
-EtWPK9nL18pCUc7sWNjTVYk6/jGrk494PkvOss7Z9TbGbr6hQYKpx7tc2+T+8xrX
-hjOkBxCLvGDMsafbN0qSSm5XqywjzRt9PpgkfmKXN1Alwo9Z292R5lnurwfdVQsD
-bfxevoDkqA0TkoTyVaLD4f6Mi5JW0Z1Gavj6lkV0uko=</sign>
-	<url_reg>https://mapi.click.uz/merchants/reg.php</url_reg>
+<ROOT>
+<version>2.0.0.2</version>
+<scenario>
+<scenario_id>1</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 1</scenario_name>
+<scenario_desc>РћС€РёР±РєР° РІ РїРѕРґРїРёСЃРµ РїСЂРё РїРѕРґРіРѕС‚РѕРІРєРµ РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>0</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key>5555somewrongsole</req_secret_key>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-1</rep_error>
+<rep_error_note>SIGN CHECK FAILED!</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>2</goto>
+</scenario>
+<scenario>
+<scenario_id>2</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 2</scenario_name>
+<scenario_desc>РЈСЃРїРµС€РЅР°СЏ РїРѕРґРіРѕС‚РѕРІРєР° РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>0</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>0</rep_error>
+<rep_error_note>Success</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>3</goto>
+</scenario>
+<scenario>
+<scenario_id>3</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 3</scenario_name>
+<scenario_desc>РћС€РёР±РєР° РІ РїРѕРґРїРёСЃРµ РїСЂРё РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРё РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key>5555somewrongsole</req_secret_key>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-1</rep_error>
+<rep_error_note>SIGN CHECK FAILED!</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>4</goto>
+</scenario>
+<scenario>
+<scenario_id>4</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 4</scenario_name>
+<scenario_desc>РћС€РёР±РєР° РІ СЃСѓРјРјРµ РїСЂРё РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>1500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-2</rep_error>
+<rep_error_note>Incorrect parameter amount</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>5</goto>
+</scenario>
+<scenario>
+<scenario_id>5</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 5</scenario_name>
+<scenario_desc>РЈСЃРїРµС€РЅРѕРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>0</rep_error>
+<rep_error_note>Success</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>6</goto>
+</scenario>
+<scenario>
+<scenario_id>6</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 6</scenario_name>
+<scenario_desc>РџРѕРІС‚РѕСЂРЅРѕРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ СЂР°РЅРµРµ СѓСЃРїРµС€РЅРѕРіРѕ РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-4</rep_error>
+<rep_error_note>Already paid</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>7</goto>
+</scenario>
+<scenario>
+<scenario_id>7</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 7</scenario_name>
+<scenario_desc>РџРѕРїС‹С‚РєР° РѕС‚РјРµРЅС‹ СЂР°РЅРµРµ СѓСЃРїРµС€РЅРѕРіРѕ РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566027</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>-1</req_error>
+<req_error_note>РћС€РёР±РєР° РІ Р±Р°РЅРєРµ</req_error_note>
+<req_click_paydoc_id>16853761</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-4</rep_error>
+<rep_error_note>Already paid</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>0</goto>
+</scenario>
+<scenario>
+<scenario_id>8</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 8</scenario_name>
+<scenario_desc>РќРµ РЅР°Р№РґРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ/Р·Р°РєР°Р·</scenario_desc>
+<req_click_trans_id>14566030</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id>55550000000000000000555555</req_merchant_trans_id>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>0</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853764</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-5</rep_error>
+<rep_error_note>User does not exist</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>9</goto>
+</scenario>
+<scenario>
+<scenario_id>9</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 9</scenario_name>
+<scenario_desc>РЈСЃРїРµС€РЅР°СЏ РїРѕРґРіРѕС‚РѕРІРєР° РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566030</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>0</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853764</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>0</rep_error>
+<rep_error_note>Success</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>10</goto>
+</scenario>
+<scenario>
+<scenario_id>10</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 10</scenario_name>
+<scenario_desc>РќРµ РЅР°Р№РґРµРЅР° С‚СЂР°РЅР·Р°РєС†РёСЏ (РїСЂРѕРІРµСЂРєР° РїР°СЂР°РјРµС‚СЂР° merchant_prepare_id)</scenario_desc>
+<req_click_trans_id>14566030</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>77777777777777</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853764</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-6</rep_error>
+<rep_error_note>Transaction does not exist</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>11</goto>
+</scenario>
+<scenario>
+<scenario_id>11</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 11</scenario_name>
+<scenario_desc>РЈСЃРїРµС€РЅРѕРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ РїР»Р°С‚РµР¶Р°, Complete</scenario_desc>
+<req_click_trans_id>14566030</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853764</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>0</rep_error>
+<rep_error_note>Success</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>0</goto>
+</scenario>
+<scenario>
+<scenario_id>12</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 12</scenario_name>
+<scenario_desc>РЈСЃРїРµС€РЅР°СЏ РїРѕРґРіРѕС‚РѕРІРєР° РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566033</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>0</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853765</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>0</rep_error>
+<rep_error_note>Success</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>13</goto>
+</scenario>
+<scenario>
+<scenario_id>13</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 13</scenario_name>
+<scenario_desc>РћС‚РјРµРЅР° РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566033</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>-5017</req_error>
+<req_error_note>РќРµС…РІР°С‚РєР° СЃСЂРµРґСЃС‚РІ</req_error_note>
+<req_click_paydoc_id>16853765</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-9</rep_error>
+<rep_error_note>Transaction cancelled</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>14</goto>
+</scenario>
+<scenario>
+<scenario_id>14</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 14</scenario_name>
+<scenario_desc>РџРѕРІС‚РѕСЂРЅР°СЏ РѕС‚РјРµРЅР° РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566033</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>-5017</req_error>
+<req_error_note>РќРµС…РІР°С‚РєР° СЃСЂРµРґСЃС‚РІ</req_error_note>
+<req_click_paydoc_id>16853765</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-9</rep_error>
+<rep_error_note>Transaction cancelled</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>15</goto>
+</scenario>
+<scenario>
+<scenario_id>15</scenario_id>
+<scenario_name>РЎС†РµРЅР°СЂРёР№ 15</scenario_name>
+<scenario_desc>РџРѕРІС‚РѕСЂРЅРѕРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ СЂР°РЅРµРµ РѕС‚РјРµРЅРЅРѕРіРѕ РїР»Р°С‚РµР¶Р°</scenario_desc>
+<req_click_trans_id>14566033</req_click_trans_id>
+<req_amount>500</req_amount>
+<req_merchant_trans_id/>
+<req_merchant_prepare_id>%s</req_merchant_prepare_id>
+<req_action>1</req_action>
+<req_error>0</req_error>
+<req_error_note>Ok</req_error_note>
+<req_click_paydoc_id>16853765</req_click_paydoc_id>
+<req_secret_key/>
+<rep_click_trans_id>%s</rep_click_trans_id>
+<rep_merchant_trans_id>%s</rep_merchant_trans_id>
+<rep_merchant_prepare_id/>
+<rep_merchant_confirm_id/>
+<rep_error>-9</rep_error>
+<rep_error_note>Transaction cancelled</rep_error_note>
+<scenario_result>0</scenario_result>
+<goto>0</goto>
+</scenario>
+<sign>AEIHSY2YS/Q1yg1yO161DvkPFm8zOIiuLWoFh9yghCRTXOQ4gXPtFVLb75Rz5hI1 +RZJMC3Gt9Y4RXnv1vnOvstCwsI7hkwp8DeLr5Qk3ycv3IvXer/0GaHNmyzPo/yQ +D6P9uG+xF3PVpg0cvcSn8D4MVKKF7XlLGuUXjHbhxdVMeJmnSkP1BNv3jCWxkD8 anXQGb/WCtJJTqF78CI72+fsQ28/dmqMUVTbX0nrSD3yJ3bWjE1cR81XInUrzfQ1 tsevIa6Xcqqc+LgIB1DcXodIiDCQ3WF+MReJ6cYwXvHREPu08bI1h9MaYLNCs7Jp s5RMRDiPVNBACBuJkDq4kzwbXwufVFE69ZOtmciB0aYn0+6+qV7MjxgIkJWlnuvE TaQIDsMFS5PHiA09puEMCbyoFyHswik5O5RLUYiqLSMCCBJ0au4Evf+vq5VcqosR sjlib3gAceBLsGkyMe40QJvt2DsrFZ02/6fYT4A0MDLN54B4I8jtKd5EPtZqMPNE EtWPK9nL18pCUc7sWNjTVYk6/jGrk494PkvOss7Z9TbGbr6hQYKpx7tc2+T+8xrX hjOkBxCLvGDMsafbN0qSSm5XqywjzRt9PpgkfmKXN1Alwo9Z292R5lnurwfdVQsD bfxevoDkqA0TkoTyVaLD4f6Mi5JW0Z1Gavj6lkV0uko=</sign>
+<url_reg>https://mapi.click.uz/merchants/reg.php</url_reg>
 </ROOT>
-

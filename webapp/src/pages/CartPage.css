@@ -217,7 +217,7 @@
   flex-direction: column;
   align-items: flex-start;
   padding: 14px 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: #F8FAFC;
   border: 1px solid rgba(15, 118, 110, 0.12);
   border-radius: 16px;
   cursor: pointer;
@@ -2326,20 +2326,26 @@
 .checkout-layout {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  padding-bottom: 12px;
 }
 
 .checkout-block {
+  margin: 0 16px;
   padding: 18px 16px;
-  border-bottom: 8px solid #EDEFF4;
+  background: #FFFFFF;
+  border-radius: 22px;
+  border: 1px solid #E6E8EF;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
 .checkout-block--last {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .checkout-block h3 {
   margin: 0 0 14px;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #0F172A;
 }
@@ -2352,19 +2358,25 @@
   margin-bottom: 14px;
 }
 
+.checkout-block-header h3 {
+  margin-bottom: 0;
+}
+
 .checkout-block-action {
-  border: none;
-  background: transparent;
+  border: 1px solid rgba(15, 118, 110, 0.25);
+  background: rgba(15, 118, 110, 0.08);
   color: var(--cart-primary);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 
 .checkout-address-card {
-  background: #FFFFFF;
+  background: #F8FAFC;
   border-radius: 20px;
   overflow: hidden;
-  border: 1px solid #E6E8EF;
+  border: 1px solid #E2E8F0;
   margin-bottom: 14px;
 }
 
@@ -2788,6 +2800,40 @@
   color: #0F172A;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.checkout-delivery-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #E2E8F0;
+  color: #0F172A;
+  white-space: nowrap;
+}
+
+.checkout-delivery-badge.ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+.checkout-delivery-badge.warn {
+  background: rgba(249, 115, 22, 0.16);
+  color: #C2410C;
+}
+
+.checkout-delivery-badge.error {
+  background: rgba(239, 68, 68, 0.16);
+  color: #B91C1C;
+}
+
+.checkout-delivery-badge.pending {
+  background: rgba(100, 116, 139, 0.16);
+  color: #475569;
 }
 
 .checkout-delivery-message {

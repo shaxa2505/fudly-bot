@@ -30,6 +30,7 @@ from handlers.common.utils import (
     has_approved_store,
     is_partner_button,
     normalize_city,
+    safe_edit_message,
     set_user_view_mode,
 )
 from localization import get_categories, get_cities, get_text
@@ -64,6 +65,34 @@ db: DatabaseProtocol | None = None
 bot: Any | None = None
 
 router = Router()
+
+
+def _is_cancel_text(raw: str | None) -> bool:
+    if not raw:
+        return False
+    text = raw.strip().casefold()
+    if not text:
+        return False
+    return text in {
+        get_text("ru", "cancel").casefold(),
+        get_text("uz", "cancel").casefold(),
+        "отмена",
+        "bekor",
+        "bekor qilish",
+        "/cancel",
+    }
+
+
+@router.message(StateFilter(RegisterStore), F.text.func(_is_cancel_text))
+async def register_store_cancel(message: types.Message, state: FSMContext) -> None:
+    """Cancel partner registration from any step (reply keyboard)."""
+    if not db:
+        await message.answer("System error")
+        return
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+    await state.clear()
+    await message.answer(get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang))
 
 
 def setup_dependencies(
@@ -209,11 +238,15 @@ async def register_store_city(message: types.Message, state: FSMContext) -> None
         # Move to category selection: prefer inline keyboard
         try:
             await message.answer(
-                get_text(lang, "store_category"), reply_markup=category_inline_keyboard(lang)
+                get_text(lang, "store_category"),
+                parse_mode="HTML",
+                reply_markup=category_inline_keyboard(lang),
             )
         except Exception:
             await message.answer(
-                get_text(lang, "store_category"), reply_markup=category_keyboard(lang)
+                get_text(lang, "store_category"),
+                parse_mode="HTML",
+                reply_markup=category_keyboard(lang),
             )
         await state.set_state(RegisterStore.category)
 
@@ -252,16 +285,28 @@ async def register_store_city_cb(callback: types.CallbackQuery, state: FSMContex
     # Send category selection inline (use safe helper)
     text = get_text(lang, "store_category")
     try:
-        await _safe_answer_or_send(
+        if callback.message and await safe_edit_message(
             callback.message,
-            callback.from_user.id,
             text,
             reply_markup=category_inline_keyboard(lang),
-        )
+        ):
+            pass
+        else:
+            await _safe_answer_or_send(
+                callback.message,
+                callback.from_user.id,
+                text,
+                parse_mode="HTML",
+                reply_markup=category_inline_keyboard(lang),
+            )
     except Exception:
         try:
             await _safe_answer_or_send(
-                callback.message, callback.from_user.id, text, reply_markup=category_keyboard(lang)
+                callback.message,
+                callback.from_user.id,
+                text,
+                parse_mode="HTML",
+                reply_markup=category_keyboard(lang),
             )
         except Exception:
             pass
@@ -291,8 +336,31 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
     if cat_text in categories:
         # CRITICAL: Normalize business type to Russian for DB consistency
         normalized_category = normalize_business_type(cat_text)
-        await state.update_data(category=normalized_category)
-        await message.answer(get_text(lang, "store_name"), reply_markup=cancel_keyboard(lang))
+        business_type_map = {
+            "РЎСѓРїРµСЂРјР°СЂРєРµС‚": "supermarket",
+            "Supermarket": "supermarket",
+            "Р РµСЃС‚РѕСЂР°РЅ": "restaurant",
+            "Restaurant": "restaurant",
+            "РџРµРєР°СЂРЅСЏ": "bakery",
+            "Nonvoyxona": "bakery",
+            "РљР°С„Рµ": "cafe",
+            "Kafe": "cafe",
+            "РљРѕРЅРґРёС‚РµСЂСЃРєР°СЏ": "confectionery",
+            "Qandolatchilik": "confectionery",
+            "Р¤Р°СЃС‚С„СѓРґ": "fastfood",
+            "Fastfud": "fastfood",
+            "Boshqa": "other",
+            "Р”СЂСѓРіРѕРµ": "other",
+        }
+        business_type = business_type_map.get(cat_text) or business_type_map.get(
+            normalized_category
+        )
+        await state.update_data(category=normalized_category, business_type=business_type)
+        await message.answer(
+            get_text(lang, "store_name"),
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang),
+        )
         await state.set_state(RegisterStore.name)
 
 
@@ -331,15 +399,27 @@ async def register_store_category_cb(callback: types.CallbackQuery, state: FSMCo
         "fastfood": "Фастфуд",
     }
     normalized_category = cat_name_map.get(cat_id, cat_id)
-    await state.update_data(category=normalized_category)
+    await state.update_data(category=normalized_category, business_type=cat_id)
+    # Remove inline keyboard message to reduce clutter
+    try:
+        if callback.message:
+            await callback.message.delete()
+    except Exception:
+        pass
     name_prompt = get_text(lang, "store_name")
     try:
         await _safe_answer_or_send(
-            callback.message, callback.from_user.id, name_prompt, reply_markup=cancel_keyboard(lang)
+            callback.message,
+            callback.from_user.id,
+            name_prompt,
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang),
         )
     except Exception:
         try:
-            await _safe_answer_or_send(callback.message, callback.from_user.id, name_prompt)
+            await _safe_answer_or_send(
+                callback.message, callback.from_user.id, name_prompt, parse_mode="HTML"
+            )
         except Exception:
             pass
     await state.set_state(RegisterStore.name)
@@ -356,7 +436,7 @@ async def register_store_name(message: types.Message, state: FSMContext) -> None
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(name=message.text)
-    await message.answer(get_text(lang, "store_address"))
+    await message.answer(get_text(lang, "store_address"), parse_mode="HTML")
     await state.set_state(RegisterStore.address)
 
 
@@ -380,7 +460,11 @@ async def register_store_address(message: types.Message, state: FSMContext) -> N
         else "<b>5/7-qadam: joylashuv</b>\n"
         "Do'kon geolokatsiyasini pastdagi tugma orqali yuboring. Bu majburiy."
     )
-    await message.answer(location_text, reply_markup=location_request_keyboard(lang))
+    await message.answer(
+        location_text,
+        parse_mode="HTML",
+        reply_markup=location_request_keyboard(lang),
+    )
     await state.set_state(RegisterStore.location)
 
 
@@ -416,7 +500,9 @@ async def register_store_location(message: types.Message, state: FSMContext) -> 
     )
 
     description_text = get_text(lang, "store_description")
-    await message.answer(description_text, reply_markup=cancel_keyboard(lang))
+    await message.answer(
+        description_text, parse_mode="HTML", reply_markup=cancel_keyboard(lang)
+    )
     await state.set_state(RegisterStore.description)
 
 
@@ -730,13 +816,20 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
 
     # Start partner registration
     try:
-        await _safe_answer_or_send(
+        if callback.message and await safe_edit_message(
             callback.message,
-            callback.from_user.id,
             get_text(lang, "become_partner_text"),
-            parse_mode="HTML",
             reply_markup=city_inline_keyboard(lang),
-        )
+        ):
+            pass
+        else:
+            await _safe_answer_or_send(
+                callback.message,
+                callback.from_user.id,
+                get_text(lang, "become_partner_text"),
+                parse_mode="HTML",
+                reply_markup=city_inline_keyboard(lang),
+            )
     except Exception:
         try:
             await _safe_answer_or_send(
@@ -749,50 +842,6 @@ async def become_partner_cb(callback: types.CallbackQuery, state: FSMContext) ->
         except Exception:
             pass
     await state.set_state(RegisterStore.city)
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("reg_cat_"))
-async def register_store_category_callback(
-    callback: types.CallbackQuery, state: FSMContext
-) -> None:
-    """Category selected for store registration via inline button."""
-    if not db:
-        await callback.answer("System error", show_alert=True)
-        return
-
-    assert callback.from_user is not None
-    lang = db.get_user_language(callback.from_user.id)
-    category_id = (callback.data or "").replace("reg_cat_", "")
-
-    # Map category ID to display name
-    category_map = {
-        "supermarket": "Супермаркет" if lang == "ru" else "Supermarket",
-        "restaurant": "Ресторан" if lang == "ru" else "Restaurant",
-        "bakery": "Пекарня" if lang == "ru" else "Nonvoyxona",
-        "cafe": "Кафе" if lang == "ru" else "Kafe",
-        "confectionery": "Кондитерская" if lang == "ru" else "Qandolatchilik",
-        "fastfood": "Фастфуд" if lang == "ru" else "Fastfud",
-    }
-
-    category = category_map.get(category_id, category_id)
-    await state.update_data(category=category, business_type=category_id)
-
-    name_prompt = get_text(lang, "store_name")
-    try:
-        try:
-            await _safe_answer_or_send(
-                callback.message, callback.from_user.id, name_prompt, reply_markup=None
-            )
-        except Exception:
-            try:
-                await _safe_answer_or_send(callback.message, callback.from_user.id, name_prompt)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    await state.set_state(RegisterStore.name)
     await callback.answer()
 
 

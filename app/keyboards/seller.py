@@ -48,7 +48,7 @@ def main_menu_seller(
     builder.button(text=get_text(lang, "add_item"))
     builder.button(text=get_text(lang, "my_items"))
     builder.button(text=get_text(lang, "partner_panel"))
-    builder.button(text=get_text(lang, "profile"))
+    builder.button(text=f"\U0001F464 {get_text(lang, 'profile')}")
     builder.button(text=get_text(lang, "back_to_customer"))
 
     # Add Web Panel button if URL provided
