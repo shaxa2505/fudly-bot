@@ -2971,6 +2971,34 @@
   gap: 12px;
 }
 
+.checkout-order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.checkout-order-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checkout-order-toggle-icon {
+  transition: transform 0.2s ease;
+}
+
+.checkout-order-toggle-icon.is-open {
+  transform: rotate(90deg);
+}
+
 .checkout-order-item {
   display: flex;
   align-items: center;

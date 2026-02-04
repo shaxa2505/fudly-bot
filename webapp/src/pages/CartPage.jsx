@@ -93,6 +93,8 @@ function CartPage({ user }) {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('cash') // 'cash' | 'click'
   const [showPaymentSheet, setShowPaymentSheet] = useState(false)
   const [deliverySlot, setDeliverySlot] = useState('fast')
+  const [orderItemsExpanded, setOrderItemsExpanded] = useState(false)
+  const [showMapEditor, setShowMapEditor] = useState(false)
   const [addressMeta, setAddressMeta] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('fudly_address_meta') || '{}')
@@ -211,7 +213,7 @@ function CartPage({ user }) {
   }, [saveCoordsFallback])
 
   const showCheckoutSheet = showCheckout || isCheckoutRoute
-  const mapEnabled = showCheckoutSheet && orderType === 'delivery'
+  const mapEnabled = showCheckoutSheet && orderType === 'delivery' && showMapEditor
   const isMapLoading = mapEnabled && !mapLoaded && !mapError
   const isMapResolving = mapEnabled && mapResolving
 
@@ -867,6 +869,12 @@ function CartPage({ user }) {
   }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled, storeInfoLoading])
 
   useEffect(() => {
+    if (orderType !== 'delivery' && showMapEditor) {
+      setShowMapEditor(false)
+    }
+  }, [orderType, showMapEditor])
+
+  useEffect(() => {
     if (!isCheckoutRoute) {
       return
     }
@@ -895,6 +903,8 @@ function CartPage({ user }) {
     setShowCheckout(false)
     setShowPaymentSheet(false)
     setOrderTypeTouched(false)
+    setOrderItemsExpanded(false)
+    setShowMapEditor(false)
     setMapSearchOpen(false)
     if (isCheckoutRoute) {
       navigate('/cart')
@@ -1445,6 +1455,8 @@ function CartPage({ user }) {
     }
     setOrderType(autoOrderType)
     setOrderTypeTouched(false)
+    setOrderItemsExpanded(false)
+    setShowMapEditor(false)
     setMapSearchOpen(false)
     setCheckoutStep('details')
     if (!isCheckoutRoute) {
@@ -2067,81 +2079,92 @@ function CartPage({ user }) {
                       <button
                         type="button"
                         className="checkout-block-action"
-                        onClick={handleLocateMe}
-                        disabled={!mapEnabled}
+                        onClick={() => {
+                          if (orderType !== 'delivery') return
+                          setShowMapEditor((prev) => {
+                            const next = !prev
+                            if (!next) {
+                              setMapSearchOpen(false)
+                            }
+                            return next
+                          })
+                        }}
+                        disabled={orderType !== 'delivery'}
                       >
-                        Avtoaniqlash
+                        {showMapEditor ? 'Yopish' : 'Xaritada o\'zgartirish'}
                       </button>
                     </div>
                     <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
-                      <div
-                        className={`checkout-map${isMapLoading ? ' is-loading' : ''}${isMapResolving ? ' is-resolving' : ''}`}
-                        aria-busy={isMapLoading || isMapResolving}
-                      >
-                        <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
-                        {mapEnabled && mapSearchOpen && mapQuery.trim().length > 0 && mapQuery.trim().length < 3 && (
-                          <div className="checkout-map-search-hint">
-                            Kamida 3 ta belgi kiriting
-                          </div>
-                        )}
-                        {mapEnabled && mapSearchOpen && mapQuery.trim().length >= 3 && (
-                          <div
-                            className="checkout-map-search-results"
-                            onPointerDown={(event) => event.preventDefault()}
-                          >
-                            {mapSearchLoading && (
-                              <div className="checkout-map-search-skeleton" aria-hidden="true">
-                                {Array.from({ length: 3 }).map((_, index) => (
-                                  <div key={index} className="checkout-map-search-item skeleton"></div>
-                                ))}
-                              </div>
-                            )}
-                            {mapSearchResults.length === 0 && !mapSearchLoading && (
-                              <button
-                                type="button"
-                                className="checkout-map-search-item empty"
-                                disabled
-                              >
-                                Manzil topilmadi
-                              </button>
-                            )}
-                            {mapSearchResults.map((result) => (
-                              <button
-                                key={`${result.place_id}-${result.lat}-${result.lon}`}
-                                type="button"
-                                className="checkout-map-search-item"
-                                onClick={() => handleMapResultSelect(result)}
-                              >
-                                {result.display_name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          className="checkout-map-locate"
-                          onClick={handleLocateMe}
-                          disabled={!mapEnabled}
-                          aria-label="Mening joylashuvim"
+                      {showMapEditor && (
+                        <div
+                          className={`checkout-map${isMapLoading ? ' is-loading' : ''}${isMapResolving ? ' is-resolving' : ''}`}
+                          aria-busy={isMapLoading || isMapResolving}
                         >
-                          <LocateFixed size={16} strokeWidth={2} />
-                        </button>
-                        {mapEnabled && !mapLoaded && !mapError && (
-                          <div className="checkout-map-status">
-                            Xarita yuklanmoqda...
-                          </div>
-                        )}
-                        {mapEnabled && mapResolving && (
-                          <div className="checkout-map-status">
-                            Manzil aniqlanmoqda...
-                          </div>
-                        )}
-                        {mapEnabled && mapError && (
-                          <div className="checkout-map-status error">
-                            {mapError}
-                          </div>
-                        )}
-                      </div>
+                          <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
+                          {mapEnabled && mapSearchOpen && mapQuery.trim().length > 0 && mapQuery.trim().length < 3 && (
+                            <div className="checkout-map-search-hint">
+                              Kamida 3 ta belgi kiriting
+                            </div>
+                          )}
+                          {mapEnabled && mapSearchOpen && mapQuery.trim().length >= 3 && (
+                            <div
+                              className="checkout-map-search-results"
+                              onPointerDown={(event) => event.preventDefault()}
+                            >
+                              {mapSearchLoading && (
+                                <div className="checkout-map-search-skeleton" aria-hidden="true">
+                                  {Array.from({ length: 3 }).map((_, index) => (
+                                    <div key={index} className="checkout-map-search-item skeleton"></div>
+                                  ))}
+                                </div>
+                              )}
+                              {mapSearchResults.length === 0 && !mapSearchLoading && (
+                                <button
+                                  type="button"
+                                  className="checkout-map-search-item empty"
+                                  disabled
+                                >
+                                  Manzil topilmadi
+                                </button>
+                              )}
+                              {mapSearchResults.map((result) => (
+                                <button
+                                  key={`${result.place_id}-${result.lat}-${result.lon}`}
+                                  type="button"
+                                  className="checkout-map-search-item"
+                                  onClick={() => handleMapResultSelect(result)}
+                                >
+                                  {result.display_name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className="checkout-map-locate"
+                            onClick={handleLocateMe}
+                            disabled={!mapEnabled}
+                            aria-label="Mening joylashuvim"
+                          >
+                            <LocateFixed size={16} strokeWidth={2} />
+                          </button>
+                          {mapEnabled && !mapLoaded && !mapError && (
+                            <div className="checkout-map-status">
+                              Xarita yuklanmoqda...
+                            </div>
+                          )}
+                          {mapEnabled && mapResolving && (
+                            <div className="checkout-map-status">
+                              Manzil aniqlanmoqda...
+                            </div>
+                          )}
+                          {mapEnabled && mapError && (
+                            <div className="checkout-map-status error">
+                              {mapError}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="checkout-address-body">
                         <input
                           ref={addressInputRef}
@@ -2324,37 +2347,56 @@ function CartPage({ user }) {
                   </section>
 
                   <section className="checkout-block checkout-block--last">
-                    <h3>Sizning buyurtmangiz</h3>
-                    <div className="checkout-order-items">
-                      {cartItems.map(item => {
-                        const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
-                        const rawOriginalPrice = item.offer.original_price
-                        const rawDiscountPrice = item.offer.discount_price
-                        const parsedOriginalPrice = rawOriginalPrice == null ? NaN : Number(rawOriginalPrice)
-                        const parsedDiscountPrice = rawDiscountPrice == null ? NaN : Number(rawDiscountPrice)
-                        const originalPrice = Number.isFinite(parsedOriginalPrice) ? parsedOriginalPrice : null
-                        const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
-                        const unitPrice = discountPrice ?? originalPrice ?? 0
-                        const lineTotal = unitPrice * item.quantity
-                        return (
-                          <div key={item.offer.id} className="checkout-order-item">
-                            <div className="checkout-order-info">
-                              <img
-                                src={photoUrl}
-                                alt={item.offer.title}
-                                loading="lazy"
-                                decoding="async"
-                              />
-                              <div>
-                                <p className="checkout-order-title">{item.offer.title}</p>
-                                <p className="checkout-order-qty">{item.quantity} dona</p>
-                              </div>
-                            </div>
-                            <span className="checkout-order-price">{formatSum(lineTotal)} so'm</span>
-                          </div>
-                        )
-                      })}
+                    <div className="checkout-order-header">
+                      <h3>Sizning buyurtmangiz</h3>
+                      <button
+                        type="button"
+                        className="checkout-order-toggle"
+                        onClick={() => setOrderItemsExpanded(prev => !prev)}
+                        aria-expanded={orderItemsExpanded}
+                        aria-label="Sizning buyurtmangiz"
+                      >
+                        <span>{itemsCount} dona</span>
+                        <ChevronRight
+                          size={16}
+                          strokeWidth={2}
+                          className={`checkout-order-toggle-icon${orderItemsExpanded ? ' is-open' : ''}`}
+                          aria-hidden="true"
+                        />
+                      </button>
                     </div>
+                    {orderItemsExpanded && (
+                      <div className="checkout-order-items">
+                        {cartItems.map(item => {
+                          const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
+                          const rawOriginalPrice = item.offer.original_price
+                          const rawDiscountPrice = item.offer.discount_price
+                          const parsedOriginalPrice = rawOriginalPrice == null ? NaN : Number(rawOriginalPrice)
+                          const parsedDiscountPrice = rawDiscountPrice == null ? NaN : Number(rawDiscountPrice)
+                          const originalPrice = Number.isFinite(parsedOriginalPrice) ? parsedOriginalPrice : null
+                          const discountPrice = Number.isFinite(parsedDiscountPrice) ? parsedDiscountPrice : null
+                          const unitPrice = discountPrice ?? originalPrice ?? 0
+                          const lineTotal = unitPrice * item.quantity
+                          return (
+                            <div key={item.offer.id} className="checkout-order-item">
+                              <div className="checkout-order-info">
+                                <img
+                                  src={photoUrl}
+                                  alt={item.offer.title}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                                <div>
+                                  <p className="checkout-order-title">{item.offer.title}</p>
+                                  <p className="checkout-order-qty">{item.quantity} dona</p>
+                                </div>
+                              </div>
+                              <span className="checkout-order-price">{formatSum(lineTotal)} so'm</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                     <div className="checkout-summary">
                       <div className="checkout-summary-row">
                         <span>Mahsulotlar</span>
