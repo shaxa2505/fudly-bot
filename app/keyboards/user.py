@@ -12,29 +12,31 @@ WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
 
 
 def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
-    """Main menu for customers - 2 compact rows with clear actions.
+    """Main menu for customers - compact rows with clear actions.
 
     Args:
         lang: Interface language
         cart_count: Number of items in cart (shown on button)
     """
-    hot_offers_text = f"🛍 {get_text(lang, 'hot_offers')}"
+    hot_offers_text = f"?? {get_text(lang, 'hot_offers')}"
+    search_text = f"?? {get_text(lang, 'search')}"
     builder = ReplyKeyboardBuilder()
 
-    # Row 1: Main actions - offers and search
-    builder.button(text=hot_offers_text)
-    builder.button(text=f"🔍 {get_text(lang, 'search')}")
-
-    # Row 2: Cart with counter + My Orders + Profile
-    cart_text = f"🛒 {get_text(lang, 'my_cart')}"
+    # Row 1: Offers, search, cart
+    cart_text = f"?? {get_text(lang, 'my_cart')}"
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
+    builder.button(text=hot_offers_text)
+    builder.button(text=search_text)
     builder.button(text=cart_text)
-    builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
-    builder.button(text=f"👤 {get_text(lang, 'profile')}")
 
-    # Layout: 2 columns first row, 3 buttons second row
-    builder.adjust(2, 3)
+    # Row 2: Orders, profile, partner menu
+    builder.button(text=f"?? {get_text(lang, 'my_orders')}")
+    builder.button(text=f"?? {get_text(lang, 'profile')}")
+    builder.button(text=get_text(lang, "partner_menu"))
+
+    # Layout: 2 rows of 3 buttons
+    builder.adjust(3, 3)
     return builder.as_markup(resize_keyboard=True)
 
 
@@ -42,18 +44,27 @@ def registration_complete_keyboard(lang: str = "ru", cart_count: int = 0) -> Rep
     """Main menu with a WebApp button for registration completion."""
     from aiogram.types import KeyboardButton, WebAppInfo
 
-    hot_offers_text = f"🛍 {get_text(lang, 'hot_offers')}"
-    search_text = f"🔍 {get_text(lang, 'search')}"
-    cart_text = f"🛒 {get_text(lang, 'my_cart')}"
+    hot_offers_text = f"?? {get_text(lang, 'hot_offers')}"
+    search_text = f"?? {get_text(lang, 'search')}"
+    cart_text = f"?? {get_text(lang, 'my_cart')}"
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
-    orders_text = f"🧾 {get_text(lang, 'my_orders')}"
-    profile_text = f"👤 {get_text(lang, 'profile')}"
+    orders_text = f"?? {get_text(lang, 'my_orders')}"
+    profile_text = f"?? {get_text(lang, 'profile')}"
+    partner_text = get_text(lang, "partner_menu")
 
     keyboard = [
         [KeyboardButton(text=get_text(lang, "open_store_button"), web_app=WebAppInfo(url=WEBAPP_URL))],
-        [KeyboardButton(text=hot_offers_text), KeyboardButton(text=search_text)],
-        [KeyboardButton(text=cart_text), KeyboardButton(text=orders_text), KeyboardButton(text=profile_text)],
+        [
+            KeyboardButton(text=hot_offers_text),
+            KeyboardButton(text=search_text),
+            KeyboardButton(text=cart_text),
+        ],
+        [
+            KeyboardButton(text=orders_text),
+            KeyboardButton(text=profile_text),
+            KeyboardButton(text=partner_text),
+        ],
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
@@ -82,6 +93,7 @@ def settings_keyboard(
         current_mode: Current viewing mode ('seller' or 'customer')
     """
     builder = InlineKeyboardBuilder()
+    rows: list[int] = []
 
     # For seller show mode switch based on current mode
     if role == "seller":
@@ -96,46 +108,48 @@ def settings_keyboard(
                 text=get_text(lang, "back_to_customer"),
                 callback_data="switch_to_customer",
             )
+            rows.append(2)
         else:
             # Currently in customer mode - show switch to seller
             builder.button(
-                text=get_text(lang, "switched_to_seller"),
+                text=get_text(lang, "partner_menu"),
                 callback_data="switch_to_seller",
             )
-    else:
-        # For customer show "Become partner"
-        builder.button(text=get_text(lang, "become_partner"), callback_data="become_partner_cb")
+            rows.append(1)
 
     # Notifications
-    notif_emoji = "🔔" if notifications_enabled else "🔕"
-    notif_status = "Вкл" if notifications_enabled else "Выкл"
+    notif_emoji = "??" if notifications_enabled else "??"
+    notif_status = "???" if notifications_enabled else "????"
     notif_status_uz = "Yoqildi" if notifications_enabled else "O'chirildi"
     notif_text = (
-        f"{notif_emoji} Уведомления: {notif_status}"
+        f"{notif_emoji} ???????????: {notif_status}"
         if lang == "ru"
         else f"{notif_emoji} Bildirishnomalar: {notif_status_uz}"
     )
     builder.button(text=notif_text, callback_data="toggle_notifications")
+    rows.append(1)
 
     # Change city
     builder.button(
-        text="📍 Сменить город" if lang == "ru" else "📍 Shaharni o'zgartirish",
+        text="?? ??????? ?????" if lang == "ru" else "?? Shaharni o'zgartirish",
         callback_data="profile_change_city",
     )
 
     # Change language
     builder.button(
-        text="🌐 Язык" if lang == "ru" else "🌐 Til",
+        text="?? ????" if lang == "ru" else "?? Til",
         callback_data="change_language",
     )
+    rows.append(2)
 
     # Delete account
     builder.button(
-        text="🗑 Удалить аккаунт" if lang == "ru" else "🗑 Akkauntni o'chirish",
+        text="?? ??????? ???????" if lang == "ru" else "?? Akkauntni o'chirish",
         callback_data="delete_account",
     )
+    rows.append(1)
 
-    builder.adjust(1, 1, 1, 1, 1)
+    builder.adjust(*rows)
     return builder.as_markup()
 
 

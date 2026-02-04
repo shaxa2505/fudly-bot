@@ -153,6 +153,7 @@ __all__ = [
     "is_search_button",
     "is_my_orders_button",
     "is_profile_button",
+    "is_partner_button",
     # Safe message operations
     "safe_delete_message",
     "safe_edit_message",
@@ -323,6 +324,23 @@ def is_profile_button(text: str | None) -> bool:
         return False
     return stripped in _menu_labels()["profile"] or stripped in {"👤 Профиль", "👤 Profil"}
 
+def is_partner_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in {
+        get_text("ru", "become_partner"),
+        get_text("uz", "become_partner"),
+        get_text("ru", "partner_menu"),
+        get_text("uz", "partner_menu"),
+        "?? ????? ?????????",
+        "?? Hamkor bo'lish",
+        "?? Hamkor bolish",
+        "?? ???? ????????",
+        "?? Hamkor menyusi",
+    }
+
+
 
 def is_main_menu_button(text: str | None) -> bool:
     """Check if text is a main menu button (should exit FSM and handle separately)."""
@@ -333,6 +351,7 @@ def is_main_menu_button(text: str | None) -> bool:
             is_cart_button(text),
             is_my_orders_button(text),
             is_profile_button(text),
+            is_partner_button(text),
             _strip(text) in MAIN_MENU_BUTTONS,
             _strip(text) in LEGACY_MAIN_MENU_BUTTONS,
         )

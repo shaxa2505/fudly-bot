@@ -406,9 +406,10 @@ async def get_offers(
             apply_sort = False
             apply_slice = False
         else:
-            # Prefer nearby offers when coordinates are available (TGTG proximity-first)
-            if lat_val is not None and lon_val is not None and hasattr(db, "get_nearby_offers"):
-                raw_offers = await db.get_nearby_offers(
+            async def _fetch_nearby_offers() -> list[Any]:
+                if lat_val is None or lon_val is None or not hasattr(db, "get_nearby_offers"):
+                    return []
+                nearby = await db.get_nearby_offers(
                     latitude=lat_val,
                     longitude=lon_val,
                     limit=limit,
@@ -420,8 +421,8 @@ async def get_offers(
                     min_discount=min_discount,
                     max_distance_km=max_distance,
                 )
-                if not raw_offers and extended_distance and extended_distance > max_distance:
-                    raw_offers = await db.get_nearby_offers(
+                if not nearby and extended_distance and extended_distance > max_distance:
+                    nearby = await db.get_nearby_offers(
                         latitude=lat_val,
                         longitude=lon_val,
                         limit=limit,
@@ -433,10 +434,11 @@ async def get_offers(
                         min_discount=min_discount,
                         max_distance_km=extended_distance,
                     )
-                if raw_offers:
-                    apply_filters = False
-                    apply_sort = False
-                    apply_slice = False
+                return nearby
+
+            has_location_filters = bool(normalized_city or region or district)
+            if not has_location_filters:
+                raw_offers = await _fetch_nearby_offers()
 
             async def _fetch_scoped_offers(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
@@ -501,24 +503,8 @@ async def get_offers(
                 if raw_offers:
                     break
 
-            if (
-                not raw_offers
-                and lat_val is not None
-                and lon_val is not None
-                and hasattr(db, "get_nearby_offers")
-            ):
-                raw_offers = await db.get_nearby_offers(
-                    latitude=lat_val,
-                    longitude=lon_val,
-                    limit=limit,
-                    offset=offset,
-                    category=category_filter,
-                    sort_by=sort_key,
-                    min_price=storage_min_price,
-                    max_price=storage_max_price,
-                    min_discount=min_discount,
-                    max_distance_km=max_distance,
-                )
+            if not raw_offers:
+                raw_offers = await _fetch_nearby_offers()
 
             apply_filters = False
             apply_sort = False

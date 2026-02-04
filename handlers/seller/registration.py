@@ -28,6 +28,7 @@ from handlers.common.utils import (
 from handlers.common.utils import (
     get_user_view_mode,
     has_approved_store,
+    is_partner_button,
     normalize_city,
     set_user_view_mode,
 )
@@ -107,7 +108,7 @@ def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
     )
 
 
-@router.message(F.text.contains("Стать партнером") | F.text.contains("Hamkor bolish"))
+@router.message(F.text.func(is_partner_button))
 async def become_partner(message: types.Message, state: FSMContext) -> None:
     """Start partner registration or switch to seller mode."""
     if not db:
