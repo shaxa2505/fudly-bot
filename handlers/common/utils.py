@@ -154,6 +154,7 @@ __all__ = [
     "is_my_orders_button",
     "is_profile_button",
     "is_partner_button",
+    "is_customer_menu_button",
     # Safe message operations
     "safe_delete_message",
     "safe_edit_message",
@@ -333,11 +334,36 @@ def is_partner_button(text: str | None) -> bool:
         get_text("uz", "become_partner"),
         get_text("ru", "partner_menu"),
         get_text("uz", "partner_menu"),
-        "?? ????? ?????????",
-        "?? Hamkor bo'lish",
-        "?? Hamkor bolish",
-        "?? ???? ????????",
-        "?? Hamkor menyusi",
+        get_text("ru", "switched_to_seller"),
+        get_text("uz", "switched_to_seller"),
+        "🏪 Стать партнером",
+        "🏪 Меню партнера",
+        "Меню партнера",
+        "Режим: партнёр",
+        "Режим: партнер",
+        "Rejim: hamkor",
+        "🏪 Hamkor bo'lish",
+        "🏪 Hamkor bolish",
+        "🏪 Hamkor menyusi",
+    }
+
+
+def is_customer_menu_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in {
+        get_text("ru", "back_to_customer"),
+        get_text("uz", "back_to_customer"),
+        get_text("ru", "switched_to_customer"),
+        get_text("uz", "switched_to_customer"),
+        "🛒 Меню покупателя",
+        "Меню покупателя",
+        "🛒 Режим: покупатель",
+        "Режим: покупатель",
+        "Rejim: xaridor",
+        "🛒 Rejim: xaridor",
+        "🛒 Xaridor menyusi",
     }
 
 
@@ -352,6 +378,7 @@ def is_main_menu_button(text: str | None) -> bool:
             is_my_orders_button(text),
             is_profile_button(text),
             is_partner_button(text),
+            is_customer_menu_button(text),
             _strip(text) in MAIN_MENU_BUTTONS,
             _strip(text) in LEGACY_MAIN_MENU_BUTTONS,
         )

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 
 from .common import _photo_cache, logger, settings
+from app.core.caching import get_cache_service
 
 router = APIRouter()
 _legacy_bot_token = (
@@ -15,24 +16,48 @@ _legacy_bot_token = (
     or os.getenv("OLD_TELEGRAM_BOT_TOKEN")
     or os.getenv("PHOTO_FALLBACK_BOT_TOKEN")
 )
+_photo_cache_ttl = int(os.getenv("PHOTO_CACHE_TTL_SECONDS", "3600"))  # 1 hour default
+_photo_cache_prefix = "photo:url:"
+_bots_by_token: dict[str, Bot] = {}
 
 
-async def _resolve_photo_url(file_id: str) -> str | None:
+def _get_bot(token: str) -> Bot:
+    bot = _bots_by_token.get(token)
+    if bot is None:
+        bot = Bot(token=token)
+        _bots_by_token[token] = bot
+    return bot
+
+
+async def _resolve_photo_url(file_id: str, force_refresh: bool = False) -> str | None:
     """Try to resolve photo URL using primary bot token and optional legacy token."""
-    if file_id in _photo_cache:
+    if not force_refresh and file_id in _photo_cache:
         return _photo_cache[file_id]
+
+    cache = get_cache_service(os.getenv("REDIS_URL"))
+    cache_key = f"{_photo_cache_prefix}{file_id}"
+    if cache:
+        if force_refresh:
+            await cache.delete(cache_key)
+        else:
+            cached_url = await cache.get(cache_key)
+            if cached_url:
+                _photo_cache[file_id] = cached_url
+                return cached_url
 
     tokens = [settings.bot_token]
     if _legacy_bot_token and _legacy_bot_token != settings.bot_token:
         tokens.append(_legacy_bot_token)
 
     for token in tokens:
-        bot = Bot(token=token)
+        bot = _get_bot(token)
         try:
             file = await bot.get_file(file_id)
             if file and file.file_path:
                 url = f"https://api.telegram.org/file/bot{token}/{file.file_path}"
                 _photo_cache[file_id] = url
+                if cache and _photo_cache_ttl > 0:
+                    await cache.set(cache_key, url, ttl=_photo_cache_ttl)
                 if token != settings.bot_token:
                     logger.info("Photo served via legacy bot token")
                 return url
@@ -40,14 +65,12 @@ async def _resolve_photo_url(file_id: str) -> str | None:
             logger.debug("Bot token failed to fetch photo_id %s", file_id, exc_info=True)
         except Exception:
             logger.debug("Unexpected error fetching photo %s", file_id, exc_info=True)
-        finally:
-            await bot.session.close()
 
     return None
 
 
 @router.get("/photo/{file_id:path}")
-async def get_photo(file_id: str):
+async def get_photo(file_id: str, refresh: bool = False):
     """Convert Telegram file_id to actual photo URL and redirect.
 
     If the file_id is invalid or Telegram does not return a file,
@@ -56,8 +79,11 @@ async def get_photo(file_id: str):
     if not file_id or len(file_id) < 10:
         raise HTTPException(status_code=404, detail="Invalid file_id")
 
-    url = await _resolve_photo_url(file_id)
+    url = await _resolve_photo_url(file_id, force_refresh=refresh)
     if url:
-        return RedirectResponse(url=url)
+        return RedirectResponse(
+            url=url,
+            headers={"Cache-Control": "public, max-age=600, must-revalidate"},
+        )
 
     raise HTTPException(status_code=404, detail="Photo not found")

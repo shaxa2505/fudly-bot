@@ -163,9 +163,16 @@ const OfferCard = memo(function OfferCard({
             setImageLoaded(true)
           }}
           onError={(e) => {
-            if (!e.target.dataset.fallback) {
-              e.target.dataset.fallback = 'true'
-              e.target.src = fallbackUrl
+            const img = e.target
+            if (!img.dataset.refreshAttempted && resolvedUrl.includes('/photo/')) {
+              img.dataset.refreshAttempted = 'true'
+              const separator = resolvedUrl.includes('?') ? '&' : '?'
+              img.src = `${resolvedUrl}${separator}refresh=1`
+              return
+            }
+            if (!img.dataset.fallback) {
+              img.dataset.fallback = 'true'
+              img.src = fallbackUrl
               setImageError(true)
               LOADED_IMAGE_CACHE.add(fallbackUrl)
               setImageLoaded(true)

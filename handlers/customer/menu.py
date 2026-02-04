@@ -6,9 +6,7 @@ from typing import Any
 
 from aiogram import F, Router, types
 
-from app.core.utils import get_field
-from handlers.common.utils import set_user_view_mode
-from handlers.seller.dashboard import send_partner_dashboard
+from handlers.common.utils import is_customer_menu_button, set_user_view_mode
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +44,7 @@ def setup(
 # This module now only handles mode switching (customer/seller)
 
 
-@router.message(F.text.contains("Режим: покупатель") | F.text.contains("Rejim: xaridor"))
+@router.message(F.text.func(is_customer_menu_button))
 async def switch_to_customer(message: types.Message):
     """Switch user to customer mode."""
     if not db or not get_text or not main_menu_customer:
@@ -71,47 +69,3 @@ async def switch_to_customer(message: types.Message):
     )
 
     logger.info(f"User {user_id} switched to customer mode successfully")
-
-
-@router.message(F.text.contains("Режим: партнер") | F.text.contains("Rejim: hamkor"))
-async def switch_to_seller(message: types.Message):
-    """Switch user to seller mode."""
-    if not db or not get_text or not main_menu_seller:
-        logger.error("switch_to_seller: dependencies not initialized!")
-        lang_code = (message.from_user.language_code or "ru") if message.from_user else "ru"
-        if lang_code.startswith("uz"):
-            text = "Xizmat vaqtincha mavjud emas. Keyinroq urinib ko'ring."
-        else:
-            text = "Сервис временно недоступен. Попробуйте позже."
-        await message.answer(text)
-        return
-
-    user_id = message.from_user.id
-    lang = db.get_user_language(user_id)
-
-    user = db.get_user_model(user_id)
-    if not user or user.role != "seller":
-        await message.answer(
-            "Только партнеры могут использовать этот режим"
-            if lang == "ru"
-            else "Faqat hamkorlar bu rejimdan foydalanishlari mumkin"
-        )
-        return
-
-    logger.info(f"User {user_id} switching to seller mode")
-
-    set_user_view_mode(user_id, "seller", db)
-
-    # Get partner panel URL
-    from handlers.common.webapp import get_partner_panel_url
-
-    webapp_url = get_partner_panel_url()
-
-    await message.answer(
-        "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
-        reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id),
-    )
-
-    await send_partner_dashboard(message, user_id, lang)
-
-    logger.info(f"User {user_id} switched to seller mode successfully")

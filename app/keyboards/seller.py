@@ -42,13 +42,14 @@ def _with_signed_uid(url: str, user_id: int | None) -> str:
 def main_menu_seller(
     lang: str = "ru", webapp_url: str = None, user_id: int = None
 ) -> ReplyKeyboardMarkup:
-    """Simplified partner menu: Orders, Products, Add, Today, Profile, Web Panel."""
+    """Simplified partner menu: Orders, Products, Add, Today, Profile, Customer Menu, Web Panel."""
     builder = ReplyKeyboardBuilder()
     builder.button(text=get_text(lang, "orders"))
     builder.button(text=get_text(lang, "my_items"))
     builder.button(text=get_text(lang, "add_item"))
     builder.button(text=get_text(lang, "today_stats"))
     builder.button(text=get_text(lang, "profile"))
+    builder.button(text=get_text(lang, "back_to_customer"))
 
     # Add Web Panel button if URL provided
     if webapp_url:
@@ -57,9 +58,9 @@ def main_menu_seller(
         builder.button(text="🖥 Веб-панель", web_app=WebAppInfo(url=url))
 
     if webapp_url:
-        builder.adjust(2, 2, 1, 1)
+        builder.adjust(2, 2, 2, 1)
     else:
-        builder.adjust(2, 2, 1)
+        builder.adjust(2, 2, 2)
     return builder.as_markup(resize_keyboard=True)
 
 

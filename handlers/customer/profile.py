@@ -678,18 +678,3 @@ async def confirm_delete_no(callback: types.CallbackQuery) -> None:
         )
 
     await callback.answer()
-
-
-@router.message(F.text.contains("Режим: покупатель") | F.text.contains("Rejim: xaridor"))
-async def switch_to_customer(message: types.Message) -> None:
-    """Switch to customer mode."""
-    if not db:
-        await message.answer(_service_unavailable(_lang_code(message.from_user)))
-        return
-
-    lang = db.get_user_language(message.from_user.id)
-    set_user_view_mode(message.from_user.id, "customer", db)
-
-    await message.answer(
-        get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
-    )

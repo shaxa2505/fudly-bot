@@ -100,6 +100,7 @@ function HomePage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [categoryCounts, setCategoryCounts] = useState({})
   const [categoriesLoading, setCategoriesLoading] = useState(false)
+  const [categoriesReady, setCategoriesReady] = useState(false)
 
   // Search history state
   const [searchHistory, setSearchHistory] = useState([])
@@ -172,6 +173,12 @@ function HomePage() {
     if (hasRelevantCounts || hasAllCount) return categoryCounts
     return derivedCategoryCounts
   }, [categoriesLoading, categoryCounts, derivedCategoryCounts, offers.length])
+  useEffect(() => {
+    if (categoriesReady) return
+    if (loading && offers.length === 0) return
+    const timer = setTimeout(() => setCategoriesReady(true), 600)
+    return () => clearTimeout(timer)
+  }, [categoriesReady, loading, offers.length])
   const getGeoAttemptTs = () => {
     const stored = localStorage.getItem(GEO_ATTEMPT_KEY)
     const ts = stored ? Number(stored) : 0
@@ -394,6 +401,9 @@ function HomePage() {
 
   useEffect(() => {
     let isActive = true
+    if (!categoriesReady) return () => {
+      isActive = false
+    }
 
     const loadCategories = async () => {
       setCategoriesLoading(true)
@@ -434,7 +444,7 @@ function HomePage() {
     return () => {
       isActive = false
     }
-  }, [cityForApi, location.region, location.district])
+  }, [categoriesReady, cityForApi, location.region, location.district])
   // Load offers - сначала по городу, если пусто - из всех городов
   const loadOffers = useCallback(async (reset = false, options = {}) => {
     const { searchOverride, force = false } = options
@@ -456,9 +466,6 @@ function HomePage() {
       const params = {
         limit: OFFERS_LIMIT,
         offset: currentOffset,
-      }
-      if (reset) {
-        params.include_meta = true
       }
       if (cityForApi) {
         params.city = cityForApi

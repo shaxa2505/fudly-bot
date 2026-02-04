@@ -1,0 +1,19 @@
+name: Keepalive Ping
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping API health
+        env:
+          PING_URL: ${{ secrets.PING_URL }}
+        run: |
+          URL="${PING_URL:-https://fudly-bot-production.up.railway.app/api/v1/health}"
+          echo "Pinging $URL"
+          curl -fsS --max-time 10 "$URL" >/dev/null
