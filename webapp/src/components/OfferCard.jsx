@@ -48,6 +48,10 @@ const OfferCard = memo(function OfferCard({
   const normalizeText = (value) => String(value || '').trim()
   const storeNameNormalized = normalizeText(storeName).toLowerCase()
 
+  const availability = getOfferAvailability(offer)
+  const timeRange = availability.timeRange
+  const isUnavailableNow = Boolean(timeRange && !availability.isAvailableNow)
+
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
     if (isOutOfStock || isMaxReached || isUnavailableNow) {
@@ -76,9 +80,6 @@ const OfferCard = memo(function OfferCard({
   const isLowStock = !isOutOfStock && stockLimit > 0 && stockLimit <= 5
   const locationText = offer.store_address || offer.address || offer.district || offer.region || ''
 
-  const availability = getOfferAvailability(offer)
-  const timeRange = availability.timeRange
-  const isUnavailableNow = Boolean(timeRange && !availability.isAvailableNow)
   const titleCandidates = [
     offer.title,
     offer.product_name,
