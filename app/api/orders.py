@@ -628,6 +628,10 @@ async def get_order_timeline(
     raw_status = order_dict.get("order_status", order_dict.get("status", "pending"))
     status = UnifiedOrderStatus.normalize(str(raw_status).strip().lower())
     created_at = str(order_dict.get("created_at", ""))
+    order_type = order_dict.get("order_type") or (
+        "delivery" if order_dict.get("delivery_address") else "pickup"
+    )
+    is_pickup = order_type == "pickup"
 
     # Build timeline based on status
     timeline = []
@@ -636,16 +640,26 @@ async def get_order_timeline(
     timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="Заказ создан"))
 
     # v23+ statuses: pending, preparing, ready, delivering, completed, rejected, cancelled
-    if status in ["preparing", "confirmed", "ready", "delivering", "completed"]:
-        timeline.append(
-            StatusUpdate(
-                status="preparing",
-                timestamp=str(order_dict.get("updated_at", created_at)),
-                message="Заказ подтвержден магазином",
+    if not is_pickup:
+        if status in ["preparing", "confirmed", "ready", "delivering", "completed"]:
+            timeline.append(
+                StatusUpdate(
+                    status="preparing",
+                    timestamp=str(order_dict.get("updated_at", created_at)),
+                    message="Заказ подтвержден магазином",
+                )
             )
-        )
+    else:
+        if status in ["preparing", "confirmed", "ready", "completed"]:
+            timeline.append(
+                StatusUpdate(
+                    status="ready",
+                    timestamp=str(order_dict.get("updated_at", created_at)),
+                    message="Заказ готов к выдаче",
+                )
+            )
 
-    if status in ["ready", "delivering", "completed"]:
+    if not is_pickup and status in ["ready", "delivering", "completed"]:
         timeline.append(
             StatusUpdate(
                 status="ready",
@@ -654,7 +668,7 @@ async def get_order_timeline(
             )
         )
 
-    if status == "delivering":
+    if not is_pickup and status == "delivering":
         timeline.append(
             StatusUpdate(
                 status="delivering",
@@ -692,7 +706,7 @@ async def get_order_timeline(
 
     # Estimate ready time based on status
     estimated_ready = None
-    if status in ["preparing", "confirmed"]:
+    if not is_pickup and status in ["preparing", "confirmed"]:
         # Calculate estimated time based on when order was confirmed
         from datetime import datetime, timedelta
         try:

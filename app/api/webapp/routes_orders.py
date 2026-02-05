@@ -41,6 +41,8 @@ from .common import (
     get_db,
     get_val,
     is_offer_active,
+    is_offer_available_now,
+    get_offer_time_range_label,
     logger,
     normalize_price,
     settings,
@@ -167,6 +169,12 @@ async def _load_offers_and_store(items: list[Any], db: Any) -> tuple[dict[int, A
         offer = await db.get_offer(item.offer_id) if hasattr(db, "get_offer") else None
         if not offer or not is_offer_active(offer):
             raise HTTPException(status_code=400, detail=f"Offer not found: {item.offer_id}")
+        if not is_offer_available_now(offer):
+            time_range = get_offer_time_range_label(offer)
+            detail = "Mahsulot hozir buyurtma uchun mavjud emas"
+            if time_range:
+                detail = f"{detail}. Buyurtma vaqti: {time_range}"
+            raise HTTPException(status_code=409, detail=detail)
         offers_by_id[item.offer_id] = offer
         store_id = int(get_val(offer, "store_id") or 0)
         if store_id:

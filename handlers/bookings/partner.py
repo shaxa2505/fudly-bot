@@ -415,7 +415,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             ok = await order_service.update_status(
                 entity_id=booking_id,
                 entity_type="booking",
-                new_status=OrderStatus.PREPARING,
+                new_status=OrderStatus.READY,
                 notify_customer=False,
             )
 

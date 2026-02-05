@@ -5,6 +5,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import time
 from datetime import date, datetime, time as dt_time
 from typing import Any
@@ -14,6 +15,7 @@ from fastapi import Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.config import load_settings
+from app.core.utils import get_uzb_time
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,77 @@ def _parse_offer_expiry_date(value: Any) -> date | None:
         except ValueError:
             pass
     return None
+
+
+def _parse_time_value(value: Any) -> dt_time | None:
+    if not value:
+        return None
+    if isinstance(value, dt_time):
+        return value
+    if isinstance(value, datetime):
+        return value.time()
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        if "T" in raw:
+            raw = raw.split("T", 1)[1]
+        raw = raw[:8]
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                return datetime.strptime(raw, fmt).time()
+            except ValueError:
+                continue
+    return None
+
+
+def _parse_time_range_from_text(value: Any) -> tuple[dt_time | None, dt_time | None]:
+    if not value:
+        return None, None
+    raw = str(value)
+    match = re.search(r"(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})", raw)
+    if not match:
+        return None, None
+    start = _parse_time_value(match.group(1))
+    end = _parse_time_value(match.group(2))
+    return start, end
+
+
+def _is_time_in_window(start: dt_time | None, end: dt_time | None, now: dt_time) -> bool:
+    if not start or not end:
+        return True
+    if start <= end:
+        return start <= now <= end
+    return now >= start or now <= end
+
+
+def get_offer_time_range_label(offer: Any) -> str | None:
+    start = _parse_time_value(get_val(offer, "available_from"))
+    end = _parse_time_value(get_val(offer, "available_until"))
+    if not start or not end:
+        alt_start, alt_end = _parse_time_range_from_text(get_val(offer, "pickup_time"))
+        start = start or alt_start
+        end = end or alt_end
+    if start and end:
+        return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+    if start:
+        return start.strftime("%H:%M")
+    if end:
+        return end.strftime("%H:%M")
+    return None
+
+
+def is_offer_available_now(offer: Any, now: datetime | None = None) -> bool:
+    start = _parse_time_value(get_val(offer, "available_from"))
+    end = _parse_time_value(get_val(offer, "available_until"))
+    if not start or not end:
+        alt_start, alt_end = _parse_time_range_from_text(get_val(offer, "pickup_time"))
+        start = start or alt_start
+        end = end or alt_end
+    if not start or not end:
+        return True
+    current = (now or get_uzb_time()).time()
+    return _is_time_in_window(start, end, current)
 
 
 def _get_offer_quantity(offer: Any) -> int | None:
@@ -401,6 +474,8 @@ __all__ = [
     "settings",
     "get_val",
     "is_offer_active",
+    "is_offer_available_now",
+    "get_offer_time_range_label",
     "OfferResponse",
     "OfferListResponse",
     "StoreResponse",

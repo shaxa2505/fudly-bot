@@ -11,6 +11,7 @@ import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
 import { getCurrentLocation } from '../utils/geolocation'
 import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../utils/pendingPayment'
+import { getOfferAvailability } from '../utils/availability'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
@@ -692,6 +693,18 @@ function CartPage({ user }) {
   const serviceFee = 0
   const checkoutTotal = calcTotalPrice(total, serviceFee)
   const itemsCount = cartCount
+  const unavailableCartItems = useMemo(() => {
+    return cartItems.filter((item) => {
+      const availability = getOfferAvailability(item.offer)
+      return availability.timeRange && !availability.isAvailableNow
+    })
+  }, [cartItems])
+  const hasUnavailableItems = unavailableCartItems.length > 0
+  const unavailableTimeRange = useMemo(() => {
+    if (!hasUnavailableItems) return ''
+    const availability = getOfferAvailability(unavailableCartItems[0]?.offer)
+    return availability.timeRange || ''
+  }, [hasUnavailableItems, unavailableCartItems])
   const savingsTotal = useMemo(() => {
     return cartItems.reduce((sum, item) => {
       const original = Number(item.offer.original_price)
@@ -1520,6 +1533,13 @@ function CartPage({ user }) {
 
   // Proceed to payment
   const proceedToPayment = async () => {
+    if (hasUnavailableItems) {
+      const message = unavailableTimeRange
+        ? `Buyurtma vaqti: ${unavailableTimeRange}`
+        : 'Hozir buyurtma qilish mumkin emas'
+      toast.warning(message)
+      return
+    }
     const resolvedPhone = ensurePhoneOrPrompt()
     if (!resolvedPhone) {
       return
@@ -1865,8 +1885,10 @@ function CartPage({ user }) {
               const unitPrice = discountPrice ?? originalPrice ?? 0
               const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
               const subtitle = item.offer.description || item.offer.short_description || item.offer.store_address || ''
+              const availability = getOfferAvailability(item.offer)
+              const isUnavailableNow = availability.timeRange && !availability.isAvailableNow
               return (
-                <div key={item.offer.id} className="cart-item-row">
+                <div key={item.offer.id} className={`cart-item-row${isUnavailableNow ? ' is-unavailable' : ''}`}>
                   <div className="cart-item-thumb">
                     <img
                       src={photoUrl}
@@ -1902,13 +1924,18 @@ function CartPage({ user }) {
                         Maksimum: {maxStock} {getUnitLabel(item.offer.unit)}
                       </p>
                     )}
+                    {isUnavailableNow && (
+                      <p className="cart-item-availability">
+                        Hozir yopiq - Buyurtma vaqti: {availability.timeRange}
+                      </p>
+                    )}
                   </div>
                   <div className="cart-item-qty">
                     <button
                       type="button"
                       onClick={() => handleQuantityChange(item.offer.id, 1)}
                       aria-label={`${item.offer.title} miqdorini oshirish`}
-                      disabled={item.quantity >= stockLimit}
+                      disabled={item.quantity >= stockLimit || isUnavailableNow}
                     >
                       <Plus size={20} strokeWidth={2} />
                     </button>
@@ -2417,6 +2444,11 @@ function CartPage({ user }) {
                         <span>{formatSum(checkoutTotal)} so'm</span>
                       </div>
                     </div>
+                    {hasUnavailableItems && (
+                      <p className="checkout-hint">
+                        Hozir buyurtma qilish mumkin emas{unavailableTimeRange ? ` - ${unavailableTimeRange}` : ''}
+                      </p>
+                    )}
                   </section>
                 </div>
               )}
@@ -2428,7 +2460,7 @@ function CartPage({ user }) {
                 <button
                   className={`checkout-confirm${checkoutBusy ? ' is-loading' : ''}`}
                   onClick={proceedToPayment}
-                  disabled={checkoutBusy || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
+                  disabled={checkoutBusy || hasUnavailableItems || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
                 >
                   {checkoutBusy && <span className="checkout-confirm-spinner" aria-hidden="true"></span>}
                   <span>{checkoutButtonLabel}</span>

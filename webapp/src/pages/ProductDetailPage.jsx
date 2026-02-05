@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { getUnitLabel } from '../utils/helpers'
 import { calcItemsTotal } from '../utils/orderMath'
+import { getOfferAvailability } from '../utils/availability'
 import api from '../api/client'
 import { resolveOfferImageUrl } from '../utils/imageUtils'
 import QuantityControl from '../components/QuantityControl'
@@ -120,6 +121,8 @@ function ProductDetailPage() {
   const lowStock = hasStock && stockValue <= 3
   const midStock = hasStock && stockValue > 3 && stockValue <= 10
   const stockMeterValue = !hasStock ? 0 : lowStock ? 24 : midStock ? 56 : 92
+  const availability = getOfferAvailability(offer)
+  const isUnavailableNow = Boolean(availability.timeRange && !availability.isAvailableNow)
   const heroStockLabel = hasStock
     ? (lowStock ? 'Kam qoldi' : `Qoldi: ${stockValue} ${displayUnitLabel}`)
     : null
@@ -137,6 +140,19 @@ function ProductDetailPage() {
   const handleAddToCart = () => {
     if (!hasStock || !offer) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+      return
+    }
+    if (isUnavailableNow) {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+      const message = availability.timeRange
+        ? `Buyurtma vaqti: ${availability.timeRange}`
+        : "Hozir buyurtma qilish mumkin emas"
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram?.WebApp?.showAlert?.(message)
+      } else {
+        // eslint-disable-next-line no-alert
+        alert(message)
+      }
       return
     }
 
@@ -345,6 +361,12 @@ function ProductDetailPage() {
               <span className="pdp-total-savings">Jami tejaysiz {formatPrice(totalSavings)} so'm</span>
             )}
           </div>
+          {availability.timeRange && (
+            <div className={`pdp-availability ${isUnavailableNow ? 'is-closed' : ''}`}>
+              <span>{isUnavailableNow ? 'Hozir yopiq' : 'Buyurtma vaqti'}</span>
+              <strong>{availability.timeRange}</strong>
+            </div>
+          )}
           <div className="pdp-stock-meter">
             <span
               className={`pdp-stock-meter-fill ${lowStock ? 'is-low' : midStock ? 'is-mid' : ''}`}
@@ -409,15 +431,18 @@ function ProductDetailPage() {
             onDecrement={() => handleQuantityChange(-1)}
             onIncrement={() => handleQuantityChange(1)}
             disableDecrement={!hasStock || quantity <= 1}
-            disableIncrement={!hasStock || quantity >= maxQty}
+            disableIncrement={!hasStock || quantity >= maxQty || isUnavailableNow}
           />
           <button
             className={`pdp-add-btn ${addedToCart ? 'success' : ''}`}
             onClick={handleAddToCart}
-            disabled={addedToCart || !hasStock}
+            disabled={addedToCart || !hasStock || isUnavailableNow}
           >
             <span className="pdp-add-text">
-              {!hasStock ? "Tugagan" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish")}
+              {!hasStock
+                ? "Tugagan"
+                : (isUnavailableNow ? "Hozir yopiq" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish"))
+              }
             </span>
             {hasStock && (
               <span className="pdp-add-total">

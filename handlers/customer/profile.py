@@ -115,9 +115,8 @@ async def profile(message: types.Message, state: FSMContext) -> None:
             pass
 
     # Determine current mode for settings keyboard
-    # Approved sellers are locked to seller mode; others stay in customer mode.
-    approved_store = has_approved_store(message.from_user.id, db)
-    if effective_role == "seller" and approved_store:
+    # Sellers are locked to seller mode.
+    if effective_role == "seller":
         current_mode = "seller"
     else:
         current_mode = "customer"
@@ -174,7 +173,7 @@ async def profile(message: types.Message, state: FSMContext) -> None:
                 lines.append(f"{done_label}: {total_completed}")
 
     # Seller statistics - show when in seller mode
-    elif current_mode == "seller" or user.role == "seller":
+    elif current_mode == "seller":
         stores = db.get_user_stores(message.from_user.id)
         if stores:
             total_bookings = 0
@@ -339,7 +338,7 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
     await callback.message.answer(
         get_text(lang, "city_changed_confirm", city=city),
         parse_mode="HTML",
-        reply_markup=main_menu_customer(lang),
+        reply_markup=get_appropriate_menu(callback.from_user.id, lang),
     )
     await callback.answer()
 
@@ -366,10 +365,10 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
         user_role = getattr(user, "role", "customer") if user else "customer"
         if user_role == "store_owner":
             user_role = "seller"
-        if user_role == "seller" and has_approved_store(user_id, db):
+        if user_role == "seller":
             await callback.message.answer(
                 get_text(lang, "customer_mode_disabled"),
-                reply_markup=main_menu_seller(lang),
+                reply_markup=main_menu_seller(lang, user_id=user_id),
             )
             await callback.answer()
             return
@@ -483,14 +482,9 @@ async def switch_to_seller_cb(callback: types.CallbackQuery) -> None:
 
         # Send new message with ReplyKeyboard
         try:
-            # Get partner panel URL
-            from handlers.common.webapp import get_partner_panel_url
-
-            webapp_url = get_partner_panel_url()
-
             await callback.message.answer(
                 "Переключено в режим партнера" if lang == "ru" else "Hamkor rejimiga o'tkazildi",
-                reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id),
+                reply_markup=main_menu_seller(lang, user_id=user_id),
             )
             await callback.answer()
         except Exception as e:

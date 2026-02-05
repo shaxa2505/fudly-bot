@@ -26,7 +26,6 @@ from handlers.common.utils import (
     get_appropriate_menu as _get_appropriate_menu,
 )
 from handlers.common.utils import (
-    get_user_view_mode,
     has_approved_store,
     is_partner_button,
     normalize_city,
@@ -92,7 +91,10 @@ async def register_store_cancel(message: types.Message, state: FSMContext) -> No
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
     await state.clear()
-    await message.answer(get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang))
+    await message.answer(
+        get_text(lang, "action_cancelled"),
+        reply_markup=get_appropriate_menu(message.from_user.id, lang),
+    )
 
 
 def setup_dependencies(
@@ -154,46 +156,40 @@ async def become_partner(message: types.Message, state: FSMContext) -> None:
         await message.answer(get_text(lang, "choose_language"), reply_markup=language_keyboard())
         return
 
-    # If already a seller with approved store - switch to seller mode
-    if user.role == "seller":
+    user_role = getattr(user, "role", "customer")
+    if user_role == "store_owner":
+        user_role = "seller"
+
+    # If already a seller - stay in partner mode
+    if user_role == "seller":
+        # Remember seller view preference
+        set_user_view_mode(message.from_user.id, "seller", db)
+
+        stores = db.get_user_accessible_stores(message.from_user.id)
         if has_approved_store(message.from_user.id, db):
-            # Remember seller view preference
-            set_user_view_mode(message.from_user.id, "seller", db)
-
-            # Get partner panel URL
-            from handlers.common.webapp import get_partner_panel_url
-
-            webapp_url = get_partner_panel_url()
-
             await message.answer(
                 get_text(lang, "switched_to_seller"),
-                reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=message.from_user.id),
+                reply_markup=main_menu_seller(lang, user_id=message.from_user.id),
             )
-            return
         else:
-            # No approved store - show status
-            stores = db.get_user_accessible_stores(message.from_user.id)
-            if stores:
-                # Has store(s) but not approved
-                status = stores[0].get("status", "pending")
-                if status == "pending":
-                    await message.answer(
-                        get_text(lang, "no_approved_stores"),
-                        reply_markup=main_menu_customer(lang),
-                    )
-                elif status == "rejected":
-                    # Can reapply
-                    await message.answer(
-                        get_text(lang, "store_rejected") + "\n\nПодайте заявку заново:",
-                        reply_markup=main_menu_customer(lang),
-                    )
-                    # Continue with new registration below
-                else:
-                    await message.answer(
-                        get_text(lang, "no_approved_stores"),
-                        reply_markup=main_menu_customer(lang),
-                    )
-                return
+            status = stores[0].get("status", "pending") if stores else "pending"
+            if status == "rejected":
+                text = get_text(lang, "store_rejected")
+            else:
+                text = get_text(lang, "no_approved_stores")
+            await message.answer(
+                text,
+                reply_markup=main_menu_seller(lang, user_id=message.from_user.id),
+            )
+
+        if stores:
+            try:
+                from handlers.seller.dashboard import send_partner_dashboard
+
+                await send_partner_dashboard(message, message.from_user.id, lang)
+            except Exception:
+                pass
+        return
 
     # Not a seller or no store - start registration
     # Prefer inline city selection to avoid free-text ambiguity; keep text fallback
@@ -593,18 +589,14 @@ async def register_store_photo_text(message: types.Message, state: FSMContext) -
         return
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
-    text = (message.text or "").lower().strip()
-
     # Check for cancel command
-    if "отмена" in text or "bekor" in text or text == "/cancel":
+    if _is_cancel_text(message.text):
         await state.clear()
-        from app.keyboards.user import main_menu_customer
-
         await message.answer(
-            get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
+            get_text(lang, "action_cancelled"),
+            reply_markup=get_appropriate_menu(message.from_user.id, lang),
         )
         return
-
     # Any other text - require photo
     await message.answer(
         "Пожалуйста, отправьте фото магазина. Это обязательный шаг."
@@ -688,6 +680,12 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
 
     await state.clear()
 
+    try:
+        db.update_user_role(message.from_user.id, "seller")
+    except Exception:
+        pass
+    set_user_view_mode(message.from_user.id, "seller", db)
+
     # Notify user about moderation
     await message.answer(
         get_text(
@@ -698,12 +696,11 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
             address=data["address"],
             category=data["category"],
             description=data["description"],
-            phone=owner_phone or "—",
+            phone=owner_phone or "-",
         ),
         parse_mode="HTML",
-        reply_markup=main_menu_customer(lang),
+        reply_markup=main_menu_seller(lang, user_id=message.from_user.id),
     )
-
     if latitude is None or longitude is None:
         if lang == "ru":
             await message.answer(
@@ -715,6 +712,12 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
                 "Do'kon koordinatalarini avtomatik aniqlab bo'lmadi. "
                 "Do'kon sozlamalarida geolokatsiyani o'rnating."
             )
+    try:
+        from handlers.seller.dashboard import send_partner_dashboard
+
+        await send_partner_dashboard(message, message.from_user.id, lang)
+    except Exception:
+        pass
 
     # Notify ALL admins about new application
     admins = db.get_all_admins()
@@ -864,11 +867,11 @@ async def register_cancel_callback(callback: types.CallbackQuery, state: FSMCont
     except Exception:
         pass
 
-    # Send cancel confirmation with customer menu
+    # Send cancel confirmation with appropriate menu
     try:
         await callback.message.answer(
             cancel_text,
-            reply_markup=main_menu_customer(lang),
+            reply_markup=get_appropriate_menu(callback.from_user.id, lang),
         )
     except Exception:
         pass

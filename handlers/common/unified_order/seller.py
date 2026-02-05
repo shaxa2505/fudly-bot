@@ -152,15 +152,30 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    # Determine order type early for correct status transition
+    delivery_address: str | None = None
+    order_type = "delivery"
+    if entity_type == "order":
+        delivery_address = _get_entity_field(entity, "delivery_address")
+        order_type_db = _get_entity_field(entity, "order_type")
+        if order_type_db:
+            order_type = order_type_db
+        else:
+            order_type = "delivery" if delivery_address else "pickup"
+    else:
+        order_type = "pickup"
+
+    target_status = OrderStatus.READY if order_type == "pickup" else OrderStatus.PREPARING
+
     # Use UnifiedOrderService if available, otherwise fallback
     if order_service:
         success = await order_service.confirm_order(entity_id, entity_type)
     else:
         try:
             if entity_type == "order":
-                db_instance.update_order_status(entity_id, OrderStatus.PREPARING)
+                db_instance.update_order_status(entity_id, target_status)
             else:
-                db_instance.update_booking_status(entity_id, OrderStatus.PREPARING)
+                db_instance.update_booking_status(entity_id, target_status)
             success = True
         except Exception as e:  # pragma: no cover - defensive logging
             logger.error(f"Failed to confirm: {e}")
@@ -174,21 +189,12 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     from app.core.utils import get_offer_field
 
     items: list[dict] = []
-    order_type = "delivery"
-    delivery_address: str | None = None
     customer_name: str | None = None
     customer_phone: str | None = None
     total = 0
     delivery_price = 0
 
     if entity_type == "order":
-        delivery_address = _get_entity_field(entity, "delivery_address")
-        order_type_db = _get_entity_field(entity, "order_type")
-        if order_type_db:
-            order_type = order_type_db
-        else:
-            order_type = "delivery" if delivery_address else "pickup"
-
         offer_id = _get_entity_field(entity, "offer_id")
         quantity = _get_entity_field(entity, "quantity", 1)
         if offer_id:
@@ -229,7 +235,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
         order_id=entity_id,
-        status=OrderStatus.PREPARING,
+        status=target_status,
         order_type=order_type,
         items=items,
         customer_name=customer_name,

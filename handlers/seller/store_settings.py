@@ -408,18 +408,16 @@ async def back_from_settings(callback: types.CallbackQuery) -> None:
     lang = db.get_user_language(callback.from_user.id)
 
     from app.keyboards import main_menu_seller
-    from handlers.common.webapp import get_partner_panel_url
 
     try:
         await callback.message.delete()
     except Exception:
         pass
 
-    webapp_url = get_partner_panel_url()
     await bot.send_message(
         callback.from_user.id,
         "Главное меню" if lang == "ru" else "Asosiy menyu",
-        reply_markup=main_menu_seller(lang, webapp_url=webapp_url, user_id=callback.from_user.id),
+        reply_markup=main_menu_seller(lang, user_id=callback.from_user.id),
     )
 
     await callback.answer()

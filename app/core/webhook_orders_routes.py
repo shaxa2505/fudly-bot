@@ -715,7 +715,7 @@ def build_order_handlers(
                     from urllib.parse import quote
 
                     status = booking.get("status") or "pending"
-                    status = "preparing" if status == "confirmed" else status
+                    status = "ready" if status == "confirmed" else status
                     booking_code = booking.get("booking_code") or ""
                     quantity = int(booking.get("quantity") or 1)
 
@@ -744,7 +744,7 @@ def build_order_handlers(
                     )
 
                     qr_code = None
-                    if booking_code and status in ("preparing", "confirmed", "ready"):
+                    if booking_code and status in ("ready", "preparing", "confirmed"):
                         try:
                             from app.api.orders import generate_qr_code
 
@@ -926,21 +926,13 @@ def build_order_handlers(
                         )
 
                     status = booking.get("status") or "pending"
-                    status = "preparing" if status == "confirmed" else status
+                    status = "ready" if status == "confirmed" else status
                     created_at = str(booking.get("created_at") or "")
                     updated_at = created_at
 
                     timeline = [
                         {"status": "pending", "timestamp": created_at, "message": "Заказ создан"}
                     ]
-                    if status in ("preparing", "confirmed", "ready", "completed"):
-                        timeline.append(
-                            {
-                                "status": "preparing",
-                                "timestamp": updated_at,
-                                "message": "Заказ принят и готовится",
-                            }
-                        )
                     if status in ("ready", "completed"):
                         timeline.append(
                             {"status": "ready", "timestamp": updated_at, "message": "Заказ готов"}
@@ -991,24 +983,34 @@ def build_order_handlers(
             status = order_dict.get("order_status") or "pending"
             created_at = str(order_dict.get("created_at") or "")
             updated_at = str(order_dict.get("updated_at") or created_at)
+            order_type = order_dict.get("order_type") or (
+                "delivery" if order_dict.get("delivery_address") else "pickup"
+            )
+            is_pickup = order_type == "pickup"
 
             timeline = [{"status": "pending", "timestamp": created_at, "message": "Заказ создан"}]
 
-            if status in ("preparing", "confirmed", "ready", "delivering", "completed"):
-                timeline.append(
-                    {
-                        "status": "preparing",
-                        "timestamp": updated_at,
-                        "message": "Заказ принят и готовится",
-                    }
-                )
+            if not is_pickup:
+                if status in ("preparing", "confirmed", "ready", "delivering", "completed"):
+                    timeline.append(
+                        {
+                            "status": "preparing",
+                            "timestamp": updated_at,
+                            "message": "Заказ принят и готовится",
+                        }
+                    )
+            else:
+                if status in ("preparing", "confirmed", "ready", "completed"):
+                    timeline.append(
+                        {"status": "ready", "timestamp": updated_at, "message": "Заказ готов"}
+                    )
 
-            if status in ("ready", "delivering", "completed"):
+            if not is_pickup and status in ("ready", "delivering", "completed"):
                 timeline.append(
                     {"status": "ready", "timestamp": updated_at, "message": "Заказ готов"}
                 )
 
-            if status in ("delivering", "completed"):
+            if not is_pickup and status in ("delivering", "completed"):
                 timeline.append(
                     {
                         "status": "delivering",
@@ -1045,7 +1047,7 @@ def build_order_handlers(
                 )
 
             estimated_ready = None
-            if status in ("preparing", "confirmed"):
+            if not is_pickup and status in ("preparing", "confirmed"):
                 try:
                     from datetime import datetime, timedelta
 
@@ -1114,10 +1116,10 @@ def build_order_handlers(
                         )
 
                     status = booking.get("status") or "pending"
-                    status = "preparing" if status == "confirmed" else status
+                    status = "ready" if status == "confirmed" else status
                     booking_code = booking.get("booking_code") or ""
 
-                    if status not in ("preparing", "confirmed", "ready"):
+                    if status not in ("ready", "preparing", "confirmed"):
                         return add_cors_headers(
                             web.json_response(
                                 {"error": "QR not available for this status"}, status=400

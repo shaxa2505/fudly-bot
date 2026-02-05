@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
+import { getOfferAvailability } from '../utils/availability'
 import './OfferCard.css'
 
 const LOADED_IMAGE_CACHE = new Set()
@@ -49,8 +50,11 @@ const OfferCard = memo(function OfferCard({
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
-    if (isOutOfStock || isMaxReached) {
+    if (isOutOfStock || isMaxReached || isUnavailableNow) {
       window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+      if (isUnavailableNow && timeRange) {
+        toast?.warning(`Buyurtma vaqti: ${timeRange}`, 2000)
+      }
       return
     }
 
@@ -63,7 +67,7 @@ const OfferCard = memo(function OfferCard({
       setTimeout(() => setIsAdding(false), 300)
       toast?.success("Savatga qo'shildi", 1800)
     }
-  }, [cartQuantity, isOutOfStock, isMaxReached, offer, onAddToCart, toast])
+  }, [cartQuantity, isOutOfStock, isMaxReached, isUnavailableNow, offer, onAddToCart, timeRange, toast])
 
   const originalPrice = Number(offer.original_price) || 0
   const discountPrice = Number(offer.discount_price) || 0
@@ -72,30 +76,9 @@ const OfferCard = memo(function OfferCard({
   const isLowStock = !isOutOfStock && stockLimit > 0 && stockLimit <= 5
   const locationText = offer.store_address || offer.address || offer.district || offer.region || ''
 
-  const formatTime = (value) => {
-    if (!value) return ''
-    const raw = String(value).trim()
-    if (!raw) return ''
-    const timePart = raw.includes('T') ? raw.split('T')[1] : raw
-    const match = timePart.match(/\d{2}:\d{2}/)
-    return match ? match[0] : timePart
-  }
-
-  const pickupStart = offer.available_from ?? offer.pickup_time_start ?? offer.pickup_from ?? offer.pickup_start
-  const pickupEnd = offer.available_until ?? offer.pickup_time_end ?? offer.pickup_until ?? offer.pickup_end
-  const timeFrom = formatTime(pickupStart)
-  const timeUntil = formatTime(pickupEnd)
-  let timeRange = ''
-  if (timeFrom && timeUntil) {
-    timeRange = `${timeFrom} - ${timeUntil}`
-  } else if (timeFrom || timeUntil) {
-    timeRange = timeFrom || timeUntil
-  }
-  if (!timeRange && offer.pickup_time) {
-    const rawPickup = String(offer.pickup_time).trim()
-    const rangeMatch = rawPickup.match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/)
-    timeRange = rangeMatch ? `${rangeMatch[1]} - ${rangeMatch[2]}` : rawPickup
-  }
+  const availability = getOfferAvailability(offer)
+  const timeRange = availability.timeRange
+  const isUnavailableNow = Boolean(timeRange && !availability.isAvailableNow)
   const titleCandidates = [
     offer.title,
     offer.product_name,
@@ -144,7 +127,7 @@ const OfferCard = memo(function OfferCard({
 
   return (
     <div
-      className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
+      className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''} ${isUnavailableNow ? 'is-unavailable' : ''}`}
       onClick={handleCardClick}
     >
       <div className="offer-image-wrap">
@@ -180,6 +163,9 @@ const OfferCard = memo(function OfferCard({
           }}
         />
         <div className="offer-tags">
+          {isUnavailableNow && (
+            <span className="offer-tag offer-tag--closed">Hozir yopiq</span>
+          )}
           {timeRange && (
             <span className="offer-tag">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -246,7 +232,7 @@ const OfferCard = memo(function OfferCard({
               type="button"
               className={`offer-add-btn ${isAdding ? 'pulse' : ''}`}
               onClick={handleAddClick}
-              disabled={isOutOfStock || isMaxReached}
+              disabled={isOutOfStock || isMaxReached || isUnavailableNow}
               aria-label="Savatga qo'shish"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">

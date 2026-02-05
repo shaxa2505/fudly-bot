@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { calcItemsTotal, calcQuantity } from '../utils/orderMath';
+import { getOfferAvailability } from '../utils/availability';
 
 const STORAGE_KEY = 'fudly_cart_v2';
 const STORAGE_PREFIX = 'fudly_cart_user_';
@@ -91,6 +92,19 @@ export function CartProvider({ children }) {
 
   // Add item to cart
   const addToCart = useCallback((offer) => {
+    const availability = getOfferAvailability(offer);
+    if (availability.timeRange && !availability.isAvailableNow) {
+      window.Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('warning')
+      const message = `Buyurtma vaqti: ${availability.timeRange}`
+      if (window.Telegram?.WebApp?.showAlert) {
+        window.Telegram?.WebApp?.showAlert?.(message)
+      } else {
+        // eslint-disable-next-line no-alert
+        alert(message)
+      }
+      return
+    }
+
     setCart((prev) => {
       const newStoreId = offer.store_id || offer.storeId || offer.store?.id
       const existingStoreId = Object.values(prev).find(item => item.offer?.store_id)?.offer?.store_id
@@ -151,6 +165,19 @@ export function CartProvider({ children }) {
             store_address: offer.store_address || existing?.offer?.store_address,
             unit: offer.unit || existing?.offer?.unit,
             stock: stockLimit, // Save stock limit for later checks
+            available_from:
+              offer.available_from ??
+              offer.pickup_time_start ??
+              offer.pickup_from ??
+              offer.pickup_start ??
+              existing?.offer?.available_from,
+            available_until:
+              offer.available_until ??
+              offer.pickup_time_end ??
+              offer.pickup_until ??
+              offer.pickup_end ??
+              existing?.offer?.available_until,
+            pickup_time: offer.pickup_time ?? existing?.offer?.pickup_time,
           },
           quantity: Math.min(currentQty + 1, stockLimit),
         },

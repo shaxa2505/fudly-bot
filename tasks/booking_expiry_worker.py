@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from app.keyboards import main_menu_customer
+from localization import get_text
 
 logger = logging.getLogger(__name__)
 
@@ -393,6 +394,57 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                     logger.error(f"Error processing ready booking row: {e}")
     except Exception as e:
         logger.error(f"Ready bookings query failed: {e}")
+
+    # 4.5) Ready pickup orders expire after configured hours
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT order_id, user_id
+                FROM orders
+                WHERE order_type = 'pickup'
+                  AND order_status = 'ready'
+                  AND updated_at < now() - (%s * INTERVAL '1 hour')
+            """,
+                (int(ready_expiry_hours),),
+            )
+            rows = cursor.fetchall()
+            for row in rows:
+                try:
+                    if hasattr(row, "get"):
+                        order_id = row.get("order_id")
+                        user_id = row.get("user_id")
+                    else:
+                        order_id = row[0]
+                        user_id = row[1]
+
+                    # Update status to cancelled and restore quantities
+                    try:
+                        if order_service:
+                            await order_service.cancel_order(order_id, entity_type="order")
+                        elif set_order_status_direct:
+                            set_order_status_direct(db, order_id, order_status_cancelled)
+                    except Exception as e:
+                        logger.error(f"Failed to expire ready pickup order {order_id}: {e}")
+
+                    # Notify user if unified order service is unavailable
+                    if bot and user_id and not order_service:
+                        try:
+                            lang = "ru"
+                            try:
+                                lang = db.get_user_language(user_id)
+                            except Exception:
+                                pass
+                            await bot.send_message(
+                                user_id, get_text(lang, "pickup_ready_expired")
+                            )
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.error(f"Error processing ready pickup order row: {e}")
+    except Exception as e:
+        logger.error(f"Ready pickup orders query failed: {e}")
 
     # 5) Pending pickup bookings expire after configured minutes
     try:

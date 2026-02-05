@@ -6,7 +6,7 @@ from typing import Any
 
 from aiogram import F, Router, types
 
-from handlers.common.utils import has_approved_store, is_customer_menu_button, set_user_view_mode
+from handlers.common.utils import is_customer_menu_button, set_user_view_mode
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ async def switch_to_customer(message: types.Message):
     user_role = getattr(user, "role", "customer") if user else "customer"
     if user_role == "store_owner":
         user_role = "seller"
-    if user_role == "seller" and has_approved_store(user_id, db):
+    if user_role == "seller":
         if not main_menu_seller:
             await message.answer(get_text(lang, "customer_mode_disabled"))
             return

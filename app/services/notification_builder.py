@@ -7,9 +7,10 @@ consistent structure and optional detail blocks.
 from __future__ import annotations
 
 import html
+import os
 from typing import Literal
 
-from app.domain.order_labels import status_label
+from app.domain.order_labels import normalize_order_status, status_label
 from localization import get_text
 
 
@@ -83,6 +84,9 @@ class NotificationBuilder:
     ) -> str:
         type_label = self._type_label(lang)
         status_text = self._status_label(status, lang)
+        normalized_status = normalize_order_status(status)
+        if self.order_type == "pickup" and normalized_status == "preparing":
+            normalized_status = "ready"
 
         group_ids = sorted({int(x) for x in (order_ids or []) if x})
         is_group = bool(is_cart or (len(group_ids) > 1))
@@ -96,6 +100,11 @@ class NotificationBuilder:
 
         lines: list[str] = [header]
         lines.append(f"{get_text(lang, 'label_status')}: {status_text}")
+        if role == "customer" and self.order_type == "pickup" and normalized_status == "ready":
+            ready_hours = int(os.getenv("PICKUP_READY_EXPIRY_HOURS", "2"))
+            lines.append(
+                get_text(lang, "pickup_ready_notice", hours=str(ready_hours))
+            )
 
         if is_group and group_ids:
             max_show = 5

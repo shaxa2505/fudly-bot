@@ -27,10 +27,12 @@ def status_label(
     order_type_norm = (order_type or "delivery").strip().lower()
     if order_type_norm not in ("delivery", "pickup"):
         order_type_norm = "delivery"
+    if order_type_norm == "pickup" and normalized == OrderStatus.PREPARING:
+        normalized = OrderStatus.READY
 
     pickup = {
         "pending": "Tasdiq kutilmoqda" if lang == "uz" else "Ожидает подтверждения",
-        "preparing": "Tayyorlanmoqda" if lang == "uz" else "Готовится",
+        "preparing": "Tayyor" if lang == "uz" else "Готов к выдаче",
         "ready": "Tayyor" if lang == "uz" else "Готов к выдаче",
         "delivering": "Yo'lda" if lang == "uz" else "В пути",
         "completed": "Berildi" if lang == "uz" else "Выдано",

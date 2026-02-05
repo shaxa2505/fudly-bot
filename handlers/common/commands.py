@@ -30,7 +30,6 @@ from handlers.common.utils import (
     has_approved_store,
     set_user_view_mode,
 )
-from handlers.common.webapp import get_partner_panel_url
 from localization import LANGUAGES, get_cities, get_text
 from app.core.utils import get_user_field, normalize_city
 from app.core.order_math import calc_items_total, calc_quantity, parse_cart_items
@@ -853,13 +852,13 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         return
 
     # Registered user - show menu
-    current_mode = get_user_view_mode(user_id, db)
-    if current_mode == "seller" and user_role == "seller":
-        menu = main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=user_id)
-    else:
-        if current_mode != "customer":
-            set_user_view_mode(message.from_user.id, "customer", db)
-        menu = main_menu_customer(lang)
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
+    )
 
     await message.answer(
         get_text(
@@ -1026,9 +1025,14 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
     role = user.role if user else "customer"
 
     if current_state and str(current_state).startswith("RegisterStore"):
-        await message.answer(
-            get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
+        menu = get_appropriate_menu(
+            user_id,
+            lang,
+            db,
+            main_menu_seller=main_menu_seller,
+            main_menu_customer=main_menu_customer,
         )
+        await message.answer(get_text(lang, "operation_cancelled"), reply_markup=menu)
         return
 
     if role == "seller":
@@ -1041,10 +1045,12 @@ async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseP
     if role != "seller":
         target = "customer"
 
-    menu = (
-        main_menu_seller(lang, webapp_url=get_partner_panel_url(), user_id=user_id)
-        if target == "seller"
-        else main_menu_customer(lang)
+    menu = get_appropriate_menu(
+        user_id,
+        lang,
+        db,
+        main_menu_seller=main_menu_seller,
+        main_menu_customer=main_menu_customer,
     )
 
     await message.answer(get_text(lang, "operation_cancelled"), reply_markup=menu)

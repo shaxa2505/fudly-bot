@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_field, get_store_field
+from app.core.utils import get_field
 from app.services.unified_order_service import OrderStatus
 from database_protocol import DatabaseProtocol
 from localization import get_text
@@ -47,11 +47,6 @@ def _normalize_status(raw: Any) -> str:
 
 def _get_dashboard_stats(user_id: int) -> tuple[int, dict[str, int]]:
     stores = db.get_user_accessible_stores(user_id) if db else []
-    active_stores = [
-        store
-        for store in stores or []
-        if get_store_field(store, "status") in ("active", "approved")
-    ]
     counts = {"new": 0, "active": 0, "completed": 0, "cancelled": 0}
 
     from handlers.seller.management.orders import _get_all_orders
@@ -68,7 +63,7 @@ def _get_dashboard_stats(user_id: int) -> tuple[int, dict[str, int]]:
         elif status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
             counts["cancelled"] += 1
 
-    return len(active_stores), counts
+    return len(stores or []), counts
 
 
 def _build_dashboard_keyboard(lang: str) -> InlineKeyboardMarkup:

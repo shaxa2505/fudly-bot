@@ -11,16 +11,16 @@ This service handles:
 Status Flow:
     PENDING     → Waiting for seller confirmation
     PREPARING   → Seller accepted, preparing order
-    READY       → Ready for pickup/delivery (internal state, no customer notification)
+    READY       → Ready for pickup/delivery (pickup customers are notified)
     DELIVERING  → In transit (delivery only)
     COMPLETED   → Order completed
     REJECTED    → Rejected by seller
     CANCELLED   → Cancelled by customer
 
 NOTIFICATION STRATEGY (Optimized v2):
-    - Minimize spam by skipping READY notifications
+    - Minimize spam by skipping READY notifications for delivery
     - Use visual progress bars for better UX
-    - Pickup: PREPARING → COMPLETED (2 notifications)
+    - Pickup: READY → COMPLETED (2 notifications)
     - Delivery: PREPARING → DELIVERING → COMPLETED (3 notifications)
 """
 from __future__ import annotations
@@ -3380,11 +3380,21 @@ class UnifiedOrderService:
         entity_id: int,
         entity_type: Literal["order", "booking"],
     ) -> bool:
-        """Seller confirms an order - moves to PREPARING status."""
+        """Seller confirms an order - pickup goes READY, delivery goes PREPARING."""
+        target_status = OrderStatus.PREPARING
+        try:
+            ctx = self._get_status_update_context(
+                entity_id=entity_id,
+                entity_type=entity_type,
+            )
+            if ctx and ctx.order_type == "pickup":
+                target_status = OrderStatus.READY
+        except Exception as e:
+            logger.warning("Confirm order context check failed: %s", e)
         return await self.update_status(
             entity_id=entity_id,
             entity_type=entity_type,
-            new_status=OrderStatus.PREPARING,
+            new_status=target_status,
             notify_customer=True,
         )
 

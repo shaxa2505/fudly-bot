@@ -358,6 +358,32 @@
   color: var(--color-text-tertiary);
 }
 
+.pdp-availability {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: rgba(15, 118, 110, 0.08);
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  border-radius: 999px;
+  padding: 6px 10px;
+  width: fit-content;
+}
+
+.pdp-availability strong {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.pdp-availability.is-closed {
+  background: rgba(249, 115, 22, 0.12);
+  border-color: rgba(249, 115, 22, 0.3);
+  color: #B45309;
+}
+
 .pdp-stock {
   color: var(--color-text-tertiary);
   font-weight: 600;

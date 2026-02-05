@@ -1308,7 +1308,14 @@ async def confirm_order(
         await unified_service.confirm_order(order_id, "order")
     else:
         if hasattr(db, "update_order_status"):
-            await db.update_order_status(order_id, OrderStatus.PREPARING)
+            if isinstance(order, dict):
+                order_type = order.get("order_type") or (
+                    "delivery" if order.get("delivery_address") else "pickup"
+                )
+            else:
+                order_type = order[5] if len(order) > 5 else "delivery"
+            target_status = OrderStatus.READY if order_type == "pickup" else OrderStatus.PREPARING
+            await db.update_order_status(order_id, target_status)
 
     # Return type based on order_type for frontend
     db_order_type = (
