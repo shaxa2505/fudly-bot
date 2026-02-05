@@ -198,7 +198,7 @@ def build_order_handlers(
                     delivery_price = 0
                     if is_delivery and store:
                         delivery_price = int(
-                            get_offer_value(store, "delivery_price", 15000) or 15000
+                            get_offer_value(store, "delivery_price", 0) or 0
                         )
 
                     order_items.append(

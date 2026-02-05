@@ -131,23 +131,23 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 
     # Use same 8 categories as in the customer view
     categories = {
-        "bakery": "Выпечка" if lang == "ru" else "Pishiriq",
-        "dairy": "Молочные" if lang == "ru" else "Sut mahsulotlari",
-        "meat": "Мясные" if lang == "ru" else "Go'sht mahsulotlari",
-        "fruits": "Фрукты" if lang == "ru" else "Mevalar",
-        "vegetables": "Овощи" if lang == "ru" else "Sabzavotlar",
-        "drinks": "Напитки" if lang == "ru" else "Ichimliklar",
-        "snacks": "Снеки" if lang == "ru" else "Gaz. ovqatlar",
-        "frozen": "Замороженное" if lang == "ru" else "Muzlatilgan",
-        "sweets": "Сладости" if lang == "ru" else "Shirinliklar",
-        "other": "Другое" if lang == "ru" else "Boshqa",
+        "bakery": "🥐 Выпечка" if lang == "ru" else "🥐 Pishiriq",
+        "dairy": "🥛 Молочные" if lang == "ru" else "🥛 Sut mahsulotlari",
+        "meat": "🥩 Мясные" if lang == "ru" else "🥩 Go'sht",
+        "fruits": "🍎 Фрукты" if lang == "ru" else "🍎 Mevalar",
+        "vegetables": "🥦 Овощи" if lang == "ru" else "🥦 Sabzavotlar",
+        "drinks": "🥤 Напитки" if lang == "ru" else "🥤 Ichimliklar",
+        "snacks": "🍿 Снеки" if lang == "ru" else "🍿 Gaz. ovqatlar",
+        "frozen": "❄️ Замороженное" if lang == "ru" else "❄️ Muzlatilgan",
+        "sweets": "🍰 Сладости" if lang == "ru" else "🍰 Shirinliklar",
+        "other": "📦 Другое" if lang == "ru" else "📦 Boshqa",
     }
 
     for cat_id, cat_name in categories.items():
         builder.button(text=cat_name, callback_data=f"product_cat_{cat_id}")
 
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_store")
-    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_store")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(2)  # 2 buttons per row
     return builder.as_markup()
 
@@ -159,9 +159,9 @@ def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     for d in discounts:
         label = "Без скидки" if d == 0 and lang == "ru" else ("Chegirmasiz" if d == 0 else f"{d}%")
         builder.button(text=label, callback_data=f"discount_{d}")
-    builder.button(text="Другая" if lang == "ru" else "Boshqa", callback_data="discount_custom")
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_price")
-    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.button(text="✍️ Другая" if lang == "ru" else "✍️ Boshqa", callback_data="discount_custom")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_price")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(3, 3, 3, 2)
     return builder.as_markup()
 
@@ -186,9 +186,9 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
         for q in quantities:
             builder.button(text=str(q), callback_data=f"quantity_{q}")
 
-    builder.button(text="Другое" if lang == "ru" else "Boshqa", callback_data="quantity_custom")
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_unit")
-    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.button(text="✍️ Другое" if lang == "ru" else "✍️ Boshqa", callback_data="quantity_custom")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_unit")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(3, 3, 3)
     return builder.as_markup()
 
@@ -202,8 +202,8 @@ def unit_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder.button(text="Граммы (г)" if lang == "ru" else "Gramm (g)", callback_data="unit_type_г")
     builder.button(text="Литры (л)" if lang == "ru" else "Litr (l)", callback_data="unit_type_л")
     builder.button(text="Миллилитры (мл)" if lang == "ru" else "Millilitr (ml)", callback_data="unit_type_мл")
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_discount")
-    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_discount")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(2, 2, 2, 2)
     return builder.as_markup()
 
@@ -228,10 +228,10 @@ def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
         date = (today + timedelta(days=days)).strftime("%d.%m")
         builder.button(text=f"{label} ({date})", callback_data=f"expiry_{days}")
 
-    builder.button(text="Без срока" if lang == "ru" else "Muddatsiz", callback_data="expiry_none")
-    builder.button(text="Другая дата" if lang == "ru" else "Boshqa sana", callback_data="expiry_custom")
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_quantity")
-    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.button(text="∞ Без срока" if lang == "ru" else "∞ Muddatsiz", callback_data="expiry_none")
+    builder.button(text="📅 Другая дата" if lang == "ru" else "📅 Boshqa sana", callback_data="expiry_custom")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_quantity")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
 
@@ -239,8 +239,8 @@ def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 def photo_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Photo upload or skip keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="Без фото" if lang == "ru" else "Rasmsiz", callback_data="create_skip_photo")
-    builder.button(text=get_text(lang, "back"), callback_data="create_back_expiry")
-    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.button(text="🚫 Без фото" if lang == "ru" else "🚫 Rasmsiz", callback_data="create_skip_photo")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_expiry")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(1, 2)
     return builder.as_markup()

@@ -310,7 +310,7 @@ async def create_order(
                 store_address = get_val(store, "address", "") if store else ""
                 delivery_price = 0
                 if is_delivery and store:
-                    delivery_price = int(normalize_price(get_val(store, "delivery_price", 15000)))
+                    delivery_price = int(normalize_price(get_val(store, "delivery_price", 0)))
 
                 order_items.append(
                     OrderItem(

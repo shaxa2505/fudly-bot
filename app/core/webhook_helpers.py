@@ -195,8 +195,8 @@ def store_to_dict(store: Any, photo_url: str | None = None) -> dict:
         "offers_count": int(get_offer_value(store, "offers_count", 0) or 0),
         # Delivery settings
         "delivery_enabled": get_offer_value(store, "delivery_enabled", 1) == 1,
-        "delivery_price": int(get_offer_value(store, "delivery_price", 15000) or 15000),
-        "min_order_amount": int(get_offer_value(store, "min_order_amount", 30000) or 30000),
+        "delivery_price": int(get_offer_value(store, "delivery_price", 0) or 0),
+        "min_order_amount": int(get_offer_value(store, "min_order_amount", 0) or 0),
         # Photo
         "photo_url": photo_url,
         # Geolocation for map

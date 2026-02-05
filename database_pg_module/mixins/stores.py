@@ -669,6 +669,52 @@ class StoreMixin:
             logger.info(f"Store {store_id} location updated to ({latitude}, {longitude})")
             return True
 
+    def update_store_working_hours(self, store_id: int, working_hours: str) -> bool:
+        """Update store working hours string (HH:MM - HH:MM)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE stores SET working_hours = %s WHERE store_id = %s",
+                (working_hours, store_id),
+            )
+            logger.info(f"Store {store_id} working hours updated to {working_hours}")
+            return True
+
+    def update_store_delivery_settings(
+        self,
+        store_id: int,
+        delivery_price: int | None = None,
+        min_order_amount: int | None = None,
+    ) -> bool:
+        """Update store delivery price and/or minimum order amount."""
+        fields: list[str] = []
+        params: list[Any] = []
+
+        if delivery_price is not None:
+            fields.append("delivery_price = %s")
+            params.append(int(delivery_price))
+        if min_order_amount is not None:
+            fields.append("min_order_amount = %s")
+            params.append(int(min_order_amount))
+
+        if not fields:
+            return False
+
+        params.append(store_id)
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"UPDATE stores SET {', '.join(fields)} WHERE store_id = %s",
+                tuple(params),
+            )
+            logger.info(
+                "Store %s delivery settings updated (delivery_price=%s, min_order_amount=%s)",
+                store_id,
+                delivery_price,
+                min_order_amount,
+            )
+            return True
+
     def get_store_analytics(self, store_id: int) -> dict:
         """Get store analytics."""
         with self.get_connection() as conn:

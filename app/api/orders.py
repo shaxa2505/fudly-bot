@@ -213,25 +213,12 @@ async def calculate_delivery_cost(city: str, address: str, store_id: int, db) ->
             message=f"Delivery available only in {store_city_raw or 'store city'}",
         )
 
-    delivery_costs = {
-        "???????": 15000,  # 15k sum
-        "?????????": 12000,
-        "??????": 10000,
-        "????????": 10000,
-        "???????": 10000,
-        "Tashkent": 15000,
-        "Samarqand": 12000,
-        "Bukhara": 10000,
-        "Namangan": 10000,
-        "Fergana": 10000,
-    }
-
-    base_cost = delivery_costs.get(normalized_store_city or normalized_city, 15000)
-    min_order = 50000  # 50k sum minimum
+    delivery_cost = int(store_dict.get("delivery_price") or 0)
+    min_order = int(store_dict.get("min_order_amount") or 0)
 
     return DeliveryResult(
         can_deliver=True,
-        delivery_cost=float(base_cost),
+        delivery_cost=float(delivery_cost),
         estimated_time="30-45 min",
         min_order_amount=float(min_order),
         message=None,

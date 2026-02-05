@@ -206,6 +206,19 @@ class DatabaseProtocol(Protocol):
         """Update store geolocation coordinates."""
         ...
 
+    def update_store_delivery_settings(
+        self,
+        store_id: int,
+        delivery_price: int | None = None,
+        min_order_amount: int | None = None,
+    ) -> bool:
+        """Update store delivery price and/or minimum order amount."""
+        ...
+
+    def update_store_working_hours(self, store_id: int, working_hours: str) -> bool:
+        """Update store working hours string (HH:MM - HH:MM)."""
+        ...
+
     # ========== GEO REFERENCE METHODS ==========
     def resolve_geo_region(self, value: Any) -> dict[str, Any] | None:
         ...

@@ -23,8 +23,8 @@ class Store(BaseModel):
 
     # Delivery settings
     delivery_enabled: bool = Field(False, description="Delivery available")
-    delivery_price: int = Field(15000, description="Delivery price in sum")
-    min_order_amount: int = Field(30000, description="Minimum order amount in sum")
+    delivery_price: int = Field(0, description="Delivery price in sum")
+    min_order_amount: int = Field(0, description="Minimum order amount in sum")
 
     created_at: datetime | None = Field(None, description="Creation timestamp")
 
@@ -88,7 +88,7 @@ class Store(BaseModel):
             phone=row[7] if len(row) > 7 else None,
             description=row[8] if len(row) > 8 else None,
             delivery_enabled=bool(row[9]) if len(row) > 9 else False,
-            delivery_price=row[10] if len(row) > 10 else 15000,
-            min_order_amount=row[11] if len(row) > 11 else 30000,
+            delivery_price=row[10] if len(row) > 10 else 0,
+            min_order_amount=row[11] if len(row) > 11 else 0,
             created_at=row[12] if len(row) > 12 else None,
         )

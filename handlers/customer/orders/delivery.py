@@ -137,7 +137,7 @@ async def resume_delivery_after_phone(
     )
     title = get_offer_field(offer, "title", "")
     store_name = get_store_field(store, "name", "")
-    delivery_price = get_store_field(store, "delivery_price", 15000)
+    delivery_price = get_store_field(store, "delivery_price", 0)
     min_order = get_store_field(store, "min_order_amount", 0)
     offer_photo = get_offer_field(offer, "photo", None) or get_offer_field(offer, "photo_id", None)
 
@@ -237,7 +237,7 @@ async def start_delivery_order(
     )
     title = get_offer_field(offer, "title", "")
     store_name = get_store_field(store, "name", "")
-    delivery_price = get_store_field(store, "delivery_price", 15000)
+    delivery_price = get_store_field(store, "delivery_price", 0)
     min_order = get_store_field(store, "min_order_amount", 0)
 
     # Get saved address

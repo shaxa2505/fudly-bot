@@ -1,6 +1,8 @@
 """Store settings handlers - photo upload, store info management."""
 from __future__ import annotations
 
+from datetime import datetime, time as dt_time
+import re
 from typing import Any
 
 from aiogram import F, Router, types
@@ -9,6 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.geocoding import reverse_geocode_store
+from localization import get_text
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -18,12 +21,90 @@ bot: Any | None = None
 
 router = Router(name="store_settings")
 
+DEFAULT_WORKING_HOURS = "08:00 - 23:00"
+_TIME_TOKEN_RE = re.compile(r"\d{1,2}(?::\d{1,2})?")
+
+
+def _parse_time_value(value: object) -> dt_time | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    raw = raw.replace(".", ":")
+    if "T" in raw:
+        raw = raw.split("T", 1)[1]
+    raw = raw.strip()
+    if re.fullmatch(r"\d{1,2}", raw):
+        raw = f"{int(raw):02d}:00"
+    elif re.fullmatch(r"\d{1,2}:\d{1,2}", raw):
+        parts = raw.split(":", 1)
+        raw = f"{int(parts[0]):02d}:{int(parts[1]):02d}"
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
+def _normalize_working_hours(value: object) -> str | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    raw = raw.replace(".", ":")
+    tokens = _TIME_TOKEN_RE.findall(raw)
+    if len(tokens) < 2:
+        return None
+    start = _parse_time_value(tokens[0])
+    end = _parse_time_value(tokens[1])
+    if not start or not end:
+        return None
+    return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+
+
+def _resolve_working_hours(store: dict | None) -> str:
+    if not store:
+        return DEFAULT_WORKING_HOURS
+    normalized = _normalize_working_hours(store.get("working_hours"))
+    return normalized or DEFAULT_WORKING_HOURS
+
+
+def _parse_amount(text: str | None) -> int | None:
+    if not text:
+        return None
+    raw = re.sub(r"[^\d]", "", str(text))
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _format_delivery_settings(store: dict | None, lang: str) -> tuple[str, str]:
+    """Return formatted delivery price and min order lines."""
+    store = store or {}
+    currency = get_text(lang, "currency")
+    delivery_price = int(store.get("delivery_price") or 0)
+    min_order_amount = int(store.get("min_order_amount") or 0)
+    delivery_label = get_text(lang, "store_delivery_price_label")
+    min_order_label = get_text(lang, "store_min_order_label")
+    delivery_line = f"{delivery_label}: {delivery_price:,} {currency}"
+    min_order_line = f"{min_order_label}: {min_order_amount:,} {currency}"
+    return delivery_line, min_order_line
+
 
 class StoreSettingsStates(StatesGroup):
     """States for store settings."""
 
     waiting_photo = State()
     waiting_location = State()
+    waiting_working_hours = State()
+    waiting_delivery_price = State()
+    waiting_min_order_amount = State()
     waiting_admin_contact = State()  # Waiting for admin contact/username
     waiting_click_merchant_id = State()
     waiting_click_service_id = State()
@@ -81,6 +162,21 @@ def store_settings_keyboard(
 
     # Payment integrations (only for owner)
     if is_owner:
+        working_hours_text = get_text(lang, "store_working_hours")
+        builder.button(text=working_hours_text, callback_data=f"store_working_hours_{store_id}")
+
+        delivery_price_text = get_text(lang, "store_delivery_price_button")
+        builder.button(
+            text=delivery_price_text,
+            callback_data=f"store_delivery_price_{store_id}",
+        )
+
+        min_order_text = get_text(lang, "store_min_order_button")
+        builder.button(
+            text=min_order_text,
+            callback_data=f"store_min_order_{store_id}",
+        )
+
         payment_text = "Онлайн оплата" if lang == "ru" else "Onlayn to'lov"
         builder.button(text=payment_text, callback_data=f"store_payment_settings_{store_id}")
 
@@ -123,6 +219,9 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
     has_photo = bool(store.get("photo"))
     has_location = bool(store.get("latitude") and store.get("longitude"))
     is_owner = store.get("user_role") == "owner" or store.get("owner_id") == user_id
+    working_hours = _resolve_working_hours(store)
+    working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
+    delivery_line, min_order_line = _format_delivery_settings(store, lang)
 
     role_text = "" if is_owner else (" (сотрудник)" if lang == "ru" else " (xodim)")
 
@@ -141,6 +240,8 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
             f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
             f"Geolokatsiya: {geo_set}"
         )
+
+    text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
 
     # Show current photo if exists
     if has_photo and callback.message:
@@ -186,6 +287,295 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
             )
 
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("store_working_hours_"))
+async def request_store_working_hours(
+    callback: types.CallbackQuery, state: FSMContext
+) -> None:
+    """Request store working hours update."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_working_hours_", ""))
+
+    # Verify store ownership
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    store = db.get_store(store_id)
+    working_hours = _resolve_working_hours(store if isinstance(store, dict) else None)
+
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_working_hours)
+
+    prompt = get_text(lang, "store_working_hours_prompt", hours=working_hours)
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(
+        text=get_text(lang, "cancel"),
+        callback_data="store_working_hours_cancel",
+    )
+
+    try:
+        await callback.message.edit_text(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "store_working_hours_cancel")
+async def cancel_store_working_hours(
+    callback: types.CallbackQuery, state: FSMContext
+) -> None:
+    """Cancel working hours update."""
+    await state.clear()
+    await show_store_settings(callback)
+
+
+@router.message(StoreSettingsStates.waiting_working_hours, F.text)
+async def handle_store_working_hours(message: types.Message, state: FSMContext) -> None:
+    """Handle store working hours update."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    if not verify_store_owner(message.from_user.id, store_id):
+        await state.clear()
+        await message.answer(get_text(lang, "no_access"))
+        return
+
+    normalized = _normalize_working_hours(message.text)
+    if not normalized:
+        await message.answer(get_text(lang, "store_working_hours_invalid"))
+        return
+
+    try:
+        db.update_store_working_hours(store_id, normalized)
+    except Exception as e:
+        logger.error(f"Failed to update working hours: {e}")
+        await message.answer(get_text(lang, "error"))
+        return
+
+    await state.clear()
+
+    success_text = get_text(lang, "store_working_hours_saved", hours=normalized)
+    back_kb = InlineKeyboardBuilder()
+    back_kb.button(
+        text=get_text(lang, "store_settings"),
+        callback_data="my_store_settings",
+    )
+
+    await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+
+
+@router.callback_query(F.data.startswith("store_delivery_price_"))
+async def request_store_delivery_price(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Request store delivery price update."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_delivery_price_", ""))
+
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_delivery_price)
+
+    prompt = get_text(lang, "store_delivery_price_prompt")
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(text=get_text(lang, "cancel"), callback_data="store_delivery_price_cancel")
+
+    try:
+        await callback.message.edit_text(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "store_delivery_price_cancel")
+async def cancel_store_delivery_price(
+    callback: types.CallbackQuery, state: FSMContext
+) -> None:
+    """Cancel delivery price update."""
+    await state.clear()
+    await show_store_settings(callback)
+
+
+@router.message(StoreSettingsStates.waiting_delivery_price, F.text)
+async def handle_store_delivery_price(message: types.Message, state: FSMContext) -> None:
+    """Handle store delivery price update."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    if not verify_store_owner(message.from_user.id, store_id):
+        await state.clear()
+        await message.answer(get_text(lang, "no_access"))
+        return
+
+    amount = _parse_amount(message.text)
+    if amount is None:
+        await message.answer(get_text(lang, "store_delivery_price_invalid"))
+        return
+
+    amount = max(0, int(amount))
+
+    try:
+        db.update_store_delivery_settings(store_id, delivery_price=amount)
+    except Exception as e:
+        logger.error(f"Failed to update delivery price: {e}")
+        await message.answer(get_text(lang, "error"))
+        return
+
+    await state.clear()
+
+    success_text = get_text(
+        lang,
+        "store_delivery_price_saved",
+        amount=f"{amount:,}",
+        currency=get_text(lang, "currency"),
+    )
+    back_kb = InlineKeyboardBuilder()
+    back_kb.button(text=get_text(lang, "store_settings"), callback_data="my_store_settings")
+
+    await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+
+
+@router.callback_query(F.data.startswith("store_min_order_"))
+async def request_store_min_order(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Request minimum order amount update."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_min_order_", ""))
+
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_min_order_amount)
+
+    prompt = get_text(lang, "store_min_order_prompt")
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(text=get_text(lang, "cancel"), callback_data="store_min_order_cancel")
+
+    try:
+        await callback.message.edit_text(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "store_min_order_cancel")
+async def cancel_store_min_order(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel minimum order amount update."""
+    await state.clear()
+    await show_store_settings(callback)
+
+
+@router.message(StoreSettingsStates.waiting_min_order_amount, F.text)
+async def handle_store_min_order(message: types.Message, state: FSMContext) -> None:
+    """Handle minimum order amount update."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    if not verify_store_owner(message.from_user.id, store_id):
+        await state.clear()
+        await message.answer(get_text(lang, "no_access"))
+        return
+
+    amount = _parse_amount(message.text)
+    if amount is None:
+        await message.answer(get_text(lang, "store_min_order_invalid"))
+        return
+
+    amount = max(0, int(amount))
+
+    try:
+        db.update_store_delivery_settings(store_id, min_order_amount=amount)
+    except Exception as e:
+        logger.error(f"Failed to update minimum order amount: {e}")
+        await message.answer(get_text(lang, "error"))
+        return
+
+    await state.clear()
+
+    success_text = get_text(
+        lang,
+        "store_min_order_saved",
+        amount=f"{amount:,}",
+        currency=get_text(lang, "currency"),
+    )
+    back_kb = InlineKeyboardBuilder()
+    back_kb.button(text=get_text(lang, "store_settings"), callback_data="my_store_settings")
+
+    await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
 
 
 @router.callback_query(F.data.startswith("store_change_photo_"))
@@ -309,6 +699,9 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
         store_name = store.get("name", "Магазин")
         has_photo = bool(store.get("photo"))
         has_location = bool(store.get("latitude") and store.get("longitude"))
+        working_hours = _resolve_working_hours(store)
+        working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
+        delivery_line, min_order_line = _format_delivery_settings(store, lang)
 
         text = (
             f"<b>Настройки магазина</b>\n\n"
@@ -321,6 +714,7 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
             f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
             f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}"
         )
+        text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
 
         try:
             await callback.message.edit_text(
@@ -362,6 +756,9 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
             store = active_stores[0]
             store_name = store.get("name", "Магазин")
             has_location = bool(store.get("latitude") and store.get("longitude"))
+            working_hours = _resolve_working_hours(store)
+            working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
+            delivery_line, min_order_line = _format_delivery_settings(store, lang)
 
             text = (
                 f"<b>Настройки магазина</b>\n\n"
@@ -376,6 +773,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
                 f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}\n\n"
                 f"Rasm o'chirildi"
             )
+            text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
 
             try:
                 await callback.message.delete()
@@ -570,6 +968,9 @@ async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext
         store_name = store.get("name", "Магазин")
         has_photo = bool(store.get("photo"))
         has_location = bool(store.get("latitude") and store.get("longitude"))
+        working_hours = _resolve_working_hours(store)
+        working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
+        delivery_line, min_order_line = _format_delivery_settings(store, lang)
 
         text = (
             f"<b>Настройки магазина</b>\n\n"
@@ -582,6 +983,7 @@ async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext
             f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
             f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}"
         )
+        text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
 
         try:
             await callback.message.edit_text(
