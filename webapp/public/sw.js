@@ -1,5 +1,5 @@
 // Service Worker для кэширования и оффлайн режима
-const CACHE_VERSION = 'v3'
+const CACHE_VERSION = 'v4'
 const CACHE_NAME = `fudly-${CACHE_VERSION}`
 const STATIC_CACHE = `fudly-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `fudly-dynamic-${CACHE_VERSION}`
@@ -8,7 +8,6 @@ const API_CACHE = `fudly-api-${CACHE_VERSION}`
 // Статические ресурсы для предзагрузки
 const STATIC_ASSETS = [
   '/',
-  '/index.html',
   '/manifest.json',
   '/images/placeholder.svg',
 ]
@@ -65,6 +64,12 @@ self.addEventListener('fetch', (event) => {
   // API запросы: Stale-While-Revalidate (быстро из кэша, обновляем в фоне)
   if (CACHE_STRATEGIES.api.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(request, API_CACHE))
+    return
+  }
+
+  // Навигация (HTML): Network First, чтобы не залипать на старых index.html
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirst(request, STATIC_CACHE))
     return
   }
 

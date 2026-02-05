@@ -279,9 +279,9 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
     filter_kb.button(text=f"Активные ({active_count})", callback_data="filter_offers_active_0")
     filter_kb.button(
         text=(
-            f"Мало (<5) ({low_stock_count})"
+            f"Мало (≤5) ({low_stock_count})"
             if lang == "ru"
-            else f"Kam (<5) ({low_stock_count})"
+            else f"Kam (≤5) ({low_stock_count})"
         ),
         callback_data="filter_offers_low_0",
     )
@@ -305,7 +305,7 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
     await message.answer(
         f"<b>{'Ваши товары' if lang == 'ru' else 'Mahsulotlaringiz'}</b>\n\n"
         f"Активных: <b>{active_count}</b>\n"
-        f"{'Мало (<5)' if lang == 'ru' else 'Kam (<5)'}: <b>{low_stock_count}</b>\n"
+        f"{'Мало (≤5)' if lang == 'ru' else 'Kam (≤5)'}: <b>{low_stock_count}</b>\n"
         f"{'Срок ≤2д' if lang == 'ru' else 'Muddat ≤2k'}: <b>{expiring_count}</b>\n"
         f"Неактивных: <b>{inactive_count}</b>\n"
         f"Всего: <b>{len(all_offers)}</b>\n\n"
@@ -348,7 +348,7 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
         title = "Неактивные" if lang == "ru" else "Nofaol"
     elif filter_type == "low":
         filtered = [o for o in all_offers if _is_low_stock(o)]
-        title = "Мало (<5)" if lang == "ru" else "Kam (<5)"
+        title = "Мало (≤5)" if lang == "ru" else "Kam (≤5)"
     elif filter_type == "expiring":
         filtered = [o for o in all_offers if _is_expiring_soon(o)]
         title = "Срок ≤2д" if lang == "ru" else "Muddat ≤2k"
@@ -457,9 +457,9 @@ async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
     filter_kb.button(text=f"Активные ({active_count})", callback_data="filter_offers_active_0")
     filter_kb.button(
         text=(
-            f"Мало (<5) ({low_stock_count})"
+            f"Мало (≤5) ({low_stock_count})"
             if lang == "ru"
-            else f"Kam (<5) ({low_stock_count})"
+            else f"Kam (≤5) ({low_stock_count})"
         ),
         callback_data="filter_offers_low_0",
     )
@@ -482,7 +482,7 @@ async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
     await callback.message.edit_text(
         f"<b>{'Ваши товары' if lang == 'ru' else 'Mahsulotlaringiz'}</b>\n\n"
         f"{'Активных' if lang == 'ru' else 'Faol'}: <b>{active_count}</b>\n"
-        f"{'Мало (<5)' if lang == 'ru' else 'Kam (<5)'}: <b>{low_stock_count}</b>\n"
+        f"{'Мало (≤5)' if lang == 'ru' else 'Kam (≤5)'}: <b>{low_stock_count}</b>\n"
         f"{'Срок ≤2д' if lang == 'ru' else 'Muddat ≤2k'}: <b>{expiring_count}</b>\n"
         f"{'Неактивных' if lang == 'ru' else 'Nofaol'}: <b>{inactive_count}</b>\n"
         f"{'Всего' if lang == 'ru' else 'Jami'}: <b>{len(all_offers)}</b>\n\n"
