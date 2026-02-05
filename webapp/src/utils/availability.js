@@ -58,6 +58,37 @@ const isWithinWindow = (startMinutes, endMinutes, nowMinutes) => {
   return nowMinutes >= startMinutes || nowMinutes <= endMinutes
 }
 
+export const getStoreAvailability = (store) => {
+  const hoursRaw =
+    store?.working_hours ||
+    store?.work_time ||
+    (store?.open_time && store?.close_time
+      ? `${store.open_time} - ${store.close_time}`
+      : '')
+
+  if (!hoursRaw) {
+    return { isOpen: true, timeRange: '', startLabel: '', endLabel: '' }
+  }
+
+  const range = extractRangeFromText(hoursRaw)
+  const startLabel = range ? normalizeTimeLabel(range.start) : normalizeTimeLabel(hoursRaw)
+  const endLabel = range ? normalizeTimeLabel(range.end) : ''
+
+  const startMinutes = range ? parseTimeToMinutes(range.start) : parseTimeToMinutes(hoursRaw)
+  const endMinutes = range ? parseTimeToMinutes(range.end) : parseTimeToMinutes(hoursRaw)
+
+  const nowMinutes = getTashkentNowMinutes()
+  const isOpen = isWithinWindow(startMinutes, endMinutes, nowMinutes)
+  const timeRange = startLabel && endLabel ? `${startLabel} - ${endLabel}` : startLabel || endLabel || ''
+
+  return {
+    isOpen,
+    timeRange,
+    startLabel,
+    endLabel,
+  }
+}
+
 export const getOfferAvailability = (offer) => {
   const startRaw =
     offer?.available_from ??
@@ -108,4 +139,3 @@ export const getOfferAvailability = (offer) => {
 }
 
 export const formatOfferTimeRange = (offer) => getOfferAvailability(offer).timeRange
-

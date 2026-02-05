@@ -19,13 +19,6 @@ export default function OrderDetailsPage() {
   const userId = getUserId()
 
   useEffect(() => {
-    loadOrderDetails({ allowEnrich: true, silent: false })
-    // Auto-refresh every 15 seconds (silent)
-    const interval = setInterval(() => loadOrderDetails({ allowEnrich: false, silent: true }), 15000)
-    return () => clearInterval(interval)
-  }, [orderId, loadOrderDetails])
-
-  useEffect(() => {
     if (!order) return
     const pending = readPendingPayment()
     if (!pending?.orderId) return
@@ -128,6 +121,13 @@ export default function OrderDetailsPage() {
       setIsSyncing(false)
     }
   }, [orderId])
+
+  useEffect(() => {
+    loadOrderDetails({ allowEnrich: true, silent: false })
+    // Auto-refresh every 15 seconds (silent)
+    const interval = setInterval(() => loadOrderDetails({ allowEnrich: false, silent: true }), 15000)
+    return () => clearInterval(interval)
+  }, [orderId, loadOrderDetails])
 
   useEffect(() => {
     const handleVisibility = () => {

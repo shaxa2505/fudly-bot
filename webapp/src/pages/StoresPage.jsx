@@ -24,6 +24,7 @@ import {
   buildLocationFromReverseGeocode,
 } from '../utils/cityUtils'
 import { getCurrentLocation, addDistanceToStores } from '../utils/geolocation'
+import { getStoreAvailability } from '../utils/availability'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
 import BottomNav from '../components/BottomNav'
@@ -96,6 +97,10 @@ const CITY_CENTERS = {
 const getStoreStatus = (store) => {
   const offers = Number(store?.offers_count || 0)
   if (!offers) return null
+  const availability = getStoreAvailability(store)
+  if (availability.timeRange && !availability.isOpen) {
+    return { label: 'Hozir yopiq', tone: 'closed' }
+  }
   if (offers <= 2) {
     return { label: 'Tez tugayapti', tone: 'low' }
   }
@@ -565,7 +570,9 @@ function StoresPage() {
               const isFavorite = favoriteIds.has(store.id)
               const offersCount = Number(store.offers_count || 0)
               const hasOffers = offersCount > 0
+              const storeAvailability = getStoreAvailability(store)
               const hoursLabel =
+                storeAvailability.timeRange ||
                 store.working_hours ||
                 store.work_time ||
                 (store.open_time && store.close_time

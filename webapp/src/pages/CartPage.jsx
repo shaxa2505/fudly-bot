@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, LocateFixed } from 'lucide-react'
-import api from '../api/client'
+import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
 import { calcTotalPrice } from '../utils/orderMath'
-import { getCurrentUser } from '../utils/auth'
+import { getCurrentUser, getUserId } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
 import { getCurrentLocation } from '../utils/geolocation'
@@ -57,6 +57,7 @@ function CartPage({ user }) {
   const botUsername = import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'
   const cachedUser = getCurrentUser()
   const canonicalPhone = (user?.phone || cachedUser?.phone || '').toString().trim()
+  const userId = getUserId()
 
   const [orderLoading, setOrderLoading] = useState(false)
   const [cartValidationLoading, setCartValidationLoading] = useState(false)
@@ -1019,6 +1020,23 @@ function CartPage({ user }) {
     }
   }, [pendingActionLoading, pendingPayment, toast, cartItems])
 
+  const refreshPendingStatus = useCallback(async () => {
+    if (!pendingPayment?.orderId) return
+    try {
+      const data = await api.getOrderStatus(pendingPayment.orderId)
+      const orderStatus = String(data?.status || data?.order_status || '').toLowerCase()
+      const paymentStatus = String(data?.payment_status || '').toLowerCase()
+      const awaiting = paymentStatus === 'awaiting_payment' || orderStatus === 'awaiting_payment'
+      const doneStatuses = new Set(['completed', 'cancelled', 'rejected', 'delivering', 'ready', 'preparing'])
+      if (!awaiting && (doneStatuses.has(orderStatus) || paymentStatus === 'confirmed')) {
+        clearPendingPayment()
+        setPendingPayment(null)
+      }
+    } catch (error) {
+      // ignore status check errors
+    }
+  }, [pendingPayment?.orderId])
+
   const buildCartSnapshot = useCallback(() => {
     const snapshot = {}
     cartItems.forEach((item) => {
@@ -1033,30 +1051,103 @@ function CartPage({ user }) {
   }, [cartItems])
 
   useEffect(() => {
-    let isActive = true
-    const checkPendingStatus = async () => {
-      if (!pendingPayment?.orderId) return
-      try {
-        const data = await api.getOrderStatus(pendingPayment.orderId)
-        if (!isActive) return
-        const orderStatus = String(data?.status || data?.order_status || '').toLowerCase()
-        const paymentStatus = String(data?.payment_status || '').toLowerCase()
-        const awaiting = paymentStatus === 'awaiting_payment' || orderStatus === 'awaiting_payment'
-        const doneStatuses = new Set(['completed', 'cancelled', 'rejected', 'delivering', 'ready', 'preparing'])
-        if (!awaiting && (doneStatuses.has(orderStatus) || paymentStatus === 'confirmed')) {
-          clearPendingPayment()
-          setPendingPayment(null)
-        }
-      } catch (error) {
-        // ignore status check errors
+    if (!pendingPayment?.orderId) return
+
+    refreshPendingStatus()
+    const interval = setInterval(() => {
+      refreshPendingStatus()
+    }, 15000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshPendingStatus()
       }
     }
 
-    checkPendingStatus()
+    window.addEventListener('focus', handleVisibility)
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
-      isActive = false
+      clearInterval(interval)
+      window.removeEventListener('focus', handleVisibility)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [pendingPayment?.orderId])
+  }, [pendingPayment?.orderId, refreshPendingStatus])
+
+  useEffect(() => {
+    if (!userId || !pendingPayment?.orderId) return
+
+    const buildWsUrl = () => {
+      const envBase = import.meta.env.VITE_WS_URL
+      const baseSource = (envBase || API_BASE_URL || '').trim()
+      if (!baseSource) return ''
+
+      let base = baseSource
+      if (!base.startsWith('ws://') && !base.startsWith('wss://')) {
+        base = base.replace(/^http/, 'ws')
+      }
+      base = base.replace(/\/api\/v1\/?$/, '')
+      base = base.replace(/\/+$/, '')
+
+      let wsEndpoint = ''
+      if (base.endsWith('/ws/notifications')) {
+        wsEndpoint = base
+      } else if (base.endsWith('/ws')) {
+        wsEndpoint = `${base}/notifications`
+      } else {
+        wsEndpoint = `${base}/ws/notifications`
+      }
+
+      const params = new URLSearchParams()
+      if (userId) {
+        params.set('user_id', userId)
+      }
+      const initData = getTelegramInitData()
+      if (initData) {
+        params.set('init_data', initData)
+      }
+      const query = params.toString()
+      return `${wsEndpoint}${query ? `?${query}` : ''}`
+    }
+
+    const wsUrl = buildWsUrl()
+    if (!wsUrl) return
+
+    let ws
+    try {
+      ws = new WebSocket(wsUrl)
+    } catch (error) {
+      console.warn('WebSocket init failed:', error)
+      return
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        const type = payload?.type
+        const data =
+          payload?.payload?.data ||
+          payload?.payload ||
+          payload?.data ||
+          {}
+        const eventOrderId = data?.order_id || data?.booking_id
+
+        if (type === 'order_status_changed' || type === 'order_created') {
+          if (!eventOrderId || Number(eventOrderId) === Number(pendingPayment?.orderId)) {
+            refreshPendingStatus()
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse order update:', error)
+      }
+    }
+
+    return () => {
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [userId, pendingPayment?.orderId, refreshPendingStatus])
 
   // Handle quantity change with delta (+1 or -1)
   const handleQuantityChange = (offerId, delta) => {

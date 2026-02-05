@@ -451,6 +451,12 @@
   border-color: #F43F5E;
 }
 
+.sp-store-status.closed {
+  color: #0F172A;
+  background: #E2E8F0;
+  border-color: #CBD5F5;
+}
+
 .sp-store-favorite {
   width: 32px;
   height: 32px;
