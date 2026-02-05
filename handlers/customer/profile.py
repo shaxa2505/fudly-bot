@@ -115,10 +115,10 @@ async def profile(message: types.Message, state: FSMContext) -> None:
             pass
 
     # Determine current mode for settings keyboard
-    # If user is seller, check their current mode, otherwise always customer
-    # Default to customer mode if not explicitly set (safer - matches the menu they see after /start)
-    if effective_role == "seller":
-        current_mode = get_user_view_mode(message.from_user.id, db)
+    # Approved sellers are locked to seller mode; others stay in customer mode.
+    approved_store = has_approved_store(message.from_user.id, db)
+    if effective_role == "seller" and approved_store:
+        current_mode = "seller"
     else:
         current_mode = "customer"
 
@@ -362,6 +362,17 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
         logger.info(f"🔄 User {user_id} switching to customer mode")
 
         lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        user_role = getattr(user, "role", "customer") if user else "customer"
+        if user_role == "store_owner":
+            user_role = "seller"
+        if user_role == "seller" and has_approved_store(user_id, db):
+            await callback.message.answer(
+                get_text(lang, "customer_mode_disabled"),
+                reply_markup=main_menu_seller(lang),
+            )
+            await callback.answer()
+            return
 
         # Set customer mode
         try:

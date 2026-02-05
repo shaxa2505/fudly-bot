@@ -32,7 +32,7 @@ from handlers.common.utils import (
 )
 from handlers.common.webapp import get_partner_panel_url
 from localization import LANGUAGES, get_cities, get_text
-from app.core.utils import normalize_city
+from app.core.utils import get_user_field, normalize_city
 from app.core.order_math import calc_items_total, calc_quantity, parse_cart_items
 
 try:
@@ -741,6 +741,21 @@ def build_welcome_keyboard() -> types.InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def _is_city_selected(user_data: object | None) -> bool:
+    """Return True if city was explicitly selected (not just default)."""
+    if not user_data:
+        return False
+    city_raw = get_user_field(user_data, "city")
+    if not city_raw:
+        return False
+    city_norm = normalize_city(city_raw)
+    region = get_user_field(user_data, "region")
+    district = get_user_field(user_data, "district")
+    if city_norm == "Ташкент" and not (region or district):
+        return False
+    return True
+
+
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     if not message.from_user:
@@ -810,6 +825,8 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         await state.set_state(Registration.phone)
         return
 
+    raw_user = db.get_user(user_id) if hasattr(db, "get_user") else None
+    city_selected = _is_city_selected(raw_user)
     user_city = user.city
     user_role = user.role or "customer"
     user_phone = user.phone if user else None
@@ -825,7 +842,7 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         return
 
     # User exists but hasn't selected city yet - show city selection
-    if not user_city:
+    if not city_selected:
         await message.answer(
             get_text(lang, "choose_city"),
             parse_mode="HTML",

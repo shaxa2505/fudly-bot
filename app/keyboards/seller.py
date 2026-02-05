@@ -49,18 +49,7 @@ def main_menu_seller(
     builder.button(text=get_text(lang, "my_items"))
     builder.button(text=get_text(lang, "partner_panel"))
     builder.button(text=f"\U0001F464 {get_text(lang, 'profile')}")
-    builder.button(text=get_text(lang, "back_to_customer"))
-
-    # Add Web Panel button if URL provided
-    if webapp_url:
-        # Prefer Telegram WebApp initData; keep a signed uid as a fallback.
-        url = _with_signed_uid(webapp_url, user_id)
-        builder.button(text=get_text(lang, "web_panel"), web_app=WebAppInfo(url=url))
-
-    if webapp_url:
-        builder.adjust(2, 2, 2, 1)
-    else:
-        builder.adjust(2, 2, 2)
+    builder.adjust(2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
 

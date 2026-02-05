@@ -533,14 +533,7 @@ def get_appropriate_menu(
 
     if role == "seller":
         if has_approved_store(user_id, db):
-            if current_mode == "seller":
-                # Get partner panel URL from environment
-                from handlers.common.webapp import get_partner_panel_url
-
-                webapp_url = get_partner_panel_url()
-                return main_menu_seller(lang, webapp_url=webapp_url, user_id=user_id)
-            else:
-                return main_menu_customer(lang)
+            return main_menu_seller(lang, user_id=user_id)
         else:
             return main_menu_customer(lang)
 

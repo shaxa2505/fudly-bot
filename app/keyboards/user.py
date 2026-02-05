@@ -83,25 +83,12 @@ def settings_keyboard(
     """
     builder = InlineKeyboardBuilder()
 
-    # For seller show mode switch based on current mode
+    # For seller show store settings only (customer mode disabled for partners)
     if role == "seller":
-        if current_mode == "seller":
-            # Currently in seller mode - show store settings button
-            builder.button(
-                text=get_text(lang, "store_settings"),
-                callback_data="my_store_settings",
-            )
-            # Show switch to customer mode
-            builder.button(
-                text=get_text(lang, "back_to_customer"),
-                callback_data="switch_to_customer",
-            )
-        else:
-            # Currently in customer mode - show switch to seller
-            builder.button(
-                text=get_text(lang, "switched_to_seller"),
-                callback_data="switch_to_seller",
-            )
+        builder.button(
+            text=get_text(lang, "store_settings"),
+            callback_data="my_store_settings",
+        )
     else:
         # For customer show "Become partner"
         builder.button(text=get_text(lang, "become_partner"), callback_data="become_partner_cb")

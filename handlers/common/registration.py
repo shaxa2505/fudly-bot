@@ -9,7 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.location_data import get_districts_for_city_index, get_districts_for_region, get_region_key_for_city_index
 from app.core.sanitize import sanitize_phone
 from app.core.security import logger, rate_limiter, secure_user_input, validator
-from app.core.utils import normalize_city
+from app.core.utils import get_user_field, normalize_city
 from app.keyboards import (
     city_inline_keyboard,
     main_menu_customer,
@@ -22,6 +22,21 @@ from localization import get_cities, get_text
 
 router = Router(name="registration")
 REGISTRATION_COMPLETE_STICKER_ID = None
+
+
+def _is_city_selected(user_data: object | None) -> bool:
+    """Return True if city was explicitly selected (not just default)."""
+    if not user_data:
+        return False
+    city_raw = get_user_field(user_data, "city")
+    if not city_raw:
+        return False
+    city_norm = normalize_city(city_raw)
+    region = get_user_field(user_data, "region")
+    district = get_user_field(user_data, "district")
+    if city_norm == "Ташкент" and not (region or district):
+        return False
+    return True
 
 
 def _build_district_keyboard(
@@ -114,17 +129,11 @@ async def _after_phone_saved(
         )
         return
 
-    user_city_raw = None
+    user_data = None
     if hasattr(db, "get_user"):
         user_data = db.get_user(message.from_user.id)
-        if isinstance(user_data, dict):
-            user_city_raw = user_data.get("city")
-        elif user_data and len(user_data) > 4:
-            user_city_raw = user_data[4]
 
-    user_city = normalize_city(user_city_raw) if user_city_raw else None
-
-    if user_city:
+    if _is_city_selected(user_data):
         await state.clear()
         await message.answer(get_text(lang, "phone_saved"), reply_markup=ReplyKeyboardRemove())
         await _send_completion_menu(message, lang)

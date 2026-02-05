@@ -58,6 +58,7 @@ TEXTS = {
         "bulk_import": "📥 Импорт",
         "store_settings": "⚙️ Настройки магазина",
         "back_to_customer": "🛒 Режим: покупатель",
+        "customer_mode_disabled": "\u26d4 \u0420\u0435\u0436\u0438\u043c \u043f\u043e\u043a\u0443\u043f\u0430\u0442\u0435\u043b\u044f \u043e\u0442\u043a\u043b\u044e\u0447\u0451\u043d \u0434\u043b\u044f \u043f\u0430\u0440\u0442\u043d\u0451\u0440\u043e\u0432.",
         # Старые ключи (для совместимости)
         "add_offer": "➕ Добавить",
         "my_offers": "📋 Мои товары",
@@ -726,6 +727,7 @@ Bo'limni tanlang.""",
         "bulk_import": "📥 Import",
         "store_settings": "⚙️ Do'kon sozlamalari",
         "back_to_customer": "🛒 Rejim: xaridor",
+        "customer_mode_disabled": "\u26d4 Xaridor rejimi hamkorlar uchun o\'chirilgan.",
         # Eski kalitlar (muvofiqligi uchun)
         "add_offer": "➕ Qo'shish",
         "my_offers": "📦 Mening mahsulotlarim",
