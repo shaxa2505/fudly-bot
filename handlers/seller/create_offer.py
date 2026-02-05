@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -769,6 +770,96 @@ async def back_to_store(callback: types.CallbackQuery, state: FSMContext) -> Non
     )
     await state.set_state(CreateOffer.store)
     await callback.answer()
+
+
+@router.message(
+    StateFilter(CreateOffer.category, CreateOffer.store, CreateOffer.unit_type, CreateOffer.photo),
+    F.text,
+)
+async def create_offer_menu_fallback(message: types.Message, state: FSMContext) -> None:
+    """Handle main menu buttons during callback-only steps."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    if await _handle_main_menu_action(message, state):
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    current_state = await state.get_state()
+    data = await state.get_data()
+
+    if current_state == CreateOffer.store.state:
+        stores = [
+            s
+            for s in db.get_user_accessible_stores(message.from_user.id)
+            if get_store_field(s, "status") in ("active", "approved")
+        ]
+        if not stores:
+            await _upsert_prompt(message, state, get_text(lang, "no_approved_stores"))
+            await safe_delete_message(message)
+            return
+        builder = InlineKeyboardBuilder()
+        for store in stores:
+            store_id = get_store_field(store, "store_id")
+            store_name = get_store_field(store, "name", "Магазин")
+            if store_id is None:
+                continue
+            builder.button(text=store_name[:30], callback_data=f"create_store_{store_id}")
+        builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+        builder.adjust(1)
+        await _upsert_prompt(
+            message,
+            state,
+            get_text(lang, "choose_store"),
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML",
+        )
+        await safe_delete_message(message)
+        return
+
+    if current_state == CreateOffer.category.state:
+        store_name = data.get("store_name", "Магазин")
+        header = (
+            f"<b>{store_name}</b>\n\n"
+            f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
+        )
+        step_text = (
+            "<b>Шаг 1/9:</b> Выберите категорию"
+            if lang == "ru"
+            else "<b>1/9-qadam:</b> Kategoriyani tanlang"
+        )
+        await _upsert_prompt(
+            message,
+            state,
+            header + step_text,
+            reply_markup=product_categories_keyboard(lang),
+            parse_mode="HTML",
+        )
+        await safe_delete_message(message)
+        return
+
+    if current_state == CreateOffer.unit_type.state:
+        await _go_to_unit_step(message, state, lang)
+        await safe_delete_message(message)
+        return
+
+    if current_state == CreateOffer.photo.state:
+        progress = build_progress_text(data, lang, 9)
+        text = (
+            f"<b>{data.get('store_name', 'Магазин')}</b>\n\n"
+            f"{progress}\n\n"
+            f"<b>{'Отправьте фото товара или пропустите:' if lang == 'ru' else 'Mahsulot rasmini yuboring yoki o`tkazib yuboring:'}</b>"
+        )
+        await _upsert_prompt(
+            message,
+            state,
+            text,
+            reply_markup=photo_keyboard(lang),
+            parse_mode="HTML",
+        )
+        await safe_delete_message(message)
+        return
 
 
 @router.message(CreateOffer.quick_input, F.text)
