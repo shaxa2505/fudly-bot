@@ -638,15 +638,10 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
     store_name = get_store_field(stores[0], "name", "Магазин")
     await state.update_data(store_id=store_id, store_name=store_name)
 
-    header = (
-        f"<b>{store_name}</b>\n\n"
-        f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
-    )
-
+    header = f"\U0001F3EA <b>{store_name}</b>\n\n"
     step_text = (
-        "<b>Шаг 1/9:</b> Выберите категорию"
-        if lang == "ru"
-        else "<b>1/9-qadam:</b> Kategoriyani tanlang"
+        f"<b>\U0001F9FA {'Шаг 1/9: Категория' if lang == 'ru' else '1/9-qadam: Kategoriya'}</b>\n"
+        f"{'Выберите категорию' if lang == 'ru' else 'Kategoriyani tanlang'}"
     )
 
     await _upsert_prompt(
@@ -686,14 +681,10 @@ async def create_store_selected(callback: types.CallbackQuery, state: FSMContext
     store_name = get_store_field(store, "name", "Магазин")
     await state.update_data(store_id=store_id, store_name=store_name)
 
-    header = (
-        f"<b>{store_name}</b>\n\n"
-        f"<b>{'Добавить товар' if lang == 'ru' else 'Mahsulot qo`shish'}</b>\n\n"
-    )
+    header = f"\U0001F3EA <b>{store_name}</b>\n\n"
     step_text = (
-        "<b>Шаг 1/9:</b> Выберите категорию"
-        if lang == "ru"
-        else "<b>1/9-qadam:</b> Kategoriyani tanlang"
+        f"<b>\U0001F9FA {'Шаг 1/9: Категория' if lang == 'ru' else '1/9-qadam: Kategoriya'}</b>\n"
+        f"{'Выберите категорию' if lang == 'ru' else 'Kategoriyani tanlang'}"
     )
 
     await _edit_prompt_from_callback(
