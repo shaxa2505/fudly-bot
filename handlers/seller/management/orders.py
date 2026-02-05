@@ -33,6 +33,20 @@ def _get_field(entity: Any, field: str, default: Any = None) -> Any:
     return getattr(entity, field, default)
 
 
+def _is_paid_click_order(order: Any) -> bool:
+    payment_method = _get_field(order, "payment_method")
+    payment_status = _get_field(order, "payment_status")
+    payment_proof_photo_id = _get_field(order, "payment_proof_photo_id")
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
+
+
 def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
     """Format single order/booking as one line for list."""
     if is_booking:
@@ -616,6 +630,15 @@ async def cancel_order_seller_handler(callback: types.CallbackQuery) -> None:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
         await callback.answer("Ошибка", show_alert=True)
+        return
+
+    order = db.get_order(order_id)
+    if not order:
+        await callback.answer(get_text(lang, "order_not_found"), show_alert=True)
+        return
+
+    if _is_paid_click_order(order):
+        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 
     service = get_unified_order_service()

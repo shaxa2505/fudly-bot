@@ -205,18 +205,18 @@ function LocationPickerModal({
 
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || mapInstanceRef.current) return
-    const L = window.L
-    if (!L) return
+    const leaflet = window.L
+    if (!leaflet) return
 
     const center = mapCenter || DEFAULT_CENTER
-    const map = L.map(mapRef.current, {
+    const map = leaflet.map(mapRef.current, {
       center: [center.lat, center.lon],
       zoom: 15,
       zoomControl: true,
       attributionControl: true,
     })
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)

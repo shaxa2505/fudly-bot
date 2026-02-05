@@ -108,6 +108,7 @@ class SchemaMixin:
                     delivery_enabled INTEGER DEFAULT 1,
                     delivery_price INTEGER DEFAULT 15000,
                     min_order_amount INTEGER DEFAULT 30000,
+                    working_hours TEXT DEFAULT '08:00 - 23:00',
                     region_id INTEGER,
                     district_id INTEGER,
                     FOREIGN KEY (owner_id) REFERENCES users(user_id)
@@ -996,6 +997,7 @@ class SchemaMixin:
         """Run database migrations."""
         self._migrate_favorites_table(cursor)
         self._migrate_stores_delivery(cursor)
+        self._migrate_stores_working_hours(cursor)
         self._migrate_bookings_delivery(cursor)
         self._migrate_user_view_mode(cursor)
 
@@ -1106,6 +1108,16 @@ class SchemaMixin:
             cursor.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS rating REAL DEFAULT 0")
         except Exception as e:
             logger.error(f"Error adding delivery fields to stores: {e}")
+
+    def _migrate_stores_working_hours(self, cursor):
+        """Add working_hours column to stores table if missing."""
+        try:
+            cursor.execute(
+                "ALTER TABLE stores ADD COLUMN IF NOT EXISTS working_hours TEXT DEFAULT '08:00 - 23:00'"
+            )
+            logger.info("✅ working_hours column ensured in stores table")
+        except Exception as e:
+            logger.warning(f"Could not add working_hours column: {e}")
 
     def _migrate_bookings_delivery(self, cursor):
         """Add delivery and expiry fields to bookings table."""

@@ -209,6 +209,7 @@
             stats: null,
             loading: false
         };
+        const DEFAULT_WORKING_HOURS = '08:00 - 23:00';
         window.allProducts = window.allProducts || [];
 
         function syncAllProducts(nextProducts) {
@@ -240,6 +241,9 @@
                 ? product.expiry_date.split('T')[0]
                 : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
             const defaultStock = product?.stock_quantity ?? product?.stock ?? product?.quantity ?? 10;
+            const storeHours = parseWorkingHours(state.store?.working_hours) || parseWorkingHours(DEFAULT_WORKING_HOURS);
+            const defaultAvailableFrom = normalizeTimeValue(product?.available_from) || storeHours?.start || '08:00';
+            const defaultAvailableUntil = normalizeTimeValue(product?.available_until) || storeHours?.end || '23:00';
             const originalPriceValue = product?.original_price ? Math.round(product.original_price) : '';
             const discountPriceValue = product?.price
                 ? Math.round(product.price)
@@ -446,6 +450,22 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>Доступно с *</label>
+                                        <input type="time" name="available_from" id="availableFrom"
+                                               value="${defaultAvailableFrom}"
+                                               required class="search-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Доступно до *</label>
+                                        <input type="time" name="available_until" id="availableUntil"
+                                               value="${defaultAvailableUntil}"
+                                               required class="search-input">
+                                    </div>
+                                </div>
+                                <div class="form-hint text-muted">По умолчанию берём режим работы магазина.</div>
 
                                 <div class="form-group">
                                     <label>Срок годности *</label>
@@ -2597,6 +2617,8 @@ function handlePhotoUpload(input, event) {
                 const hasDiscount = Number.isFinite(discountPriceInput) && discountPriceInput > 0;
 
                 const expiryDate = String(formData.get('expiry_date') || '');
+                const availableFrom = normalizeTimeValue(formData.get('available_from'));
+                const availableUntil = normalizeTimeValue(formData.get('available_until'));
                 const isAvailable = formData.get('is_available') === 'on';
 
                 console.log('💰 Saving product with prices:', {
@@ -2607,6 +2629,7 @@ function handlePhotoUpload(input, event) {
 
                 if (!title || title.length < 3) throw new Error('Название слишком короткое (мин. 3 символа)');
                 if (!hasOriginal && !hasDiscount) throw new Error('Укажите цену для клиента');
+                if (!availableFrom || !availableUntil) throw new Error('Укажите время доступности');
                 if (!expiryDate) throw new Error('Укажите срок годности');
 
                 const originalPrice = hasOriginal ? originalPriceInput : discountPriceInput;
@@ -2641,6 +2664,8 @@ function handlePhotoUpload(input, event) {
                 payload.append('quantity', String(stockQty));
                 payload.append('stock_quantity', String(stockQty));
                 payload.append('unit', unit);
+                payload.append('available_from', availableFrom);
+                payload.append('available_until', availableUntil);
                 payload.append('expiry_date', expiryDate);
                 if (description) payload.append('description', description);
                 if (photoId) payload.append('photo_id', photoId);
@@ -3052,6 +3077,7 @@ async function toggleProductAvailability(id) {
                 const coordsLabel = (Number.isFinite(latValue) && Number.isFinite(lonValue))
                     ? `${latValue.toFixed(5)}, ${lonValue.toFixed(5)}`
                     : 'Не установлена';
+                const workingHoursLabel = formatWorkingHours(state.store?.working_hours);
                 updateHeaderStatus(state.store?.is_open);
 
                 document.querySelector('.content').innerHTML = `
@@ -3153,22 +3179,15 @@ async function toggleProductAvailability(id) {
                             <div class="list-item">
                                 <div class="list-content">
                                     <div class="list-info">
-                                        <div class="list-title">Понедельник - Пятница</div>
-                                        <div class="list-subtitle">09:00 - 21:00</div>
+                                        <div class="list-title">Ежедневно</div>
+                                        <div class="list-subtitle">${workingHoursLabel}</div>
                                     </div>
                                 </div>
-                                <button class="btn btn-sm btn-ghost ripple" onclick="haptic('light'); toast('Функция в разработке', 'info')">
+                                <button class="btn btn-sm btn-ghost ripple" onclick="editWorkingHours()">
                                     <i data-lucide="edit"></i>
                                 </button>
                             </div>
-                            <div class="list-item">
-                                <div class="list-content">
-                                    <div class="list-info">
-                                        <div class="list-title">Суббота - Воскресенье</div>
-                                        <div class="list-subtitle">10:00 - 20:00</div>
-                                    </div>
-                                </div>
-                            </div>
+                            <div class="form-hint text-muted">По умолчанию используется для новых товаров.</div>
                         </div>
 
                         <div class="dashboard-card mb-lg">
@@ -3233,6 +3252,97 @@ async function toggleProductAvailability(id) {
                     </div>
                 `;
                 if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        function editWorkingHours() {
+            haptic('light');
+            const parsed = parseWorkingHours(state.store?.working_hours) || parseWorkingHours(DEFAULT_WORKING_HOURS) || {
+                start: '08:00',
+                end: '23:00'
+            };
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-sm">
+                    <div class="modal-header">
+                        <h3>Режим работы</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="saveWorkingHours(event)">
+                        <div class="modal-body">
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label>С</label>
+                                    <input type="time" name="working_from" value="${parsed.start}" required class="search-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>До</label>
+                                    <input type="time" name="working_until" value="${parsed.end}" required class="search-input">
+                                </div>
+                            </div>
+                            <div class="form-hint text-muted">Этот график используется по умолчанию для новых товаров.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">Сохранить</button>
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    haptic('light');
+                    modal.remove();
+                }
+            });
+        }
+
+        async function saveWorkingHours(event) {
+            event.preventDefault();
+            haptic('medium');
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const workingFrom = normalizeTimeValue(formData.get('working_from'));
+            const workingUntil = normalizeTimeValue(formData.get('working_until'));
+
+            if (!workingFrom || !workingUntil) {
+                toast('Укажите время работы', 'error');
+                return;
+            }
+
+            const working_hours = `${workingFrom} - ${workingUntil}`;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
+
+            try {
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
+                    body: JSON.stringify({ working_hours })
+                });
+
+                state.store = { ...state.store, working_hours };
+                haptic('success');
+                toast('Режим работы сохранён', 'success');
+                form.closest('.modal-overlay')?.remove();
+
+                if (state.currentView === 'settings') {
+                    loadSettings();
+                }
+            } catch (error) {
+                haptic('error');
+                toast('Ошибка сохранения режима работы', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
             }
         }
 
@@ -3728,6 +3838,36 @@ async function toggleProductAvailability(id) {
             const date = parseDate(dateString);
             if (!date) return '';
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function normalizeTimeValue(value) {
+            if (!value) return '';
+            let raw = String(value).trim();
+            if (!raw) return '';
+            if (raw.includes('T')) {
+                raw = raw.split('T')[1];
+            }
+            const parts = raw.split(':');
+            if (parts.length < 2) return '';
+            const hours = parts[0].padStart(2, '0');
+            const minutes = parts[1].padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        function parseWorkingHours(value) {
+            if (!value) return null;
+            const match = String(value).match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/);
+            if (!match) return null;
+            const start = normalizeTimeValue(match[1]);
+            const end = normalizeTimeValue(match[2]);
+            if (!start || !end) return null;
+            return { start, end };
+        }
+
+        function formatWorkingHours(value) {
+            const parsed = parseWorkingHours(value);
+            if (parsed) return `${parsed.start} - ${parsed.end}`;
+            return DEFAULT_WORKING_HOURS;
         }
 
         function formatElapsed(dateString) {

@@ -15,6 +15,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.domain.order import PaymentStatus
 from app.services.unified_order_service import (
     NotificationTemplates,
     OrderStatus,
@@ -40,6 +41,20 @@ def _safe_caption(text: str) -> str:
     if len(text) <= MAX_CAPTION_LENGTH:
         return text
     return text[: MAX_CAPTION_LENGTH - 3] + "..."
+
+
+def _is_paid_click_order(entity: Any) -> bool:
+    payment_method = _get_entity_field(entity, "payment_method")
+    payment_status = _get_entity_field(entity, "payment_status")
+    payment_proof_photo_id = _get_entity_field(entity, "payment_proof_photo_id")
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
 
@@ -346,6 +361,10 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    if entity_type == "order" and _is_paid_click_order(entity):
+        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
+        return
+
     if order_service:
         success = await order_service.reject_order(entity_id, entity_type)
     else:
@@ -432,6 +451,10 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
 
     if not owner_id or partner_id != owner_id:
         await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if _is_paid_click_order(entity):
+        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 
     if order_service:

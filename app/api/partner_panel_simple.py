@@ -7,8 +7,9 @@ import hashlib
 import hmac
 import io
 import os
+import re
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 import json
 from typing import Optional
 
@@ -194,6 +195,69 @@ def _to_sums(price_in_kopeks: int | float | None) -> int:
         return int(round(float(price_in_kopeks)))
     except (TypeError, ValueError):
         return 0
+
+
+DEFAULT_WORKING_HOURS = "08:00 - 23:00"
+
+
+def _parse_time_value(value: object) -> dt_time | None:
+    if not value:
+        return None
+    if isinstance(value, dt_time):
+        return value
+    if isinstance(value, datetime):
+        return value.time()
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        if "T" in raw:
+            raw = raw.split("T", 1)[1]
+        raw = raw[:8]
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                return datetime.strptime(raw, fmt).time()
+            except ValueError:
+                continue
+    return None
+
+
+def _parse_time_range(value: object) -> tuple[dt_time | None, dt_time | None]:
+    if not value:
+        return None, None
+    match = re.search(r"(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})", str(value))
+    if not match:
+        return None, None
+    start = _parse_time_value(match.group(1))
+    end = _parse_time_value(match.group(2))
+    return start, end
+
+
+def _format_time_value(value: object) -> str | None:
+    parsed = _parse_time_value(value)
+    if not parsed:
+        return None
+    return parsed.strftime("%H:%M")
+
+
+def _normalize_working_hours(value: object) -> str | None:
+    start, end = _parse_time_range(value)
+    if not start or not end:
+        return None
+    return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+
+
+def _resolve_store_hours(store: dict) -> tuple[dt_time, dt_time, str]:
+    raw = store.get("working_hours")
+    normalized = _normalize_working_hours(raw) if raw else None
+    if not normalized:
+        normalized = DEFAULT_WORKING_HOURS
+    start, end = _parse_time_range(normalized)
+    if not start or not end:
+        start = _parse_time_value("08:00") or datetime.strptime("08:00", "%H:%M").time()
+        end = _parse_time_value("23:00") or datetime.strptime("23:00", "%H:%M").time()
+        normalized = DEFAULT_WORKING_HOURS
+    return start, end, normalized
 
 
 def verify_telegram_webapp(authorization: str) -> int:
@@ -550,7 +614,8 @@ async def get_store_info(authorization: str = Header(None)):
         "description": store.get("description"),
         "status": store.get("status"),
         "is_open": store.get("status") in ("approved", "active", "open"),
-        "working_hours": store.get("working_hours") or "09:00 - 21:00",
+        "working_hours": _normalize_working_hours(store.get("working_hours"))
+        or DEFAULT_WORKING_HOURS,
         "delivery_enabled": bool(store.get("delivery_enabled")),
         "delivery_price": delivery_price,
         "min_order_amount": min_order_amount,
@@ -599,6 +664,9 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
         if o.get("photo_id"):
             photo_url = f"{API_BASE_URL}/api/partner/photo/{o['photo_id']}"
 
+        available_from = _format_time_value(o.get("available_from"))
+        available_until = _format_time_value(o.get("available_until"))
+
         product = {
             "id": o["offer_id"],  # Frontend expects 'id'
             "name": o["title"],  # Frontend expects 'name'
@@ -620,6 +688,8 @@ async def list_products(authorization: str = Header(None), status: Optional[str]
             "image": photo_url or "https://via.placeholder.com/120?text=No+Photo",
             "status": status,
             "is_active": status == "active",
+            "available_from": available_from,
+            "available_until": available_until,
         }
         products.append(product)
 
@@ -638,6 +708,8 @@ async def create_product(
     quantity: Optional[int] = Form(None),
     stock_quantity: Optional[int] = Form(None),  # NEW: Stock quantity (v22.0)
     unit: Optional[str] = Form(None),
+    available_from: Optional[str] = Form(None),
+    available_until: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     photo_id: Optional[str] = Form(None),
@@ -646,7 +718,7 @@ async def create_product(
     Create new product with unified schema.
 
     Prices are accepted in sums (user-friendly) and stored as-is.
-    Times are generated automatically (08:00 - 23:00).
+    Times default to store working hours unless overridden.
     Validation happens via Pydantic models.
 
     v22.0: Added stock_quantity support.
@@ -684,6 +756,8 @@ async def create_product(
         "stock_quantity",
     )
     unit = unit or payload.get("unit") or "шт"
+    available_from = available_from or payload.get("available_from")
+    available_until = available_until or payload.get("available_until")
     expiry_date = expiry_date or payload.get("expiry_date")
     description = description or payload.get("description")
     photo_id = photo_id or payload.get("photo_id")
@@ -704,10 +778,12 @@ async def create_product(
     # Use stock_quantity if provided, otherwise use quantity
     actual_stock = stock_quantity if stock_quantity is not None else quantity
 
-    # Prepare times (08:00 - 23:00)
+    # Prepare times (default from store working hours)
     now = datetime.now()
-    available_from = now.replace(hour=8, minute=0, second=0, microsecond=0).time()
-    available_until = now.replace(hour=23, minute=0, second=0, microsecond=0).time()
+    parsed_from = _parse_time_value(available_from)
+    parsed_until = _parse_time_value(available_until)
+    if not parsed_from or not parsed_until:
+        parsed_from, parsed_until, _ = _resolve_store_hours(store)
 
     # Parse expiry date (Pydantic will validate format)
     if expiry_date:
@@ -736,8 +812,8 @@ async def create_product(
             original_price=original_price,
             discount_price=discount_price,
             quantity=quantity,
-            available_from=available_from,
-            available_until=available_until,
+            available_from=parsed_from,
+            available_until=parsed_until,
             expiry_date=expiry,
             unit=unit,
             category=category,
@@ -781,6 +857,8 @@ async def update_product(
     quantity: Optional[int] = Form(None),
     stock_quantity: Optional[int] = Form(None),  # NEW: v22.0
     unit: Optional[str] = Form(None),
+    available_from: Optional[str] = Form(None),
+    available_until: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     photo_id: Optional[str] = Form(None),
@@ -827,6 +905,10 @@ async def update_product(
         stock_quantity = _maybe_int(payload.get("stock_quantity"), "stock_quantity")
     if unit is None:
         unit = payload.get("unit")
+    if available_from is None:
+        available_from = payload.get("available_from")
+    if available_until is None:
+        available_until = payload.get("available_until")
     if expiry_date is None:
         expiry_date = payload.get("expiry_date")
     if description is None:
@@ -845,6 +927,20 @@ async def update_product(
     # Build update dynamically for partial updates
     update_fields = []
     update_values = []
+
+    if available_from is not None or available_until is not None:
+        current_from = available_from if available_from is not None else offer.get("available_from")
+        current_until = available_until if available_until is not None else offer.get("available_until")
+        parsed_from = _parse_time_value(current_from)
+        parsed_until = _parse_time_value(current_until)
+        if not parsed_from or not parsed_until:
+            raise HTTPException(
+                status_code=400, detail="Invalid available_from/available_until values"
+            )
+        update_fields.append("available_from = %s")
+        update_values.append(parsed_from.isoformat())
+        update_fields.append("available_until = %s")
+        update_values.append(parsed_until.isoformat())
 
     if title is not None:
         update_fields.append("title = %s")
@@ -1021,7 +1117,8 @@ async def cancel_order(
     # Get order and verify ownership
     order_rows = await db.execute(
         """
-        SELECT o.order_id, o.user_id, o.order_status, o.store_id
+        SELECT o.order_id, o.user_id, o.order_status, o.store_id,
+               o.payment_method, o.payment_status, o.payment_proof_photo_id
         FROM orders o
         WHERE o.order_id = %s
         """,
@@ -1034,6 +1131,11 @@ async def cancel_order(
 
     store_id_val = order.get("store_id") if hasattr(order, "get") else order[3]
     status_val = order.get("order_status") if hasattr(order, "get") else order[2]
+    payment_method = order.get("payment_method") if hasattr(order, "get") else order[4]
+    payment_status = order.get("payment_status") if hasattr(order, "get") else order[5]
+    payment_proof_photo_id = (
+        order.get("payment_proof_photo_id") if hasattr(order, "get") else order[6]
+    )
 
     # Verify store ownership
     if store_id_val != store["store_id"]:
@@ -1042,6 +1144,18 @@ async def cancel_order(
     # Check if already cancelled
     if status_val == "cancelled":
         raise HTTPException(status_code=400, detail="Order already cancelled")
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    if method_norm == "click" and status_norm == PaymentStatus.CONFIRMED:
+        raise HTTPException(
+            status_code=409,
+            detail="Paid Click orders cannot be cancelled by partner",
+        )
 
     unified_service = _ensure_unified_service(db)
     if not unified_service:
@@ -1083,6 +1197,9 @@ async def import_csv(
         raise HTTPException(status_code=400, detail="File must be CSV")
 
     store_id = store["store_id"]
+    store_from, store_until, _ = _resolve_store_hours(store)
+    available_from_default = store_from.isoformat()
+    available_until_default = store_until.isoformat()
 
     # Read CSV
     content = await file.read()
@@ -1101,9 +1218,6 @@ async def import_csv(
                 except ValueError:
                     pass
 
-            now = datetime.now().isoformat()
-            until = (datetime.now() + timedelta(days=7)).isoformat()
-
             await db.add_offer(
                 store_id=store_id,
                 title=row["title"],
@@ -1111,8 +1225,8 @@ async def import_csv(
                 original_price=_to_kopeks(row.get("original_price", 0)) or None,
                 discount_price=_to_kopeks(row.get("discount_price", 0)),
                 quantity=int(row.get("quantity", 1)),
-                available_from=now,
-                available_until=until,
+                available_from=available_from_default,
+                available_until=available_until_default,
                 expiry_date=expiry.isoformat() if expiry else None,
                 unit=row.get("unit", "шт"),
                 category=row.get("category", "other"),
@@ -1585,6 +1699,16 @@ async def update_store(settings: dict, authorization: str = Header(None)):
     delivery_price_value = max(0, int(delivery_price))
     min_order_value = max(0, int(min_order_amount))
 
+    working_hours_value = store.get("working_hours")
+    if "working_hours" in settings:
+        normalized_hours = _normalize_working_hours(settings.get("working_hours"))
+        if not normalized_hours:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid working_hours format. Use HH:MM - HH:MM",
+            )
+        working_hours_value = normalized_hours
+
     region_value = settings.get("region", store.get("region"))
     district_value = settings.get("district", store.get("district"))
     region_id_value = store.get("region_id")
@@ -1625,6 +1749,7 @@ async def update_store(settings: dict, authorization: str = Header(None)):
             district_id = %s,
             phone = %s,
             description = %s,
+            working_hours = %s,
             delivery_enabled = %s,
             delivery_price = %s,
             min_order_amount = %s
@@ -1641,6 +1766,7 @@ async def update_store(settings: dict, authorization: str = Header(None)):
             district_id_value,
             settings.get("phone", store.get("phone")),
             settings.get("description", store.get("description")),
+            working_hours_value,
             int(delivery_enabled),
             delivery_price_value,
             min_order_value,

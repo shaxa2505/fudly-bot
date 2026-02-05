@@ -15,6 +15,7 @@ from typing import Any
 from aiogram import F, Router, types
 
 from app.core.utils import get_offer_field, get_store_field
+from app.domain.order import PaymentStatus
 from app.services.unified_order_service import (
     OrderStatus,
     get_unified_order_service,
@@ -42,6 +43,15 @@ def _get_order_field(order: Any, field: str, index: int = 0) -> Any:
     if isinstance(order, dict):
         return order.get(field)
     return order[index] if len(order) > index else None
+
+
+def _is_paid_click_order(order: Any) -> bool:
+    payment_method = _get_order_field(order, "payment_method", 9)
+    payment_status = _get_order_field(order, "payment_status", 11)
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(payment_status, payment_method=payment_method)
+    return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
 # =============================================================================
@@ -183,6 +193,10 @@ async def partner_confirm_order_batch(
             if partner_id != owner_id:
                 continue
 
+            if _is_paid_click_order(order):
+                blocked_count += 1
+                continue
+
             # Update order status
             await order_service.update_status(
                 entity_id=order_id,
@@ -314,6 +328,7 @@ async def partner_reject_order_batch(
 
     # Reject all orders and restore quantities
     rejected_count = 0
+    blocked_count = 0
     customer_notifications: dict[int, dict[str, Any]] = {}  # {customer_id: {stores, photo}}
 
     order_service = get_unified_order_service()
@@ -423,4 +438,8 @@ async def partner_reject_order_batch(
         if lang == "uz"
         else f"❌ Отклонено заказов: {rejected_count}"
     )
-    await callback.answer(reject_text)
+    if blocked_count:
+        blocked_msg = get_text(lang, "paid_click_reject_blocked")
+        await callback.answer(f"{reject_text}\n{blocked_msg}", show_alert=True)
+    else:
+        await callback.answer(reject_text)

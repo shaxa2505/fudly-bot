@@ -146,6 +146,7 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     for cat_id, cat_name in categories.items():
         builder.button(text=cat_name, callback_data=f"product_cat_{cat_id}")
 
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_store")
     builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2)  # 2 buttons per row
     return builder.as_markup()
@@ -159,8 +160,9 @@ def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
         label = "Без скидки" if d == 0 and lang == "ru" else ("Chegirmasiz" if d == 0 else f"{d}%")
         builder.button(text=label, callback_data=f"discount_{d}")
     builder.button(text="Другая" if lang == "ru" else "Boshqa", callback_data="discount_custom")
+    builder.button(text=get_text(lang, "back"), callback_data="create_back_price")
     builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
-    builder.adjust(3, 3, 3, 1)
+    builder.adjust(3, 3, 3, 2)
     return builder.as_markup()
 
 
@@ -186,7 +188,8 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
 
     builder.button(text="Другое" if lang == "ru" else "Boshqa", callback_data="quantity_custom")
     builder.button(text=get_text(lang, "back"), callback_data="create_back_unit")
-    builder.adjust(3, 3, 2)
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.adjust(3, 3, 3)
     return builder.as_markup()
 
 
@@ -200,7 +203,8 @@ def unit_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder.button(text="Литры (л)" if lang == "ru" else "Litr (l)", callback_data="unit_type_л")
     builder.button(text="Миллилитры (мл)" if lang == "ru" else "Millilitr (ml)", callback_data="unit_type_мл")
     builder.button(text=get_text(lang, "back"), callback_data="create_back_discount")
-    builder.adjust(2, 2, 2, 1)
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.adjust(2, 2, 2, 2)
     return builder.as_markup()
 
 
@@ -227,6 +231,7 @@ def expiry_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder.button(text="Без срока" if lang == "ru" else "Muddatsiz", callback_data="expiry_none")
     builder.button(text="Другая дата" if lang == "ru" else "Boshqa sana", callback_data="expiry_custom")
     builder.button(text=get_text(lang, "back"), callback_data="create_back_quantity")
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
     builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
 
@@ -236,5 +241,6 @@ def photo_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Без фото" if lang == "ru" else "Rasmsiz", callback_data="create_skip_photo")
     builder.button(text=get_text(lang, "back"), callback_data="create_back_expiry")
-    builder.adjust(1)
+    builder.button(text=get_text(lang, "cancel"), callback_data="create_cancel")
+    builder.adjust(1, 2)
     return builder.as_markup()

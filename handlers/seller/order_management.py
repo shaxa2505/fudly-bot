@@ -11,6 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import get_field, get_store_field
+from app.domain.order import PaymentStatus
 from app.interfaces.bot.presenters.order_messages import (
     build_seller_payment_confirmed,
     build_seller_payment_rejected,
@@ -42,6 +43,15 @@ def get_order_field(order, field: str, index: int):
     if isinstance(order, (list, tuple)) and len(order) > index:
         return order[index]
     return None
+
+
+def _is_paid_click_order(order) -> bool:
+    payment_method = get_order_field(order, "payment_method", 9)
+    payment_status = get_order_field(order, "payment_status", 11)
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(payment_status, payment_method=payment_method)
+    return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
 def _safe_caption(text: str) -> str:
@@ -142,6 +152,10 @@ async def cancel_order(callback: types.CallbackQuery):
         await callback.answer("Ошибка", show_alert=True)
         return
 
+    if _is_paid_click_order(order):
+        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
+        return
+
     # Используем UnifiedOrderService для отмены заказа
     service = get_unified_order_service()
     await service.cancel_order(order_id, "Отменено продавцом", "Seller cancelled")
@@ -230,6 +244,10 @@ async def reject_payment(callback: types.CallbackQuery):
 
     if callback.from_user.id != owner_id:
         await callback.answer("Ошибка", show_alert=True)
+        return
+
+    if _is_paid_click_order(order):
+        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 
     # Используем UnifiedOrderService для отклонения (отмены)

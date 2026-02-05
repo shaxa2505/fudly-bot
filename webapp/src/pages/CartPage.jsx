@@ -359,15 +359,15 @@ function CartPage({ user }) {
       return
     }
 
-    const L = window.L
-    if (!L) return
+    const leaflet = window.L
+    if (!leaflet) return
 
     const savedCoords = getSavedCoordinates()
     const startLat = savedCoords?.lat ?? DEFAULT_MAP_CENTER.lat
     const startLon = savedCoords?.lon ?? DEFAULT_MAP_CENTER.lon
     const startZoom = savedCoords ? 16 : 12
 
-    const map = L.map(checkoutMapRef.current, {
+    const map = leaflet.map(checkoutMapRef.current, {
       center: [startLat, startLon],
       zoom: startZoom,
       zoomControl: false,
@@ -375,20 +375,20 @@ function CartPage({ user }) {
       tap: false,
     })
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
     checkoutMapInstanceRef.current = map
 
-    const markerIcon = L.divIcon({
+    const markerIcon = leaflet.divIcon({
       className: 'checkout-map-marker',
       html: '<span></span>',
       iconSize: [36, 36],
       iconAnchor: [18, 34],
     })
-    const marker = L.marker([startLat, startLon], {
+    const marker = leaflet.marker([startLat, startLon], {
       draggable: true,
       icon: markerIcon,
     }).addTo(map)

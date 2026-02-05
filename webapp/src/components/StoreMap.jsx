@@ -120,7 +120,7 @@ function StoreMap({
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || mapInstance.current) return;
 
-    const L = window.L;
+    const leaflet = window.L;
 
     // Default center (Tashkent)
     const defaultCenter = [41.2995, 69.2401];
@@ -131,7 +131,7 @@ function StoreMap({
         : defaultCenter;
 
     // Create map
-    const map = L.map(mapRef.current, {
+    const map = leaflet.map(mapRef.current, {
       center: center,
       zoom: 13,
       zoomControl: true,
@@ -139,13 +139,13 @@ function StoreMap({
     });
 
     // Add tile layer (OpenStreetMap)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
     mapInstance.current = map;
-    storeLayerRef.current = L.layerGroup().addTo(map);
+    storeLayerRef.current = leaflet.layerGroup().addTo(map);
     userMovedRef.current = false;
 
     map.on('movestart', () => {
@@ -161,7 +161,7 @@ function StoreMap({
   useEffect(() => {
     if (!mapInstance.current || !mapLoaded || !storeLayerRef.current) return;
 
-    const L = window.L;
+    const leaflet = window.L;
     const map = mapInstance.current;
     const layer = storeLayerRef.current;
 
@@ -172,7 +172,7 @@ function StoreMap({
     );
 
     validStores.forEach((store) => {
-      const storeIcon = L.divIcon({
+      const storeIcon = leaflet.divIcon({
         className: 'store-marker',
         html: `<div class="store-marker-inner">SHOP</div>`,
         iconSize: [36, 36],
@@ -191,7 +191,7 @@ function StoreMap({
         </div>
       `;
 
-      const marker = L.marker([store.latitude, store.longitude], { icon: storeIcon })
+      const marker = leaflet.marker([store.latitude, store.longitude], { icon: storeIcon })
         .addTo(layer)
         .bindPopup(popupContent);
 
@@ -203,7 +203,7 @@ function StoreMap({
     });
 
     if (!userMovedRef.current && validStores.length > 0 && !userLocation) {
-      const bounds = L.latLngBounds(validStores.map((s) => [s.latitude, s.longitude]));
+      const bounds = leaflet.latLngBounds(validStores.map((s) => [s.latitude, s.longitude]));
       map.fitBounds(bounds, { padding: [50, 50] });
     }
   }, [normalizedStores, mapLoaded, onStoreSelect, t, userLocation]);
@@ -211,7 +211,7 @@ function StoreMap({
   // Update user marker when location changes
   useEffect(() => {
     if (!mapInstance.current || !mapLoaded) return;
-    const L = window.L;
+    const leaflet = window.L;
     const map = mapInstance.current;
 
     if (!userLocation?.latitude || !userLocation?.longitude) {
@@ -222,7 +222,7 @@ function StoreMap({
       return;
     }
 
-    const userIcon = L.divIcon({
+    const userIcon = leaflet.divIcon({
       className: 'user-marker',
       html: '<div class="user-marker-inner">YOU</div>',
       iconSize: [30, 30],
@@ -230,7 +230,7 @@ function StoreMap({
     });
 
     if (!userMarkerRef.current) {
-      userMarkerRef.current = L.marker([userLocation.latitude, userLocation.longitude], { icon: userIcon })
+      userMarkerRef.current = leaflet.marker([userLocation.latitude, userLocation.longitude], { icon: userIcon })
         .addTo(map)
         .bindPopup(t('Your location', 'Sizning joylashuvingiz'));
     } else {
