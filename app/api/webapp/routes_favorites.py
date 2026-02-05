@@ -38,6 +38,7 @@ def _to_store_response(store: object) -> StoreResponse:
         if get_val(store, "min_order_amount")
         else None,
         photo_url=get_val(store, "photo") or get_val(store, "photo_url"),
+        working_hours=get_val(store, "working_hours"),
     )
 
 

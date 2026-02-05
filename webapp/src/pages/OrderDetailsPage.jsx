@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import apiClient from '../api/client'
+import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import { deriveDisplayStatus, displayStatusText, normalizeOrderStatus, paymentStatusText, resolveOrderType } from '../utils/orderStatus'
 import { readPendingPayment, clearPendingPayment } from '../utils/pendingPayment'
+import { getUserId } from '../utils/auth'
 import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
@@ -12,15 +13,17 @@ export default function OrderDetailsPage() {
   const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState(null)
   const enrichmentAttemptedRef = useRef(false)
+  const userId = getUserId()
 
   useEffect(() => {
-    loadOrderDetails({ allowEnrich: true })
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(() => loadOrderDetails({ allowEnrich: false }), 30000)
+    loadOrderDetails({ allowEnrich: true, silent: false })
+    // Auto-refresh every 15 seconds (silent)
+    const interval = setInterval(() => loadOrderDetails({ allowEnrich: false, silent: true }), 15000)
     return () => clearInterval(interval)
-  }, [orderId])
+  }, [orderId, loadOrderDetails])
 
   useEffect(() => {
     if (!order) return
@@ -37,9 +40,13 @@ export default function OrderDetailsPage() {
     }
   }, [order, orderId])
 
-  const loadOrderDetails = async ({ allowEnrich } = {}) => {
+  const loadOrderDetails = useCallback(async ({ allowEnrich = false, silent = false } = {}) => {
     try {
-      setLoading(true)
+      if (!silent) {
+        setLoading(true)
+      } else {
+        setIsSyncing(true)
+      }
       const numericOrderId = Number(orderId)
       if (!Number.isFinite(numericOrderId)) {
         setError('Buyurtma topilmadi')
@@ -115,9 +122,101 @@ export default function OrderDetailsPage() {
       console.error('Failed to load order details:', err)
       setError('Buyurtma ma\'lumotlarini yuklab bo\'lmadi')
     } finally {
-      setLoading(false)
+      if (!silent) {
+        setLoading(false)
+      }
+      setIsSyncing(false)
     }
-  }
+  }, [orderId])
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadOrderDetails({ allowEnrich: false, silent: true })
+      }
+    }
+    window.addEventListener('focus', handleVisibility)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('focus', handleVisibility)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [loadOrderDetails])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const buildWsUrl = () => {
+      const envBase = import.meta.env.VITE_WS_URL
+      const baseSource = (envBase || API_BASE_URL || '').trim()
+      if (!baseSource) return ''
+
+      let base = baseSource
+      if (!base.startsWith('ws://') && !base.startsWith('wss://')) {
+        base = base.replace(/^http/, 'ws')
+      }
+      base = base.replace(/\/api\/v1\/?$/, '')
+      base = base.replace(/\/+$/, '')
+
+      let wsEndpoint = ''
+      if (base.endsWith('/ws/notifications')) {
+        wsEndpoint = base
+      } else if (base.endsWith('/ws')) {
+        wsEndpoint = `${base}/notifications`
+      } else {
+        wsEndpoint = `${base}/ws/notifications`
+      }
+
+      const params = new URLSearchParams()
+      if (userId) {
+        params.set('user_id', userId)
+      }
+      const initData = getTelegramInitData()
+      if (initData) {
+        params.set('init_data', initData)
+      }
+      const query = params.toString()
+      return `${wsEndpoint}${query ? `?${query}` : ''}`
+    }
+
+    const wsUrl = buildWsUrl()
+    if (!wsUrl) return
+
+    let ws
+    try {
+      ws = new WebSocket(wsUrl)
+    } catch (error) {
+      console.warn('WebSocket init failed:', error)
+      return
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        const type = payload?.type
+        const data =
+          payload?.payload?.data ||
+          payload?.payload ||
+          payload?.data ||
+          {}
+        const eventOrderId = data?.order_id || data?.booking_id
+
+        if (type === 'order_status_changed' || type === 'order_created') {
+          if (!eventOrderId || Number(eventOrderId) === Number(orderId)) {
+            loadOrderDetails({ allowEnrich: false, silent: true })
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse order update:', error)
+      }
+    }
+
+    return () => {
+      if (ws) {
+        ws.close()
+      }
+    }
+  }, [orderId, userId, loadOrderDetails])
 
   const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('ru-RU')
 
@@ -212,7 +311,9 @@ export default function OrderDetailsPage() {
             </button>
             <div className="details-header-main">
               <span className="details-label">Buyurtma</span>
-              <h1 className="details-title">#{orderId}</h1>
+              <div className="details-title-row">
+                <h1 className="details-title">#{orderId}</h1>
+              </div>
             </div>
           </div>
         </div>
@@ -226,8 +327,9 @@ export default function OrderDetailsPage() {
 
   const fulfillmentStatus = order.fulfillment_status || normalizeOrderStatus(order.order_status || order.status)
   const orderType = resolveOrderType(order)
-  const statusInfo = getStatusInfo(fulfillmentStatus || order.status, orderType)
   const isDelivery = orderType === 'delivery'
+  const displayFulfillmentStatus = (!isDelivery && fulfillmentStatus === 'preparing') ? 'ready' : fulfillmentStatus
+  const statusInfo = getStatusInfo(displayFulfillmentStatus || order.status, orderType)
   const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
   const canPayOnline = order.payment_method === 'click'
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
@@ -315,13 +417,15 @@ export default function OrderDetailsPage() {
       ]
     : [
         { key: 'pending', label: 'Yaratildi' },
-        { key: 'preparing', label: 'Tayyorlanmoqda' },
         { key: 'ready', label: 'Tayyor' },
-        { key: 'completed', label: 'Yakunlandi' },
+        { key: 'completed', label: 'Berildi' },
       ]
 
-  const activeStepIndex = Math.max(0, statusSteps.findIndex(step => step.key === fulfillmentStatus))
+  const activeStepIndex = Math.max(0, statusSteps.findIndex(step => step.key === displayFulfillmentStatus))
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
+  const showPickupReadyNote = !isDelivery && displayFulfillmentStatus === 'ready'
+  const hasDeliveryInfo = Boolean(order.delivery_address || order.phone || order.delivery_notes)
+  const hasStoreInfo = Boolean(order.store_name || order.store_address || order.store_phone)
 
   return (
     <div className="order-details-page">
@@ -336,18 +440,13 @@ export default function OrderDetailsPage() {
             <span className="details-label">Buyurtma</span>
             <div className="details-title-row">
               <h1 className="details-title">#{orderId}</h1>
+              {isSyncing && (
+                <span className="details-sync">
+                  <span className="details-sync-dot"></span>
+                  Yangilanmoqda
+                </span>
+              )}
             </div>
-            <div className="details-meta">
-              <span className="details-meta-item">{order.store_name || "Do'kon"}</span>
-              <span className="details-dot"></span>
-              <span className="details-meta-item">{formatDate(order.created_at)}</span>
-            </div>
-          </div>
-          <div className="details-header-side">
-            <span className="details-type-pill">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
-            <span className="status-pill" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>
-              {statusInfo.text}
-            </span>
           </div>
         </div>
       </div>
@@ -385,27 +484,55 @@ export default function OrderDetailsPage() {
         </div>
       )}
 
-      <div className="summary-card">
-        <div className="summary-grid">
-          <div className="summary-item">
-            <span className="summary-label">Jami</span>
-            <span className="summary-value total">{formatMoney(totalPrice)} so'm</span>
+      <div className="hero-card">
+        <div className="hero-top">
+          <div className="hero-meta">
+            <span className="hero-store">{order.store_name || "Do'kon"}</span>
+            <span className="details-dot"></span>
+            <span className="hero-date">{formatDate(order.created_at)}</span>
           </div>
-          <div className="summary-item">
-            <span className="summary-label">Mahsulotlar</span>
-            <span className="summary-value">{totalUnits} dona</span>
+          <div className="hero-status">
+            <span className="details-type-pill">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
+            <span className="status-pill" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>
+              {statusInfo.text}
+            </span>
           </div>
-          <div className="summary-item">
-            <span className="summary-label">Buyurtma turi</span>
-            <span className="summary-value">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
+        </div>
+        <div className="hero-body">
+          <div className="hero-total">
+            <span className="hero-label">Jami</span>
+            <span className="hero-value">{formatMoney(totalPrice)} so'm</span>
           </div>
-          <div className="summary-item">
-            <span className="summary-label">To'lov usuli</span>
-            <span className="summary-value">{paymentMethodLabels[order.payment_method] || 'Naqd'}</span>
+          {orderPhotoUrl && (
+            <div className="hero-photo">
+              <img
+                src={orderPhotoUrl}
+                alt={order.offer_title || 'Buyurtma'}
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            </div>
+          )}
+        </div>
+        <div className="hero-grid">
+          <div className="hero-item">
+            <span className="hero-label">Mahsulotlar</span>
+            <span className="hero-value">{totalUnits} dona</span>
+          </div>
+          <div className="hero-item">
+            <span className="hero-label">To'lov usuli</span>
+            <span className="hero-value">{paymentMethodLabels[order.payment_method] || 'Naqd'}</span>
+          </div>
+          <div className="hero-item">
+            <span className="hero-label">Buyurtma turi</span>
+            <span className="hero-value">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
           </div>
         </div>
         {paymentStatusLabel && (
-          <div className="summary-chip">{paymentStatusLabel}</div>
+          <div className="hero-chip">{paymentStatusLabel}</div>
         )}
       </div>
 
@@ -431,6 +558,16 @@ export default function OrderDetailsPage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {showPickupReadyNote && (
+        <div className="pickup-ready-note">
+          <div className="pickup-ready-icon">i</div>
+          <div className="pickup-ready-content">
+            <h3>Buyurtma tayyor</h3>
+            <p>2 soat ichida olib ketishingiz kerak, aks holda buyurtma bekor qilinadi.</p>
           </div>
         </div>
       )}
@@ -469,9 +606,6 @@ export default function OrderDetailsPage() {
                     <div className="item-sub">
                       <span>{item.quantity} x {formatMoney(item.price)} so'm</span>
                     </div>
-                    {item.store_name && (
-                      <div className="item-store">Do'kon: {item.store_name}</div>
-                    )}
                   </div>
                 </div>
               )
@@ -502,51 +636,118 @@ export default function OrderDetailsPage() {
                 <div className="item-sub">
                   <span>{order.quantity || 1} dona</span>
                 </div>
-                {order.store_name && (
-                  <div className="item-store">Do'kon: {order.store_name}</div>
-                )}
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {isDelivery && order.delivery_address && (
+      {isDelivery && (
         <div className="details-section">
           <h2 className="details-section-title">Yetkazib berish</h2>
           <div className="info-card">
-            <div className="info-row">
-              <span className="info-label">Manzil</span>
-              <span className="info-value">{order.delivery_address}</span>
-            </div>
-            {order.phone && (
-              <div className="info-row">
-                <span className="info-label">Telefon</span>
-                <span className="info-value">{order.phone}</span>
+            {hasDeliveryInfo && (
+              <div className="info-group">
+                <div className="info-group-title">Mijoz</div>
+                {order.delivery_address && (
+                  <div className="info-row">
+                    <span className="info-label">Manzil</span>
+                    <span className="info-value">{order.delivery_address}</span>
+                  </div>
+                )}
+                {order.phone && (
+                  <div className="info-row">
+                    <span className="info-label">Telefon</span>
+                    <span className="info-value">{order.phone}</span>
+                  </div>
+                )}
+                {order.delivery_notes && (
+                  <div className="info-row">
+                    <span className="info-label">Izoh</span>
+                    <span className="info-value">{order.delivery_notes}</span>
+                  </div>
+                )}
               </div>
             )}
-            {order.delivery_notes && (
-              <div className="info-row">
-                <span className="info-label">Izoh</span>
-                <span className="info-value">{order.delivery_notes}</span>
+            {hasStoreInfo && (
+              <div className="info-group">
+                <div className="info-group-title">Do'kon</div>
+                {order.store_name && (
+                  <div className="info-row">
+                    <span className="info-label">Nomi</span>
+                    <span className="info-value">{order.store_name}</span>
+                  </div>
+                )}
+                {order.store_address && (
+                  <div className="info-row">
+                    <span className="info-label">Manzil</span>
+                    <span className="info-value">{order.store_address}</span>
+                  </div>
+                )}
+                {order.store_phone && (
+                  <div className="info-row">
+                    <span className="info-label">Telefon</span>
+                    <span className="info-value">
+                      <a href={`tel:${order.store_phone}`}>{order.store_phone}</a>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {!isDelivery && order.booking_code && (
+      {!isDelivery && (
         <div className="details-section">
           <h2 className="details-section-title">Olib ketish</h2>
           <div className="info-card">
-            <div className="info-row">
-              <span className="info-label">Kod</span>
-              <span className="info-value booking-code">{order.booking_code}</span>
-            </div>
-            {order.pickup_time && (
-              <div className="info-row">
-                <span className="info-label">Vaqt</span>
-                <span className="info-value">{formatDate(order.pickup_time)}</span>
+            {(order.booking_code || order.pickup_time || order.pickup_address) && (
+              <div className="info-group">
+                <div className="info-group-title">Buyurtma</div>
+                {order.booking_code && (
+                  <div className="info-row">
+                    <span className="info-label">Kod</span>
+                    <span className="info-value booking-code">{order.booking_code}</span>
+                  </div>
+                )}
+                {order.pickup_time && (
+                  <div className="info-row">
+                    <span className="info-label">Vaqt</span>
+                    <span className="info-value">{formatDate(order.pickup_time)}</span>
+                  </div>
+                )}
+                {order.pickup_address && (
+                  <div className="info-row">
+                    <span className="info-label">Manzil</span>
+                    <span className="info-value">{order.pickup_address}</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {hasStoreInfo && (
+              <div className="info-group">
+                <div className="info-group-title">Do'kon</div>
+                {order.store_name && (
+                  <div className="info-row">
+                    <span className="info-label">Nomi</span>
+                    <span className="info-value">{order.store_name}</span>
+                  </div>
+                )}
+                {order.store_address && (
+                  <div className="info-row">
+                    <span className="info-label">Manzil</span>
+                    <span className="info-value">{order.store_address}</span>
+                  </div>
+                )}
+                {order.store_phone && (
+                  <div className="info-row">
+                    <span className="info-label">Telefon</span>
+                    <span className="info-value">
+                      <a href={`tel:${order.store_phone}`}>{order.store_phone}</a>
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -556,54 +757,22 @@ export default function OrderDetailsPage() {
       <div className="details-section">
         <h2 className="details-section-title">To'lov tafsilotlari</h2>
         <div className="info-card">
-          <div className="info-row">
-            <span className="info-label">Mahsulotlar</span>
-            <span className="info-value">{formatMoney(itemsSubtotal)} so'm</span>
-          </div>
-          {deliveryFee > 0 && (
+          <div className="info-group">
             <div className="info-row">
-              <span className="info-label">Yetkazib berish</span>
-              <span className="info-value">{formatMoney(deliveryFee)} so'm</span>
+              <span className="info-label">Mahsulotlar</span>
+              <span className="info-value">{formatMoney(itemsSubtotal)} so'm</span>
             </div>
-          )}
-          <div className="info-row">
-            <span className="info-label">To'lov usuli</span>
-            <span className="info-value">{paymentMethodLabels[order.payment_method] || 'Naqd'}</span>
+            {deliveryFee > 0 && (
+              <div className="info-row">
+                <span className="info-label">Yetkazib berish</span>
+                <span className="info-value">{formatMoney(deliveryFee)} so'm</span>
+              </div>
+            )}
+            <div className="info-row total-row">
+              <span className="info-label">Jami</span>
+              <span className="info-value total-price">{formatMoney(totalPrice)} so'm</span>
+            </div>
           </div>
-          {paymentStatusLabel && (
-            <div className="info-row">
-              <span className="info-label">To'lov holati</span>
-              <span className="info-value">{paymentStatusLabel}</span>
-            </div>
-          )}
-          <div className="info-row total-row">
-            <span className="info-label">Jami</span>
-            <span className="info-value total-price">{formatMoney(totalPrice)} so'm</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="details-section">
-        <h2 className="details-section-title">Do'kon</h2>
-        <div className="info-card">
-          <div className="info-row">
-            <span className="info-label">Nomi</span>
-            <span className="info-value">{order.store_name || "Do'kon"}</span>
-          </div>
-          {order.store_address && (
-            <div className="info-row">
-              <span className="info-label">Manzil</span>
-              <span className="info-value">{order.store_address}</span>
-            </div>
-          )}
-          {order.store_phone && (
-            <div className="info-row">
-              <span className="info-label">Telefon</span>
-              <span className="info-value">
-                <a href={`tel:${order.store_phone}`}>{order.store_phone}</a>
-              </span>
-            </div>
-          )}
         </div>
       </div>
 

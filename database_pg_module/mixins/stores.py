@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 import re
+from datetime import datetime, time as dt_time
 
 from psycopg.rows import dict_row
 
@@ -26,6 +27,45 @@ except ImportError:
     logger = logging.getLogger(__name__)
 
 _plaintext_payment_secret_warned = False
+
+DEFAULT_WORKING_HOURS = "08:00 - 23:00"
+
+
+def _parse_time_value(value: object) -> dt_time | None:
+    if not value:
+        return None
+    if isinstance(value, dt_time):
+        return value
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if "T" in raw:
+        raw = raw.split("T", 1)[1]
+    raw = raw[:8]
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_time_range(value: object) -> tuple[dt_time | None, dt_time | None]:
+    if not value:
+        return None, None
+    match = re.search(r"(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})", str(value))
+    if not match:
+        return None, None
+    start = _parse_time_value(match.group(1))
+    end = _parse_time_value(match.group(2))
+    return start, end
+
+
+def _normalize_working_hours(value: object) -> str | None:
+    start, end = _parse_time_range(value)
+    if not start or not end:
+        return None
+    return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
 
 
 class StoreMixin:
@@ -674,10 +714,75 @@ class StoreMixin:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE stores SET working_hours = %s WHERE store_id = %s",
-                (working_hours, store_id),
+                "SELECT working_hours FROM stores WHERE store_id = %s",
+                (store_id,),
             )
-            logger.info(f"Store {store_id} working hours updated to {working_hours}")
+            row = cursor.fetchone()
+            current_hours = row[0] if row else None
+
+            normalized_current = _normalize_working_hours(current_hours)
+            normalized_new = _normalize_working_hours(working_hours) or working_hours
+
+            cursor.execute(
+                "UPDATE stores SET working_hours = %s WHERE store_id = %s",
+                (normalized_new, store_id),
+            )
+
+            updated_offers = 0
+            current_match_hours = normalized_current or DEFAULT_WORKING_HOURS
+            if current_match_hours and normalized_new:
+                old_start, old_end = _parse_time_range(current_match_hours)
+                new_start, new_end = _parse_time_range(normalized_new)
+                if old_start and old_end and new_start and new_end:
+                    cursor.execute(
+                        """
+                        UPDATE offers
+                        SET available_from = %s, available_until = %s
+                        WHERE store_id = %s
+                          AND available_from = %s
+                          AND available_until = %s
+                        """,
+                        (
+                            new_start.strftime("%H:%M:%S"),
+                            new_end.strftime("%H:%M:%S"),
+                            store_id,
+                            old_start.strftime("%H:%M:%S"),
+                            old_end.strftime("%H:%M:%S"),
+                        ),
+                    )
+                    updated_offers = cursor.rowcount or 0
+
+                # If store hours were already updated earlier, still sync offers
+                if (
+                    updated_offers == 0
+                    and normalized_new != DEFAULT_WORKING_HOURS
+                    and new_start
+                    and new_end
+                ):
+                    default_start, default_end = _parse_time_range(DEFAULT_WORKING_HOURS)
+                    if default_start and default_end:
+                        cursor.execute(
+                            """
+                            UPDATE offers
+                            SET available_from = %s, available_until = %s
+                            WHERE store_id = %s
+                              AND available_from = %s
+                              AND available_until = %s
+                            """,
+                            (
+                                new_start.strftime("%H:%M:%S"),
+                                new_end.strftime("%H:%M:%S"),
+                                store_id,
+                                default_start.strftime("%H:%M:%S"),
+                                default_end.strftime("%H:%M:%S"),
+                            ),
+                        )
+                        updated_offers = cursor.rowcount or 0
+
+            logger.info(
+                f"Store {store_id} working hours updated to {normalized_new}. "
+                f"Offers synced: {updated_offers}"
+            )
             return True
 
     def update_store_delivery_settings(

@@ -214,6 +214,7 @@ async def get_stores(
                     if get_val(store, "min_order_amount")
                     else None,
                     photo_url=get_val(store, "photo"),
+                    working_hours=get_val(store, "working_hours"),
                 )
             )
 
@@ -275,6 +276,7 @@ async def get_store(
             if get_val(store, "min_order_amount")
             else None,
             photo_url=get_val(store, "photo"),
+            working_hours=get_val(store, "working_hours"),
         )
     except HTTPException:
         raise
@@ -368,6 +370,7 @@ async def get_nearby_stores(
                 if get_val(store, "min_order_amount")
                 else None,
                 photo_url=get_val(store, "photo"),
+                working_hours=get_val(store, "working_hours"),
             )
             stores_with_distance.append(
                 {"store": store_data, "distance_km": round(float(distance), 2) if distance is not None else None}

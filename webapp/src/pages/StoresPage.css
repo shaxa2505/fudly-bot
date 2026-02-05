@@ -331,20 +331,20 @@
 .sp-store-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .sp-store-card {
   display: flex;
   align-items: stretch;
-  gap: 16px;
-  padding: 10px;
+  gap: 12px;
+  padding: 12px;
   background: #FFFFFF;
-  border: 1px solid #F1F5F9;
-  border-radius: 20px;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+  border: 1px solid #E2E8F0;
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .sp-store-card.is-muted {
@@ -353,14 +353,15 @@
 }
 
 .sp-store-card:active {
-  transform: scale(0.99);
+  transform: scale(0.995);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
 }
 
 .sp-store-media {
   position: relative;
-  width: 112px;
-  height: 112px;
-  border-radius: 14px;
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
   overflow: hidden;
   background: #F1F5F9;
   flex-shrink: 0;
@@ -455,18 +456,19 @@
   height: 32px;
   border-radius: 999px;
   border: none;
-  background: transparent;
+  background: #F8FAFC;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #CBD5E1;
   cursor: pointer;
-  transition: transform 0.2s ease, color 0.2s ease;
+  transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
   margin: -4px -4px 0 0;
 }
 
 .sp-store-favorite.active {
   color: #EF4444;
+  background: #FEE2E2;
 }
 
 .sp-store-favorite:active {
@@ -478,7 +480,7 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   padding: 2px 0;
   min-width: 0;
 }
@@ -495,24 +497,25 @@
 }
 
 .sp-store-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   margin: 0 0 4px;
   color: var(--sp-text);
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sp-store-meta {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 11px;
   font-weight: 600;
-  color: #64748B;
+  color: #475569;
 }
 
 
@@ -520,21 +523,18 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
 }
 
 .sp-meta-item + .sp-meta-item::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: #CBD5E1;
-  display: inline-block;
-  margin-right: 6px;
-  transform: translateY(-1px);
+  content: none;
 }
 
 .sp-meta-item + .sp-meta-item {
-  padding-left: 6px;
+  padding-left: 0;
 }
 
 .sp-store-rating {
@@ -545,20 +545,20 @@
 .sp-store-price {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .sp-store-price-old {
-  font-size: 10px;
+  font-size: 11px;
   color: #94A3B8;
   text-decoration: line-through;
   font-weight: 600;
 }
 
 .sp-store-price-current {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--sp-primary);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sp-primary-dark);
 }
 
 .sp-store-price-current.is-dark {
@@ -574,7 +574,7 @@
 
 .sp-store-bottom {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
@@ -583,12 +583,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 10px;
   border: 1px solid #D1FAE5;
   background: #ECFDF5;
   color: #047857;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -617,13 +617,28 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 10px;
   border: 1px solid #E2E8F0;
   background: #F1F5F9;
   color: #94A3B8;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
+}
+
+@media (max-width: 360px) {
+  .sp-store-card {
+    padding: 10px;
+  }
+
+  .sp-store-media {
+    width: 84px;
+    height: 84px;
+  }
+
+  .sp-store-title {
+    font-size: 15px;
+  }
 }
 
 .sp-skeleton {

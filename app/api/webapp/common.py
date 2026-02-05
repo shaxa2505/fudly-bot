@@ -228,6 +228,7 @@ class StoreResponse(BaseModel):
     delivery_price: float | None = None
     min_order_amount: float | None = None
     photo_url: str | None = None
+    working_hours: str | None = None
 
 
 class CategoryResponse(BaseModel):
