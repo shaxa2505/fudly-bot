@@ -453,7 +453,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    if _is_paid_click_order(entity):
+    if _is_paid_click_order(order):
         await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 
