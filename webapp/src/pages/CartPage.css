@@ -1417,6 +1417,10 @@
   box-shadow: var(--cart-shadow);
 }
 
+.empty-card .empty-icon {
+  margin: 0 auto var(--spacing-xl, 24px);
+}
+
 .empty-description {
   color: var(--color-text-secondary);
   margin: 0 0 16px;
