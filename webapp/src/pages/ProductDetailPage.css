@@ -218,6 +218,58 @@
   gap: var(--spacing-sm);
 }
 
+.pdp-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.pdp-title-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.pdp-title-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.pdp-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.2s ease, color 0.2s ease;
+  box-shadow: var(--shadow-xs);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pdp-icon-btn:active {
+  transform: scale(0.96);
+  background: var(--color-bg-secondary);
+}
+
+.pdp-icon-btn:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.35);
+  outline-offset: 2px;
+}
+
+.pdp-icon-btn.active {
+  color: #E11D48;
+  border-color: rgba(225, 29, 72, 0.25);
+}
+
 .pdp-meta-row {
   display: flex;
   flex-wrap: wrap;
@@ -287,6 +339,42 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.pdp-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-xs);
+}
+
+.pdp-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pdp-info-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.pdp-info-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.pdp-info-value.is-urgent {
+  color: #B45309;
+  font-weight: 700;
 }
 
 .pdp-price-card {

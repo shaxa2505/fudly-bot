@@ -6,6 +6,8 @@
   min-height: 100%;
   background: var(--color-bg-secondary);
   padding-bottom: calc(var(--spacing-4xl) + var(--safe-area-bottom));
+  --details-section-gap: var(--spacing-xl);
+  --details-card-padding: var(--spacing-md);
 }
 
 /* Header */
@@ -130,8 +132,8 @@
 
 /* Status Note */
 .status-note {
-  margin: 0 var(--page-padding-x) var(--spacing-xl);
-  padding: var(--spacing-lg);
+  margin: 0 var(--page-padding-x) var(--details-section-gap);
+  padding: var(--details-card-padding);
   border-radius: var(--radius-2xl);
   background: var(--color-error-light);
   border: 1px solid rgba(217, 45, 32, 0.2);
@@ -153,8 +155,8 @@
 
 /* Action Card */
 .action-card {
-  margin: 0 var(--page-padding-x) var(--spacing-xl);
-  padding: var(--spacing-lg);
+  margin: 0 var(--page-padding-x) var(--details-section-gap);
+  padding: var(--details-card-padding);
   border-radius: var(--radius-2xl);
   background: linear-gradient(135deg, #FFF8ED 0%, #FFF1E6 100%);
   border: 1px solid rgba(249, 115, 22, 0.18);
@@ -253,8 +255,8 @@
 
 /* Hero */
 .hero-card {
-  margin: 0 var(--page-padding-x) var(--spacing-2xl);
-  padding: var(--spacing-lg);
+  margin: 0 var(--page-padding-x) var(--details-section-gap);
+  padding: var(--details-card-padding);
   border-radius: var(--radius-2xl);
   background: var(--color-bg-primary);
   border: 1px solid rgba(15, 118, 110, 0.1);
@@ -297,7 +299,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .hero-total {
@@ -320,8 +322,8 @@
 }
 
 .hero-photo {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: 16px;
   background: var(--color-bg-tertiary);
   border: 1px solid rgba(15, 118, 110, 0.12);
@@ -338,7 +340,7 @@
 .hero-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .hero-item {
@@ -382,7 +384,7 @@
 
 /* Details Sections */
 .details-section {
-  margin: 0 var(--page-padding-x) var(--spacing-2xl);
+  margin: 0 var(--page-padding-x) var(--details-section-gap);
 }
 
 .details-section-title {
@@ -396,7 +398,7 @@
 .progress-card {
   background: var(--color-bg-primary);
   border-radius: var(--radius-2xl);
-  padding: var(--spacing-lg);
+  padding: var(--details-card-padding);
   border: 1px solid rgba(15, 118, 110, 0.08);
   box-shadow: var(--shadow-sm);
 }
@@ -462,8 +464,8 @@
 
 /* Pickup Ready Note */
 .pickup-ready-note {
-  margin: 0 var(--page-padding-x) var(--spacing-2xl);
-  padding: var(--spacing-lg);
+  margin: 0 var(--page-padding-x) var(--details-section-gap);
+  padding: var(--details-card-padding);
   border-radius: var(--radius-2xl);
   background: linear-gradient(135deg, #E0F2FE 0%, #ECFEFF 100%);
   border: 1px solid rgba(14, 165, 233, 0.2);
@@ -511,7 +513,7 @@
 .item-card {
   background: var(--color-bg-primary);
   border-radius: 20px;
-  padding: var(--spacing-lg);
+  padding: var(--details-card-padding);
   display: flex;
   gap: var(--spacing-md);
   box-shadow: var(--shadow-sm);
@@ -519,8 +521,8 @@
 }
 
 .item-thumb {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: 16px;
   background: var(--color-bg-tertiary);
   display: flex;
@@ -592,7 +594,7 @@
 .info-card {
   background: var(--color-bg-primary);
   border-radius: 20px;
-  padding: var(--spacing-lg);
+  padding: var(--details-card-padding);
   box-shadow: var(--shadow-sm);
   border: 1px solid rgba(15, 118, 110, 0.08);
 }
@@ -621,7 +623,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--spacing-md);
-  padding: var(--spacing-md) 0;
+  padding: var(--spacing-sm) 0;
   border-bottom: 1px solid var(--color-border-light);
 }
 
@@ -661,7 +663,7 @@
 }
 
 .total-row {
-  padding-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
   margin-top: var(--spacing-sm);
   border-top: 2px solid var(--color-border);
 }
@@ -680,8 +682,8 @@
 
 /* Support Section */
 .support-section {
-  margin: var(--spacing-2xl) var(--page-padding-x) var(--spacing-3xl);
-  padding: var(--spacing-xl);
+  margin: var(--details-section-gap) var(--page-padding-x) var(--spacing-3xl);
+  padding: var(--details-card-padding);
   background: var(--color-bg-primary);
   border-radius: 20px;
   text-align: center;
