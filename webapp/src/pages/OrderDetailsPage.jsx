@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
@@ -10,7 +10,6 @@ import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams()
-  const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -304,15 +303,9 @@ export default function OrderDetailsPage() {
       <div className="order-details-page">
         <div className="details-header">
           <div className="topbar-card details-header-inner">
-            <button className="details-back" onClick={() => navigate(-1)} aria-label="Ortga">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
             <div className="details-header-main">
-              <span className="details-label">Buyurtma</span>
               <div className="details-title-row">
-                <h1 className="details-title">#{orderId}</h1>
+                <h1 className="details-title">Buyurtma #{orderId}</h1>
               </div>
             </div>
           </div>
@@ -333,6 +326,7 @@ export default function OrderDetailsPage() {
   const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
   const canPayOnline = order.payment_method === 'click'
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
+  const showPaymentChip = paymentStatusLabel && paymentStatusLabel !== "To'lov talab qilinmaydi"
 
   const rawTotalValue = order?.total_price
   const rawTotal = rawTotalValue == null ? null : Number(rawTotalValue || 0)
@@ -431,15 +425,9 @@ export default function OrderDetailsPage() {
     <div className="order-details-page">
       <div className="details-header">
         <div className="topbar-card details-header-inner">
-          <button className="details-back" onClick={() => navigate(-1)} aria-label="Ortga">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
           <div className="details-header-main">
-            <span className="details-label">Buyurtma</span>
             <div className="details-title-row">
-              <h1 className="details-title">#{orderId}</h1>
+              <h1 className="details-title">Buyurtma #{orderId}</h1>
               {isSyncing && (
                 <span className="details-sync">
                   <span className="details-sync-dot"></span>
@@ -531,7 +519,7 @@ export default function OrderDetailsPage() {
             <span className="hero-value">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
           </div>
         </div>
-        {paymentStatusLabel && (
+        {showPaymentChip && (
           <div className="hero-chip">{paymentStatusLabel}</div>
         )}
       </div>

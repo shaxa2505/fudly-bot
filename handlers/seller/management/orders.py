@@ -18,6 +18,7 @@ from app.services.unified_order_service import (
     get_unified_order_service,
     init_unified_order_service,
 )
+from handlers.common.utils import html_escape
 from localization import get_text
 from logging_config import logger
 
@@ -47,39 +48,41 @@ def _is_paid_click_order(order: Any) -> bool:
     return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
-def _format_order_line(item: Any, is_booking: bool, lang: str, idx: int) -> str:
-    """Format single order/booking as one line for list."""
-    if is_booking:
-        booking_id = _get_field(item, "booking_id") or (
-            item[0] if isinstance(item, (list, tuple)) else 0
-        )
-        status = _get_field(item, "status") or (
-            item[3] if isinstance(item, (list, tuple)) and len(item) > 3 else "pending"
-        )
-        title = _get_field(item, "title") or "Товар"
-        quantity = _get_field(item, "quantity") or 1
+def _shorten(text: Any, limit: int = 28) -> str:
+    value = str(text) if text is not None else ""
+    if len(value) <= limit:
+        return value
+    return value[: max(0, limit - 1)] + "…"
 
-        pickup_label = "Самовывоз" if lang == "ru" else "Olib ketish"
-        label = status_label(status, lang, "pickup")
-        return f"{idx}. {pickup_label} #{booking_id} • {title[:20]} ×{quantity} • {label}"
-    else:
-        order_id = _get_field(item, "order_id") or (
-            item[0] if isinstance(item, (list, tuple)) else 0
-        )
-        status = _get_field(item, "order_status") or (
-            item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else "pending"
-        )
-        title = (
-            _get_field(item, "item_title")
-            or _get_field(item, "offer_title")
-            or _get_field(item, "title")
-            or "Товар"
-        )
-        quantity = _get_field(item, "quantity") or 1
 
-        delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
-        label = status_label(status, lang, "delivery")
-        return f"{idx}. {delivery_label} #{order_id} • {title[:20]} ×{quantity} • {label}"
+def _format_order_card(item: Any, lang: str, idx: int, order_type: str) -> list[str]:
+    """Format single order as a compact 2-line card."""
+    order_id = _get_field(item, "order_id") or (
+        item[0] if isinstance(item, (list, tuple)) else 0
+    )
+    status = _get_field(item, "order_status") or (
+        item[10] if isinstance(item, (list, tuple)) and len(item) > 10 else "pending"
+    )
+    title = (
+        _get_field(item, "item_title")
+        or _get_field(item, "offer_title")
+        or _get_field(item, "title")
+        or "Товар"
+    )
+    quantity = _get_field(item, "quantity") or 1
+
+    is_pickup = order_type == "pickup"
+    type_label = "Самовывоз" if lang == "ru" else "Olib ketish"
+    delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
+    label = status_label(status, lang, "pickup" if is_pickup else "delivery")
+    type_text = type_label if is_pickup else delivery_label
+    type_emoji = "🏪" if is_pickup else "🚚"
+
+    title_safe = html_escape(_shorten(title))
+    return [
+        f"<b>{idx}) {type_emoji} {type_text} #{order_id}</b>",
+        f"{title_safe} ×{quantity} • {label}",
+    ]
 
 
 def _build_list_text(
@@ -89,39 +92,43 @@ def _build_list_text(
     lines = []
 
     if filter_type == "pending":
-        header = "YANGI BUYURTMALAR" if lang == "uz" else "НОВЫЕ ЗАКАЗЫ"
+        header = "🆕 Yangi buyurtmalar" if lang == "uz" else "🆕 Новые заказы"
     elif filter_type == "active":
-        header = "FAOL BUYURTMALAR" if lang == "uz" else "АКТИВНЫЕ ЗАКАЗЫ"
+        header = "⚡ Faol buyurtmalar" if lang == "uz" else "⚡ Активные заказы"
     elif filter_type == "completed":
-        header = "BAJARILGAN" if lang == "uz" else "ВЫПОЛНЕННЫЕ"
+        header = "✅ Bajarilgan" if lang == "uz" else "✅ Выполненные"
     else:
-        header = "BUYURTMALAR" if lang == "uz" else "ЗАКАЗЫ"
+        header = "📦 Buyurtmalar" if lang == "uz" else "📦 Заказы"
 
     lines.append(f"<b>{header}</b>")
     lines.append("")
 
     pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
     delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-    lines.append(f"{pickup_label}: <b>{len(pickup_orders)}</b>")
-    lines.append(f"{delivery_label}: <b>{len(delivery_orders)}</b>")
-    lines.append("─" * 25)
+    lines.append(f"🏪 {pickup_label}: <b>{len(pickup_orders)}</b>    🚚 {delivery_label}: <b>{len(delivery_orders)}</b>")
+    lines.append("")
 
     idx = 1
     for order in pickup_orders[:5]:
-        lines.append(_format_order_line(order, False, lang, idx))
+        lines.extend(_format_order_card(order, lang, idx, "pickup"))
+        lines.append("")
         idx += 1
 
     for order in delivery_orders[:5]:
-        lines.append(_format_order_line(order, False, lang, idx))
+        lines.extend(_format_order_card(order, lang, idx, "delivery"))
+        lines.append("")
         idx += 1
 
     if not pickup_orders and not delivery_orders:
         empty = "Buyurtmalar yo'q" if lang == "uz" else "Заказов нет"
         lines.append(f"\n<i>{empty}</i>")
     else:
-        hint = "Tanlang:" if lang == "uz" else "Выберите:"
-        lines.append(f"\n<i>{hint}</i>")
+        hint = "Tanlang:" if lang == "uz" else "Выберите заказ ниже:"
+        lines.append(f"<i>{hint}</i>")
 
+    # Remove trailing empty line
+    while lines and not lines[-1].strip():
+        lines.pop()
     return "\n".join(lines)
 
 
@@ -136,19 +143,15 @@ def _build_keyboard(
         order_id = _get_field(order, "order_id") or (
             order[0] if isinstance(order, (list, tuple)) else 0
         )
-        status = _get_field(order, "order_status") or "pending"
         # Use "o_" prefix for all orders (unified table)
-        pickup_label = "Самовывоз" if lang == "ru" else "Olib ketish"
-        kb.button(text=f"{pickup_label} #{order_id}", callback_data=f"seller_view_o_{order_id}")
+        kb.button(text=f"🏪 #{order_id}", callback_data=f"seller_view_o_{order_id}")
 
     # Delivery orders buttons
     for order in delivery_orders[:5]:
         order_id = _get_field(order, "order_id") or (
             order[0] if isinstance(order, (list, tuple)) else 0
         )
-        status = _get_field(order, "order_status") or "pending"
-        delivery_label = "Доставка" if lang == "ru" else "Yetkazish"
-        kb.button(text=f"{delivery_label} #{order_id}", callback_data=f"seller_view_o_{order_id}")
+        kb.button(text=f"🚚 #{order_id}", callback_data=f"seller_view_o_{order_id}")
 
     kb.adjust(2)
 
@@ -411,14 +414,12 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     try:
         order_id = int(callback.data.split("_")[-1])
     except ValueError:
-        await callback.answer("Ошибка", show_alert=True)
+        await callback.answer("??????", show_alert=True)
         return
 
     order = db.get_order(order_id)
     if not order:
-        await callback.answer(
-            "Topilmadi" if lang == "uz" else "Не найдено", show_alert=True
-        )
+        await callback.answer("Topilmadi" if lang == "uz" else "?? ???????", show_alert=True)
         return
 
     status_raw = (
@@ -428,6 +429,10 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     quantity = _get_field(order, "quantity") or 1
     delivery_address = _get_field(order, "delivery_address") or ""
     pickup_code = _get_field(order, "pickup_code") or ""
+    payment_method = _get_field(order, "payment_method")
+    payment_status = _get_field(order, "payment_status")
+    payment_proof_photo_id = _get_field(order, "payment_proof_photo_id")
+
     order_type = _get_field(order, "order_type")
     if not order_type:
         order_type = "delivery" if delivery_address else "pickup"
@@ -441,56 +446,83 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     title = item_title
     if not title:
         offer = db.get_offer(offer_id) if offer_id else None
-        title = _get_field(offer, "title") or "Товар"
+        title = _get_field(offer, "title") or "?????"
 
     customer = db.get_user_model(user_id) if user_id else None
-    customer_name = customer.first_name if customer and customer.first_name else "Клиент"
-    customer_phone = customer.phone if customer and customer.phone else "—"
+    customer_name = customer.first_name if customer and customer.first_name else "??????"
+    customer_phone = customer.phone if customer and customer.phone else "?"
 
-    currency = "so'm" if lang == "uz" else "сум"
+    currency = "so'm" if lang == "uz" else "???"
 
-    status_text = {
-        OrderStatus.PENDING: "Kutilmoqda" if lang == "uz" else "Ожидает",
-        OrderStatus.PREPARING: "Tayyorlanmoqda" if lang == "uz" else "Готовится",
-        OrderStatus.READY: "Tayyor" if lang == "uz" else "Готов",
-        OrderStatus.DELIVERING: "Yo'lda" if lang == "uz" else "В пути",
-        OrderStatus.COMPLETED: (
-            "Yetkazildi" if lang == "uz" else "Доставлено"
-        )
-        if is_delivery
-        else ("Berildi" if lang == "uz" else "Выдано"),
-        OrderStatus.REJECTED: "Rad etildi" if lang == "uz" else "Отклонён",
-        OrderStatus.CANCELLED: "Bekor qilindi" if lang == "uz" else "Отменён",
-    }.get(status, status)
+    status_text = status_label(status, lang, "delivery" if is_delivery else "pickup")
+
+    payment_method_norm = PaymentStatus.normalize_method(payment_method)
+    payment_status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+
+    method_label_map = {
+        "cash": "????????" if lang == "ru" else "Naqd",
+        "click": "Click",
+        "payme": "Payme",
+        "card": "?????" if lang == "ru" else "Karta",
+    }
+    method_label = method_label_map.get(payment_method_norm, str(payment_method_norm or ""))
+
+    def _with_method(base: str) -> str:
+        return f"{base} ({method_label})" if method_label else base
+
+    if payment_status_norm == PaymentStatus.NOT_REQUIRED:
+        payment_text = _with_method("?????? ??? ?????????" if lang == "ru" else "Olishda to'lov")
+    elif payment_status_norm == PaymentStatus.CONFIRMED:
+        payment_text = _with_method("????????" if lang == "ru" else "To'langan")
+    elif payment_status_norm == PaymentStatus.AWAITING_PAYMENT:
+        payment_text = _with_method("??????? ??????" if lang == "ru" else "To'lov kutilmoqda")
+    elif payment_status_norm == PaymentStatus.PROOF_SUBMITTED:
+        payment_text = _with_method("??? ?????????" if lang == "ru" else "Chek yuborildi")
+    elif payment_status_norm == PaymentStatus.AWAITING_PROOF:
+        payment_text = _with_method("??????? ???" if lang == "ru" else "Chek kutilmoqda")
+    elif payment_status_norm == PaymentStatus.REJECTED:
+        payment_text = _with_method("?????? ?????????" if lang == "ru" else "To'lov rad etildi")
+    else:
+        payment_text = method_label or ("?" if lang == "ru" else "?")
 
     type_label = "YETKAZISH" if is_delivery else "OLIB KETISH"
-    type_label_ru = "ДОСТАВКА" if is_delivery else "САМОВЫВОЗ"
+    type_label_ru = "????????" if is_delivery else "?????????"
+
+    title_safe = html_escape(title)
+    customer_name_safe = html_escape(customer_name)
+    address_safe = html_escape(delivery_address or "?")
+    payment_label = "??????" if lang == "ru" else "To'lov"
 
     lines = [
         f"<b>{type_label if lang == 'uz' else type_label_ru} #{order_id}</b>",
-        f"{'Holat' if lang == 'uz' else 'Статус'}: <b>{status_text}</b>",
+        f"{'?????? ??????' if lang == 'ru' else 'Buyurtma holati'}: <b>{status_text}</b>",
+        f"{payment_label}: <b>{payment_text}</b>",
         "",
-        f"{title} x {quantity}",
-        f"{'Jami' if lang == 'uz' else 'Итого'}: <b>{total_price:,} {currency}</b>",
+        f"?? {'?????' if lang == 'ru' else 'Mahsulot'}: {title_safe} ?{quantity}",
+        f"?? {'?????' if lang == 'ru' else 'Jami'}: <b>{total_price:,} {currency}</b>",
     ]
 
     if is_delivery and delivery_price:
         lines.append(
-            f"{'Yetkazish' if lang == 'uz' else 'Доставка'}: {delivery_price:,} {currency}"
+            f"?? {'????????' if lang == 'ru' else 'Yetkazish'}: {delivery_price:,} {currency}"
         )
 
     lines.extend(
         [
             "",
-            f"{'Mijoz' if lang == 'uz' else 'Клиент'}: {customer_name}",
-            f"{'Telefon' if lang == 'uz' else 'Телефон'}: <code>{customer_phone}</code>",
+            f"?? {'Mijoz' if lang == 'uz' else '??????'}: {customer_name_safe}",
+            f"?? {'Telefon' if lang == 'uz' else '???????'}: <code>{customer_phone}</code>",
         ]
     )
     if is_delivery:
-        lines.append(f"{'Manzil' if lang == 'uz' else 'Адрес'}: {delivery_address or '—'}")
+        lines.append(f"?? {'Manzil' if lang == 'uz' else '?????'}: {address_safe}")
     elif pickup_code:
-        code_label = "Kod" if lang == "uz" else "Код"
-        lines.append(f"{code_label}: <b>{pickup_code}</b>")
+        code_label = "Kod" if lang == "uz" else "???"
+        lines.append(f"?? {code_label}: <b>{pickup_code}</b>")
 
     text = "\n".join(lines)
 
@@ -498,57 +530,56 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
 
     if status == OrderStatus.PENDING:
         kb.button(
-            text="✅ Qabul qilish" if lang == "uz" else "✅ Принять",
+            text="? Qabul qilish" if lang == "uz" else "? ???????",
             callback_data=f"order_confirm_{order_id}",
         )
         kb.button(
-            text="❌ Rad etish" if lang == "uz" else "❌ Отклонить",
+            text="? Rad etish" if lang == "uz" else "? ?????????",
             callback_data=f"order_reject_{order_id}",
         )
     elif status == OrderStatus.PREPARING:
         if is_delivery:
             kb.button(
-                text="📦 Topshirishga tayyor" if lang == "uz" else "📦 Готов к передаче",
+                text="?? Topshirishga tayyor" if lang == "uz" else "?? ????? ? ????????",
                 callback_data=f"order_ready_{order_id}",
             )
         else:
             kb.button(
-                text="✅ Berildi" if lang == "uz" else "✅ Выдано",
+                text="? Berildi" if lang == "uz" else "? ??????",
                 callback_data=f"order_complete_{order_id}",
             )
         kb.button(
-            text="❌ Bekor" if lang == "uz" else "❌ Отменить",
+            text="? Bekor" if lang == "uz" else "? ????????",
             callback_data=f"order_cancel_seller_{order_id}",
         )
     elif status == OrderStatus.READY:
         if is_delivery:
             kb.button(
-                text="🚚 Kuryerga topshirdim" if lang == "uz" else "🚚 Передал курьеру",
+                text="?? Kuryerga topshirdim" if lang == "uz" else "?? ??????? ???????",
                 callback_data=f"order_delivering_{order_id}",
             )
         else:
             kb.button(
-                text="✅ Berildi" if lang == "uz" else "✅ Выдано",
+                text="? Berildi" if lang == "uz" else "? ??????",
                 callback_data=f"order_complete_{order_id}",
             )
     elif status == OrderStatus.DELIVERING:
         if is_delivery:
             kb.button(
-                text="✅ Topshirildi" if lang == "uz" else "✅ Доставлено",
+                text="? Topshirildi" if lang == "uz" else "? ??????????",
                 callback_data=f"order_complete_{order_id}",
             )
         else:
             kb.button(
-                text="✅ Berildi" if lang == "uz" else "✅ Выдано",
+                text="? Berildi" if lang == "uz" else "? ??????",
                 callback_data=f"order_complete_{order_id}",
             )
 
-
     kb.button(
-        text="Aloqa" if lang == "uz" else "Связаться",
+        text="Aloqa" if lang == "uz" else "?????????",
         callback_data=f"contact_customer_o_{order_id}",
     )
-    kb.button(text="Orqaga" if lang == "uz" else "Назад", callback_data="seller_orders_refresh")
+    kb.button(text="Orqaga" if lang == "uz" else "?????", callback_data="seller_orders_refresh")
     kb.adjust(2, 1, 1)
 
     try:

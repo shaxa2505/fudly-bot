@@ -1703,18 +1703,16 @@
 }
 
 .cart-header-inner {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
   gap: 10px;
   height: var(--cart-topbar-height);
 }
 
-.cart-header-center {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transform: translate(6px, 3px);
+.cart-header-spacer {
+  width: 28px;
+  height: 28px;
 }
 
 .cart-header-title {
@@ -1723,6 +1721,7 @@
   font-weight: 700;
   text-align: center;
   line-height: 1;
+  justify-self: center;
 }
 
 .cart-header-clear {
@@ -1737,6 +1736,7 @@
   justify-content: center;
   cursor: pointer;
   transition: transform var(--transition-fast), background var(--transition-fast);
+  justify-self: end;
 }
 
 .cart-header-clear:active {

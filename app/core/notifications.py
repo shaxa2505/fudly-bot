@@ -174,8 +174,6 @@ class RedisPubSub(PubSubBackend):
 
                 self._redis = await aioredis.from_url(self._redis_url)
                 self._pubsub = self._redis.pubsub()
-                self._running = True
-                self._listener_task = asyncio.create_task(self._listen())
             except ImportError:
                 logger.warning("redis package not installed, falling back to in-memory")
                 raise
@@ -184,6 +182,9 @@ class RedisPubSub(PubSubBackend):
         """Listen for Redis pub/sub messages."""
         while self._running and self._pubsub:
             try:
+                if not self._subscribers:
+                    await asyncio.sleep(0.5)
+                    continue
                 message = await self._pubsub.get_message(
                     ignore_subscribe_messages=True, timeout=1.0
                 )
@@ -222,6 +223,9 @@ class RedisPubSub(PubSubBackend):
             await self._pubsub.subscribe(channel)
 
         self._subscribers[channel].add(handler)
+        if not self._listener_task or self._listener_task.done():
+            self._running = True
+            self._listener_task = asyncio.create_task(self._listen())
 
     async def unsubscribe(self, channel: str, handler: NotificationHandler) -> None:
         """Unsubscribe from Redis channel."""

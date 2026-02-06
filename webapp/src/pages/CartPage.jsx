@@ -1845,18 +1845,17 @@ function CartPage({ user }) {
       <div className="cart-page cart-page--empty">
         <header className="cart-header">
           <div className="cart-header-inner">
-            <div className="cart-header-center">
-              <h1 className="cart-header-title">Savat</h1>
-              <button
-                className="cart-header-clear"
-                type="button"
-                onClick={handleClearCart}
-                aria-label="Savatni tozalash"
-                disabled
-              >
-                <Trash2 size={18} strokeWidth={1.8} />
-              </button>
-            </div>
+            <div className="cart-header-spacer" aria-hidden="true" />
+            <h1 className="cart-header-title">Savat</h1>
+            <button
+              className="cart-header-clear"
+              type="button"
+              onClick={handleClearCart}
+              aria-label="Savatni tozalash"
+              disabled
+            >
+              <Trash2 size={18} strokeWidth={1.8} />
+            </button>
           </div>
         </header>
 
@@ -1894,17 +1893,16 @@ function CartPage({ user }) {
     <div className="cart-page">
       <header className="cart-header">
         <div className="cart-header-inner">
-          <div className="cart-header-center">
-            <h1 className="cart-header-title">Savat</h1>
-            <button
-              className="cart-header-clear"
-              type="button"
-              onClick={handleClearCart}
-              aria-label="Savatni tozalash"
-            >
-              <Trash2 size={18} strokeWidth={1.8} />
-            </button>
-          </div>
+          <div className="cart-header-spacer" aria-hidden="true" />
+          <h1 className="cart-header-title">Savat</h1>
+          <button
+            className="cart-header-clear"
+            type="button"
+            onClick={handleClearCart}
+            aria-label="Savatni tozalash"
+          >
+            <Trash2 size={18} strokeWidth={1.8} />
+          </button>
         </div>
       </header>
 

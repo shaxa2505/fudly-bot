@@ -68,8 +68,7 @@ describe('OrderDetailsPage', () => {
       { initialEntries: ['/order/123/details'] }
     )
 
-    expect(await screen.findByText('#123')).toBeInTheDocument()
-    expect(screen.getByText('Buyurtma')).toBeInTheDocument()
+    expect(await screen.findByText('Buyurtma #123')).toBeInTheDocument()
     expect(screen.getByText('Milk')).toBeInTheDocument()
 
     await waitFor(() => {
