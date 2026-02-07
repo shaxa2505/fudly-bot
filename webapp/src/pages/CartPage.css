@@ -13,6 +13,7 @@
   justify-content: center;
   z-index: var(--z-modal);
   padding: var(--spacing-xl);
+  animation: fadeIn 0.2s ease;
 }
 
 .cart-modal-overlay.checkout-overlay {
@@ -31,6 +32,8 @@
   overflow-y: auto;
   border: 1px solid rgba(15, 118, 110, 0.1);
   box-shadow: 0 -20px 48px rgba(16, 24, 40, 0.2);
+  animation: slideUpSmall 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
 .checkout-modal {
@@ -1801,6 +1804,10 @@
   gap: 12px;
 }
 
+.pending-payment-card.animate-in {
+  animation: slideUpSmall 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .pending-payment-header {
   display: flex;
   align-items: center;
@@ -1829,6 +1836,10 @@
   padding: 6px 10px;
   border-radius: 999px;
   white-space: nowrap;
+}
+
+.pending-payment-badge.pulse {
+  animation: badgePulse 0.4s ease;
 }
 
 .pending-payment-actions {

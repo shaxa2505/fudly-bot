@@ -16,6 +16,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.offer-card.just-added {
+  animation: cardPop 0.35s ease;
+}
+
 .offer-card:focus-visible {
   outline: 3px solid rgba(6, 95, 70, 0.25);
   outline-offset: 2px;

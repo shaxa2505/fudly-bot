@@ -95,6 +95,7 @@ function HomePage() {
   const [locationError, setLocationError] = useState('')
   const [showAddressModal, setShowAddressModal] = useState(false)
   const [geoStatusLabel, setGeoStatusLabel] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
+  const [locationPulse, setLocationPulse] = useState(false)
 
   // Quick filters state
   const [minDiscount, setMinDiscount] = useState(null) // null, 20, 30, 50
@@ -214,6 +215,18 @@ function HomePage() {
   )
   const showResultsEmpty = showLiveDropdown && !searchResultsLoading && !hasOfferResults && !hasStoreResults
   const locationCacheKey = buildLocationCacheKey(location)
+  const prevLocationKeyRef = useRef(null)
+
+  useEffect(() => {
+    if (prevLocationKeyRef.current && prevLocationKeyRef.current !== locationCacheKey) {
+      setLocationPulse(true)
+      const timer = setTimeout(() => setLocationPulse(false), 360)
+      prevLocationKeyRef.current = locationCacheKey
+      return () => clearTimeout(timer)
+    }
+    prevLocationKeyRef.current = locationCacheKey
+    return undefined
+  }, [locationCacheKey])
 
   useEffect(() => {
     if (restoreHandledRef.current) return
@@ -1048,7 +1061,7 @@ function HomePage() {
         <div className="header-top">
           <div className="header-title">
             <span className="header-location-label">Manzil</span>
-            <button className="header-location" onClick={openAddressModal}>
+            <button className={`header-location ${locationPulse ? 'location-pulse' : ''}`} onClick={openAddressModal}>
               <span className="header-location-city-name">{cityLabel}</span>
               <svg className="header-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />

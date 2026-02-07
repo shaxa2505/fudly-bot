@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from '../api/client';
 import { useCart } from '../context/CartContext';
@@ -34,6 +34,8 @@ function OrderTrackingPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showQR, setShowQR] = useState(false);
+  const [statusPulse, setStatusPulse] = useState(false);
+  const prevStatusRef = useRef(null);
 
   const lang = user?.language || 'ru';
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
@@ -44,6 +46,18 @@ function OrderTrackingPage({ user }) {
     const interval = setInterval(() => loadOrderData(false), 30000);
     return () => clearInterval(interval);
   }, [bookingId]);
+
+  useEffect(() => {
+    if (!order?.status) return;
+    if (prevStatusRef.current && prevStatusRef.current !== order.status) {
+      setStatusPulse(true);
+      const timer = setTimeout(() => setStatusPulse(false), 420);
+      prevStatusRef.current = order.status;
+      return () => clearTimeout(timer);
+    }
+    prevStatusRef.current = order.status;
+    return undefined;
+  }, [order?.status]);
 
   const loadOrderData = async (withSpinner = false) => {
     if (!bookingId) {
@@ -187,7 +201,7 @@ function OrderTrackingPage({ user }) {
 
       {/* Order Status Card */}
       <div className="order-status-card">
-        <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
+        <div className={`status-badge ${statusPulse ? 'pulse' : ''}`} style={{ backgroundColor: getStatusColor(order.status) }}>
           {getStatusIcon(normalizedStatus)} {statusText(normalizedStatus, lang, orderType)}
         </div>
         {paymentStatusLabel() && (

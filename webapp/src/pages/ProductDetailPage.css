@@ -697,6 +697,7 @@
 
 .pdp-add-btn.success {
   background: var(--color-primary-dark);
+  animation: pop 0.35s ease;
 }
 
 .pdp-add-btn:disabled {

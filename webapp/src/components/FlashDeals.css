@@ -92,6 +92,10 @@
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+.flash-card.just-added {
+  animation: cardPop 0.35s ease;
+}
+
 .flash-card:active {
   transform: scale(0.97);
 }
@@ -189,6 +193,10 @@
   font-weight: var(--font-semibold);
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+
+.flash-add-btn.pulse {
+  animation: pop 0.3s ease;
 }
 
 .flash-add-btn:active {

@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useEffect } from 'react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { useFavorites } from '../context/FavoritesContext'
@@ -18,6 +18,8 @@ const OfferCard = memo(function OfferCard({
   const { toast } = useToast()
   const { isFavorite, toggleFavorite } = useFavorites()
   const [isAdding, setIsAdding] = useState(false)
+  const [justAdded, setJustAdded] = useState(false)
+  const prevQtyRef = useRef(cartQuantity)
 
   // Get photo URL (handles Telegram file_id conversion)
   const photoUrl = resolveOfferImageUrl(offer)
@@ -30,6 +32,17 @@ const OfferCard = memo(function OfferCard({
     setImageError(false)
     setImageLoaded(LOADED_IMAGE_CACHE.has(resolvedUrl))
   }, [resolvedUrl])
+
+  useEffect(() => {
+    if (prevQtyRef.current === 0 && cartQuantity > 0) {
+      setJustAdded(true)
+      const timer = setTimeout(() => setJustAdded(false), 360)
+      prevQtyRef.current = cartQuantity
+      return () => clearTimeout(timer)
+    }
+    prevQtyRef.current = cartQuantity
+    return undefined
+  }, [cartQuantity])
 
   const handleCardClick = () => {
     navigate('/product', { state: { offer } })
@@ -128,7 +141,7 @@ const OfferCard = memo(function OfferCard({
 
   return (
     <div
-      className={`offer-card ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''} ${isUnavailableNow ? 'is-unavailable' : ''}`}
+      className={`offer-card ${justAdded ? 'just-added' : ''} ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''} ${isUnavailableNow ? 'is-unavailable' : ''}`}
       onClick={handleCardClick}
     >
       <div className="offer-image-wrap">

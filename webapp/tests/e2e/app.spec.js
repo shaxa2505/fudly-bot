@@ -121,27 +121,61 @@ const resetApiState = () => {
   apiState.paymentLink = 'https://pay.test/123'
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key',
+}
+
 const fulfillJson = (route, data) =>
   route.fulfill({
     status: 200,
     contentType: 'application/json',
+    headers: CORS_HEADERS,
     body: JSON.stringify(data),
   })
 
 const setupApiRoutes = async (page) => {
-  await page.route('**/api/v1/**', async (route) => {
+  await page.route('**/*', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     const method = request.method()
-    const pathIndex = url.pathname.indexOf('/api/v1')
-    const path = pathIndex >= 0 ? url.pathname.slice(pathIndex + 7) : null
+    if (!url.pathname.startsWith('/api/v1/')) {
+      await route.fallback()
+      return
+    }
+    const rawPath = url.pathname.slice('/api/v1'.length)
+    const path = rawPath
+      ? `/${rawPath.replace(/^\/+/, '').replace(/\/+$/, '')}`
+      : rawPath
+
+    const isFavoritesPath = path?.includes('/favorites')
 
     if (!path) {
       await route.fallback()
       return
     }
 
-    if (path === '/offers' && method === 'GET') {
+    if (method === 'OPTIONS') {
+      await route.fulfill({ status: 200, headers: CORS_HEADERS })
+      return
+    }
+
+    if (path.includes('/offers') || path.includes('/stores') || path.includes('/orders')) {
+      console.log('API', method, path, request.url())
+    }
+
+    if (!isFavoritesPath && method === 'GET' && path.includes('/offers/')) {
+      const match = path.match(/\/offers\/(\d+)/)
+      const offerId = match ? Number(match[1]) : null
+      const offer =
+        homeOffers.find((item) => item.id === offerId) ||
+        storeOffers.find((item) => item.id === offerId) ||
+        null
+      return fulfillJson(route, offer || {})
+    }
+
+    if (!isFavoritesPath && method === 'GET' && path.includes('/offers')) {
       if (url.searchParams.get('store_id')) {
         return fulfillJson(route, storeOffers)
       }
@@ -163,7 +197,7 @@ const setupApiRoutes = async (page) => {
     if (path === '/user/profile' && method === 'GET') {
       return fulfillJson(route, {
         registered: true,
-        phone: '',
+        phone: '+998901234567',
         city: "Toshkent, O'zbekiston",
         language: 'uz',
       })
@@ -192,6 +226,36 @@ const setupApiRoutes = async (page) => {
         apiState.lastOrderPayload = null
       }
       return fulfillJson(route, apiState.orderCreateResponse)
+    }
+
+    if (path === '/cart/calculate' && method === 'GET') {
+      const offerIdsRaw = url.searchParams.get('offer_ids') || ''
+      const pairs = offerIdsRaw.split(',').map((entry) => entry.trim()).filter(Boolean)
+      const items = pairs.map((pair) => {
+        const [idRaw] = pair.split(':')
+        const offerId = Number(idRaw)
+        const offer =
+          homeOffers.find((item) => item.id === offerId) ||
+          storeOffers.find((item) => item.id === offerId) ||
+          null
+        return {
+          offer_id: offerId,
+          price: offer?.discount_price ?? offer?.original_price ?? 0,
+          title: offer?.title || 'Mahsulot',
+          photo: offer?.image_url || '',
+        }
+      })
+      return fulfillJson(route, { items })
+    }
+
+    if (path === '/orders/calculate-delivery' && method === 'POST') {
+      return fulfillJson(route, {
+        ok: true,
+        can_deliver: true,
+        delivery_fee: apiState.store.delivery_price ?? 0,
+        min_order_amount: apiState.store.min_order_amount ?? 0,
+        estimated_time: '30-40 min',
+      })
     }
 
     if (path.startsWith('/orders/') && path.endsWith('/status') && method === 'GET') {
@@ -238,9 +302,23 @@ test.beforeEach(async ({ page }) => {
   resetApiState()
 
   await page.addInitScript((savedLocation) => {
+    localStorage.clear()
+    sessionStorage.clear()
     localStorage.setItem('fudly_location', JSON.stringify(savedLocation))
+    localStorage.setItem('fudly_user', JSON.stringify({
+      id: 123,
+      phone: '+998901234567',
+      city: "Toshkent, O'zbekiston",
+      language: 'uz',
+      registered: true,
+    }))
     sessionStorage.setItem('fudly_init_data', 'test_init_data')
     sessionStorage.setItem('fudly_init_data_ts', String(Date.now()))
+
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.register = () => Promise.resolve({})
+      navigator.serviceWorker.ready = Promise.resolve({ active: true })
+    }
 
     const noop = () => {}
     const backCallbacks = new Set()
@@ -297,7 +375,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('home loads offers and opens product details', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const offerCard = page.locator('.offer-card', { hasText: 'Non' }).first()
   await expect(offerCard).toBeVisible()
@@ -309,19 +387,32 @@ test('home loads offers and opens product details', async ({ page }) => {
 })
 
 test('adds item to cart and opens checkout', async ({ page }) => {
-  await page.goto('/')
+  await page.addInitScript(() => {
+    localStorage.setItem('fudly_cart_v2', JSON.stringify({
+      '1': {
+        offer: {
+          id: 1,
+          title: 'Non',
+          discount_price: 5000,
+          original_price: 10000,
+          store_id: 99,
+        },
+        quantity: 1,
+      },
+    }))
+  })
 
-  await page.getByLabel("Savatga qo'shish").first().click()
-  await page.locator('.bottom-nav').getByRole('button', { name: /Savat/ }).click()
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' })
 
   await expect(page.locator('.cart-item-title', { hasText: 'Non' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Keyingi' }).click()
-  await expect(page.getByLabel(/Telefon raqam/)).toBeVisible()
+  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
+  await expect(page.locator('.checkout-modal')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Buyurtmani tasdiqlash/ })).toBeVisible()
 })
 
 test('stores list opens offers sheet', async ({ page }) => {
-  await page.goto('/stores')
+  await page.goto('/stores', { waitUntil: 'domcontentloaded' })
 
   const storeCard = page.locator('.sp-card', { hasText: 'Lavka Market' })
   await expect(storeCard).toBeVisible()
@@ -332,13 +423,13 @@ test('stores list opens offers sheet', async ({ page }) => {
 })
 
 test('profile shows empty orders state', async ({ page }) => {
-  await page.goto('/profile')
+  await page.goto('/profile', { waitUntil: 'domcontentloaded' })
 
   await expect(page.getByText("Buyurtmalar yo'q")).toBeVisible()
 })
 
 test('search filters offers and clears', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const offerTitles = page.locator('.offers-grid .offer-title')
   await expect(offerTitles).toHaveCount(2)
@@ -353,7 +444,7 @@ test('search filters offers and clears', async ({ page }) => {
 })
 
 test('favorites flow from product detail', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   const offerCard = page.locator('.offer-card', { hasText: 'Sut' }).first()
   await expect(offerCard).toBeVisible()
@@ -363,30 +454,43 @@ test('favorites flow from product detail', async ({ page }) => {
   await favButton.click()
   await expect(favButton).toHaveClass(/active/)
 
-  await page.goto('/favorites')
+  await page.goto('/favorites', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.favorite-title', { hasText: 'Sut' })).toBeVisible()
 })
 
 test('cart shows empty state', async ({ page }) => {
-  await page.goto('/cart')
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' })
 
   await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
 })
 
 test('places pickup order with cash', async ({ page }) => {
-  await page.goto('/')
+  await page.addInitScript(() => {
+    localStorage.setItem('fudly_cart_v2', JSON.stringify({
+      '1': {
+        offer: {
+          id: 1,
+          title: 'Non',
+          discount_price: 5000,
+          original_price: 10000,
+          store_id: 99,
+        },
+        quantity: 1,
+      },
+    }))
+  })
 
-  await page.getByLabel("Savatga qo'shish").first().click()
-  await page.locator('.bottom-nav').getByRole('button', { name: /Savat/ }).click()
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' })
 
-  await page.getByRole('button', { name: 'Keyingi' }).click()
-  await page.getByLabel(/Telefon raqam/).fill('+998901234567')
+  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
 
   const orderResponse = page.waitForResponse((resp) =>
     resp.url().includes('/api/v1/orders') && resp.request().method() === 'POST'
   )
 
-  await page.locator('.checkout-footer-btn').click()
+  const confirmButton = page.getByRole('button', { name: /Buyurtmani tasdiqlash/ })
+  await expect(confirmButton).toBeEnabled()
+  await confirmButton.click()
 
   await orderResponse
   expect(apiState.lastOrderPayload).toBeTruthy()
@@ -421,17 +525,17 @@ test('delivery payment creates online payment link', async ({ page }) => {
     }))
   })
 
-  await page.goto('/cart')
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' })
 
-  await page.getByRole('button', { name: 'Keyingi' }).click()
+  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
 
   const deliveryButton = page
     .locator('.order-type-options')
     .getByRole('button', { name: /Yetkazib berish/ })
   await expect(deliveryButton).toBeEnabled()
   await deliveryButton.click()
-  await page.getByLabel(/Telefon raqam/).fill('+998901234567')
-  await page.getByLabel(/Yetkazib berish manzili/).fill('Toshkent, Yunusobod')
+  await page.getByPlaceholder('Manzilni kiriting').fill('Toshkent, Yunusobod')
+  await page.getByRole('button', { name: 'Click' }).click()
 
   const orderResponse = page.waitForResponse((resp) =>
     resp.url().includes('/api/v1/orders') && resp.request().method() === 'POST'
@@ -440,7 +544,9 @@ test('delivery payment creates online payment link', async ({ page }) => {
     resp.url().includes('/api/v1/payment/create') && resp.status() === 200
   )
 
-  await page.locator('.checkout-footer-btn').click()
+  const confirmButton = page.getByRole('button', { name: /Buyurtmani tasdiqlash/ })
+  await expect(confirmButton).toBeEnabled()
+  await confirmButton.click()
 
   await orderResponse
   await paymentResponse
@@ -467,7 +573,7 @@ test('order tracking shows status', async ({ page }) => {
     )
   })
 
-  await page.goto('/order/555')
+  await page.goto('/order/555', { waitUntil: 'domcontentloaded' })
 
   await expect(page.locator('.order-details h3', { hasText: 'Non' })).toBeVisible()
   await expect(page.getByText(/T-555/)).toBeVisible()

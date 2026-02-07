@@ -66,6 +66,8 @@ function CartPage({ user }) {
   const [deliveryCheck, setDeliveryCheck] = useState(null)
   const [pendingPayment, setPendingPayment] = useState(() => readPendingPayment())
   const [pendingActionLoading, setPendingActionLoading] = useState(false)
+  const [pendingPulse, setPendingPulse] = useState(false)
+  const pendingPulseRef = useRef(null)
   const addressInputRef = useRef(null)
   const commentInputRef = useRef(null)
   const lastDeliveryCheckRef = useRef({ address: '', storeId: null, city: '' })
@@ -1093,6 +1095,21 @@ function CartPage({ user }) {
   }, [pendingPayment?.orderId, refreshPendingStatus])
 
   useEffect(() => {
+    if (!pendingPayment?.orderId) {
+      pendingPulseRef.current = null
+      setPendingPulse(false)
+      return
+    }
+    if (pendingPulseRef.current !== pendingPayment.orderId) {
+      setPendingPulse(true)
+      const timer = setTimeout(() => setPendingPulse(false), 420)
+      pendingPulseRef.current = pendingPayment.orderId
+      return () => clearTimeout(timer)
+    }
+    return undefined
+  }, [pendingPayment?.orderId])
+
+  useEffect(() => {
     if (!userId || !pendingPayment?.orderId) return
 
     const buildWsUrl = () => {
@@ -1507,7 +1524,7 @@ function CartPage({ user }) {
   ])
 
   const pendingPaymentCard = hasPendingPayment ? (
-    <div className="pending-payment-card">
+    <div className={`pending-payment-card animate-in`}>
       <div className="pending-payment-header">
         <div>
           <p className="pending-payment-title">To'lov kutilmoqda</p>
@@ -1517,7 +1534,7 @@ function CartPage({ user }) {
             {pendingPayment.total ? ` - ${formatSum(pendingPayment.total)} so'm` : ''}
           </p>
         </div>
-        <span className="pending-payment-badge">
+        <span className={`pending-payment-badge ${pendingPulse ? 'pulse' : ''}`}>
           {String(pendingPayment.provider || 'click').toUpperCase()}
         </span>
       </div>

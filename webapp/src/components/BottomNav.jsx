@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import './BottomNav.css'
 
@@ -12,6 +13,9 @@ const PAGE_ROUTES = {
 function BottomNav({ currentPage, cartCount }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [cartPulse, setCartPulse] = useState(false)
+  const [cartIconPulse, setCartIconPulse] = useState(false)
+  const prevCountRef = useRef(cartCount)
 
   // Determine current page from route if not explicitly passed
   const activePage = currentPage || (() => {
@@ -76,24 +80,49 @@ function BottomNav({ currentPage, cartCount }) {
     navigate(route)
   }
 
+  useEffect(() => {
+    const prev = prevCountRef.current
+    if (typeof prev === 'number' && cartCount > prev) {
+      setCartPulse(true)
+      setCartIconPulse(true)
+      const badgeTimer = setTimeout(() => setCartPulse(false), 360)
+      const iconTimer = setTimeout(() => setCartIconPulse(false), 420)
+      prevCountRef.current = cartCount
+      return () => {
+        clearTimeout(badgeTimer)
+        clearTimeout(iconTimer)
+      }
+    }
+    prevCountRef.current = cartCount
+    return undefined
+  }, [cartCount])
+
   return (
     <nav className="bottom-nav">
       <div className="bottom-nav-content">
-        {menuItems.map(item => (
+        {menuItems.map(item => {
+          const isCart = item.id === 'cart'
+          const shouldPulse = isCart && cartPulse
+          const shouldPop = isCart && cartIconPulse
+          return (
           <button
             key={item.id}
             className={`nav-item ${activePage === item.id ? 'active' : ''}`}
             onClick={() => handleNavigate(item.id)}
           >
             <div className="nav-icon-container">
-              <span className="nav-icon">{getIcon(item.id, activePage === item.id)}</span>
+              <span className={`nav-icon ${shouldPop ? 'pop' : ''}`}>
+                {getIcon(item.id, activePage === item.id)}
+              </span>
               {item.badge > 0 && (
-                <span className="nav-badge">{item.badge > 99 ? '99+' : item.badge}</span>
+                <span className={`nav-badge ${shouldPulse ? 'pulse' : ''}`}>
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
               )}
             </div>
             <span className="nav-label">{item.label}</span>
           </button>
-        ))}
+        )})}
       </div>
     </nav>
   )

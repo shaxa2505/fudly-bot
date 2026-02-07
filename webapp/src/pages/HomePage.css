@@ -133,6 +133,14 @@
   transform: translateY(-10px) scale(0.98);
 }
 
+.header-location.location-pulse .header-location-city-name {
+  animation: pulseScale 0.35s ease;
+}
+
+.header-location.location-pulse .header-location-caret {
+  animation: pop 0.35s ease;
+}
+
 .header-location:focus-visible {
   outline: 3px solid rgba(6, 95, 70, 0.25);
   outline-offset: 2px;

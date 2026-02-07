@@ -58,10 +58,12 @@ const OffersSection = ({
         ) : (
           offers.map((offer, index) => {
             const offerKey = offer.id || offer.offer_id || `${offer.store_id || 'store'}-${offer.title || 'offer'}-${index}`
+            const delay = `${Math.min(index, 8) * 40}ms`
             return (
               <div
                 key={offerKey}
-                className="offer-card-wrapper"
+                className="offer-card-wrapper animate-in"
+                style={{ animationDelay: delay }}
               >
                 <OfferCard
                   offer={offer}

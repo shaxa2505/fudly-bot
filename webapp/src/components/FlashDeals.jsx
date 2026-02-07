@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -34,6 +34,8 @@ function FlashDeals({ city = '', region = '', district = '' }) {
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [pulseId, setPulseId] = useState(null)
+  const pulseTimerRef = useRef(null)
 
   const loadDeals = useCallback(async () => {
     try {
@@ -57,7 +59,18 @@ function FlashDeals({ city = '', region = '', district = '' }) {
     e.stopPropagation()
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('medium')
     addToCart(offer)
+    if (pulseTimerRef.current) {
+      clearTimeout(pulseTimerRef.current)
+    }
+    setPulseId(offer?.id || null)
+    pulseTimerRef.current = setTimeout(() => setPulseId(null), 380)
   }
+
+  useEffect(() => () => {
+    if (pulseTimerRef.current) {
+      clearTimeout(pulseTimerRef.current)
+    }
+  }, [])
 
   // Don't render if no deals or error
   if (!loading && (error || deals.length === 0)) {
@@ -93,15 +106,18 @@ function FlashDeals({ city = '', region = '', district = '' }) {
             </div>
           ))
         ) : (
-          deals.map(deal => {
+          deals.map((deal, index) => {
             const timeLeft = getTimeRemaining(deal.expiry_date)
             const inCart = getQuantity(deal.id) > 0
             const photoUrl = resolveOfferImageUrl(deal) || PLACEHOLDER_IMAGE
+            const isPulsing = pulseId === deal.id
+            const delay = `${Math.min(index, 6) * 40}ms`
 
             return (
               <div
                 key={deal.id}
-                className="flash-card"
+                className={`flash-card animate-in ${isPulsing ? 'just-added' : ''}`}
+                style={{ animationDelay: delay }}
                 onClick={() => navigate('/product', { state: { offer: deal } })}
               >
                 <div className="flash-card-image">
@@ -143,7 +159,7 @@ function FlashDeals({ city = '', region = '', district = '' }) {
                   )}
 
                   <button
-                    className={`flash-add-btn ${inCart ? 'in-cart' : ''}`}
+                    className={`flash-add-btn ${inCart ? 'in-cart' : ''} ${isPulsing ? 'pulse' : ''}`}
                     onClick={(e) => handleAddToCart(e, deal)}
                   >
                     {inCart ? '✓ Savatda' : '+ Qo\'shish'}
