@@ -82,5 +82,9 @@ describe('CartPage', () => {
     await waitFor(() => {
       expect(apiMocks.getStore).toHaveBeenCalledWith(5)
     })
+
+    await waitFor(() => {
+      expect(apiMocks.getPaymentProviders).toHaveBeenCalledWith(5)
+    })
   })
 })

@@ -546,19 +546,6 @@ function CartPage({ user }) {
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
 
-  // Load payment providers
-  useEffect(() => {
-    const loadProviders = async () => {
-      try {
-        const providers = await api.getPaymentProviders()
-        setPaymentProviders(providers)
-      } catch (e) {
-        console.warn('Could not load payment providers:', e)
-      }
-    }
-    loadProviders()
-  }, [])
-
   // Keep phone in sync with server profile (bot registration is the single source)
   useEffect(() => {
     if (canonicalPhone && canonicalPhone !== phone) {
@@ -601,6 +588,35 @@ function CartPage({ user }) {
       })
       .slice(0, 3)
   }, [storeOffers, cartItems])
+
+  // Load payment providers for the current store (fallback to platform if needed)
+  useEffect(() => {
+    let isActive = true
+    const loadProviders = async () => {
+      if (!cartStoreId) {
+        if (isActive) {
+          setPaymentProviders([])
+        }
+        return
+      }
+      try {
+        const providers = await api.getPaymentProviders(cartStoreId)
+        if (isActive) {
+          setPaymentProviders(providers)
+        }
+      } catch (e) {
+        console.warn('Could not load payment providers:', e)
+        if (isActive) {
+          setPaymentProviders([])
+        }
+      }
+    }
+    loadProviders()
+    return () => {
+      isActive = false
+    }
+  }, [cartStoreId])
+
   // Check if stores in cart support delivery
   useEffect(() => {
     let isActive = true

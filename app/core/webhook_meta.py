@@ -81,7 +81,10 @@ def build_metrics_prom():
     async def metrics_prom(request: web.Request) -> web.Response:
         """Return Prometheus-style metrics."""
         text = app_metrics.export_prometheus()
-        return web.Response(text=text, content_type="text/plain; version=0.0.4; charset=utf-8")
+        return web.Response(
+            text=text,
+            headers={"Content-Type": "text/plain; version=0.0.4; charset=utf-8"},
+        )
 
     return metrics_prom
 
