@@ -210,6 +210,7 @@ class StatusUpdateContext:
     order_type: str | None
     payment_method: str | None
     payment_status: str | None
+    payment_proof_photo_id: str | None
     delivery_address: str | None
     delivery_price: int
     is_cart: bool
@@ -2127,6 +2128,7 @@ class UnifiedOrderService:
                 store_id = entity.get("store_id")
                 pickup_code = entity.get("booking_code") or entity.get("pickup_code")
                 current_status_raw = entity.get("status") or entity.get("order_status")
+                payment_proof_photo_id = entity.get("payment_proof_photo_id")
                 is_cart = int(entity.get("is_cart_booking") or 0) == 1
                 cart_items_json = entity.get("cart_items")
                 offer_id = entity.get("offer_id")
@@ -2140,6 +2142,7 @@ class UnifiedOrderService:
                 current_status_raw = getattr(entity, "status", None) or getattr(
                     entity, "order_status", None
                 )
+                payment_proof_photo_id = getattr(entity, "payment_proof_photo_id", None)
                 is_cart = int(getattr(entity, "is_cart_booking", 0) or 0) == 1
                 cart_items_json = getattr(entity, "cart_items", None)
                 offer_id = getattr(entity, "offer_id", None)
@@ -2156,6 +2159,7 @@ class UnifiedOrderService:
                 order_type="pickup",
                 payment_method=None,
                 payment_status=None,
+                payment_proof_photo_id=payment_proof_photo_id,
                 delivery_address=None,
                 delivery_price=0,
                 is_cart=is_cart,
@@ -2185,6 +2189,7 @@ class UnifiedOrderService:
             order_type = entity.get("order_type")
             payment_method = entity.get("payment_method")
             payment_status = entity.get("payment_status")
+            payment_proof_photo_id = entity.get("payment_proof_photo_id")
             delivery_address = entity.get("delivery_address")
             delivery_price = int(entity.get("delivery_price") or 0)
             is_cart = int(entity.get("is_cart_order") or 0) == 1
@@ -2214,6 +2219,7 @@ class UnifiedOrderService:
             order_type = getattr(entity, "order_type", None)
             payment_method = getattr(entity, "payment_method", None)
             payment_status = getattr(entity, "payment_status", None)
+            payment_proof_photo_id = getattr(entity, "payment_proof_photo_id", None)
             delivery_address = getattr(entity, "delivery_address", None)
             delivery_price = int(getattr(entity, "delivery_price", 0) or 0)
             is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
@@ -2238,6 +2244,7 @@ class UnifiedOrderService:
             order_type=order_type,
             payment_method=payment_method,
             payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
             delivery_address=delivery_address,
             delivery_price=delivery_price,
             is_cart=is_cart,

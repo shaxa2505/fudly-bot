@@ -135,8 +135,10 @@ async def _after_phone_saved(
 
     if _is_city_selected(user_data):
         await state.clear()
-        await message.answer(get_text(lang, "phone_saved"), reply_markup=ReplyKeyboardRemove())
-        await _send_completion_menu(message, lang)
+        await message.answer(
+            get_text(lang, "phone_saved"),
+            reply_markup=registration_complete_keyboard(lang),
+        )
         return
 
     await state.set_state(Registration.city)

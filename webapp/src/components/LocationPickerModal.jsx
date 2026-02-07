@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import api from '../api/client'
-import { buildLocationFromReverseGeocode, normalizeLocationName } from '../utils/cityUtils'
+import {
+  buildLocationFromReverseGeocode,
+  normalizeLocationName,
+  normalizeCityQuery,
+  buildCitySearchKey,
+} from '../utils/cityUtils'
 import './LocationPickerModal.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
@@ -36,6 +41,56 @@ const getSecondaryLabel = (item) => {
   const display = item.display_name || ''
   const segments = display.split(',').map(part => part.trim()).filter(Boolean)
   return segments.slice(1, 3).join(', ')
+}
+
+const getCityFromItem = (item) => {
+  const address = item?.address || {}
+  return (
+    address.city ||
+    address.town ||
+    address.village ||
+    address.county ||
+    item?.name ||
+    item?.display_name?.split(',')[0] ||
+    ''
+  )
+}
+
+const isCityLikeResult = (item) => {
+  const type = String(item?.type || '').toLowerCase()
+  const cls = String(item?.class || '').toLowerCase()
+  const addrType = String(item?.addresstype || '').toLowerCase()
+  return (
+    ['city', 'town', 'village', 'county', 'state', 'region'].includes(type) ||
+    ['city', 'town', 'village', 'county', 'state', 'region'].includes(addrType) ||
+    (cls === 'boundary' && type === 'administrative')
+  )
+}
+
+const scoreCityMatch = (item, cityKey) => {
+  if (!cityKey) return 0
+  const itemCityKey = buildCitySearchKey(getCityFromItem(item))
+  let score = 0
+  if (itemCityKey && itemCityKey === cityKey) {
+    score += 100
+  }
+  if (isCityLikeResult(item)) {
+    score += 30
+  }
+  const type = String(item?.type || '').toLowerCase()
+  if (type === 'city') score += 20
+  if (type === 'town') score += 10
+  return score
+}
+
+const buildCitySuggestionItem = (cityName) => {
+  if (!cityName) return null
+  return {
+    __kind: 'city',
+    name: cityName,
+    display_name: `${cityName}, O'zbekiston`,
+    address: { city: cityName, country: "O'zbekiston" },
+  }
 }
 
 function LocationPickerModal({
@@ -103,14 +158,42 @@ function LocationPickerModal({
       setSearchLoading(true)
       setSearchError('')
       try {
-        const response = await api.searchLocations(normalized, {
+        const citySuggestion = normalizeCityQuery(normalized)
+        const searchQuery = citySuggestion
+          ? `${citySuggestion}, Uzbekistan`
+          : normalized
+        const response = await api.searchLocations(searchQuery, {
           lat: coords?.lat,
           lon: coords?.lon,
           limit: 8,
         })
-        const items = Array.isArray(response?.items)
+        let items = Array.isArray(response?.items)
           ? response.items
           : (Array.isArray(response) ? response : [])
+        if (citySuggestion) {
+          const cityKey = buildCitySearchKey(citySuggestion)
+          items = items
+            .map((item, index) => ({
+              item,
+              index,
+              score: scoreCityMatch(item, cityKey),
+            }))
+            .sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score
+              return a.index - b.index
+            })
+            .map(({ item }) => item)
+
+          const hasCanonicalLabel = items.some((item) => (
+            normalizeLocationName(getPrimaryLabel(item)) === citySuggestion
+          ))
+          if (!hasCanonicalLabel) {
+            const suggestionItem = buildCitySuggestionItem(citySuggestion)
+            if (suggestionItem) {
+              items = [suggestionItem, ...items]
+            }
+          }
+        }
         if (!activeRef.current) return
         setResults(items)
       } catch (error) {
@@ -129,6 +212,21 @@ function LocationPickerModal({
   }, [query, coords?.lat, coords?.lon, isOpen, mode])
 
   const handleSelectResult = useCallback((item) => {
+    if (item?.__kind === 'city') {
+      const normalized = normalizeLocationName(item?.name || '')
+      const cityValue = normalized.includes("O'zbekiston")
+        ? normalized
+        : `${normalized}, O'zbekiston`
+      onApply?.({
+        city: cityValue,
+        address: '',
+        coordinates: null,
+        region: '',
+        district: '',
+        source: 'manual',
+      })
+      return
+    }
     const lat = Number(item?.lat)
     const lon = Number(item?.lon)
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
@@ -138,7 +236,7 @@ function LocationPickerModal({
   }, [onApply])
 
   const handleUseTyped = useCallback(() => {
-    const normalized = normalizeLocationName(query.trim())
+    const normalized = normalizeCityQuery(query.trim()) || normalizeLocationName(query.trim())
     if (!normalized) {
       setSearchError('Shahar yoki hududni kiriting')
       return

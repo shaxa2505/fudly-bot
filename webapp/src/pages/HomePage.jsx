@@ -368,6 +368,20 @@ function HomePage() {
   const cityForApi = cityRaw ? transliterateCity(cityRaw) : ''
   const cityLabel = cityRaw || 'Shahar tanlang'
   const isLocationUnset = !cityRaw && !location.coordinates
+  const locationMeta = formattedAddress || [location.district, location.region].filter(Boolean).join(', ')
+  const locationStatusText = locationError
+    ? locationError
+    : locationMeta || (isLocationUnset ? 'Manzilni belgilang' : "Shahar bo'yicha")
+  const locationBadgeText = locationError
+    ? 'Xato'
+    : hasPreciseLocation
+      ? 'Aniq'
+      : 'Shahar'
+  const locationBadgeVariant = locationError
+    ? 'error'
+    : hasPreciseLocation
+      ? 'precise'
+      : 'approx'
 
   useEffect(() => {
     saveLocation(location)
@@ -1047,12 +1061,44 @@ function HomePage() {
       <header className="header">
         <div className="header-top">
           <div className="header-title">
-            <span className="header-location-label">Manzil</span>
-            <button className="header-location" onClick={openAddressModal}>
-              <span className="header-location-city-name">{cityLabel}</span>
-              <svg className="header-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+            <button
+              type="button"
+              className={`address-card address-card--${locationBadgeVariant}`}
+              onClick={openAddressModal}
+              aria-label={`Manzil: ${cityLabel}`}
+            >
+              <span className="address-card__icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="12" cy="10" r="2.5" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              </span>
+              <span className="address-card__content">
+                <span className="address-card__label">Manzil</span>
+                <span className="address-card__value">
+                  <span className="address-card__city">{cityLabel}</span>
+                  <svg
+                    className="address-card__caret"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span className="address-card__meta">{locationStatusText}</span>
+              </span>
+              <span className={`address-card__badge address-card__badge--${locationBadgeVariant}`}>
+                {locationBadgeText}
+              </span>
             </button>
           </div>
         </div>

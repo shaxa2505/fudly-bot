@@ -55,6 +55,14 @@ self.addEventListener('fetch', (event) => {
   // Пропускаем chrome-extension и других внешних
   if (!url.protocol.startsWith('http')) return
 
+  // Do not cache authenticated requests (avoid leaking user data)
+  const hasAuthHeaders =
+    request.headers.get('X-Telegram-Init-Data') ||
+    request.headers.get('Authorization') ||
+    request.headers.get('Idempotency-Key') ||
+    request.headers.get('X-Idempotency-Key')
+  if (hasAuthHeaders) return
+
   // Telegram API images - кэшируем агрессивно
   if (CACHE_STRATEGIES.telegram.test(url.href)) {
     event.respondWith(cacheFirst(request, DYNAMIC_CACHE, 86400000)) // 24 hours
@@ -62,10 +70,8 @@ self.addEventListener('fetch', (event) => {
   }
 
   // API запросы: Stale-While-Revalidate (быстро из кэша, обновляем в фоне)
-  if (CACHE_STRATEGIES.api.test(url.pathname)) {
-    event.respondWith(staleWhileRevalidate(request, API_CACHE))
-    return
-  }
+  // API requests: do not cache (may contain user data)
+  if (CACHE_STRATEGIES.api.test(url.pathname)) return
 
   // Навигация (HTML): Network First, чтобы не залипать на старых index.html
   if (request.mode === 'navigate') {

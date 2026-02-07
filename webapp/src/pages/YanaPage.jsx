@@ -17,7 +17,7 @@ import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
-import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
+import { getUserId, getUserLanguage, getCurrentUser, getStoredPhone } from '../utils/auth'
 import { resolveImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import { deriveDisplayStatus as deriveStatus, displayStatusText, normalizeOrderStatus, resolveOrderType } from '../utils/orderStatus'
@@ -53,7 +53,7 @@ function YanaPage({ user }) {
     user?.phone ||
     cachedUser?.phone ||
     telegramUser?.phone_number ||
-    localStorage.getItem('fudly_phone') ||
+    getStoredPhone() ||
     ''
   )
   const resolvedCity = (() => {

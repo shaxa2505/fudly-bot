@@ -984,9 +984,23 @@ async def choose_language(callback: types.CallbackQuery, state: FSMContext, db: 
     await callback.answer()
 
 
-@router.message(
-    F.text.in_([f"❌ {get_text('ru', 'cancel')}", f"❌ {get_text('uz', 'cancel')}"])
-)
+def _is_cancel_message(text: str | None) -> bool:
+    if not text:
+        return False
+    raw = text.strip()
+    cancel_ru = get_text("ru", "cancel")
+    cancel_uz = get_text("uz", "cancel")
+    candidates = {
+        cancel_ru,
+        cancel_uz,
+        f"❌ {cancel_ru}",
+        f"❌ {cancel_uz}",
+        "/cancel",
+    }
+    return raw.casefold() in {c.casefold() for c in candidates}
+
+
+@router.message(F.text.func(_is_cancel_message))
 async def cancel_action(message: types.Message, state: FSMContext, db: DatabaseProtocol):
     if not message.from_user:
         return

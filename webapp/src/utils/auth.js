@@ -2,6 +2,88 @@
 // Validates user and handles registration flow
 
 import api from '../api/client'
+import { readStorageItem, writeStorageItem, removeStorageItem } from './storage'
+
+const USER_KEY = 'fudly_user'
+const PHONE_KEY = 'fudly_phone'
+
+const resolveUserId = (explicitId = null) => {
+  if (explicitId != null) return explicitId
+  const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user
+  if (telegramUser?.id) return telegramUser.id
+  const storedId = readStorageItem('fudly_last_user_id')
+  return storedId || null
+}
+
+const buildScopedKey = (baseKey, userId) => (
+  userId ? `${baseKey}_${userId}` : baseKey
+)
+
+const readScopedItem = (baseKey, userId = null) => {
+  const resolvedId = resolveUserId(userId)
+  if (resolvedId) {
+    const scoped = readStorageItem(buildScopedKey(baseKey, resolvedId))
+    if (scoped != null) return scoped
+  }
+  return readStorageItem(baseKey)
+}
+
+const writeScopedItem = (baseKey, value, userId = null) => {
+  const resolvedId = resolveUserId(userId)
+  const key = buildScopedKey(baseKey, resolvedId)
+  writeStorageItem(key, value)
+  if (resolvedId) {
+    removeStorageItem(baseKey)
+  }
+  return key
+}
+
+export const getStoredUser = (userId = null) => {
+  const raw = readScopedItem(USER_KEY, userId)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch (e) {
+    console.error('Failed to parse user from storage:', e)
+    return null
+  }
+}
+
+export const setStoredUser = (profile, userId = null) => {
+  if (!profile) return null
+  const resolvedId = resolveUserId(
+    userId ?? profile?.user_id ?? profile?.id ?? null
+  )
+  writeScopedItem(USER_KEY, JSON.stringify(profile), resolvedId)
+  return resolvedId
+}
+
+export const clearStoredUser = (userId = null) => {
+  const resolvedId = resolveUserId(userId)
+  if (resolvedId) {
+    removeStorageItem(buildScopedKey(USER_KEY, resolvedId))
+  }
+  removeStorageItem(USER_KEY)
+}
+
+export const getStoredPhone = (userId = null) => {
+  return readScopedItem(PHONE_KEY, userId) || ''
+}
+
+export const setStoredPhone = (phone, userId = null) => {
+  if (!phone) return null
+  const resolvedId = resolveUserId(userId)
+  writeScopedItem(PHONE_KEY, String(phone), resolvedId)
+  return resolvedId
+}
+
+export const clearStoredPhone = (userId = null) => {
+  const resolvedId = resolveUserId(userId)
+  if (resolvedId) {
+    removeStorageItem(buildScopedKey(PHONE_KEY, resolvedId))
+  }
+  removeStorageItem(PHONE_KEY)
+}
 
 /**
  * Initialize Telegram WebApp and validate authentication
@@ -54,8 +136,8 @@ export const initializeTelegramAuth = async () => {
       return null
     }
 
-    // Save to localStorage
-    localStorage.setItem('fudly_user', JSON.stringify(profile))
+    // Save to sessionStorage (reduce persistence of PII)
+    setStoredUser(profile)
     
     return profile
   } catch (error) {
@@ -74,19 +156,11 @@ export const initializeTelegramAuth = async () => {
 }
 
 /**
- * Get current user from localStorage
+ * Get current user from storage
  * @returns {Object|null} User profile or null
  */
 export const getCurrentUser = () => {
-  const userStr = localStorage.getItem('fudly_user')
-  if (!userStr) return null
-  
-  try {
-    return JSON.parse(userStr)
-  } catch (e) {
-    console.error('Failed to parse user from localStorage:', e)
-    return null
-  }
+  return getStoredUser()
 }
 
 /**
@@ -149,9 +223,11 @@ export const logout = () => {
     storage.removeItem(key)
   }
 
-  localStorage.removeItem('fudly_user')
-  localStorage.removeItem('fudly_init_data')
-  localStorage.removeItem('fudly_last_user_id')
+  clearStoredUser(userId)
+  clearStoredPhone(userId)
+  removeStorageItem('fudly_init_data')
+  removeStorageItem('fudly_init_data_ts')
+  removeStorageItem('fudly_last_user_id')
   clearKey(localStorage, 'fudly_cart_v2')
   clearKey(localStorage, 'fudly_favorites')
   clearKey(localStorage, 'fudly_pending_payment')
@@ -159,7 +235,7 @@ export const logout = () => {
   clearByPrefix(localStorage, 'fudly_favorites_user_')
   clearByPrefix(localStorage, 'fudly_pending_payment_user_')
   if (userId) {
-    localStorage.removeItem(`fudly_init_data_${userId}`)
+    removeStorageItem(`fudly_init_data_${userId}`)
   }
 
   try {

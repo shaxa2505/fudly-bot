@@ -224,63 +224,57 @@ TEXTS = {
         "unit": "шт",
         "expires_on": "Годен до",
         # Help and FAQ
-        "help_customer": """❓ <b>Как работает Fudly?</b>
+        "help_customer": """❓ <b>Fudly — как пользоваться</b>
 
-<b>🔥 Акции</b>
-Товары с самыми большими скидками (30-70%)
-Обновляется каждый день!
+<b>1. Откройте предложения</b>
+• Нажмите «Открыть приложение» или «Предложения»
+• Выберите город/район и категорию
 
-<b>🏪 Магазины</b>
-1️⃣ Выберите магазин в вашем городе
-2️⃣ Посмотрите категории товаров
-3️⃣ Выберите товар и забронируйте
+<b>2. Выберите товар</b>
+• В карточке видно цену до/после, скидку, остаток и время выдачи
+• Если магазин закрыт — товар отмечен «Закрыто» и в корзину не добавится
 
-<b>🔍 Поиск</b>
-Найдите товар по названию
-Пример: йогурт, хлеб, молоко
+<b>3. Оформите заказ</b>
+• Добавьте в корзину и выберите количество
+• Тип: доставка (если доступна) или самовывоз
+• Оплата онлайн или при получении (если доступно)
 
-<b>📦 Как забронировать:</b>
-1️⃣ Нажмите на товар
-2️⃣ Выберите количество
-3️⃣ Получите 8-значный код
-4️⃣ Покажите код продавцу
+<b>4. Получите товар</b>
+• В заказе появится код выдачи
+• Покажите код продавцу
 
-<b>📱 Статусы заказа:</b>
-⏳ <b>Ожидает</b> - магазин проверяет заказ
-✅ <b>Готов</b> - приезжайте забрать товар
-🎉 <b>Завершён</b> - вы получили товар
-❌ <b>Отменён</b> - заказ отменён
-
-<b>💡 Советы:</b>
-• Проверяйте раздел "Акции" каждый день
-• Забирайте товар в указанное время
-• Оценивайте магазины после покупки""",
-        "help_partner": """<b>Партнёрский кабинет: как работать</b>
-
-<b>Добавление товаров</b>
-1) Нажмите «Добавить»
-2) Укажите название, цену и срок
-3) Добавьте фото по желанию
-4) Товар сразу появится у покупателей
-
-<b>Товары</b>
-Просмотр, редактирование и удаление позиций.
-
-<b>Заказы</b>
-Новые - подтвердите.
-Готовится - подготовьте товар.
-Готово - выдайте по коду.
-Завершённые и отменённые - в истории.
-
-<b>Статистика</b>
-Продажи, товары и средний чек.
+<b>Статусы заказа</b>
+Ожидает → Готовится → Готов к выдаче → В пути → Завершён / Отменён
 
 <b>Советы</b>
-• Скидки 30-70%
-• Качественные фото
-• Обновляйте ассортимент
+• Количество ограничено — проверяйте новые предложения
+• Забирайте товар в указанный интервал времени""",
+        "help_partner": """<b>Партнёрский кабинет — кратко</b>
+
+<b>1. Настройте магазин</b>
+• Фото, адрес, город
+• Режим работы
+• Доставка и минимальная сумма заказа
+
+<b>2. Добавьте товары</b>
+• Название, категория, количество, срок годности
+• Цена до и после (скидка минимум 20%)
+• Время выдачи для товара (если отличается от режима магазина)
+
+<b>3. Обрабатывайте заказы</b>
+• Новые — подтвердите
+• Готовится — подготовьте товар
+• Готов к выдаче — выдайте по коду
+• В пути / Завершён / Отменён — история
+
+<b>4. Управляйте доступом</b>
+• «Сотрудники» — добавляйте сотрудников (если используется)
+• «Передать магазин» — смена владельца через контакт или пересланное сообщение
+
+<b>Советы</b>
+• Держите остатки актуальными
 • Быстро подтверждайте заказы
-• Указывайте точное время выдачи""",
+• Добавляйте качественные фото""",
         # Бронирование
         "booking_step_quantity": """┏━━━━━━━━━━━━━━━━━━━━━┓
 ┃   БРОНИРОВАНИЕ        ┃
@@ -1030,63 +1024,61 @@ Menyu pastda.""",
         "unit": "dona",
         "expires_on": "Yaroqlilik muddati",
         # Help and FAQ
-        "help_customer": """❓ <b>Fudly qanday ishlaydi?</b>
+        "help_customer": """
+? <b>Fudly qanday ishlaydi?</b>
 
-<b>🔥 Aksiyalar</b>
-Eng katta chegirmali mahsulotlar (30-70%)
-Har kuni yangilanadi!
+<b>1. Takliflarni oching</b>
+? ?Ilovani ochish? yoki ?Takliflar? ni bosing
+? Shahar/tuman va kategoriyani tanlang
 
-<b>🏪 Do'konlar</b>
-1️⃣ Shahringizdagi do'konni tanlang
-2️⃣ Mahsulot kategoriyalarini ko'ring
-3️⃣ Mahsulotni tanlang va bron qiling
+<b>2. Mahsulotni tanlang</b>
+? Kartochkada eski/yangi narx, chegirma, qoldiq va berish vaqti ko?rinadi
+? Do?kon yopiq bo?lsa ? ?Yopiq? chiqadi va savatga qo?shib bo?lmaydi
 
-<b>🔍 Qidirish</b>
-Mahsulotni nomi bo'yicha toping
-Misol: yogurt, non, sut
+<b>3. Buyurtma bering</b>
+? Savatga qo?shing va miqdorni tanlang
+? Yetkazib berish (agar bo?lsa) yoki olib ketish
+? Onlayn yoki olib ketishda to?lov (agar yoqilgan bo?lsa)
 
-<b>📦 Qanday bron qilish:</b>
-1️⃣ Mahsulotga bosing
-2️⃣ Miqdorini tanlang
-3️⃣ 8 raqamli kodni oling
-4️⃣ Sotuvchiga kodni ko'rsating
+<b>4. Mahsulotni oling</b>
+? Buyurtmada berish kodi chiqadi
+? Kodni sotuvchiga ko?rsating
 
-<b>📱 Buyurtma holatlari:</b>
-⏳ <b>Kutilmoqda</b> - do'kon buyurtmani tekshirmoqda
-✅ <b>Tayyor</b> - kelib mahsulotni oling
-🎉 <b>Bajarildi</b> - mahsulotni oldingiz
-❌ <b>Bekor qilindi</b> - buyurtma bekor qilindi
-
-<b>💡 Maslahatlar:</b>
-• Har kuni "Aksiyalar" bo'limini tekshiring
-• Mahsulotni ko'rsatilgan vaqtda oling
-• Xariddan keyin do'konni baholang""",
-        "help_partner": """<b>Hamkor kabineti: qisqa qo'llanma</b>
-
-<b>Mahsulot qo'shish</b>
-1) «Qo'shish» tugmasini bosing
-2) Nomi, narxi va muddatini kiriting
-3) Xohlasangiz rasm qo'shing
-4) Mahsulot darhol ko'rinadi
-
-<b>Mahsulotlar</b>
-Ro'yxat, tahrirlash va o'chirish.
-
-<b>Buyurtmalar</b>
-Yangi - tasdiqlang.
-Tayyorlanmoqda - mahsulotni tayyorlang.
-Tayyor - kod bo'yicha bering.
-Yakunlangan va bekor qilingan - tarixda.
-
-<b>Statistika</b>
-Savdo, mahsulotlar va o'rtacha чек.
+<b>Buyurtma holatlari</b>
+Kutilmoqda ? Tayyorlanmoqda ? Tayyor ? Yo?lda ? Yakunlandi / Bekor qilindi
 
 <b>Maslahatlar</b>
-• 30-70% chegirma
-• Sifatli rasmlar
-• Assortimentni yangilang
-• Buyurtmalarni tez tasdiqlang
-• Berish vaqtini aniq yozing""",
+? Takliflar tez tugaydi ? tezroq tanlang
+? Belgilangan vaqt oralig?ida olib keting
+""",
+        "help_partner": """
+<b>Hamkor kabineti ? qisqa qo?llanma</b>
+
+<b>1. Do?konni sozlang</b>
+? Foto, manzil, shahar
+? Ish vaqti
+? Yetkazib berish va minimal summa
+
+<b>2. Mahsulot qo?shing</b>
+? Nomi, kategoriya, miqdor, yaroqlilik muddati
+? Eski va yangi narx (chegirma kamida 20%)
+? Maxsus berish vaqti (agar do?kon vaqtidan farq qilsa)
+
+<b>3. Buyurtmalarni boshqaring</b>
+? Yangi ? tasdiqlang
+? Tayyorlanmoqda ? tayyorlang
+? Tayyor ? kod bo?yicha topshiring
+? Yo?lda / Yakunlandi / Bekor qilindi ? tarix
+
+<b>4. Kirishni boshqaring</b>
+? ?Xodimlar? ? xodim qo?shish (agar ishlatilsa)
+? ?Do?konni topshirish? ? kontakt yoki forward xabar bilan
+
+<b>Maslahatlar</b>
+? Qoldiqni doim yangilang
+? Buyurtmalarni tez tasdiqlang
+? Sifatli foto qo?shing
+""",
         # Buyurtma
         "booking_success": """<b>✅ Buyurtma muvaffaqiyatli</b>
 

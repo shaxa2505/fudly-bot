@@ -97,6 +97,7 @@ export const CITY_TRANSLATIONS = {
 
 const CYRILLIC_RE = /[\u0400-\u04FF]/
 const APOSTROPHE_RE = /[\u2018\u2019\u02BB\u02BC\u2032\u2035\u00B4\u0060]/g
+const CITY_KEY_RE = /[\s'’`,.\-]+/g
 
 const hasCyrillic = (value) => CYRILLIC_RE.test(String(value || ''))
 const normalizeApostrophes = (value) => String(value || '').replace(APOSTROPHE_RE, "'")
@@ -134,6 +135,29 @@ export const normalizeLocationName = (value) => {
   cleaned = cleaned.replace(/\s{2,}/g, ' ')
   cleaned = cleaned.replace(/[,\\s]+$/g, '')
   return cleaned.trim()
+}
+
+export const buildCitySearchKey = (value) => (
+  normalizeLocationName(value)
+    .toLowerCase()
+    .replace(CITY_KEY_RE, '')
+)
+
+const CITY_QUERY_ALIASES = {
+  [buildCitySearchKey('Samarqand')]: 'Samarqand',
+  [buildCitySearchKey('Samarkand')]: 'Samarqand',
+  [buildCitySearchKey("Kattaqo'rg'on")]: "Kattaqo'rg'on",
+  [buildCitySearchKey('Kattaqurgan')]: "Kattaqo'rg'on",
+  [buildCitySearchKey('Kattakurgan')]: "Kattaqo'rg'on",
+  [buildCitySearchKey('Kattaqorgon')]: "Kattaqo'rg'on",
+  [buildCitySearchKey('Kattaqorqon')]: "Kattaqo'rg'on",
+}
+
+export const normalizeCityQuery = (value) => {
+  const normalized = normalizeLocationName(value)
+  if (!normalized) return ''
+  const key = buildCitySearchKey(normalized)
+  return CITY_QUERY_ALIASES[key] || ''
 }
 
 export const buildLocationFromReverseGeocode = (data, lat, lon) => {

@@ -6,7 +6,8 @@ import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
 import { calcTotalPrice } from '../utils/orderMath'
-import { getCurrentUser, getUserId } from '../utils/auth'
+import { getCurrentUser, getUserId, getStoredPhone, setStoredPhone, setStoredUser } from '../utils/auth'
+import { readStorageItem, writeStorageItem } from '../utils/storage'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
 import { getCurrentLocation } from '../utils/geolocation'
@@ -71,7 +72,7 @@ function CartPage({ user }) {
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(() => isCheckoutRoute)
-  const [phone, setPhone] = useState(() => canonicalPhone || localStorage.getItem('fudly_phone') || '')
+  const [phone, setPhone] = useState(() => canonicalPhone || getStoredPhone() || '')
   const [address, setAddress] = useState(() => {
     try {
       const loc = JSON.parse(localStorage.getItem('fudly_location') || '{}')
@@ -99,7 +100,8 @@ function CartPage({ user }) {
   const [showMapEditor, setShowMapEditor] = useState(false)
   const [addressMeta, setAddressMeta] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('fudly_address_meta') || '{}')
+      const raw = readStorageItem('fudly_address_meta')
+      return raw ? JSON.parse(raw) : {}
     } catch {
       return {}
     }
@@ -550,14 +552,14 @@ function CartPage({ user }) {
   useEffect(() => {
     if (canonicalPhone && canonicalPhone !== phone) {
       setPhone(canonicalPhone)
-      localStorage.setItem('fudly_phone', canonicalPhone)
+      setStoredPhone(canonicalPhone)
     }
   }, [canonicalPhone, phone])
 
   const { entrance = '', floor = '', apartment = '' } = addressMeta
 
   useEffect(() => {
-    localStorage.setItem('fudly_address_meta', JSON.stringify(addressMeta))
+    writeStorageItem('fudly_address_meta', JSON.stringify(addressMeta))
   }, [addressMeta])
 
   const updateAddressMeta = useCallback((key, value) => {
@@ -1186,8 +1188,8 @@ function CartPage({ user }) {
         return ''
       }
       const mergedUser = { ...(getCurrentUser() || {}), ...profile }
-      localStorage.setItem('fudly_user', JSON.stringify(mergedUser))
-      localStorage.setItem('fudly_phone', profilePhone)
+      setStoredUser(mergedUser)
+      setStoredPhone(profilePhone)
       setPhone(profilePhone)
       return profilePhone
     } catch (error) {
@@ -1740,7 +1742,7 @@ function CartPage({ user }) {
         payment_method: selectedPaymentMethod,
       }
 
-      localStorage.setItem('fudly_phone', resolvedPhone)
+      setStoredPhone(resolvedPhone)
 
       const result = await api.createOrder(orderData)
 
@@ -1825,7 +1827,7 @@ function CartPage({ user }) {
         payment_method: 'click',
       }
 
-      localStorage.setItem('fudly_phone', resolvedPhone)
+      setStoredPhone(resolvedPhone)
       const result = await api.createOrder(orderData)
 
       const isSuccess = !!(result?.success || result?.order_id)
