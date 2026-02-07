@@ -399,7 +399,7 @@ function StoresPage() {
     navigate('/product', { state: { offer } })
   }
 
-  const toggleFavorite = async (storeId) => {
+  const toggleFavorite = useCallback(async (storeId) => {
     if (!storeId) return
     const isFavorite = favoriteIds.has(storeId)
     try {
@@ -431,7 +431,7 @@ function StoresPage() {
       console.error('Favorite toggle error:', error)
       window.Telegram?.WebApp?.showAlert?.('Sevimlilarni yangilab bo\'lmadi')
     }
-  }, [])
+  }, [favoriteIds, stores])
 
   const baseStores = useMemo(
     () => (activeFilter === 'favorites' ? favoriteStores : stores),

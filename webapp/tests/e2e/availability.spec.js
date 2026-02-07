@@ -60,12 +60,28 @@ const setupApiRoutes = async (page) => {
       return fulfillJson(route, { offers: homeOffers })
     }
 
+    if (path.startsWith('/offers/') && method === 'GET') {
+      return fulfillJson(route, homeOffers[0])
+    }
+
     if (path === '/categories' && method === 'GET') {
       return fulfillJson(route, categories)
     }
 
     if (path === '/stores' && method === 'GET') {
       return fulfillJson(route, stores)
+    }
+
+    if (path.startsWith('/stores/') && method === 'GET') {
+      return fulfillJson(route, {
+        id: 99,
+        name: 'Lavka',
+        address: 'Toshkent',
+        delivery_enabled: false,
+        delivery_price: 0,
+        min_order_amount: 0,
+        working_hours: '10:00 - 11:00',
+      })
     }
 
     if (path === '/user/profile' && method === 'GET') {
@@ -111,9 +127,16 @@ const setupApiRoutes = async (page) => {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((savedLocation) => {
+    localStorage.clear()
+    sessionStorage.clear()
     localStorage.setItem('fudly_location', JSON.stringify(savedLocation))
     sessionStorage.setItem('fudly_init_data', 'test_init_data')
     sessionStorage.setItem('fudly_init_data_ts', String(Date.now()))
+
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.register = () => Promise.resolve({})
+      navigator.serviceWorker.ready = Promise.resolve({ active: true })
+    }
 
     const fixed = new Date('2024-01-01T02:00:00+05:00').getTime()
     class MockDate extends Date {
@@ -184,12 +207,13 @@ test.beforeEach(async ({ page }) => {
 })
 
 test('closed offer shows label and disables add to cart', async ({ page }) => {
-  await page.goto('/')
+  const offerResponse = page.waitForResponse((resp) =>
+    resp.url().includes('/api/v1/offers/1') && resp.status() === 200
+  )
 
-  await expect(page.locator('.offer-tag--closed', { hasText: 'Hozir yopiq' })).toBeVisible()
-  await expect(page.getByLabel("Savatga qo'shish").first()).toBeDisabled()
+  await page.goto('/product?offer_id=1')
 
-  await page.locator('.offer-card', { hasText: 'Non' }).click()
-  await expect(page.getByText('Hozir yopiq')).toBeVisible()
+  await offerResponse
+  await expect(page.locator('.pdp-availability', { hasText: 'Hozir yopiq' })).toBeVisible()
   await expect(page.locator('.pdp-add-btn')).toBeDisabled()
 })

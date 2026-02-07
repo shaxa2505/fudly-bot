@@ -361,7 +361,7 @@ def verify_telegram_webapp(authorization: str) -> int:
 # Profile endpoint
 @router.get("/profile")
 @limiter.limit("120/minute")
-async def get_profile(authorization: str = Header(None)):
+async def get_profile(request: Request, authorization: str = Header(None)):
     """Get partner profile"""
     import logging
 
@@ -480,7 +480,7 @@ async def websocket_partner(
 # Store info endpoint (для frontend storeAPI.getInfo())
 @router.get("/store")
 @limiter.limit("120/minute")
-async def get_store_info(authorization: str = Header(None)):
+async def get_store_info(request: Request, authorization: str = Header(None)):
     """Get store information for partner panel"""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = await get_partner_with_store(telegram_id)
@@ -512,7 +512,11 @@ async def get_store_info(authorization: str = Header(None)):
 # Products endpoints
 @router.get("/products")
 @limiter.limit("120/minute")
-async def list_products(authorization: str = Header(None), status: Optional[str] = None):
+async def list_products(
+    request: Request,
+    authorization: str = Header(None),
+    status: Optional[str] = None,
+):
     """
     List partner's products with frontend-compatible field names.
 
@@ -966,7 +970,7 @@ async def update_product_status(
 
 @router.delete("/products/{product_id}")
 @limiter.limit("120/minute")
-async def delete_product(product_id: int, authorization: str = Header(None)):
+async def delete_product(product_id: int, request: Request, authorization: str = Header(None)):
     """Delete product (soft delete)"""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = await get_partner_with_store(telegram_id)
@@ -1158,7 +1162,11 @@ async def import_csv(
 # Orders endpoints
 @router.get("/orders")
 @limiter.limit("120/minute")
-async def list_orders(authorization: str = Header(None), status: Optional[str] = None):
+async def list_orders(
+    request: Request,
+    authorization: str = Header(None),
+    status: Optional[str] = None,
+):
     """
     List partner's orders (unified from orders table).
     After v24 migration, all orders (pickup + delivery) are in orders table.
@@ -1471,7 +1479,11 @@ async def update_order_status(
 # Stats endpoint
 @router.get("/stats")
 @limiter.limit("120/minute")
-async def get_stats(authorization: str = Header(None), period: str = "today"):
+async def get_stats(
+    request: Request,
+    authorization: str = Header(None),
+    period: str = "today",
+):
     """Get partner statistics with daily breakdown for charts."""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = await get_partner_with_store(telegram_id)
@@ -1606,7 +1618,11 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
 # Store settings
 @router.put("/store")
 @limiter.limit("120/minute")
-async def update_store(settings: dict, authorization: str = Header(None)):
+async def update_store(
+    settings: dict,
+    request: Request,
+    authorization: str = Header(None),
+):
     """Update store settings"""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = await get_partner_with_store(telegram_id)
@@ -1728,7 +1744,11 @@ async def update_store(settings: dict, authorization: str = Header(None)):
 
 @router.patch("/store/status")
 @limiter.limit("120/minute")
-async def toggle_store_status(is_open: bool = Form(...), authorization: str = Header(None)):
+async def toggle_store_status(
+    request: Request,
+    is_open: bool = Form(...),
+    authorization: str = Header(None),
+):
     """Toggle store open/closed status"""
     telegram_id = verify_telegram_webapp(authorization)
     user, store = await get_partner_with_store(telegram_id)
@@ -1746,7 +1766,11 @@ async def toggle_store_status(is_open: bool = Form(...), authorization: str = He
 # Photo upload endpoint
 @router.post("/upload-photo")
 @limiter.limit("120/minute")
-async def upload_photo(photo: UploadFile = File(...), authorization: str = Header(None)):
+async def upload_photo(
+    request: Request,
+    photo: UploadFile = File(...),
+    authorization: str = Header(None),
+):
     """
     Upload photo and get Telegram file_id.
     Sends photo to a special channel/chat via bot to get file_id.
@@ -1807,10 +1831,17 @@ async def upload_photo(photo: UploadFile = File(...), authorization: str = Heade
 # Get photo URL endpoint
 @router.get("/photo/{file_id}")
 @limiter.limit("120/minute")
-async def get_photo_url(file_id: str):
+async def get_photo_url(
+    file_id: str,
+    request: Request,
+    authorization: str = Header(None),
+):
     """Redirect to Telegram photo URL"""
     import aiohttp
     from fastapi.responses import RedirectResponse
+
+    telegram_id = verify_telegram_webapp(authorization)
+    await get_partner_with_store(telegram_id)
 
     tokens = [_bot_token] if _bot_token else []
     if _legacy_bot_token and _legacy_bot_token not in tokens:

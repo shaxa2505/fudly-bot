@@ -49,8 +49,8 @@ def _resolve_cors_origin() -> str:
     if is_dev:
         return "*"
 
-    logger.warning("⚠️ CORS origin not configured; falling back to '*'")
-    return "*"
+    logger.error("❌ CORS origin not configured; refusing wildcard in production")
+    return "null"
 
 
 _CORS_ALLOW_ORIGIN = _resolve_cors_origin()

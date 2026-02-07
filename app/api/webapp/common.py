@@ -24,6 +24,10 @@ settings = load_settings()
 PRICE_STORAGE_UNIT = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
 
 
+def _is_dev_env() -> bool:
+    return os.getenv("ENVIRONMENT", "production").lower() in ("development", "dev", "local", "test")
+
+
 def normalize_price(value: Any) -> float:
     """Normalize stored price to sums for API responses."""
     try:
@@ -426,9 +430,18 @@ async def get_current_user(
     Guest access only allowed in development mode.
     """
     if not x_telegram_init_data:
-        if os.getenv("ALLOW_GUEST_ACCESS", "false").lower() in ("true", "1", "yes"):
-            logger.warning("Guest access allowed - DEVELOPMENT MODE ONLY")
+        is_dev = _is_dev_env()
+        allow_guest = os.getenv("ALLOW_GUEST_ACCESS", "false").lower() in ("true", "1", "yes")
+        if allow_guest and is_dev:
+            logger.warning("Guest access allowed (dev only)")
             return {"id": 0, "first_name": "Guest"}
+        if allow_guest and not is_dev:
+            logger.warning("Guest access ignored in production")
+        if not is_dev and (
+            os.getenv("ALLOW_UNSAFE_AUTH", "").strip()
+            or os.getenv("ALLOW_URL_AUTH", "").strip()
+        ):
+            logger.warning("Unsafe auth flags ignored in production")
         raise HTTPException(status_code=401, detail="Authentication required")
 
     bot_token = settings.bot_token
@@ -437,7 +450,10 @@ async def get_current_user(
     if not validated:
         raise HTTPException(status_code=401, detail="Invalid Telegram initData")
 
-    return validated.get("user")
+    user = validated.get("user") if isinstance(validated, dict) else None
+    if not isinstance(user, dict) or not user.get("id"):
+        raise HTTPException(status_code=401, detail="Invalid Telegram initData")
+    return user
 
 
 async def get_optional_user(
@@ -452,7 +468,10 @@ async def get_optional_user(
     if not validated:
         return None
 
-    return validated.get("user")
+    user = validated.get("user") if isinstance(validated, dict) else None
+    if not isinstance(user, dict) or not user.get("id"):
+        return None
+    return user
 
 
 # =============================================================================

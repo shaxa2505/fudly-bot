@@ -254,12 +254,15 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             ]
         )
 
+    allow_origin_regex = r"https://fudly-webapp.*\.vercel\.app" if is_dev else None
+    allow_credentials = _is_truthy(os.getenv("CORS_ALLOW_CREDENTIALS", "0"))
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        # Allow all Vercel preview/production URLs (only for webapp)
-        allow_origin_regex=r"https://fudly-webapp.*\.vercel\.app",
-        allow_credentials=True,
+        # Allow all Vercel preview/production URLs (dev only)
+        allow_origin_regex=allow_origin_regex,
+        allow_credentials=allow_credentials,
         # ✅ SECURITY: Restrict methods to only what's needed
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         # ✅ SECURITY: Restrict headers

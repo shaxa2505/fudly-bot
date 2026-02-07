@@ -6,16 +6,20 @@ with Basic Auth as required by Uzum Bank.
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import secrets
 import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.core.async_db import AsyncDBProxy
+from app.api.rate_limit import limiter
+from app.domain.order import PaymentStatus
 
 router = APIRouter(prefix="/api/merchant", tags=["merchant"])
 security = HTTPBasic()
@@ -24,6 +28,39 @@ _db: Any = None
 
 def _now_ms() -> int:
     return int(time.time() * 1000)
+
+
+def _is_dev_env() -> bool:
+    return os.getenv("ENVIRONMENT", "production").lower() in ("development", "dev", "local", "test")
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+async def _require_signature(request: Request) -> None:
+    """Optional HMAC signature verification for merchant webhooks."""
+    secret = os.getenv("UZUM_MERCHANT_WEBHOOK_SECRET")
+    require_sig = _env_flag("UZUM_MERCHANT_REQUIRE_SIGNATURE", False)
+    if not secret:
+        if require_sig and not _is_dev_env():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Merchant webhook signature not configured",
+            )
+        return
+
+    signature = request.headers.get("X-Uzum-Signature") or request.headers.get("X-Signature")
+    if not signature:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing signature")
+
+    body = await request.body()
+    expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
 
 
 def _require_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
@@ -107,8 +144,36 @@ async def _fetch_transaction(db, trans_id: str):
         return None
 
 
+def _normalize_tx_status(raw_status: Any) -> str:
+    return str(raw_status or "").strip().upper()
+
+
+def _payment_is_confirmed(order: Any) -> bool:
+    if not order:
+        return False
+    payment_status = PaymentStatus.normalize(
+        order.get("payment_status") if isinstance(order, dict) else getattr(order, "payment_status", None),
+        payment_method=order.get("payment_method") if isinstance(order, dict) else getattr(order, "payment_method", None),
+        payment_proof_photo_id=order.get("payment_proof_photo_id")
+        if isinstance(order, dict)
+        else getattr(order, "payment_proof_photo_id", None),
+    )
+    return payment_status == PaymentStatus.CONFIRMED
+
+
+def _allow_reverse_after_confirm() -> bool:
+    return _env_flag("UZUM_ALLOW_REVERSE_AFTER_CONFIRM", False)
+
+
 @router.post("/check")
-async def check(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
+@limiter.limit("120/minute")
+async def check(
+    payload: dict,
+    request: Request,
+    _: str = Depends(_require_auth),
+    __: None = Depends(_require_signature),
+    db=Depends(_require_db),
+) -> dict:
     """Webhook: validate if payment is possible."""
     service_id = _get(payload, "serviceId")
     timestamp = _get(payload, "timestamp", _now_ms())
@@ -121,6 +186,8 @@ async def check(payload: dict, _: str = Depends(_require_auth), db=Depends(_requ
     order = await db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=400, detail="Order not found")
+    if _payment_is_confirmed(order):
+        raise HTTPException(status_code=409, detail="Order already paid")
 
     return {
         "serviceId": service_id,
@@ -131,7 +198,14 @@ async def check(payload: dict, _: str = Depends(_require_auth), db=Depends(_requ
 
 
 @router.post("/create")
-async def create(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
+@limiter.limit("120/minute")
+async def create(
+    payload: dict,
+    request: Request,
+    _: str = Depends(_require_auth),
+    __: None = Depends(_require_signature),
+    db=Depends(_require_db),
+) -> dict:
     """Webhook: create a payment transaction."""
     service_id = _get(payload, "serviceId")
     trans_id = _get(payload, "transId") or str(uuid.uuid4())
@@ -145,11 +219,30 @@ async def create(payload: dict, _: str = Depends(_require_auth), db=Depends(_req
     order = await db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=400, detail="Order not found")
+    if _payment_is_confirmed(order):
+        raise HTTPException(status_code=409, detail="Order already paid")
 
     # Prevent duplicate transId
     existing = await _fetch_transaction(db, trans_id)
     if existing:
-        raise HTTPException(status_code=400, detail="Transaction already exists")
+        existing_status = _normalize_tx_status(existing.get("status"))
+        existing_order_id = int(existing.get("order_id") or 0)
+        existing_amount = int(existing.get("amount") or 0)
+        existing_service_id = str(existing.get("service_id") or "")
+        if existing_order_id and existing_order_id != int(order_id):
+            raise HTTPException(status_code=400, detail="Transaction order mismatch")
+        if existing_service_id and str(service_id) != existing_service_id:
+            raise HTTPException(status_code=400, detail="ServiceId mismatch")
+        if existing_amount and int(amount) != existing_amount:
+            raise HTTPException(status_code=400, detail="Amount mismatch")
+        return {
+            "serviceId": service_id,
+            "transId": trans_id,
+            "status": existing_status or "CREATED",
+            "transTime": _now_ms(),
+            "data": {k: {"value": str(v)} for k, v in params.items()},
+            "amount": existing_amount or amount,
+        }
 
     try:
         await db.create_uzum_transaction(
@@ -174,7 +267,14 @@ async def create(payload: dict, _: str = Depends(_require_auth), db=Depends(_req
 
 
 @router.post("/confirm")
-async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
+@limiter.limit("120/minute")
+async def confirm(
+    payload: dict,
+    request: Request,
+    _: str = Depends(_require_auth),
+    __: None = Depends(_require_signature),
+    db=Depends(_require_db),
+) -> dict:
     """Webhook: confirm a successful payment."""
     service_id = _get(payload, "serviceId")
     trans_id = _get(payload, "transId")
@@ -194,6 +294,22 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
         raise HTTPException(status_code=400, detail="Amount mismatch")
 
     order_id = tx.get("order_id")
+    tx_status = _normalize_tx_status(tx.get("status"))
+    if tx_status == "CONFIRMED":
+        return {
+            "serviceId": service_id,
+            "transId": trans_id,
+            "status": "CONFIRMED",
+            "confirmTime": _now_ms(),
+            "data": _get(payload, "data", {}),
+            "amount": amount,
+        }
+    if tx_status == "REVERSED":
+        raise HTTPException(status_code=409, detail="Transaction reversed")
+
+    order = await db.get_order(order_id) if order_id else None
+    if not order:
+        raise HTTPException(status_code=400, detail="Order not found")
     try:
         await db.update_uzum_transaction_status(trans_id, "CONFIRMED", payload)
         service = None
@@ -204,6 +320,15 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
         except Exception:
             service = None
 
+        if _payment_is_confirmed(order):
+            return {
+                "serviceId": service_id,
+                "transId": trans_id,
+                "status": "CONFIRMED",
+                "confirmTime": _now_ms(),
+                "data": _get(payload, "data", {}),
+                "amount": amount,
+            }
         if service and order_id:
             await service.confirm_payment(int(order_id))
         elif hasattr(db, "update_payment_status") and order_id:
@@ -222,7 +347,14 @@ async def confirm(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
 
 
 @router.post("/reverse")
-async def reverse(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
+@limiter.limit("120/minute")
+async def reverse(
+    payload: dict,
+    request: Request,
+    _: str = Depends(_require_auth),
+    __: None = Depends(_require_signature),
+    db=Depends(_require_db),
+) -> dict:
     """Webhook: reverse a payment."""
     service_id = _get(payload, "serviceId")
     trans_id = _get(payload, "transId")
@@ -233,8 +365,26 @@ async def reverse(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
     tx = await _fetch_transaction(db, trans_id)
     if not tx:
         raise HTTPException(status_code=400, detail="Transaction not found")
+    if str(tx.get("service_id")) != str(service_id):
+        raise HTTPException(status_code=400, detail="ServiceId mismatch")
 
     order_id = tx.get("order_id")
+    tx_status = _normalize_tx_status(tx.get("status"))
+    if tx_status == "REVERSED":
+        return {
+            "serviceId": service_id,
+            "transId": trans_id,
+            "status": "REVERSED",
+            "reverseTime": _now_ms(),
+            "data": _get(payload, "data", {}),
+            "amount": _get(payload, "amount"),
+        }
+    if tx_status == "CONFIRMED" and not _allow_reverse_after_confirm():
+        raise HTTPException(status_code=409, detail="Transaction already confirmed")
+
+    order = await db.get_order(order_id) if order_id else None
+    if order and _payment_is_confirmed(order) and not _allow_reverse_after_confirm():
+        raise HTTPException(status_code=409, detail="Order already paid")
     try:
         await db.update_uzum_transaction_status(trans_id, "REVERSED", payload)
         if hasattr(db, "update_payment_status") and order_id:
@@ -253,7 +403,14 @@ async def reverse(payload: dict, _: str = Depends(_require_auth), db=Depends(_re
 
 
 @router.post("/status")
-async def status_check(payload: dict, _: str = Depends(_require_auth), db=Depends(_require_db)) -> dict:
+@limiter.limit("120/minute")
+async def status_check(
+    payload: dict,
+    request: Request,
+    _: str = Depends(_require_auth),
+    __: None = Depends(_require_signature),
+    db=Depends(_require_db),
+) -> dict:
     """Webhook: check transaction status."""
     service_id = _get(payload, "serviceId")
     trans_id = _get(payload, "transId")

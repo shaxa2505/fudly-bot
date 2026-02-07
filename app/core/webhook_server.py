@@ -57,6 +57,83 @@ async def create_webhook_app(
         "yes",
         "on",
     }
+
+    rate_limit_rules: dict[tuple[str, str], dict[str, int | str]] = {
+        ("POST", "/api/v1/orders"): {"limit": 10, "window": 60, "name": "create_order"},
+        ("GET", "/api/v1/location/reverse"): {"limit": 30, "window": 60, "name": "geo_reverse"},
+        ("GET", "/api/v1/location/search"): {"limit": 30, "window": 60, "name": "geo_search"},
+        ("POST", "/api/v1/payment/click/callback"): {
+            "limit": 120,
+            "window": 60,
+            "name": "click_callback",
+        },
+        ("POST", "/api/v1/payment/payme/callback"): {
+            "limit": 120,
+            "window": 60,
+            "name": "payme_callback",
+        },
+    }
+    _rate_limit_state: dict[str, dict[str, float | int]] = {}
+    _rate_limit_cleanup_ts = 0.0
+
+    def _get_client_ip(request: web.Request) -> str:
+        xff = request.headers.get("X-Forwarded-For")
+        if xff:
+            parts = [part.strip() for part in xff.split(",") if part.strip()]
+            if parts:
+                return parts[0]
+        x_real_ip = request.headers.get("X-Real-IP")
+        if x_real_ip:
+            return x_real_ip.strip()
+        return request.remote or "unknown"
+
+    def _check_rate_limit(rule: dict[str, int | str], request: web.Request) -> tuple[bool, int]:
+        nonlocal _rate_limit_cleanup_ts
+        now = time.monotonic()
+        if now - _rate_limit_cleanup_ts > 120:
+            _rate_limit_cleanup_ts = now
+            expired_keys = [
+                key for key, value in _rate_limit_state.items() if now > float(value["reset"])
+            ]
+            for key in expired_keys:
+                _rate_limit_state.pop(key, None)
+
+        limit = int(rule["limit"])
+        window = int(rule["window"])
+        ip = _get_client_ip(request)
+        key = f"{rule['name']}:{ip}"
+        entry = _rate_limit_state.get(key)
+        if entry and now < float(entry["reset"]):
+            if int(entry["count"]) >= limit:
+                retry_after = max(1, int(float(entry["reset"]) - now))
+                return False, retry_after
+            entry["count"] = int(entry["count"]) + 1
+            return True, 0
+
+        _rate_limit_state[key] = {"reset": now + window, "count": 1}
+        return True, 0
+
+    @web.middleware
+    async def rate_limit_middleware(request: web.Request, handler):
+        if request.method == "OPTIONS":
+            return await handler(request)
+
+        rule = rate_limit_rules.get((request.method, request.path))
+        if not rule:
+            return await handler(request)
+
+        allowed, retry_after = _check_rate_limit(rule, request)
+        if not allowed:
+            response = web.json_response(
+                {"detail": "Too Many Requests"},
+                status=429,
+                headers={"Retry-After": str(retry_after)},
+            )
+            return add_cors_headers(response)
+
+        return await handler(request)
+
+    app.middlewares.append(rate_limit_middleware)
     payment_link_cache: dict[tuple[int, str], dict[str, Any]] = {}
     payment_link_ttl = 90.0
 

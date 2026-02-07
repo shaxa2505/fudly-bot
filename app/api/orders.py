@@ -12,7 +12,7 @@ from aiogram import Bot
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.api.webapp.common import get_current_user, get_optional_user
+from app.api.webapp.common import get_current_user
 from app.core.async_db import AsyncDBProxy
 from app.core.order_math import (
     calc_delivery_fee,
@@ -81,6 +81,13 @@ async def _bookings_archive_exists(db) -> bool:
     except Exception:
         return False
     return False
+
+
+def _require_user_id(user: dict) -> int:
+    user_id = int(user.get("id") or 0)
+    if user_id <= 0:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user_id
 
 
 # ==================== MODELS ====================
@@ -366,12 +373,10 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
 @router.get("")
 async def get_user_orders(
     db=Depends(get_db),
-    user: dict | None = Depends(get_optional_user),
+    user: dict = Depends(get_current_user),
 ):
     """Get user's orders from unified orders table (pickup + delivery)."""
-    user_id = int(user.get("id") or 0) if isinstance(user, dict) else 0
-    if user_id <= 0:
-        return []
+    user_id = _require_user_id(user)
 
     orders: list[dict[str, Any]] = []
     raw_orders: list[Any] = []
@@ -548,11 +553,13 @@ async def get_order_status(
     Raises:
         404: Order not found
     """
+    user_id = _require_user_id(user)
+
     # v24+: try unified orders table first
     order = await db.get_order(booking_id)
     if order:
         order_dict = dict(order) if not isinstance(order, dict) else order
-        if order_dict.get("user_id") != user.get("id"):
+        if int(order_dict.get("user_id") or 0) != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         # Convert order to booking format for compatibility
         return await format_booking_to_order_status(order, db)
@@ -566,7 +573,7 @@ async def get_order_status(
             )
             if booking:
                 booking_dict = dict(booking[0]) if not isinstance(booking[0], dict) else booking[0]
-                if booking_dict.get("user_id") != user.get("id"):
+                if int(booking_dict.get("user_id") or 0) != user_id:
                     raise HTTPException(status_code=403, detail="Access denied")
                 return await format_booking_to_order_status(booking[0], db)
         except Exception:
@@ -592,6 +599,8 @@ async def get_order_timeline(
     Raises:
         404: Order not found
     """
+    user_id = _require_user_id(user)
+
     # v24+: try unified orders table first
     order = await db.get_order(booking_id)
     if not order and await _bookings_archive_exists(db):
@@ -610,7 +619,7 @@ async def get_order_timeline(
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
     order_dict = dict(order) if not isinstance(order, dict) else order
-    if order_dict.get("user_id") != user.get("id"):
+    if int(order_dict.get("user_id") or 0) != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     raw_status = order_dict.get("order_status", order_dict.get("status", "pending"))
     status = UnifiedOrderStatus.normalize(str(raw_status).strip().lower())
@@ -765,6 +774,8 @@ async def get_order_qr_code(
         404: Order not found
         400: QR code not available for this status
     """
+    user_id = _require_user_id(user)
+
     # v24+: try unified orders table first
     order = await db.get_order(booking_id)
     if not order and await _bookings_archive_exists(db):
@@ -783,7 +794,7 @@ async def get_order_qr_code(
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
     order_dict = dict(order) if not isinstance(order, dict) else order
-    if order_dict.get("user_id") != user.get("id"):
+    if int(order_dict.get("user_id") or 0) != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     raw_status = order_dict.get("order_status", order_dict.get("status", "pending"))
     status = UnifiedOrderStatus.normalize(str(raw_status).strip().lower())
