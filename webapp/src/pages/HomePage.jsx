@@ -83,6 +83,7 @@ const applyScrollTop = (target, value) => {
 }
 
 function HomePage() {
+  const navigate = useNavigate()
   const [offers, setOffers] = useState([])
   const [offersTotal, setOffersTotal] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -110,7 +111,10 @@ function HomePage() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchSuggestions, setSearchSuggestions] = useState([])
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [searchResults, setSearchResults] = useState({ offers: [], stores: [] })
+  const [searchResultsLoading, setSearchResultsLoading] = useState(false)
   const searchInputRef = useRef(null)
+  const searchResultsRequestRef = useRef(0)
   const categoriesScrollRef = useRef(null)
   const categoryTabRefs = useRef(new Map())
   const categoryMarkersRef = useRef([])
