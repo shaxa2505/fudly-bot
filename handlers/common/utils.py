@@ -528,12 +528,24 @@ def get_appropriate_menu(
     role = user.role
     if role == "store_owner":
         role = "seller"
-    if role != "seller" and has_approved_store(user_id, db):
+    has_active_store = has_approved_store(user_id, db)
+    if role != "seller" and has_active_store:
         role = "seller"
         try:
             db.update_user_role(user_id, "seller")
         except Exception:
             pass
+
+    if role == "seller" and not has_active_store:
+        try:
+            db.update_user_role(user_id, "customer")
+        except Exception:
+            pass
+        try:
+            db.set_user_view_mode(user_id, "customer")
+        except Exception:
+            pass
+        return main_menu_customer(lang)
 
     if role == "seller":
         return main_menu_seller(lang, user_id=user_id)

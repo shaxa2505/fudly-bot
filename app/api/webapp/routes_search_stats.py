@@ -55,7 +55,7 @@ async def get_search_suggestions(
 
         if hasattr(db, "get_search_suggestions"):
             suggestions = (
-                await db.get_search_suggestions(
+                db.get_search_suggestions(
                     query,
                     limit=limit,
                     city=normalized_city,
@@ -66,7 +66,7 @@ async def get_search_suggestions(
             )
         elif hasattr(db, "get_offer_suggestions"):
             suggestions = (
-                await db.get_offer_suggestions(
+                db.get_offer_suggestions(
                     query,
                     limit=limit,
                     city=normalized_city,
@@ -76,7 +76,7 @@ async def get_search_suggestions(
                 or []
             )
         elif hasattr(db, "search_offers"):
-            offers = await db.search_offers(
+            offers = db.search_offers(
                 query,
                 limit=limit * 2,
                 city=normalized_city,
@@ -125,7 +125,7 @@ async def get_hot_deals_stats(city: str | None = Query(None), db=Depends(get_db)
         }
 
         if hasattr(db, "get_hot_offers"):
-            offers = await db.get_hot_offers(normalized_city, limit=1000)
+            offers = db.get_hot_offers(normalized_city, limit=1000)
             if offers:
                 stats["total_offers"] = len(offers)
 
@@ -139,7 +139,7 @@ async def get_hot_deals_stats(city: str | None = Query(None), db=Depends(get_db)
                     stats["max_discount"] = round(max(discounts), 1)
 
         if hasattr(db, "get_stores_by_city"):
-            stores = await db.get_stores_by_city(normalized_city)
+            stores = db.get_stores_by_city(normalized_city)
             if stores:
                 stats["total_stores"] = len(stores)
 

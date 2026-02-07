@@ -90,7 +90,7 @@ async def _resolve_missing_coords(raw_stores: list[Any], db) -> None:
         store_id = int(get_val(store, "id", 0) or get_val(store, "store_id", 0) or 0)
         if store_id and hasattr(db, "update_store_location"):
             try:
-                await db.update_store_location(
+                db.update_store_location(
                     store_id,
                     lat,
                     lon,
@@ -125,18 +125,18 @@ async def get_stores(
 
         raw_stores: list[Any] = []
 
-        async def _fetch_scoped_stores(
+        def _fetch_scoped_stores(
             city_scope: str | None, region_scope: str | None, district_scope: str | None
         ) -> list[Any]:
             if hasattr(db, "get_stores_by_location"):
-                return await db.get_stores_by_location(
+                return db.get_stores_by_location(
                     city=city_scope,
                     region=region_scope,
                     district=district_scope,
                     business_type=business_type,
                 )
             if city_scope and hasattr(db, "get_stores_by_city"):
-                return await db.get_stores_by_city(city_scope)
+                return db.get_stores_by_city(city_scope)
             return []
 
         scopes: list[tuple[str | None, str | None, str | None]] = []
@@ -157,7 +157,7 @@ async def get_stores(
             if scope in seen:
                 continue
             seen.add(scope)
-            scoped_stores = await _fetch_scoped_stores(*scope) or []
+            scoped_stores = _fetch_scoped_stores(*scope) or []
             if not scoped_stores:
                 continue
             for store in scoped_stores:
@@ -174,7 +174,7 @@ async def get_stores(
             and lon_val is not None
             and hasattr(db, "get_nearby_stores")
         ):
-            raw_stores = await db.get_nearby_stores(
+            raw_stores = db.get_nearby_stores(
                 latitude=lat_val,
                 longitude=lon_val,
                 business_type=business_type,
@@ -233,21 +233,21 @@ async def get_store(
 ):
     """Get store details by ID."""
     try:
-        store = await db.get_store(store_id) if hasattr(db, "get_store") else None
+        store = db.get_store(store_id) if hasattr(db, "get_store") else None
         if not store:
             raise HTTPException(status_code=404, detail="Store not found")
 
         offers_count = int(get_val(store, "offers_count", 0) or 0)
         if offers_count == 0 and hasattr(db, "get_store_offers"):
             try:
-                offers_count = len((await db.get_store_offers(store_id)) or [])
+                offers_count = len((db.get_store_offers(store_id)) or [])
             except Exception:  # pragma: no cover - defensive
                 offers_count = 0
 
         rating = float(get_val(store, "avg_rating", 0) or get_val(store, "rating", 0) or 0)
         if rating == 0.0 and hasattr(db, "get_store_average_rating"):
             try:
-                rating = float(await db.get_store_average_rating(store_id) or 0)
+                rating = float(db.get_store_average_rating(store_id) or 0)
             except Exception:  # pragma: no cover - defensive
                 rating = 0.0
 
@@ -292,19 +292,19 @@ async def get_store_reviews(store_id: int, db=Depends(get_db)):
         if not hasattr(db, "get_store_ratings"):
             return {"reviews": [], "average_rating": 0.0, "total_reviews": 0}
 
-        reviews = await db.get_store_ratings(store_id) or []
+        reviews = db.get_store_ratings(store_id) or []
 
         average_rating = 0.0
         total_reviews = len(reviews)
         if hasattr(db, "get_store_rating_summary"):
             try:
-                average_rating, total_reviews = await db.get_store_rating_summary(store_id)
+                average_rating, total_reviews = db.get_store_rating_summary(store_id)
             except Exception:  # pragma: no cover - defensive
                 average_rating = 0.0
                 total_reviews = len(reviews)
         elif hasattr(db, "get_store_average_rating"):
             try:
-                average_rating = float(await db.get_store_average_rating(store_id) or 0.0)
+                average_rating = float(db.get_store_average_rating(store_id) or 0.0)
             except Exception:  # pragma: no cover - defensive
                 average_rating = 0.0
 
@@ -332,7 +332,7 @@ async def get_nearby_stores(
     try:
         raw_stores: list[Any] = []
         if hasattr(db, "get_nearby_stores"):
-            raw_stores = await db.get_nearby_stores(
+            raw_stores = db.get_nearby_stores(
                 latitude=location.latitude,
                 longitude=location.longitude,
                 max_distance_km=radius_km,
