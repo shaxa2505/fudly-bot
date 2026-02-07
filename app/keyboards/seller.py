@@ -45,10 +45,11 @@ def main_menu_seller(
     """Compact partner menu focused on core actions."""
     builder = ReplyKeyboardBuilder()
     builder.button(text=get_text(lang, "orders"))
+    builder.button(text=get_text(lang, "partner_panel"))
     builder.button(text=get_text(lang, "add_item"))
     builder.button(text=get_text(lang, "my_items"))
     builder.button(text=f"\U0001F464 {get_text(lang, 'profile')}")
-    builder.adjust(2, 2)
+    builder.adjust(2, 2, 1)
     return builder.as_markup(resize_keyboard=True)
 
 

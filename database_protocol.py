@@ -549,7 +549,15 @@ class DatabaseProtocol(Protocol):
     ) -> RowList:
         ...
 
-    def search_stores(self, query: str, city: str | None = None) -> RowList:
+    def search_stores(
+        self,
+        query: str,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> RowList:
         ...
 
     # ======= STORE PAYMENT INTEGRATIONS =======

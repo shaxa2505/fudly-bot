@@ -54,6 +54,34 @@ class SearchMixin:
         self._fts_available_cache = cache
         return available
 
+    def _is_trgm_available(self) -> bool:
+        cache = getattr(self, "_trgm_available_cache", None)
+        if cache is not None:
+            return cache
+
+        available = False
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm'")
+                available = cursor.fetchone() is not None
+        except Exception as e:
+            logger.warning(f"pg_trgm availability check failed: {e}")
+            available = False
+
+        self._trgm_available_cache = available
+        return available
+
+    def _trgm_threshold(self, query: str) -> float:
+        length = len(query or "")
+        if length <= 3:
+            return 0.42
+        if length <= 5:
+            return 0.34
+        if length <= 7:
+            return 0.28
+        return 0.24
+
     def _sanitize_search_query(self, query: str) -> str:
         query = re.sub(r"[!@#$%^&*()+=\[\]{};:'\",.<>?/\\|`~]", " ", query)
         query = re.sub(r"\s+", " ", query).strip()
@@ -256,6 +284,29 @@ class SearchMixin:
                     return results
 
         order_by = self._build_search_order(sort_by, include_relevance=True)
+        use_trgm = self._is_trgm_available()
+        trgm_join = ""
+        trgm_select = ""
+        trgm_where = ""
+        trgm_order = ""
+        trgm_join_params: list[Any] = []
+        trgm_threshold_param: float | None = None
+        if use_trgm:
+            threshold = self._trgm_threshold(query)
+            trgm_join = """
+            CROSS JOIN LATERAL (
+                SELECT GREATEST(
+                    similarity(LOWER(o.title), LOWER(%s)),
+                    similarity(LOWER(COALESCE(o.description, '')), LOWER(%s)),
+                    similarity(LOWER(s.name), LOWER(%s))
+                ) AS trgm_score
+            ) trgm
+            """
+            trgm_select = ", trgm.trgm_score"
+            trgm_where = " OR trgm.trgm_score >= %s"
+            trgm_order = ", trgm.trgm_score DESC"
+            trgm_join_params = [query, query, query]
+            trgm_threshold_param = threshold
         base_sql = f"""
             SELECT
                 o.offer_id, o.store_id, o.title, o.description,
@@ -274,14 +325,18 @@ class SearchMixin:
                         OR LOWER(o.title) LIKE '%%' || REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(%s), 'a', 'а'), 'e', 'е'), 'o', 'о'), 'p', 'р'), 'c', 'с') || '%%'
                     THEN 5 ELSE 0 END
                 ) as relevance
+                {trgm_select}
             FROM offers o
             JOIN stores s ON o.store_id = s.store_id
+            {trgm_join}
             WHERE o.status = 'active'
             AND COALESCE(o.stock_quantity, o.quantity) > 0
             AND (s.status = 'approved' OR s.status = 'active')
         """
 
         params = [query, query, query, query, query]
+        if trgm_join_params:
+            params.extend(trgm_join_params)
 
         # Добавляем фильтр по городу с транслитерацией
         location_conditions, location_params = self._collect_location_filters(
@@ -322,7 +377,7 @@ class SearchMixin:
                 base_sql += " AND o.category = ANY(%s)"
                 params.append(categories)
 
-        base_sql += """
+        base_sql += f"""
             AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
             AND (
                 LOWER(o.title) LIKE '%%' || LOWER(%s) || '%%' OR
@@ -330,11 +385,14 @@ class SearchMixin:
                 LOWER(s.name) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(s.category) LIKE '%%' || LOWER(%s) || '%%' OR
                 TRANSLATE(LOWER(o.title), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
+                {trgm_where}
             )
-            ORDER BY {order_by}
+            ORDER BY {order_by}{trgm_order}
             LIMIT %s OFFSET %s
         """
         params.extend([query, query, query, query, query])
+        if trgm_threshold_param is not None:
+            params.append(trgm_threshold_param)
         params.extend([limit, offset])
 
         with self.get_connection() as conn:
@@ -588,6 +646,8 @@ class SearchMixin:
         city: str | None = None,
         region: str | None = None,
         district: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> list[Any]:
         """Search stores by name with transliteration support."""
         tsquery = self._build_tsquery(query)
@@ -613,9 +673,9 @@ class SearchMixin:
                 FROM stores
                 WHERE {where_clause}
                 ORDER BY relevance DESC
-                LIMIT 20
+                LIMIT %s OFFSET %s
             """
-            select_params = [tsquery] + params
+            select_params = [tsquery] + params + [limit, offset]
             with self.get_connection() as conn:
                 cursor = conn.cursor(row_factory=dict_row)
                 cursor.execute(base_sql, tuple(select_params))
@@ -623,7 +683,31 @@ class SearchMixin:
                 if results:
                     return results
 
-        base_sql = """
+        use_trgm = self._is_trgm_available()
+        trgm_join = ""
+        trgm_select = ""
+        trgm_where = ""
+        trgm_order = ""
+        trgm_join_params: list[Any] = []
+        trgm_threshold_param: float | None = None
+        if use_trgm:
+            threshold = self._trgm_threshold(query)
+            trgm_join = """
+            CROSS JOIN LATERAL (
+                SELECT GREATEST(
+                    similarity(LOWER(name), LOWER(%s)),
+                    similarity(LOWER(COALESCE(description, '')), LOWER(%s)),
+                    similarity(LOWER(COALESCE(category, '')), LOWER(%s))
+                ) AS trgm_score
+            ) trgm
+            """
+            trgm_select = ", trgm.trgm_score"
+            trgm_where = " OR trgm.trgm_score >= %s"
+            trgm_order = ", trgm.trgm_score DESC"
+            trgm_join_params = [query, query, query]
+            trgm_threshold_param = threshold
+
+        base_sql = f"""
             SELECT
                 store_id, name, address, category, description, city, phone,
                 delivery_enabled, delivery_price, min_order_amount,
@@ -637,11 +721,15 @@ class SearchMixin:
                         OR LOWER(name) LIKE '%%' || REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(%s), 'a', 'а'), 'e', 'е'), 'o', 'о'), 'p', 'р'), 'c', 'с') || '%%'
                     THEN 5 ELSE 0 END
                 ) as relevance
+                {trgm_select}
             FROM stores
+            {trgm_join}
             WHERE (status = 'approved' OR status = 'active')
         """
 
         params = [query, query, query, query, query, query]
+        if trgm_join_params:
+            params.extend(trgm_join_params)
 
         # Добавляем фильтр по городу с транслитерацией
         location_conditions, location_params = self._collect_location_filters(
@@ -651,17 +739,21 @@ class SearchMixin:
             base_sql += " AND " + " AND ".join(location_conditions)
             params.extend(location_params)
 
-        base_sql += """
+        base_sql += f"""
             AND (
                 LOWER(name) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(category) LIKE '%%' || LOWER(%s) || '%%' OR
                 LOWER(description) LIKE '%%' || LOWER(%s) || '%%' OR
                 TRANSLATE(LOWER(name), 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя', 'abvgdeejziiklmnoprstufxcchshshhyyyeua') LIKE '%%' || LOWER(%s) || '%%'
+                {trgm_where}
             )
-            ORDER BY relevance DESC
-            LIMIT 20
+            ORDER BY relevance DESC{trgm_order}
+            LIMIT %s OFFSET %s
         """
         params.extend([query, query, query, query])
+        if trgm_threshold_param is not None:
+            params.append(trgm_threshold_param)
+        params.extend([limit, offset])
 
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
@@ -676,6 +768,8 @@ class SearchMixin:
                     city=None,
                     region=resolved_region,
                     district=resolved_district,
+                    limit=limit,
+                    offset=offset,
                 )
 
         return results

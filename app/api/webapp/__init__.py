@@ -20,6 +20,7 @@ def get_router() -> APIRouter:
         routes_offers,
         routes_orders,
         routes_photo,
+        routes_search,
         routes_search_stats,
         routes_stores,
     )
@@ -31,6 +32,7 @@ def get_router() -> APIRouter:
     router.include_router(routes_favorites.router)
     router.include_router(routes_cart.router)
     router.include_router(routes_photo.router)
+    router.include_router(routes_search.router)
     router.include_router(routes_search_stats.router)
     router.include_router(routes_location.router)
 

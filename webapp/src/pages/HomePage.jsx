@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -13,7 +14,8 @@ import ScrollTopButton from '../components/ScrollTopButton'
 import LocationPickerModal from '../components/LocationPickerModal'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
-import { blurOnEnter } from '../utils/helpers'
+import { blurOnEnter, formatPrice } from '../utils/helpers'
+import { resolveOfferImageUrl, resolveStoreImageUrl, PLACEHOLDER_IMAGE } from '../utils/imageUtils'
 import './HomePage.css'
 
 const CATEGORIES = [

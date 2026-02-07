@@ -396,6 +396,33 @@ const api = {
     return cachedGet('/search/suggestions', params, 15000) || []
   },
 
+  async searchAll(query, options = {}) {
+    const normalized = String(query || '').trim()
+    if (normalized.length < 2) {
+      return { query: normalized, offers: [], stores: [] }
+    }
+    const {
+      city,
+      region,
+      district,
+      limit_offers = 5,
+      limit_stores = 5,
+      offset_offers = 0,
+      offset_stores = 0,
+    } = options
+    const params = {
+      query: normalized,
+      limit_offers,
+      limit_stores,
+      offset_offers,
+      offset_stores,
+    }
+    if (city) params.city = city
+    if (region) params.region = region
+    if (district) params.district = district
+    return cachedGet('/search', params, 10000, options) || { query: normalized, offers: [], stores: [] }
+  },
+
   async reverseGeocode(lat, lon, lang = 'uz') {
     if (lat == null || lon == null) return null
     return cachedGet('/location/reverse', { lat, lon, lang }, 3600000)

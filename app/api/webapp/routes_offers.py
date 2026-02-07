@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import inspect
 import os
 from typing import Any
 
@@ -26,6 +27,18 @@ router = APIRouter()
 CATEGORY_ALIASES: dict[str, list[str]] = {
     "sweets": ["sweets", "snacks"],
 }
+
+async def _maybe_await(value: Any) -> Any:
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+async def _db_call(db: Any, name: str, *args: Any, **kwargs: Any) -> Any:
+    if not hasattr(db, name):
+        return None
+    result = getattr(db, name)(*args, **kwargs)
+    return await _maybe_await(result)
 
 
 def _get_cache_ttl(env_name: str, default: int) -> int:
@@ -164,7 +177,7 @@ async def get_categories(
         if cached is not None:
             return cached
 
-    def _count_for_scope(
+    async def _count_for_scope(
         category_filter: list[str] | None,
         city_scope: str | None,
         region_scope: str | None,
@@ -172,16 +185,21 @@ async def get_categories(
     ) -> int:
         if hasattr(db, "count_offers_by_filters"):
             return int(
-                db.count_offers_by_filters(
+                (await _db_call(
+                    db,
+                    "count_offers_by_filters",
                     city=city_scope,
                     region=region_scope,
                     district=district_scope,
                     category=category_filter,
-                )
+                ))
+                or 0
             )
         if category_filter:
             if hasattr(db, "get_offers_by_city_and_category"):
-                offers = db.get_offers_by_city_and_category(
+                offers = await _db_call(
+                    db,
+                    "get_offers_by_city_and_category",
                     city=city_scope,
                     category=category_filter,
                     region=region_scope,
@@ -194,18 +212,22 @@ async def get_categories(
                 if isinstance(category_filter, (list, tuple)):
                     offers = []
                     for item in category_filter:
-                        offers.extend((db.get_offers_by_category(item, city_scope)) or [])
+                        offers.extend(
+                            (await _db_call(db, "get_offers_by_category", item, city_scope)) or []
+                        )
                     return len(offers)
-                offers = db.get_offers_by_category(category_filter, city_scope) or []
+                offers = await _db_call(db, "get_offers_by_category", category_filter, city_scope) or []
                 return len(offers)
             return 0
         if hasattr(db, "count_hot_offers"):
             return (
-                db.count_hot_offers(
+                (await _db_call(
+                    db,
+                    "count_hot_offers",
                     city_scope,
                     region=region_scope,
                     district=district_scope,
-                )
+                ))
                 or 0
             )
         return 0
@@ -227,10 +249,14 @@ async def get_categories(
         total_count = 0
         for city_scope, region_scope, district_scope in scopes:
             try:
-                counts_map = db.count_offers_by_category_grouped(
-                    city=city_scope,
-                    region=region_scope,
-                    district=district_scope,
+                counts_map = (
+                    await _db_call(
+                        db,
+                        "count_offers_by_category_grouped",
+                        city=city_scope,
+                        region=region_scope,
+                        district=district_scope,
+                    )
                 ) or {}
             except Exception:  # pragma: no cover - defensive
                 counts_map = {}
@@ -253,7 +279,7 @@ async def get_categories(
             category_filter = expand_category_filter(cat["id"])
             try:
                 for city_scope, region_scope, district_scope in scopes:
-                    count = _count_for_scope(
+                    count = await _count_for_scope(
                         category_filter if cat["id"] != "all" else None,
                         city_scope,
                         region_scope,
@@ -341,7 +367,9 @@ async def get_offers(
                 return cached
         if store_id:
             raw_offers = (
-                db.get_store_offers(
+                await _db_call(
+                    db,
+                    "get_store_offers",
                     store_id,
                     limit=limit,
                     offset=offset,
@@ -354,16 +382,18 @@ async def get_offers(
                 else []
             )
             if hasattr(db, "get_store"):
-                store_fallback = db.get_store(store_id)
+                store_fallback = await _db_call(db, "get_store", store_id)
             apply_filters = False
             apply_sort = False
             apply_slice = False
         elif search:
-            def _search_scoped(
+            async def _search_scoped(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
             ) -> list[Any]:
                 return (
-                    db.search_offers(
+                    await _db_call(
+                        db,
+                        "search_offers",
                         search,
                         city_scope,
                         limit=limit,
@@ -380,7 +410,7 @@ async def get_offers(
                     else []
                 )
 
-            raw_offers = _search_scoped(normalized_city, region, district)
+            raw_offers = await _search_scoped(normalized_city, region, district)
             if not raw_offers and hasattr(db, "search_offers"):
                 scopes: list[tuple[str | None, str | None, str | None]] = []
                 if district:
@@ -398,7 +428,7 @@ async def get_offers(
                     if scope in seen:
                         continue
                     seen.add(scope)
-                    raw_offers = _search_scoped(*scope)
+                    raw_offers = await _search_scoped(*scope)
                     if raw_offers:
                         break
 
@@ -406,10 +436,12 @@ async def get_offers(
             apply_sort = False
             apply_slice = False
         else:
-            def _fetch_nearby_offers() -> list[Any]:
+            async def _fetch_nearby_offers() -> list[Any]:
                 if lat_val is None or lon_val is None or not hasattr(db, "get_nearby_offers"):
                     return []
-                nearby = db.get_nearby_offers(
+                nearby = await _db_call(
+                    db,
+                    "get_nearby_offers",
                     latitude=lat_val,
                     longitude=lon_val,
                     limit=limit,
@@ -422,7 +454,9 @@ async def get_offers(
                     max_distance_km=max_distance,
                 )
                 if not nearby and extended_distance and extended_distance > max_distance:
-                    nearby = db.get_nearby_offers(
+                    nearby = await _db_call(
+                        db,
+                        "get_nearby_offers",
                         latitude=lat_val,
                         longitude=lon_val,
                         limit=limit,
@@ -438,14 +472,16 @@ async def get_offers(
 
             has_location_filters = bool(normalized_city or region or district)
             if not has_location_filters:
-                raw_offers = _fetch_nearby_offers()
+                raw_offers = await _fetch_nearby_offers()
 
-            def _fetch_scoped_offers(
+            async def _fetch_scoped_offers(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
             ) -> list[Any]:
                 if category_filter:
                     if hasattr(db, "get_offers_by_city_and_category"):
-                        return db.get_offers_by_city_and_category(
+                        return await _db_call(
+                            db,
+                            "get_offers_by_city_and_category",
                             city=city_scope,
                             category=category_filter,
                             limit=limit,
@@ -462,13 +498,15 @@ async def get_offers(
                             combined: list[Any] = []
                             for item in category_filter:
                                 combined.extend(
-                                    (db.get_offers_by_category(item, city_scope)) or []
+                                    (await _db_call(db, "get_offers_by_category", item, city_scope)) or []
                                 )
                             return combined
-                        return db.get_offers_by_category(category_filter, city_scope)
+                        return await _db_call(db, "get_offers_by_category", category_filter, city_scope)
                     return []
                 if hasattr(db, "get_hot_offers"):
-                    return db.get_hot_offers(
+                    return await _db_call(
+                        db,
+                        "get_hot_offers",
                         city_scope,
                         limit=limit,
                         offset=offset,
@@ -499,12 +537,12 @@ async def get_offers(
                     continue
                 seen.add(scope)
                 if not raw_offers:
-                    raw_offers = _fetch_scoped_offers(*scope)
+                    raw_offers = await _fetch_scoped_offers(*scope)
                 if raw_offers:
                     break
 
             if not raw_offers:
-                raw_offers = _fetch_nearby_offers()
+                raw_offers = await _fetch_nearby_offers()
 
             apply_filters = False
             apply_sort = False
@@ -611,7 +649,9 @@ async def get_offers(
             total: int | None = None
             if not store_id and not search and hasattr(db, "count_offers_by_filters"):
                 total = int(
-                    db.count_offers_by_filters(
+                    (await _db_call(
+                        db,
+                        "count_offers_by_filters",
                         city=normalized_city,
                         region=region,
                         district=district,
@@ -619,7 +659,8 @@ async def get_offers(
                         min_price=storage_min_price,
                         max_price=storage_max_price,
                         min_discount=min_discount,
-                    )
+                    ))
+                    or 0
                 )
             if total == 0 and offers:
                 total = None
@@ -654,13 +695,17 @@ async def get_offers(
 async def get_offer(offer_id: int, db=Depends(get_db)):
     """Get single offer by ID."""
     try:
-        offer = db.get_offer(offer_id) if hasattr(db, "get_offer") else None
+        offer = (
+            await _db_call(db, "get_offer", offer_id) if hasattr(db, "get_offer") else None
+        )
 
         if not offer or not is_offer_active(offer):
             raise HTTPException(status_code=404, detail="Offer not found")
 
         store_fallback = (
-            db.get_store(get_val(offer, "store_id")) if hasattr(db, "get_store") else None
+            await _db_call(db, "get_store", get_val(offer, "store_id"))
+            if hasattr(db, "get_store")
+            else None
         )
 
         original_price_sums = normalize_price(get_val(offer, "original_price", 0))
@@ -729,8 +774,14 @@ async def get_flash_deals(
         region = normalize_city(region) if region else None
         district = normalize_city(district) if district else None
         raw_offers = (
-            db.get_hot_offers(
-                normalized_city, limit=100, offset=0, region=region, district=district
+            await _db_call(
+                db,
+                "get_hot_offers",
+                normalized_city,
+                limit=100,
+                offset=0,
+                region=region,
+                district=district,
             )
             if hasattr(db, "get_hot_offers")
             else []
@@ -738,7 +789,7 @@ async def get_flash_deals(
 
         # Fallback: if filters by region/district return nothing, retry by city only
         if not raw_offers and normalized_city and (region or district) and hasattr(db, "get_hot_offers"):
-            raw_offers = db.get_hot_offers(normalized_city, limit=100, offset=0)
+            raw_offers = await _db_call(db, "get_hot_offers", normalized_city, limit=100, offset=0)
 
         if not raw_offers:
             raw_offers = []

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo, useDeferredValue } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, useMemo, useDeferredValue, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Store,
   ShoppingCart,
@@ -162,6 +162,7 @@ const getNextOpenLabel = (store, hoursLabel) => {
 
 function StoresPage() {
   const navigate = useNavigate()
+  const routeLocation = useLocation()
   const { cartCount } = useCart()
 
   const [stores, setStores] = useState([])
@@ -187,6 +188,7 @@ function StoresPage() {
   })
   const [locationLoading, setLocationLoading] = useState(false)
   const searchInputRef = useRef(null)
+  const openStoreRef = useRef(null)
 
   const deferredQuery = useDeferredValue(searchQuery)
   const normalizedQuery = deferredQuery.trim().toLowerCase()
@@ -298,7 +300,7 @@ function StoresPage() {
     }
   }
 
-  const loadStoreOffers = async (store) => {
+  const loadStoreOffers = useCallback(async (store) => {
     if (!store || !store.id) {
       console.error('Invalid store data:', store)
       return
@@ -322,7 +324,19 @@ function StoresPage() {
     } finally {
       setLoadingOffers(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const openStore = routeLocation.state?.openStore
+    const storeId = openStore?.id || openStore?.store_id
+    if (!storeId) return
+    const openStoreKey = `${routeLocation.key || 'state'}:${storeId}`
+    if (openStoreRef.current === openStoreKey) return
+    openStoreRef.current = openStoreKey
+    const matchedStore = stores.find((store) => store.id === storeId)
+    loadStoreOffers(matchedStore || { ...openStore, id: storeId })
+    navigate(routeLocation.pathname, { replace: true, state: {} })
+  }, [routeLocation.state, routeLocation.pathname, routeLocation.key, stores, loadStoreOffers, navigate])
 
   const closeModal = () => {
     setSelectedStore(null)
@@ -417,7 +431,7 @@ function StoresPage() {
       console.error('Favorite toggle error:', error)
       window.Telegram?.WebApp?.showAlert?.('Sevimlilarni yangilab bo\'lmadi')
     }
-  }
+  }, [])
 
   const baseStores = useMemo(
     () => (activeFilter === 'favorites' ? favoriteStores : stores),
