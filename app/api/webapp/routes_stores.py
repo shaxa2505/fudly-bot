@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import inspect
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +13,19 @@ from app.core.utils import normalize_city
 router = APIRouter()
 
 _MAX_GEOCODE_PER_REQUEST = max(0, int(os.getenv("FUDLY_STORE_GEOCODE_LIMIT", "8") or 0))
+
+
+async def _maybe_await(value: Any) -> Any:
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+async def _db_call(db: Any, name: str, *args: Any, **kwargs: Any) -> Any:
+    if not hasattr(db, name):
+        return None
+    result = getattr(db, name)(*args, **kwargs)
+    return await _maybe_await(result)
 
 
 def _parse_float(value: Any) -> float | None:
