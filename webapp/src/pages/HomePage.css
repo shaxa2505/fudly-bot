@@ -1647,6 +1647,8 @@
   contain: layout paint;
   min-width: 0;
   width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: 260px 320px;
 }
 
 .offer-card-wrapper.animate-in > * {
