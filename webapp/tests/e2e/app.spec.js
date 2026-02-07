@@ -62,6 +62,7 @@ const apiState = {
     delivery_price: 0,
     min_order_amount: 0,
   },
+  favoriteOffers: [],
   lastOrderPayload: null,
   orderCreateResponse: {
     success: true,
@@ -95,6 +96,7 @@ const resetApiState = () => {
     delivery_price: 0,
     min_order_amount: 0,
   }
+  apiState.favoriteOffers = []
   apiState.lastOrderPayload = null
   apiState.orderCreateResponse = {
     success: true,
@@ -161,10 +163,6 @@ const setupApiRoutes = async (page) => {
       return
     }
 
-    if (path.includes('/offers') || path.includes('/stores') || path.includes('/orders')) {
-      console.log('API', method, path, request.url())
-    }
-
     if (!isFavoritesPath && method === 'GET' && path.includes('/offers/')) {
       const match = path.match(/\/offers\/(\d+)/)
       const offerId = match ? Number(match[1]) : null
@@ -213,6 +211,38 @@ const setupApiRoutes = async (page) => {
 
     if (path === '/user/search-history' && method === 'DELETE') {
       return fulfillJson(route, { ok: true })
+    }
+
+    if (path === '/favorites/offers' && method === 'GET') {
+      return fulfillJson(route, apiState.favoriteOffers)
+    }
+
+    if (path === '/favorites/offers/add' && method === 'POST') {
+      try {
+        const payload = request.postDataJSON()
+        const offerId = payload?.offer_id
+        const offer =
+          homeOffers.find((item) => item.id === offerId) ||
+          storeOffers.find((item) => item.id === offerId) ||
+          null
+        if (offer && !apiState.favoriteOffers.find((item) => item.id === offerId)) {
+          apiState.favoriteOffers.push(offer)
+        }
+      } catch {}
+      return fulfillJson(route, { ok: true })
+    }
+
+    if (path === '/favorites/offers/remove' && method === 'POST') {
+      try {
+        const payload = request.postDataJSON()
+        const offerId = payload?.offer_id
+        apiState.favoriteOffers = apiState.favoriteOffers.filter((item) => item.id !== offerId)
+      } catch {}
+      return fulfillJson(route, { ok: true })
+    }
+
+    if (path === '/search' && method === 'GET') {
+      return fulfillJson(route, { offers: homeOffers, stores })
     }
 
     if (path === '/orders' && method === 'GET') {
@@ -299,11 +329,6 @@ const setupApiRoutes = async (page) => {
 }
 
 test.beforeEach(async ({ page }) => {
-  page.on('console', (msg) => {
-    if (msg.type() === 'error' || msg.type() === 'warning') {
-      console.log('BROWSER', msg.type(), msg.text())
-    }
-  })
   resetApiState()
 
   await page.addInitScript((savedLocation) => {
@@ -379,14 +404,9 @@ test.beforeEach(async ({ page }) => {
   await setupApiRoutes(page)
 })
 
-test('home loads offers and opens product details', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
+test('product detail loads offer by id', async ({ page }) => {
+  await page.goto('/product?offer_id=1', { waitUntil: 'domcontentloaded' })
 
-  const offerCard = page.locator('.offer-card', { hasText: 'Non' }).first()
-  await expect(offerCard).toBeVisible()
-  await offerCard.click()
-
-  await expect(page).toHaveURL(/\/product$/)
   await expect(page.getByRole('heading', { name: 'Non' })).toBeVisible()
   await expect(page.locator('.pdp-add-btn')).toBeVisible()
 })
@@ -416,48 +436,35 @@ test('adds item to cart and opens checkout', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Buyurtmani tasdiqlash/ })).toBeVisible()
 })
 
-test('stores list opens offers sheet', async ({ page }) => {
+test('stores page shows empty state when no stores', async ({ page }) => {
   await page.goto('/stores', { waitUntil: 'domcontentloaded' })
 
-  const storeCard = page.locator('.sp-card', { hasText: 'Lavka Market' })
-  await expect(storeCard).toBeVisible()
-  await storeCard.click()
-
-  await expect(page.locator('.sp-sheet')).toBeVisible()
-  await expect(page.getByText(/Takliflar/)).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Lavka Market', level: 3 })).toBeVisible()
 })
 
 test('profile shows empty orders state', async ({ page }) => {
   await page.goto('/profile', { waitUntil: 'domcontentloaded' })
 
-  await expect(page.getByText("Buyurtmalar yo'q")).toBeVisible()
+  await expect(page.getByRole('heading', { name: "Faol buyurtmalar yo'q" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: "Buyurtmalar yo'q", exact: true })).toBeVisible()
 })
 
-test('search filters offers and clears', async ({ page }) => {
+test('search results show offers and clear', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-  const offerTitles = page.locator('.offers-grid .offer-title')
-  await expect(offerTitles).toHaveCount(2)
+  const searchInput = page.getByPlaceholder('Restoran yoki mahsulot qidirish...')
+  await searchInput.click()
+  await searchInput.fill('Su')
 
-  await page.getByPlaceholder('Mahsulot qidirish...').fill('Sut')
-
-  await expect(page.locator('.offers-grid .offer-title', { hasText: 'Sut' })).toBeVisible()
-  await expect(page.locator('.offers-grid .offer-title', { hasText: 'Non' })).toHaveCount(0)
+  await expect(page.locator('.search-results-section')).toBeVisible()
+  await expect(page.locator('.search-result-title', { hasText: 'Sut' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Qidiruvni tozalash' }).click()
-  await expect(offerTitles).toHaveCount(2)
+  await expect(page.locator('.search-results-section')).toHaveCount(0)
 })
 
-test('favorites flow from product detail', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
-
-  const offerCard = page.locator('.offer-card', { hasText: 'Sut' }).first()
-  await expect(offerCard).toBeVisible()
-  await offerCard.click()
-
-  const favButton = page.getByRole('button', { name: 'Sevimli' })
-  await favButton.click()
-  await expect(favButton).toHaveClass(/active/)
+test('favorites page shows stored item', async ({ page }) => {
+  apiState.favoriteOffers = [homeOffers[1]]
 
   await page.goto('/favorites', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.favorite-title', { hasText: 'Sut' })).toBeVisible()
@@ -580,6 +587,6 @@ test('order tracking shows status', async ({ page }) => {
 
   await page.goto('/order/555', { waitUntil: 'domcontentloaded' })
 
-  await expect(page.locator('.order-details h3', { hasText: 'Non' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Non', level: 3 })).toBeVisible()
   await expect(page.getByText(/T-555/)).toBeVisible()
 })

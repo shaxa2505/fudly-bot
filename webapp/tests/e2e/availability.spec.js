@@ -36,10 +36,17 @@ const locationState = {
   district: '',
 }
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key',
+}
+
 const fulfillJson = (route, data) =>
   route.fulfill({
     status: 200,
     contentType: 'application/json',
+    headers: CORS_HEADERS,
     body: JSON.stringify(data),
   })
 
@@ -53,6 +60,11 @@ const setupApiRoutes = async (page) => {
 
     if (!path) {
       await route.fallback()
+      return
+    }
+
+    if (method === 'OPTIONS') {
+      await route.fulfill({ status: 200, headers: CORS_HEADERS })
       return
     }
 
@@ -211,7 +223,7 @@ test('closed offer shows label and disables add to cart', async ({ page }) => {
     resp.url().includes('/api/v1/offers/1') && resp.status() === 200
   )
 
-  await page.goto('/product?offer_id=1')
+  await page.goto('/product?offer_id=1', { waitUntil: 'domcontentloaded' })
 
   await offerResponse
   await expect(page.locator('.pdp-availability', { hasText: 'Hozir yopiq' })).toBeVisible()
