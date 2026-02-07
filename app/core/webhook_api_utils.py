@@ -1,9 +1,59 @@
 ﻿"""Shared helpers for webhook Mini App API routes."""
 from __future__ import annotations
 
+import logging
+import os
+import urllib.parse
 from typing import Callable
 
 from aiohttp import web
+
+logger = logging.getLogger("fudly")
+
+
+def _origin_from_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        parsed = urllib.parse.urlsplit(value.strip())
+    except Exception:
+        return None
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _resolve_cors_origin() -> str:
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment in ("development", "dev", "local", "test")
+    partner_panel_enabled = os.getenv("PARTNER_PANEL_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    # Prefer explicit origins, fall back to WEBAPP_URL
+    origin = _origin_from_url(os.getenv("WEBAPP_ORIGIN")) or _origin_from_url(
+        os.getenv("WEBAPP_URL")
+    )
+
+    if partner_panel_enabled and not origin:
+        origin = _origin_from_url(os.getenv("PARTNER_PANEL_ORIGIN")) or _origin_from_url(
+            os.getenv("PARTNER_PANEL_URL")
+        )
+
+    if origin:
+        return origin
+
+    if is_dev:
+        return "*"
+
+    logger.warning("⚠️ CORS origin not configured; falling back to '*'")
+    return "*"
+
+
+_CORS_ALLOW_ORIGIN = _resolve_cors_origin()
 
 
 async def cors_preflight(request: web.Request) -> web.Response:
@@ -11,7 +61,7 @@ async def cors_preflight(request: web.Request) -> web.Response:
     return web.Response(
         status=200,
         headers={
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": _CORS_ALLOW_ORIGIN,
             "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": (
                 "Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key"
@@ -23,7 +73,7 @@ async def cors_preflight(request: web.Request) -> web.Response:
 
 def add_cors_headers(response: web.Response) -> web.Response:
     """Add CORS headers to response."""
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = _CORS_ALLOW_ORIGIN
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, X-Telegram-Init-Data, Idempotency-Key, X-Idempotency-Key"

@@ -641,6 +641,17 @@ class StoreMixin:
             result = cursor.fetchone()
             return result[0] if result else None
 
+    def update_store_owner(self, store_id: int, new_owner_id: int) -> bool:
+        """Transfer store ownership to another user."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE stores SET owner_id = %s WHERE store_id = %s",
+                (new_owner_id, store_id),
+            )
+            logger.info(f"Store {store_id} ownership transferred to {new_owner_id}")
+            return cursor.rowcount > 0
+
     def update_store_photo(self, store_id: int, photo: str | None) -> bool:
         """Update store photo."""
         with self.get_connection() as conn:

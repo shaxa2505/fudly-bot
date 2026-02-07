@@ -55,9 +55,12 @@ class TestUserKeyboards:
         )
 
         assert isinstance(keyboard, InlineKeyboardMarkup)
-        # Should have switch to customer button
-        buttons = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert any("покупатель" in btn.lower() or "xaridor" in btn.lower() for btn in buttons)
+        # Partner-only: should have store settings, no switch to customer
+        buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+        callback_data = [btn.callback_data or "" for btn in buttons]
+        assert "my_store_settings" in callback_data
+        texts = [btn.text.lower() for btn in buttons]
+        assert not any("покупатель" in t or "xaridor" in t for t in texts)
 
     def test_settings_keyboard_seller_customer_mode(self) -> None:
         """Test settings keyboard for seller in customer mode."""
@@ -68,9 +71,12 @@ class TestUserKeyboards:
         )
 
         assert isinstance(keyboard, InlineKeyboardMarkup)
-        # Should have switch to seller button
-        buttons = [btn.text for row in keyboard.inline_keyboard for btn in row]
-        assert any("hamkor" in btn.lower() or "партнер" in btn.lower() for btn in buttons)
+        # Partner-only: still shows store settings, no switch to seller/customer
+        buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+        callback_data = [btn.callback_data or "" for btn in buttons]
+        assert "my_store_settings" in callback_data
+        texts = [btn.text.lower() for btn in buttons]
+        assert not any("hamkor" in t or "партнер" in t for t in texts)
 
 
 class TestMainMenuSeller:

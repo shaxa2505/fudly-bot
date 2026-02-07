@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import secrets
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -12,6 +11,14 @@ def _str_to_bool(value: str | None) -> bool:
     if value is None:
         return False
     return value.strip().lower() in {"true", "1", "yes", "y"}
+
+
+def _is_strict_env() -> bool:
+    """Return True when we should enforce strict production validation."""
+    env = os.getenv("ENVIRONMENT", "").strip().lower()
+    rail_env = os.getenv("RAILWAY_ENVIRONMENT", "").strip().lower()
+    use_webhook_env = os.getenv("USE_WEBHOOK", "").strip().lower() in {"1", "true", "yes", "y"}
+    return env == "production" or rail_env == "production" or use_webhook_env
 
 
 @dataclass(slots=True)
@@ -57,16 +64,13 @@ def load_settings() -> Settings:
     if webhook_url and not os.getenv("USE_WEBHOOK"):
         use_webhook = True
 
-    # Disable webhook if URL is missing even if USE_WEBHOOK=true
+    # Strict validation for webhook mode
     if use_webhook and not webhook_url:
-        print("⚠️ USE_WEBHOOK=true but WEBHOOK_URL is empty, falling back to polling")
-        use_webhook = False
+        raise ValueError("WEBHOOK_URL is required when USE_WEBHOOK=true")
 
-    # Generate SECRET_TOKEN automatically for webhook security if not provided
     secret_token = os.getenv("SECRET_TOKEN", "")
     if use_webhook and not secret_token:
-        secret_token = secrets.token_urlsafe(32)
-        print("⚠️ SECRET_TOKEN not set, auto-generated for webhook security")
+        raise ValueError("SECRET_TOKEN is required when USE_WEBHOOK=true")
 
     webhook = WebhookConfig(
         enabled=use_webhook,
@@ -75,6 +79,13 @@ def load_settings() -> Settings:
         port=int(os.getenv("PORT", "8080")),
         secret_token=secret_token,
     )
+
+    # Strict production validation
+    if _is_strict_env():
+        if admin_id <= 0:
+            raise ValueError("ADMIN_ID environment variable is required in production")
+        if not database_url:
+            raise ValueError("DATABASE_URL environment variable is required in production")
 
     return Settings(
         bot_token=token,

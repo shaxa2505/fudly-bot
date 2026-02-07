@@ -219,6 +219,10 @@ class DatabaseProtocol(Protocol):
         """Update store working hours string (HH:MM - HH:MM)."""
         ...
 
+    def update_store_owner(self, store_id: int, new_owner_id: int) -> bool:
+        """Transfer store ownership to another user."""
+        ...
+
     # ========== GEO REFERENCE METHODS ==========
     def resolve_geo_region(self, value: Any) -> dict[str, Any] | None:
         ...

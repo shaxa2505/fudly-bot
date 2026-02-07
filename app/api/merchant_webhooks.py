@@ -28,10 +28,27 @@ def _now_ms() -> int:
 
 def _require_auth(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     """Validate Basic Auth credentials."""
-    expected_user = os.getenv("UZUM_MERCHANT_LOGIN", "fudly_merchant")
-    expected_pass = os.getenv("UZUM_MERCHANT_PASSWORD", "Fudly#Uzum_2024!pQ7s")
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment in ("development", "dev", "local", "test")
 
-    if not (expected_user and expected_pass):
+    default_user = "fudly_merchant"
+    default_pass = "Fudly#Uzum_2024!pQ7s"
+    expected_user = os.getenv("UZUM_MERCHANT_LOGIN")
+    expected_pass = os.getenv("UZUM_MERCHANT_PASSWORD")
+
+    if not expected_user or not expected_pass:
+        if is_dev:
+            expected_user = expected_user or default_user
+            expected_pass = expected_pass or default_pass
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Merchant credentials not configured",
+            )
+
+    if not is_dev and (
+        expected_user == default_user or expected_pass == default_pass
+    ):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Merchant credentials not configured",

@@ -54,7 +54,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       const debugEnabled = ErrorBoundary.isDebugEnabled();
-      const forceDetails = debugEnabled || ErrorBoundary.isTelegramWebApp();
+      const forceDetails = debugEnabled;
       return (
         <div style={styles.container}>
           <div style={styles.content}>

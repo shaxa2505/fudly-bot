@@ -43,6 +43,10 @@ def _is_truthy(value: str | None) -> bool:
     return value.strip().lower() in {"1", "true", "yes"}
 
 
+def _partner_panel_enabled() -> bool:
+    return _is_truthy(os.getenv("PARTNER_PANEL_ENABLED", "0"))
+
+
 class _PerfTracker:
     """Lightweight in-process latency tracker for API endpoints."""
 
@@ -228,11 +232,20 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         "https://fudly-webapp.vercel.app",
     ]
 
-    # Allow explicitly configured origins (webapp + partner panel)
-    for env_name in ("WEBAPP_URL", "PARTNER_PANEL_URL", "WEBAPP_ORIGIN", "PARTNER_PANEL_ORIGIN"):
+    partner_panel_enabled = _partner_panel_enabled()
+
+    # Allow explicitly configured origins (webapp)
+    for env_name in ("WEBAPP_URL", "WEBAPP_ORIGIN"):
         origin = _origin_from_url(os.getenv(env_name))
         if origin and origin not in allowed_origins:
             allowed_origins.append(origin)
+
+    # Allow partner panel origins only when enabled
+    if partner_panel_enabled:
+        for env_name in ("PARTNER_PANEL_URL", "PARTNER_PANEL_ORIGIN"):
+            origin = _origin_from_url(os.getenv(env_name))
+            if origin and origin not in allowed_origins:
+                allowed_origins.append(origin)
 
     extra_origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
     if extra_origins:
@@ -313,28 +326,32 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     app.include_router(auth_router)
     app.include_router(webapp_router)
     app.include_router(orders_router)
-    app.include_router(partner_panel_router, prefix="/api/partner")
+    if partner_panel_enabled:
+        app.include_router(partner_panel_router, prefix="/api/partner")
     app.include_router(merchant_webhooks_router)
 
     @app.get("/")
     async def root():
         return {"service": "Fudly Mini App API", "version": "1.0.0", "docs": "/api/docs"}
 
-    # Serve partner panel static files if directory exists
+    # Serve partner panel static files if enabled
     # MUST be mounted AFTER API routes to avoid conflicts
-    if partner_panel_path.exists():
-        logger.info(f"✅ Mounting partner panel static files from {partner_panel_path}")
-        try:
-            # Mount static files with html=True to serve index.html for directory requests
-            app.mount(
-                "/partner-panel",
-                StaticFiles(directory=str(partner_panel_path), html=True),
-                name="partner-panel",
-            )
-        except Exception as e:
-            logger.error(f"❌ Failed to mount partner panel: {e}")
+    if partner_panel_enabled:
+        if partner_panel_path.exists():
+            logger.info(f"✅ Mounting partner panel static files from {partner_panel_path}")
+            try:
+                # Mount static files with html=True to serve index.html for directory requests
+                app.mount(
+                    "/partner-panel",
+                    StaticFiles(directory=str(partner_panel_path), html=True),
+                    name="partner-panel",
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to mount partner panel: {e}")
+        else:
+            logger.warning(f"⚠️ Partner panel directory not found: {partner_panel_path}")
     else:
-        logger.warning(f"⚠️ Partner panel directory not found: {partner_panel_path}")
+        logger.info("ℹ️ Partner panel disabled (PARTNER_PANEL_ENABLED=0)")
 
     # Debug endpoint - DEV ONLY (leaks filesystem layout)
     if is_dev:
@@ -344,6 +361,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
             """Debug endpoint to check file paths (development only)."""
             return {
                 "partner_panel": {
+                    "enabled": partner_panel_enabled,
                     "path": str(partner_panel_path.absolute()),
                     "exists": partner_panel_path.exists(),
                     "index_exists": (partner_panel_path / "index.html").exists()

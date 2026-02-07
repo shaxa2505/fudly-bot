@@ -197,7 +197,7 @@ class TestGetAppropriateMenu:
         assert result == "seller_menu"
 
     def test_seller_with_approved_store_in_customer_mode(self) -> None:
-        """Test seller with approved store in customer mode gets customer menu."""
+        """Test seller always gets seller menu (customer mode disabled)."""
         mock_user = MagicMock()
         mock_user.role = "seller"
 
@@ -218,10 +218,10 @@ class TestGetAppropriateMenu:
             main_menu_customer=mock_customer_menu,
         )
 
-        assert result == "customer_menu"
+        assert result == "seller_menu"
 
     def test_seller_without_approved_store(self) -> None:
-        """Test seller without approved store gets customer menu."""
+        """Test seller without approved store still gets seller menu."""
         mock_user = MagicMock()
         mock_user.role = "seller"
 
@@ -242,7 +242,7 @@ class TestGetAppropriateMenu:
             main_menu_customer=mock_customer_menu,
         )
 
-        assert result == "customer_menu"
+        assert result == "seller_menu"
 
     def test_store_owner_treated_as_seller(self) -> None:
         """Test store_owner role is treated as seller."""

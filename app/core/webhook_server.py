@@ -51,6 +51,12 @@ async def create_webhook_app(
 ) -> web.Application:
     """Create aiohttp web application with webhook handlers."""
     app = web.Application()
+    partner_panel_enabled = os.getenv("PARTNER_PANEL_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     payment_link_cache: dict[tuple[int, str], dict[str, Any]] = {}
     payment_link_ttl = 90.0
 
@@ -369,8 +375,12 @@ async def create_webhook_app(
                     response_body = b"".join(body_parts)
                     return web.Response(body=response_body, status=status_code, headers=dict(headers))
 
-                # Register handler for Partner Panel API routes
-                app.router.add_route("*", "/api/partner{path:.*}", fastapi_handler)
+                # Register handler for Partner Panel API routes (optional)
+                if partner_panel_enabled:
+                    app.router.add_route("*", "/api/partner{path:.*}", fastapi_handler)
+                    logger.info("✅ Partner Panel API routes enabled")
+                else:
+                    logger.info("ℹ️ Partner Panel API routes disabled (PARTNER_PANEL_ENABLED=0)")
 
                 logger.info("✅ Partner Panel API endpoints registered (FastAPI direct ASGI)")
             except Exception as e:

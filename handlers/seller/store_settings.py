@@ -97,6 +97,15 @@ def _format_delivery_settings(store: dict | None, lang: str) -> tuple[str, str]:
     return delivery_line, min_order_line
 
 
+def _format_user_label(user: dict | None, fallback_id: int) -> str:
+    if not user:
+        return str(fallback_id)
+    name = user.get("first_name") or user.get("username")
+    if name:
+        return f"{name} ({fallback_id})"
+    return str(fallback_id)
+
+
 class StoreSettingsStates(StatesGroup):
     """States for store settings."""
 
@@ -106,6 +115,7 @@ class StoreSettingsStates(StatesGroup):
     waiting_delivery_price = State()
     waiting_min_order_amount = State()
     waiting_admin_contact = State()  # Waiting for admin contact/username
+    waiting_transfer_contact = State()
     waiting_click_merchant_id = State()
     waiting_click_service_id = State()
     waiting_click_secret_key = State()
@@ -183,6 +193,9 @@ def store_settings_keyboard(
         # Store admins management (only for owner)
         admins_text = "Сотрудники" if lang == "ru" else "Xodimlar"
         builder.button(text=admins_text, callback_data=f"store_admins_{store_id}")
+
+        transfer_text = get_text(lang, "store_transfer_button")
+        builder.button(text=transfer_text, callback_data=f"store_transfer_start_{store_id}")
 
     back_text = "Назад" if lang == "ru" else "Orqaga"
     builder.button(text=back_text, callback_data="store_settings_back")
@@ -1726,6 +1739,233 @@ async def show_store_admins(callback: types.CallbackQuery, state: FSMContext) ->
         )
 
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("store_transfer_start_"))
+async def start_store_transfer(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start store ownership transfer."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    assert callback.data is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_transfer_start_", ""))
+
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_transfer_contact)
+
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(text=get_text(lang, "cancel"), callback_data="store_transfer_cancel")
+
+    text = get_text(lang, "store_transfer_prompt")
+
+    try:
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=cancel_kb.as_markup())
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "store_transfer_cancel")
+async def cancel_store_transfer(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Cancel store transfer."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    await state.clear()
+
+    back_kb = InlineKeyboardBuilder()
+    back_kb.button(text=get_text(lang, "store_settings"), callback_data="my_store_settings")
+
+    text = get_text(lang, "store_transfer_cancelled")
+
+    try:
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=back_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+
+    await callback.answer()
+
+
+@router.message(
+    StoreSettingsStates.waiting_transfer_contact,
+    F.forward_from | F.contact | ~F.text.startswith("/"),
+)
+async def process_transfer_contact(message: types.Message, state: FSMContext) -> None:
+    """Process forwarded message or contact to transfer store ownership."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    new_owner_id = None
+    new_owner_name = None
+
+    if message.forward_from:
+        new_owner_id = message.forward_from.id
+        new_owner_name = message.forward_from.first_name or message.forward_from.username
+    elif message.contact:
+        new_owner_id = message.contact.user_id
+        new_owner_name = message.contact.first_name
+
+    if not new_owner_id:
+        await message.answer(get_text(lang, "store_transfer_invalid_user"))
+        return
+
+    if new_owner_id == message.from_user.id:
+        await message.answer(get_text(lang, "store_transfer_same_owner"))
+        return
+
+    user = db.get_user(new_owner_id)
+    if not user:
+        db.add_user(user_id=new_owner_id, first_name=new_owner_name or "User")
+        user = db.get_user(new_owner_id)
+
+    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+    store_name = store.get("name") if isinstance(store, dict) and store.get("name") else (
+        "Магазин" if lang == "ru" else "Do'kon"
+    )
+
+    if new_owner_name and isinstance(user, dict) and not user.get("first_name"):
+        user = {**user, "first_name": new_owner_name}
+
+    user_label = _format_user_label(user, new_owner_id)
+
+    confirm_text = get_text(
+        lang,
+        "store_transfer_confirm",
+        store=store_name,
+        user=user_label,
+    )
+
+    confirm_kb = InlineKeyboardBuilder()
+    confirm_kb.button(
+        text=get_text(lang, "store_transfer_confirm_keep"),
+        callback_data=f"store_transfer_confirm_{store_id}_{new_owner_id}_keep",
+    )
+    confirm_kb.button(
+        text=get_text(lang, "store_transfer_confirm_remove"),
+        callback_data=f"store_transfer_confirm_{store_id}_{new_owner_id}_remove",
+    )
+    confirm_kb.button(text=get_text(lang, "cancel"), callback_data="store_transfer_cancel")
+    confirm_kb.adjust(1)
+
+    await message.answer(confirm_text, parse_mode="HTML", reply_markup=confirm_kb.as_markup())
+
+
+@router.callback_query(F.data.startswith("store_transfer_confirm_"))
+async def confirm_store_transfer(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Confirm store transfer and update owner."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    assert callback.data is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    parts = callback.data.split("_")
+    if len(parts) < 6:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    store_id = int(parts[3])
+    new_owner_id = int(parts[4])
+    mode = parts[5]
+    keep_access = mode == "keep"
+
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    if new_owner_id == callback.from_user.id:
+        await callback.answer(get_text(lang, "store_transfer_same_owner"), show_alert=True)
+        return
+
+    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+    if not store:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    old_owner_id = store.get("owner_id") if isinstance(store, dict) else None
+    store_name = store.get("name") if isinstance(store, dict) and store.get("name") else (
+        "Магазин" if lang == "ru" else "Do'kon"
+    )
+
+    try:
+        if hasattr(db, "update_store_owner"):
+            success = db.update_store_owner(store_id, new_owner_id)
+        else:
+            success = False
+
+        if not success:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        if keep_access and old_owner_id and old_owner_id != new_owner_id and hasattr(db, "add_store_admin"):
+            db.add_store_admin(store_id, old_owner_id, callback.from_user.id)
+        if not keep_access and old_owner_id and hasattr(db, "remove_store_admin"):
+            db.remove_store_admin(store_id, old_owner_id)
+
+        if hasattr(db, "update_user_role"):
+            db.update_user_role(new_owner_id, "seller")
+
+        new_owner = db.get_user(new_owner_id) if hasattr(db, "get_user") else None
+        new_owner_label = _format_user_label(new_owner, new_owner_id)
+
+        notify_lang = db.get_user_language(new_owner_id) if hasattr(db, "get_user_language") else lang
+        notify_text = get_text(notify_lang, "store_transfer_notify_new_owner", store=store_name)
+        try:
+            await bot.send_message(new_owner_id, notify_text, parse_mode="HTML")
+        except Exception as e:
+            logger.warning(f"Failed to notify new owner: {e}")
+
+        success_key = "store_transfer_success_keep" if keep_access else "store_transfer_success_remove"
+        success_text = get_text(lang, success_key, user=new_owner_label)
+
+        back_kb = InlineKeyboardBuilder()
+        back_kb.button(text=get_text(lang, "store_settings"), callback_data="my_store_settings")
+
+        try:
+            await callback.message.edit_text(
+                success_text, parse_mode="HTML", reply_markup=back_kb.as_markup()
+            )
+        except Exception:
+            await callback.message.answer(
+                success_text, parse_mode="HTML", reply_markup=back_kb.as_markup()
+            )
+
+        await state.clear()
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error transferring store: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
 
 
 @router.callback_query(F.data.startswith("add_admin_"))
