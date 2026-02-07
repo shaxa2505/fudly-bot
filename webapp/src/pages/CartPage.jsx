@@ -784,8 +784,8 @@ function CartPage({ user }) {
     if (deliveryCheck) {
       if (!deliveryCheck.canDeliver) {
         return {
-          status: 'error',
-          label: 'Mavjud emas',
+          status: deliveryCheck.status || 'error',
+          label: deliveryCheck.label || 'Mavjud emas',
           message: deliveryCheck.message || 'Yetkazib berish mavjud emas',
         }
       }
@@ -798,7 +798,7 @@ function CartPage({ user }) {
       }
       return {
         status: deliveryCheck.status || 'ok',
-        label: 'Mavjud',
+        label: deliveryCheck.label || 'Mavjud',
         message: deliveryCheck.message || '',
       }
     }
@@ -1332,6 +1332,7 @@ function CartPage({ user }) {
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
+        label: 'Mavjud emas',
         message: 'Yetkazib berish mavjud emas',
       })
       return { ok: false, reason: 'disabled' }
@@ -1343,6 +1344,7 @@ function CartPage({ user }) {
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
+        label: 'Mavjud emas',
         message: 'Do\'kon topilmadi',
       })
       return { ok: false, reason: 'store' }
@@ -1354,33 +1356,47 @@ function CartPage({ user }) {
         toast.warning('Yetkazib berish manzilini kiriting')
       }
       setDeliveryCheck({
-        status: 'error',
+        status: 'warn',
         canDeliver: false,
+        label: 'Manzil kiritilmagan',
         message: 'Manzil kiritilmagan',
       })
       return { ok: false, reason: 'address' }
     }
 
     const city = resolveDeliveryCity()
+    lastDeliveryCheckRef.current = { address: trimmedAddress, storeId: cartStoreId, city }
     if (!city) {
       if (shouldToast) {
         toast.warning('Shaharni tanlang')
       }
       setDeliveryCheck({
-        status: 'error',
+        status: 'warn',
         canDeliver: false,
-        message: 'Shahar tanlanmagan',
+        label: 'Shahar tanlanmagan',
+        message: 'Shaharni tanlang',
       })
       return { ok: false, reason: 'city' }
     }
 
-    lastDeliveryCheckRef.current = { address: trimmedAddress, storeId: cartStoreId, city }
-
     try {
-      const response = await api.calculateDelivery({
-        city,
-        address: trimmedAddress,
-        store_id: cartStoreId,
+      const response = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error('Delivery validation timeout'))
+        }, 8000)
+        api.calculateDelivery({
+          city,
+          address: trimmedAddress,
+          store_id: cartStoreId,
+        })
+          .then((data) => {
+            clearTimeout(timer)
+            resolve(data)
+          })
+          .catch((error) => {
+            clearTimeout(timer)
+            reject(error)
+          })
       })
 
       const canDeliver = Boolean(
@@ -1396,6 +1412,7 @@ function CartPage({ user }) {
         setDeliveryCheck({
           status: 'error',
           canDeliver: false,
+          label: 'Mavjud emas',
           message: response?.message || 'Yetkazib berish mavjud emas',
         })
         return { ok: false, reason: 'unavailable' }
@@ -1435,6 +1452,7 @@ function CartPage({ user }) {
         deliveryCost: Number.isFinite(serverFee) ? serverFee : null,
         minOrderAmount: Number.isFinite(serverMin) ? serverMin : null,
         estimatedTime,
+        label: 'Mavjud',
         message: response?.message || '',
       })
 
@@ -1532,7 +1550,6 @@ function CartPage({ user }) {
     if (trimmedAddress.length < 3) return
 
     const city = resolveDeliveryCity()
-    if (!city) return
 
     const lastCheck = lastDeliveryCheckRef.current
     if (

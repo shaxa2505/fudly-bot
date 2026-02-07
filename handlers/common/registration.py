@@ -149,7 +149,7 @@ async def _after_phone_saved(
 
 
 async def _send_completion_menu(message: types.Message, lang: str) -> None:
-    menu = main_menu_customer(lang)
+    menu = registration_complete_keyboard(lang)
     if REGISTRATION_COMPLETE_STICKER_ID:
         try:
             await message.answer_sticker(
