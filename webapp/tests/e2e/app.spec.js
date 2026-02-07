@@ -299,6 +299,11 @@ const setupApiRoutes = async (page) => {
 }
 
 test.beforeEach(async ({ page }) => {
+  page.on('console', (msg) => {
+    if (msg.type() === 'error' || msg.type() === 'warning') {
+      console.log('BROWSER', msg.type(), msg.text())
+    }
+  })
   resetApiState()
 
   await page.addInitScript((savedLocation) => {
