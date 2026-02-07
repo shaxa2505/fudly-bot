@@ -1,6 +1,9 @@
 """
 Help and FAQ handler - explains how Fudly works.
 """
+import os
+from html import escape
+
 from aiogram import F, Router, types
 from aiogram.filters import Command
 
@@ -25,5 +28,12 @@ async def show_help(message: types.Message, db: DatabaseProtocol):
         help_text = get_text(lang, "help_partner")
     else:
         help_text = get_text(lang, "help_customer")
+
+    webapp_url = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app").strip()
+    webapp_url = escape(webapp_url, quote=True)
+    try:
+        help_text = help_text.format(webapp_url=webapp_url)
+    except (KeyError, ValueError):
+        pass
 
     await message.answer(help_text, parse_mode="HTML")

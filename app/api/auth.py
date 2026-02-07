@@ -119,7 +119,7 @@ def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, A
         ).hexdigest()
 
         # Verify hash
-        if computed_hash != received_hash:
+        if not hmac.compare_digest(computed_hash, received_hash):
             return None
 
         # Parse user data

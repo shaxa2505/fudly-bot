@@ -5,9 +5,10 @@ from typing import Any
 
 import aiohttp
 from cachetools import TTLCache
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from .common import logger
+from app.api.rate_limit import limiter
 
 router = APIRouter()
 
@@ -212,7 +213,9 @@ async def _fetch_search_geocode(
 
 
 @router.get("/location/reverse")
+@limiter.limit("30/minute")
 async def reverse_geocode(
+    request: Request,
     lat: float = Query(..., description="Latitude"),
     lon: float = Query(..., description="Longitude"),
     lang: str = Query("uz", description="Response language"),
@@ -242,7 +245,9 @@ async def reverse_geocode(
 
 
 @router.get("/location/search")
+@limiter.limit("30/minute")
 async def search_location(
+    request: Request,
     query: str = Query(..., min_length=2, description="Address query"),
     lang: str = Query("uz", description="Response language"),
     limit: int = Query(8, ge=1, le=20, description="Max results"),

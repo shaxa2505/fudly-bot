@@ -401,7 +401,7 @@ def validate_init_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
             secret_key, data_check_string.encode(), hashlib.sha256
         ).hexdigest()
 
-        if calculated_hash != received_hash:
+        if not hmac.compare_digest(calculated_hash, received_hash):
             logger.warning("Invalid initData hash")
             return None
 

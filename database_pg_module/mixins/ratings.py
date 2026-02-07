@@ -16,6 +16,23 @@ except ImportError:
 class RatingMixin:
     """Mixin for rating-related database operations."""
 
+    def _refresh_store_rating(self, cursor, store_id: int | None) -> None:
+        """Recalculate and persist average store rating."""
+        if not store_id:
+            return
+        cursor.execute(
+            """
+            UPDATE stores
+            SET rating = (
+                SELECT COALESCE(AVG(rating), 0)
+                FROM ratings
+                WHERE store_id = %s
+            )
+            WHERE store_id = %s
+        """,
+            (store_id, store_id),
+        )
+
     def add_rating(
         self, booking_id: int, user_id: int, store_id: int, rating: int, comment: str = None
     ):
@@ -32,6 +49,7 @@ class RatingMixin:
                 (booking_id, user_id, store_id, rating, comment, rating, comment),
             )
             row = cursor.fetchone()
+            self._refresh_store_rating(cursor, store_id)
             return row[0] if row else None
 
     def update_rating_review(self, booking_id: int, user_id: int, review_text: str) -> bool:
@@ -74,6 +92,83 @@ class RatingMixin:
         except Exception as e:
             logger.error(f"Error saving booking rating: {e}")
             return False
+
+    def add_order_rating(
+        self,
+        order_id: int,
+        user_id: int,
+        store_id: int | None = None,
+        rating: int | None = None,
+        comment: str | None = None,
+    ) -> int | None:
+        """Add or update rating for a delivery order."""
+        # Backward compatibility: add_order_rating(order_id, user_id, rating)
+        if rating is None and isinstance(store_id, int):
+            rating = store_id
+            store_id = None
+
+        if rating is None:
+            logger.warning(f"add_order_rating missing rating for order {order_id}")
+            return None
+
+        try:
+            rating = int(rating)
+        except (TypeError, ValueError):
+            logger.warning(f"Invalid rating value for order {order_id}: {rating}")
+            return None
+
+        if rating < 1 or rating > 5:
+            logger.warning(f"Rating out of range for order {order_id}: {rating}")
+            return None
+
+        if store_id is None and hasattr(self, "get_order"):
+            order = self.get_order(order_id)
+            if order:
+                if hasattr(order, "get"):
+                    store_id = order.get("store_id")
+                else:
+                    store_id = order[2] if len(order) > 2 else None
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT rating_id FROM ratings WHERE order_id = %s AND user_id = %s",
+                (order_id, user_id),
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                rating_id = existing[0]
+                cursor.execute(
+                    """
+                    UPDATE ratings
+                    SET rating = %s, comment = %s, store_id = COALESCE(store_id, %s)
+                    WHERE rating_id = %s
+                """,
+                    (rating, comment, store_id, rating_id),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO ratings (order_id, user_id, store_id, rating, comment)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING rating_id
+                """,
+                    (order_id, user_id, store_id, rating, comment),
+                )
+                row = cursor.fetchone()
+                rating_id = row[0] if row else None
+
+            self._refresh_store_rating(cursor, store_id)
+            return rating_id
+
+    def has_rated_order(self, order_id: int) -> bool:
+        """Check if order has already been rated."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM ratings WHERE order_id = %s", (order_id,))
+            count = cursor.fetchone()[0]
+            return count > 0
 
     def get_store_ratings(self, store_id: int) -> list[dict]:
         """Get all ratings for a store."""

@@ -4,6 +4,8 @@ Contains callbacks where customers mark orders as received.
 """
 from __future__ import annotations
 
+import re
+
 from aiogram import F, Router, types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -20,6 +22,7 @@ from .common import _get_db, _get_entity_field, _get_store_field, logger
 # Having them as constants allows tests to verify that they
 # actually match simple ids like "customer_received_123".
 CUSTOMER_RECEIVED_PATTERN = r"^customer_received_(\d+)$"
+RATE_ORDER_PATTERN = r"^rate_order_(\d+)_(\d+)$"
 MAX_CAPTION_LENGTH = 1000
 
 
@@ -140,6 +143,68 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
     await callback.answer(f"✅ {msg}", show_alert=True)
 
 
+async def rate_order_handler(callback: types.CallbackQuery) -> None:
+    """Customer rates a delivery/pickup order."""
+    if not callback.from_user or not callback.data:
+        await callback.answer()
+        return
+
+    db_instance = _get_db()
+    if not db_instance:
+        await callback.answer(get_text("ru", "system_error"), show_alert=True)
+        return
+
+    user_id = callback.from_user.id
+    lang = db_instance.get_user_language(user_id)
+
+    try:
+        parts = callback.data.split("_")
+        order_id = int(parts[2])
+        rating = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if rating < 1 or rating > 5:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    order = db_instance.get_order(order_id) if hasattr(db_instance, "get_order") else None
+    if not order:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    order_user_id = _get_entity_field(order, "user_id")
+    if order_user_id != user_id:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if hasattr(db_instance, "has_rated_order") and db_instance.has_rated_order(order_id):
+        already = get_text(lang, "already_rated")
+        await callback.answer(already, show_alert=True)
+        return
+
+    store_id = _get_entity_field(order, "store_id")
+
+    try:
+        if hasattr(db_instance, "add_order_rating"):
+            db_instance.add_order_rating(order_id, user_id, store_id, rating)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"Failed to save order rating: {e}")
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    try:
+        if callback.message:
+            await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:  # pragma: no cover - defensive
+        pass
+
+    thanks_html = get_text(lang, "rating_saved")
+    thanks_plain = re.sub(r"<[^>]+>", "", thanks_html)
+    await callback.answer(thanks_plain, show_alert=True)
+
+
 def register(router: Router) -> None:
     """Register all customer-side unified order handlers on the router."""
 
@@ -149,3 +214,4 @@ def register(router: Router) -> None:
     router.callback_query.register(
         customer_received_handler, F.data.regexp(r"^order_received_(\d+)$")
     )
+    router.callback_query.register(rate_order_handler, F.data.regexp(RATE_ORDER_PATTERN))

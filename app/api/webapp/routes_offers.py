@@ -5,7 +5,7 @@ import inspect
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .common import (
     CATEGORIES,
@@ -21,6 +21,7 @@ from .common import (
 )
 from app.core.utils import normalize_city
 from app.core.caching import get_cache_service
+from app.api.rate_limit import limiter
 
 router = APIRouter()
 
@@ -301,7 +302,9 @@ async def get_categories(
 
 
 @router.get("/offers", response_model=list[OfferResponse] | OfferListResponse)
+@limiter.limit("60/minute")
 async def get_offers(
+    request: Request,
     city: str | None = Query(None, description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
     district: str | None = Query(None, description="District filter"),

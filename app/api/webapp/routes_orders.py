@@ -7,7 +7,7 @@ from typing import Any
 
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -33,6 +33,7 @@ from app.core.idempotency import (
     normalize_idempotency_key,
     store_idempotency_response,
 )
+from app.api.rate_limit import limiter
 
 from .common import (
     CreateOrderRequest,
@@ -230,7 +231,9 @@ async def _validate_store_open(db: Any, store_id: int) -> None:
 
 
 @router.post("/orders", response_model=OrderResponse)
+@limiter.limit("10/minute")
 async def create_order(
+    request: Request,
     order: CreateOrderRequest,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),

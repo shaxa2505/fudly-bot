@@ -26,8 +26,6 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.core.async_db import AsyncDBProxy
 from app.core.utils import normalize_city
@@ -43,18 +41,9 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from database_protocol import DatabaseProtocol
+from app.api.rate_limit import limiter
 
 router = APIRouter(tags=["partner-panel"])
-
-def _rate_limit_storage_uri() -> str | None:
-    return os.getenv("RATE_LIMIT_REDIS_URL") or os.getenv("REDIS_URL") or None
-
-
-_rl_storage = _rate_limit_storage_uri()
-if _rl_storage:
-    limiter = Limiter(key_func=get_remote_address, storage_uri=_rl_storage)
-else:
-    limiter = Limiter(key_func=get_remote_address)
 
 # Global database instance (set by api_server.py)
 _db: DatabaseProtocol | None = None
@@ -264,10 +253,7 @@ def _resolve_store_hours(store: dict) -> tuple[dt_time, dt_time, str]:
 def verify_telegram_webapp(authorization: str) -> int:
     """
     Verify Telegram WebApp auth and return telegram_id.
-    Supports multiple auth methods:
-    1. Standard Telegram WebApp signature verification
-    2. URL-based auth (uid passed by bot in WebApp URL)
-    3. Dev mode bypass for local development
+    Only accepts signed initData (Telegram WebApp).
     """
     import logging
 
@@ -275,28 +261,6 @@ def verify_telegram_webapp(authorization: str) -> int:
         logging.warning("Missing authorization header")
         raise HTTPException(status_code=401, detail="Missing authorization")
 
-    if _is_dev_env():
-        auth_kind = (
-            "dev"
-            if authorization.startswith("dev_")
-            else "tma"
-            if authorization.startswith("tma ")
-            else "other"
-        )
-        logging.debug(f"verify_telegram_webapp called: kind={auth_kind}")
-
-    # Development mode bypass - ONLY works in non-production environment
-    if authorization.startswith("dev_"):
-        environment = os.getenv("ENVIRONMENT", "production").lower()
-        if environment in ("development", "dev", "local", "test"):
-            try:
-                return int(authorization.split("_")[1])
-            except (IndexError, ValueError):
-                raise HTTPException(status_code=401, detail="Invalid dev auth format")
-        else:
-            raise HTTPException(status_code=401, detail="Dev auth not allowed in production")
-
-    # Production: verify Telegram signature
     if not authorization.startswith("tma "):
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
@@ -308,135 +272,53 @@ def verify_telegram_webapp(authorization: str) -> int:
 
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
-        import logging
 
-        if _is_dev_env():
-            logging.debug(f"PARSED KEYS: {list(parsed.keys())}")
-
-        # URL-based auth (uid passed in the WebApp URL) is NOT secure on its own.
-        # Allow unsigned uid only in local/dev; signed URLs (uid+auth_date+sig) are allowed as a
-        # fallback when Telegram doesn't pass initData (e.g. BotFather domain glitches).
-        #
-        # IMPORTANT: Do not append extra params (like uid) to signed initData in production,
-        # it invalidates the Telegram signature.
-        allow_url_auth = os.getenv("ALLOW_URL_AUTH", "").lower() in ("1", "true", "yes")
-        allow_url_auth_prod = os.getenv("ALLOW_URL_AUTH_PROD", "").lower() in ("1", "true", "yes")
-
-        if "uid" in parsed and "hash" not in parsed:
-            try:
-                user_id = int(parsed.get("uid", 0))
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=401, detail="Invalid uid in URL")
-            if user_id <= 0:
-                raise HTTPException(status_code=401, detail="Invalid uid in URL")
-
-            sig = parsed.get("sig")
-            auth_date = parsed.get("auth_date")
-
-            # Signed URL auth fallback: uid + auth_date + sig.
-            # Accept even in production (signature is HMAC with bot token + 24h TTL).
-            if sig and auth_date:
-                try:
-                    auth_ts = int(auth_date)
-                except (ValueError, TypeError):
-                    raise HTTPException(status_code=401, detail="Invalid auth_date in URL")
-
-                now_ts = int(datetime.now().timestamp())
-                age_seconds = now_ts - auth_ts
-                if age_seconds < 0:
-                    raise HTTPException(status_code=401, detail="Invalid auth timestamp")
-
-                # Keep the fallback token short-lived but usable.
-                MAX_URL_AUTH_AGE = 24 * 3600
-                if age_seconds > MAX_URL_AUTH_AGE:
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Session expired. Please reopen from Telegram bot.",
-                    )
-
-                msg = f"uid={user_id}\nauth_date={auth_ts}".encode()
-                expected_sig = hmac.new(bot_token.encode("utf-8"), msg, hashlib.sha256).hexdigest()
-                if not hmac.compare_digest(str(sig), expected_sig):
-                    raise HTTPException(status_code=401, detail="Invalid URL signature")
-
-                return user_id
-
-            # Unsigned uid is allowed only for local development (or when explicitly enabled).
-            if not allow_url_auth:
-                raise HTTPException(
-                    status_code=401,
-                    detail="URL auth disabled. Please open from Telegram bot.",
-                )
-            if not (_is_dev_env() or allow_url_auth_prod):
-                raise HTTPException(
-                    status_code=401,
-                    detail="URL auth not allowed in production.",
-                )
-            if not _is_dev_env():
-                raise HTTPException(
-                    status_code=401,
-                    detail="Missing Telegram signature. Please open from Telegram bot.",
-                )
-            return user_id
-
-        # Check if this is unsigned data (from initDataUnsafe)
-        # Only allow if ALLOW_UNSAFE_AUTH is set (for debugging)
         if "hash" not in parsed:
-            allow_unsafe = os.getenv("ALLOW_UNSAFE_AUTH", "").lower() == "true"
-            if allow_unsafe and _is_dev_env():
-                import json
-
-                user_data = json.loads(parsed.get("user", "{}"))
-                user_id = int(user_data.get("id", 0))
-                if user_id > 0:
-                    import logging
-
-                    logging.warning(f"⚠️ UNSAFE AUTH: user_id={user_id} (no signature)")
-                    return user_id
             raise HTTPException(status_code=401, detail="Missing signature hash")
 
         # ✅ SECURITY: Verify auth_date is not too old (prevent replay attacks)
         auth_date = parsed.get("auth_date")
-        if auth_date:
+        if not auth_date:
+            raise HTTPException(status_code=401, detail="Invalid auth_date format")
+        try:
+            auth_timestamp = int(auth_date)
+            current_timestamp = int(datetime.now().timestamp())
+            age_seconds = current_timestamp - auth_timestamp
+
+            # Allow auth data up to a configurable age (default 24 hours; override via env).
+            max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "86400")
             try:
-                auth_timestamp = int(auth_date)
-                current_timestamp = int(datetime.now().timestamp())
-                age_seconds = current_timestamp - auth_timestamp
+                max_auth_age = int(max_auth_age_raw)
+            except (TypeError, ValueError):
+                max_auth_age = 86400
+                logging.warning(
+                    "⚠️ Invalid PARTNER_PANEL_AUTH_MAX_AGE_SECONDS value. "
+                    "Falling back to 86400 seconds."
+                )
+            if max_auth_age < 0:
+                max_auth_age = 0
+            if 0 < max_auth_age < 86400:
+                logging.warning(
+                    "⚠️ PARTNER_PANEL_AUTH_MAX_AGE_SECONDS below minimum (24h). "
+                    "Clamping to 86400 seconds."
+                )
+                max_auth_age = 86400
+            if age_seconds > max_auth_age:
+                logging.warning(
+                    f"⚠️ Auth data too old: {age_seconds}s (max {max_auth_age}s)"
+                )
+                raise HTTPException(
+                    status_code=401,
+                    detail=f"Auth data expired (age: {age_seconds // 3600}h)",
+                )
+            elif age_seconds < 0:
+                logging.warning(f"⚠️ Auth data from future: {age_seconds}s")
+                raise HTTPException(status_code=401, detail="Invalid auth timestamp")
 
-                # Allow auth data up to a configurable age (default 24 hours; override via env).
-                max_auth_age_raw = os.getenv("PARTNER_PANEL_AUTH_MAX_AGE_SECONDS", "86400")
-                try:
-                    max_auth_age = int(max_auth_age_raw)
-                except (TypeError, ValueError):
-                    max_auth_age = 86400
-                    logging.warning(
-                        "⚠️ Invalid PARTNER_PANEL_AUTH_MAX_AGE_SECONDS value. "
-                        "Falling back to 86400 seconds."
-                    )
-                if max_auth_age < 0:
-                    max_auth_age = 0
-                if 0 < max_auth_age < 86400:
-                    logging.warning(
-                        "⚠️ PARTNER_PANEL_AUTH_MAX_AGE_SECONDS below minimum (24h). "
-                        "Clamping to 86400 seconds."
-                    )
-                    max_auth_age = 86400
-                if age_seconds > max_auth_age:
-                    logging.warning(
-                        f"⚠️ Auth data too old: {age_seconds}s (max {max_auth_age}s)"
-                    )
-                    raise HTTPException(
-                        status_code=401,
-                        detail=f"Auth data expired (age: {age_seconds // 3600}h)",
-                    )
-                elif age_seconds < 0:
-                    logging.warning(f"⚠️ Auth data from future: {age_seconds}s")
-                    raise HTTPException(status_code=401, detail="Invalid auth timestamp")
-
-                logging.info(f"✅ Auth age valid: {age_seconds}s old")
-            except ValueError:
-                logging.error(f"❌ Invalid auth_date format: {auth_date}")
-                raise HTTPException(status_code=401, detail="Invalid auth_date format")
+            logging.info(f"✅ Auth age valid: {age_seconds}s old")
+        except ValueError:
+            logging.error(f"❌ Invalid auth_date format: {auth_date}")
+            raise HTTPException(status_code=401, detail="Invalid auth_date format")
 
         # ✅ SECURITY: Verify HMAC-SHA256 signature
         data_check_string_parts = []
@@ -452,7 +334,7 @@ def verify_telegram_webapp(authorization: str) -> int:
         ).hexdigest()
 
         received_hash = parsed.get("hash", "")
-        if calculated_hash != received_hash:
+        if not hmac.compare_digest(calculated_hash, str(received_hash)):
             logging.error(
                 f"❌ Signature mismatch: calculated={calculated_hash[:16]}... received={received_hash[:16]}..."
             )
@@ -478,6 +360,7 @@ def verify_telegram_webapp(authorization: str) -> int:
 
 # Profile endpoint
 @router.get("/profile")
+@limiter.limit("120/minute")
 async def get_profile(authorization: str = Header(None)):
     """Get partner profile"""
     import logging
@@ -596,6 +479,7 @@ async def websocket_partner(
 
 # Store info endpoint (для frontend storeAPI.getInfo())
 @router.get("/store")
+@limiter.limit("120/minute")
 async def get_store_info(authorization: str = Header(None)):
     """Get store information for partner panel"""
     telegram_id = verify_telegram_webapp(authorization)
@@ -627,6 +511,7 @@ async def get_store_info(authorization: str = Header(None)):
 
 # Products endpoints
 @router.get("/products")
+@limiter.limit("120/minute")
 async def list_products(authorization: str = Header(None), status: Optional[str] = None):
     """
     List partner's products with frontend-compatible field names.
@@ -1048,6 +933,7 @@ async def update_product(
 
 
 @router.patch("/products/{product_id}/status")
+@limiter.limit("120/minute")
 async def update_product_status(
     product_id: int, request: Request, authorization: str = Header(None)
 ):
@@ -1079,6 +965,7 @@ async def update_product_status(
 
 
 @router.delete("/products/{product_id}")
+@limiter.limit("120/minute")
 async def delete_product(product_id: int, authorization: str = Header(None)):
     """Delete product (soft delete)"""
     telegram_id = verify_telegram_webapp(authorization)
@@ -1270,6 +1157,7 @@ async def import_csv(
 
 # Orders endpoints
 @router.get("/orders")
+@limiter.limit("120/minute")
 async def list_orders(authorization: str = Header(None), status: Optional[str] = None):
     """
     List partner's orders (unified from orders table).
@@ -1490,6 +1378,7 @@ async def confirm_order(
 
 
 @router.post("/orders/{order_id}/status")
+@limiter.limit("120/minute")
 async def update_order_status(
     order_id: int,
     request: Request,
@@ -1581,6 +1470,7 @@ async def update_order_status(
 
 # Stats endpoint
 @router.get("/stats")
+@limiter.limit("120/minute")
 async def get_stats(authorization: str = Header(None), period: str = "today"):
     """Get partner statistics with daily breakdown for charts."""
     telegram_id = verify_telegram_webapp(authorization)
@@ -1715,6 +1605,7 @@ async def get_stats(authorization: str = Header(None), period: str = "today"):
 
 # Store settings
 @router.put("/store")
+@limiter.limit("120/minute")
 async def update_store(settings: dict, authorization: str = Header(None)):
     """Update store settings"""
     telegram_id = verify_telegram_webapp(authorization)
@@ -1836,6 +1727,7 @@ async def update_store(settings: dict, authorization: str = Header(None)):
 
 
 @router.patch("/store/status")
+@limiter.limit("120/minute")
 async def toggle_store_status(is_open: bool = Form(...), authorization: str = Header(None)):
     """Toggle store open/closed status"""
     telegram_id = verify_telegram_webapp(authorization)
@@ -1853,6 +1745,7 @@ async def toggle_store_status(is_open: bool = Form(...), authorization: str = He
 
 # Photo upload endpoint
 @router.post("/upload-photo")
+@limiter.limit("120/minute")
 async def upload_photo(photo: UploadFile = File(...), authorization: str = Header(None)):
     """
     Upload photo and get Telegram file_id.
@@ -1913,6 +1806,7 @@ async def upload_photo(photo: UploadFile = File(...), authorization: str = Heade
 
 # Get photo URL endpoint
 @router.get("/photo/{file_id}")
+@limiter.limit("120/minute")
 async def get_photo_url(file_id: str):
     """Redirect to Telegram photo URL"""
     import aiohttp

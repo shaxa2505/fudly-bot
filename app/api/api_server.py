@@ -20,9 +20,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.auth import router as auth_router
 from app.api.auth import set_auth_db
@@ -33,6 +33,7 @@ from app.api.partner_panel_simple import set_partner_db
 from app.api.webapp_api import router as webapp_router
 from app.api.webapp_api import set_db_instance
 from app.api.merchant_webhooks import router as merchant_webhooks_router, set_merchant_db
+from app.api.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -112,22 +113,6 @@ class _PerfTracker:
 _app_db = None
 _app_offer_service = None
 
-# Rate limiter configuration
-def _rate_limit_storage_uri() -> str | None:
-    return os.getenv("RATE_LIMIT_REDIS_URL") or os.getenv("REDIS_URL") or None
-
-
-_rl_storage = _rate_limit_storage_uri()
-if _rl_storage:
-    limiter = Limiter(
-        key_func=get_remote_address,
-        default_limits=["100/minute"],
-        storage_uri=_rl_storage,
-    )
-else:
-    limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
-
-
 def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = None) -> FastAPI:
     """
     Create FastAPI application for Mini App.
@@ -173,14 +158,19 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         # Shutdown
         logger.info("👋 Mini App API shutting down...")
 
+    # ✅ SECURITY: Strict CORS - only allow specific origins
+    # In production, restrict to actual domains only
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment in ("development", "dev", "local", "test")
+
     app = FastAPI(
         title="Fudly Mini App API",
         description="REST API for Fudly Telegram Mini App",
         version="1.0.0",
         lifespan=lifespan,
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        docs_url="/api/docs" if is_dev else None,
+        redoc_url="/api/redoc" if is_dev else None,
+        openapi_url="/api/openapi.json" if is_dev else None,
     )
 
     # Lightweight profiling middleware (disabled by default)
@@ -208,11 +198,7 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     # Add rate limiter
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-    # ✅ SECURITY: Strict CORS - only allow specific origins
-    # In production, restrict to actual domains only
-    environment = os.getenv("ENVIRONMENT", "production").lower()
-    is_dev = environment in ("development", "dev", "local", "test")
+    app.add_middleware(SlowAPIMiddleware)
 
     def _origin_from_url(value: str | None) -> str | None:
         if not value:
