@@ -198,6 +198,7 @@ def _to_sums(price_in_kopeks: int | float | None) -> int:
 
 
 DEFAULT_WORKING_HOURS = "08:00 - 23:00"
+MIN_DISCOUNT_PERCENT = 20
 
 
 def _parse_time_value(value: object) -> dt_time | None:
@@ -769,7 +770,19 @@ async def create_product(
         )
 
     if discount_price is None:
-        discount_price = original_price
+        raise HTTPException(status_code=400, detail="discount_price is required")
+
+    if original_price <= 0 or discount_price <= 0:
+        raise HTTPException(status_code=400, detail="Prices must be greater than zero")
+    if discount_price >= original_price:
+        raise HTTPException(
+            status_code=400, detail="discount_price must be less than original_price"
+        )
+    discount_percent = int((1 - discount_price / original_price) * 100)
+    if discount_percent < MIN_DISCOUNT_PERCENT:
+        raise HTTPException(
+            status_code=400, detail=f"Minimum discount is {MIN_DISCOUNT_PERCENT}%"
+        )
 
     # Normalize prices from UI input
     original_price = _to_kopeks(original_price)
@@ -917,6 +930,23 @@ async def update_product(
         photo_id = payload.get("photo_id")
     if status is None:
         status = payload.get("status")
+
+    if original_price is not None or discount_price is not None:
+        current_original = original_price if original_price is not None else offer.get("original_price")
+        current_discount = discount_price if discount_price is not None else offer.get("discount_price")
+        if current_original is None or current_discount is None:
+            raise HTTPException(status_code=400, detail="Missing price values")
+        if current_original <= 0 or current_discount <= 0:
+            raise HTTPException(status_code=400, detail="Prices must be greater than zero")
+        if current_discount >= current_original:
+            raise HTTPException(
+                status_code=400, detail="discount_price must be less than original_price"
+            )
+        discount_percent = int((1 - current_discount / current_original) * 100)
+        if discount_percent < MIN_DISCOUNT_PERCENT:
+            raise HTTPException(
+                status_code=400, detail=f"Minimum discount is {MIN_DISCOUNT_PERCENT}%"
+            )
 
     # Normalize prices from UI input
     if original_price is not None:
@@ -1417,6 +1447,20 @@ async def confirm_order(
     if order_store_id != store["store_id"]:
         raise HTTPException(status_code=403, detail="Not your order")
 
+    payment_method = order.get("payment_method") if isinstance(order, dict) else order[4]
+    payment_status = order.get("payment_status") if isinstance(order, dict) else order[5]
+    payment_proof_photo_id = (
+        order.get("payment_proof_photo_id") if isinstance(order, dict) else order[6]
+    )
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    if method_norm in ("click", "payme") and status_norm != PaymentStatus.CONFIRMED:
+        raise HTTPException(status_code=409, detail="Payment not confirmed")
+
     # Use unified service if available; fall back to direct status update.
     if unified_service:
         await unified_service.confirm_order(order_id, "order")
@@ -1470,6 +1514,20 @@ async def update_order_status(
     order_store_id = order.get("store_id") if isinstance(order, dict) else order[2]
     if order_store_id != store["store_id"]:
         raise HTTPException(status_code=403, detail="Not your order")
+
+    payment_method = order.get("payment_method") if isinstance(order, dict) else order[4]
+    payment_status = order.get("payment_status") if isinstance(order, dict) else order[5]
+    payment_proof_photo_id = (
+        order.get("payment_proof_photo_id") if isinstance(order, dict) else order[6]
+    )
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    if method_norm in ("click", "payme") and status_norm != PaymentStatus.CONFIRMED:
+        raise HTTPException(status_code=409, detail="Payment not confirmed")
 
     courier_phone: str | None = None
     if status == "delivering":

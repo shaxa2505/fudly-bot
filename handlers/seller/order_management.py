@@ -54,6 +54,17 @@ def _is_paid_click_order(order) -> bool:
     return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
+def _is_unpaid_online_order(order) -> bool:
+    payment_method = get_order_field(order, "payment_method", 9)
+    payment_status = get_order_field(order, "payment_status", 11)
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    if method_norm not in ("click", "payme"):
+        return False
+    status_norm = PaymentStatus.normalize(payment_status, payment_method=payment_method)
+    return status_norm != PaymentStatus.CONFIRMED
+
+
 def _safe_caption(text: str) -> str:
     if len(text) <= MAX_CAPTION_LENGTH:
         return text
@@ -109,6 +120,10 @@ async def confirm_order(callback: types.CallbackQuery):
 
     if callback.from_user.id != owner_id:
         await callback.answer("Ошибка", show_alert=True)
+        return
+
+    if _is_unpaid_online_order(order):
+        await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)
         return
 
     # Используем UnifiedOrderService для обновления статуса
@@ -295,6 +310,10 @@ async def start_courier_handover(callback: types.CallbackQuery, state: FSMContex
         await callback.answer("Ошибка", show_alert=True)
         return
 
+    if _is_unpaid_online_order(order):
+        await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)
+        return
+
     # Сохраняем order_id в состояние
     await state.set_state(CourierHandover.courier_phone)
     await state.update_data(order_id=order_id)
@@ -331,6 +350,10 @@ async def process_courier_phone(message: types.Message, state: FSMContext):
     if not order:
         error_text = "Заказ не найден" if lang == "ru" else "Buyurtma topilmadi"
         await message.answer(error_text)
+        return
+
+    if _is_unpaid_online_order(order):
+        await message.answer(get_text(lang, "payment_not_confirmed"))
         return
 
     # Используем UnifiedOrderService для начала доставки

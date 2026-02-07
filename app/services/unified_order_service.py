@@ -532,6 +532,78 @@ class UnifiedOrderService:
             "y",
         }
 
+    async def _flag_refund_required(
+        self,
+        ctx: StatusUpdateContext,
+        target_status: str,
+        reject_reason: str | None = None,
+    ) -> None:
+        """Mark order as refund-required and notify admins."""
+        if ctx.entity_type != "order":
+            return
+
+        reason_label = "rejected" if target_status == OrderStatus.REJECTED else "cancelled"
+        comment = f"refund_required:{reason_label}"
+        if reject_reason:
+            comment = f"{comment} ({reject_reason})"
+
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE orders
+                    SET cancel_reason = COALESCE(cancel_reason, %s),
+                        cancel_comment = CASE
+                            WHEN cancel_comment IS NULL OR cancel_comment = '' THEN %s
+                            ELSE cancel_comment || ' | ' || %s
+                        END
+                    WHERE order_id = %s
+                    """,
+                    ("refund_required", comment, comment, int(ctx.entity_id)),
+                )
+        except Exception as e:
+            logger.warning(f"Failed to mark refund_required for order #{ctx.entity_id}: {e}")
+
+        admin_ids: list[int] = []
+        try:
+            if hasattr(self.db, "get_admin_ids"):
+                admin_ids = self.db.get_admin_ids() or []
+        except Exception:
+            admin_ids = []
+
+        if not admin_ids:
+            try:
+                admin_env = os.getenv("ADMIN_ID")
+                if admin_env:
+                    admin_ids = [int(admin_env)]
+            except Exception:
+                admin_ids = []
+
+        if not admin_ids or not self.bot:
+            return
+
+        payment_method = PaymentStatus.normalize_method(ctx.payment_method)
+        total = int(ctx.total_price or 0)
+        order_type = ctx.order_type or "delivery"
+
+        text = (
+            "⚠️ Refund required\n"
+            f"Order: #{int(ctx.entity_id)}\n"
+            f"Status: {reason_label}\n"
+            f"Payment: {payment_method}\n"
+            f"Order type: {order_type}\n"
+            f"Total: {total}\n"
+        )
+        if reject_reason:
+            text += f"Reason: {reject_reason}\n"
+
+        for admin_id in admin_ids[:3]:
+            try:
+                await self.bot.send_message(admin_id, text)
+            except Exception:
+                pass
+
     def _esc(self, val: Any) -> str:
         """HTML-escape helper."""
         return html.escape(str(val)) if val else ""
@@ -3380,6 +3452,19 @@ class UnifiedOrderService:
                 logger.info(f"STATUS_UPDATE no-op (already {target_status}): #{entity_id}")
                 return True
 
+            if (
+                ctx.entity_type == "order"
+                and normalized_payment_method in ("click", "payme")
+                and normalized_payment_status != PaymentStatus.CONFIRMED
+                and target_status not in (OrderStatus.CANCELLED, OrderStatus.REJECTED)
+            ):
+                logger.info(
+                    "STATUS_UPDATE blocked: payment not confirmed for #%s (target=%s)",
+                    entity_id,
+                    target_status,
+                )
+                return False
+
             # Do not move away from terminal statuses (completed/cancelled/rejected)
             if current_status in terminal_statuses and target_status != current_status:
                 logger.info(
@@ -3412,6 +3497,15 @@ class UnifiedOrderService:
             ):
                 if update_ok:
                     await self._restore_quantities(ctx.entity, ctx.entity_type)
+                if (
+                    ctx.entity_type == "order"
+                    and normalized_payment_status == PaymentStatus.CONFIRMED
+                ):
+                    await self._flag_refund_required(
+                        ctx=ctx,
+                        target_status=target_status,
+                        reject_reason=reject_reason,
+                    )
 
             await self._notify_status_change(
                 ctx=ctx,

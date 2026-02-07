@@ -54,6 +54,17 @@ def _is_paid_click_order(order: Any) -> bool:
     return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
+def _is_unpaid_online_order(order: Any) -> bool:
+    payment_method = _get_order_field(order, "payment_method", 9)
+    payment_status = _get_order_field(order, "payment_status", 11)
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    if method_norm not in ("click", "payme"):
+        return False
+    status_norm = PaymentStatus.normalize(payment_status, payment_method=payment_method)
+    return status_norm != PaymentStatus.CONFIRMED
+
+
 # =============================================================================
 # NOTE: partner_confirm_order_ and partner_reject_order_ handlers REMOVED
 # They are now handled by unified_order_handlers.py which provides:
@@ -168,6 +179,7 @@ async def partner_confirm_order_batch(
 
     # Confirm all orders
     confirmed_count = 0
+    blocked_count = 0
 
     order_service = get_unified_order_service()
     if not order_service:
@@ -193,7 +205,7 @@ async def partner_confirm_order_batch(
             if partner_id != owner_id:
                 continue
 
-            if _is_paid_click_order(order):
+            if _is_unpaid_online_order(order):
                 blocked_count += 1
                 continue
 
@@ -299,7 +311,11 @@ async def partner_confirm_order_batch(
         if lang == "uz"
         else f"✅ Принято заказов: {confirmed_count}"
     )
-    await callback.answer(success_text)
+    if blocked_count:
+        blocked_msg = get_text(lang, "payment_not_confirmed")
+        await callback.answer(f"{success_text}\n{blocked_msg}", show_alert=True)
+    else:
+        await callback.answer(success_text)
 
 
 @router.callback_query(F.data.startswith("partner_reject_order_batch_"))
@@ -352,6 +368,10 @@ async def partner_reject_order_batch(
             owner_id = get_store_field(store, "owner_id") if store else None
 
             if partner_id != owner_id:
+                continue
+
+            if _is_paid_click_order(order):
+                blocked_count += 1
                 continue
 
             # Update order status

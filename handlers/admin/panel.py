@@ -5,6 +5,7 @@ Note: This module contains the main admin handlers. Additional admin handlers
 remain in bot.py and can be migrated here incrementally.
 """
 import os
+from datetime import datetime
 
 from aiogram import F, Router, types
 from aiogram.filters import Command
@@ -22,6 +23,45 @@ ADMIN_SECRET = os.getenv("ADMIN_SECRET")
 if not ADMIN_SECRET:
     import logging as _logging
     _logging.getLogger(__name__).warning("⚠️ ADMIN_SECRET not set - /setadmin will not work")
+
+
+def _fetch_refund_required_orders(db: DatabaseProtocol, limit: int = 10) -> list[tuple]:
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT order_id, user_id, total_price, payment_method, cancel_comment
+            FROM orders
+            WHERE (cancel_reason = %s OR COALESCE(cancel_comment, '') LIKE %s)
+              AND COALESCE(cancel_comment, '') NOT LIKE %s
+            ORDER BY updated_at DESC
+            LIMIT %s
+            """,
+            ("refund_required", "%refund_required%", "%refund_done%", int(limit)),
+        )
+        return cursor.fetchall() or []
+
+
+def _mark_refund_done(db: DatabaseProtocol, order_id: int) -> bool | None:
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            marker = f"refund_done:{datetime.utcnow().isoformat(timespec='seconds')}"
+            cursor.execute(
+                """
+                UPDATE orders
+                SET cancel_reason = COALESCE(cancel_reason, %s),
+                    cancel_comment = CASE
+                        WHEN cancel_comment IS NULL OR cancel_comment = '' THEN %s
+                        ELSE cancel_comment || ' | ' || %s
+                    END
+                WHERE order_id = %s
+                """,
+                ("refund_required", marker, marker, int(order_id)),
+            )
+            return cursor.rowcount > 0
+    except Exception:
+        return None
 
 
 @router.message(Command("setadmin"))
@@ -79,6 +119,83 @@ async def cmd_admin(message: types.Message, db: DatabaseProtocol):
         reply_markup=admin_menu(),
     )
 
+
+
+@router.message(Command("refunds"))
+async def admin_refunds(message: types.Message, db: DatabaseProtocol) -> None:
+    if not message.from_user:
+        return
+    lang = db.get_user_language(message.from_user.id)
+    if not db.is_admin(message.from_user.id):
+        await message.answer(get_text(lang, "no_admin_access"))
+        return
+
+    refunds = _fetch_refund_required_orders(db, limit=10)
+    if not refunds:
+        await message.answer(get_text(lang, "admin_refund_empty"))
+        return
+
+    lines = [get_text(lang, "admin_refund_list_title")]
+    kb = InlineKeyboardBuilder()
+    for order_id, user_id, total_price, payment_method, cancel_comment in refunds:
+        amount = int(total_price or 0)
+        method = payment_method or "-"
+        reason = str(cancel_comment or "").strip()
+        if "refund_required:" in reason:
+            reason = reason.split("refund_required:", 1)[1].strip()
+        if "|" in reason:
+            reason = reason.split("|", 1)[0].strip()
+        if not reason:
+            reason = "-"
+
+        lines.append(
+            get_text(lang, "admin_refund_item").format(
+                order_id=order_id,
+                user_id=user_id or "-",
+                amount=amount,
+                method=method,
+                reason=reason,
+            )
+        )
+        kb.button(
+            text=get_text(lang, "admin_refund_done_button").format(order_id=order_id),
+            callback_data=f"admin_refund_done_{order_id}",
+        )
+    kb.adjust(1)
+
+    await message.answer("\n".join(lines), parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+@router.callback_query(F.data.startswith("admin_refund_done_"))
+async def admin_refund_done(callback: types.CallbackQuery, db: DatabaseProtocol) -> None:
+    if not callback.from_user:
+        return
+    lang = db.get_user_language(callback.from_user.id)
+    if not db.is_admin(callback.from_user.id):
+        await callback.answer(get_text(lang, "no_admin_access"), show_alert=True)
+        return
+
+    raw_id = callback.data.replace("admin_refund_done_", "") if callback.data else ""
+    try:
+        order_id = int(raw_id)
+    except (TypeError, ValueError):
+        await callback.answer(get_text(lang, "admin_order_not_found"), show_alert=True)
+        return
+
+    ok = _mark_refund_done(db, order_id)
+    if ok is None:
+        await callback.answer(get_text(lang, "admin_db_error"), show_alert=True)
+        return
+    if not ok:
+        await callback.answer(get_text(lang, "admin_order_not_found"), show_alert=True)
+        return
+
+    await callback.answer(get_text(lang, "admin_refund_marked").format(order_id=order_id))
+    if callback.message:
+        await callback.message.edit_text(
+            get_text(lang, "admin_refund_marked").format(order_id=order_id),
+            parse_mode="HTML",
+        )
 
 @router.message(F.text == "📊 Dashboard")
 async def admin_dashboard(message: types.Message, db: DatabaseProtocol):

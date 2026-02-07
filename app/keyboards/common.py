@@ -155,14 +155,14 @@ def product_categories_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     """Quick discount selection keyboard."""
     builder = InlineKeyboardBuilder()
-    discounts = [0, 10, 20, 30, 40, 50, 60, 70]
+    discounts = [20, 30, 40, 50, 60, 70]
     for d in discounts:
-        label = "Без скидки" if d == 0 and lang == "ru" else ("Chegirmasiz" if d == 0 else f"{d}%")
+        label = f"{d}%"
         builder.button(text=label, callback_data=f"discount_{d}")
     builder.button(text="✍️ Другая" if lang == "ru" else "✍️ Boshqa", callback_data="discount_custom")
     builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_price")
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
-    builder.adjust(3, 3, 3, 2)
+    builder.adjust(3, 3, 3)
     return builder.as_markup()
 
 

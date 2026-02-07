@@ -15,6 +15,8 @@ except ImportError:
 
     logger = logging.getLogger(__name__)
 
+MIN_DISCOUNT_PERCENT = 20
+
 # Маппинг городов: латиница <-> кириллица
 CITY_TRANSLITERATION = {
     "toshkent": ["Ташкент", "Tashkent"],
@@ -320,6 +322,16 @@ class OfferMixin:
             cursor = conn.cursor()
             # Support legacy/new partner panel which may send `stock_quantity`.
             final_quantity = stock_quantity if stock_quantity is not None else quantity
+
+            if original_price is None or discount_price is None:
+                raise ValueError("Discount price is required")
+            if original_price <= 0 or discount_price <= 0:
+                raise ValueError("Prices must be greater than zero")
+            if discount_price >= original_price:
+                raise ValueError("Discount price must be less than original price")
+            discount_percent = int((1 - discount_price / original_price) * 100)
+            if discount_percent < MIN_DISCOUNT_PERCENT:
+                raise ValueError(f"Minimum discount is {MIN_DISCOUNT_PERCENT}%")
 
             cursor.execute(
                 """

@@ -57,6 +57,22 @@ def _is_paid_click_order(entity: Any) -> bool:
     return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
 
 
+def _is_unpaid_online_order(entity: Any) -> bool:
+    payment_method = _get_entity_field(entity, "payment_method")
+    payment_status = _get_entity_field(entity, "payment_status")
+    payment_proof_photo_id = _get_entity_field(entity, "payment_proof_photo_id")
+
+    method_norm = PaymentStatus.normalize_method(payment_method)
+    if method_norm not in ("click", "payme"):
+        return False
+
+    status_norm = PaymentStatus.normalize(
+        payment_status,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    return status_norm != PaymentStatus.CONFIRMED
+
 
 def _determine_entity_type(prefix: str, entity_id: int, db_instance: Any) -> tuple[str, Any]:
     """Determine entity type for order callbacks."""
@@ -179,6 +195,10 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             order_type = "delivery" if delivery_address else "pickup"
     else:
         order_type = "pickup"
+
+    if entity_type == "order" and _is_unpaid_online_order(entity):
+        await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)
+        return
 
     target_status = OrderStatus.READY if order_type == "pickup" else OrderStatus.PREPARING
 
@@ -453,8 +473,8 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    if _is_paid_click_order(order):
-        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
+    if _is_unpaid_online_order(order):
+        await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)
         return
 
     if order_service:
@@ -584,6 +604,10 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
 
     if not owner_id or partner_id != owner_id:
         await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if _is_unpaid_online_order(order):
+        await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)
         return
 
     order_type = _get_entity_field(order, "order_type", "delivery")
@@ -721,6 +745,14 @@ async def _process_delivery_handover(
 
     order = db_instance.get_order(order_id)
     if not order:
+        return
+
+    if _is_unpaid_online_order(order):
+        message = get_text(lang, "payment_not_confirmed")
+        if isinstance(event, types.Message):
+            await event.answer(message)
+        else:
+            await event.answer(message, show_alert=True)
         return
 
     order_type = _get_entity_field(order, "order_type", "delivery")

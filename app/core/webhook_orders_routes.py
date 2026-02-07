@@ -21,11 +21,78 @@ from app.core.order_math import (
 )
 from app.core.webhook_api_utils import add_cors_headers
 from app.core.webhook_helpers import _delivery_cash_enabled, _is_offer_active, get_offer_value
+from app.core.sanitize import sanitize_phone
+from app.core.security import validator
+from app.api.webapp.common import (
+    get_offer_time_range_label,
+    get_store_time_range_label,
+    is_offer_available_now,
+    is_store_open_now,
+    normalize_price,
+)
 from app.interfaces.bot.presenters.payment_proof_messages import (
     build_admin_payment_proof_caption,
     build_admin_payment_proof_keyboard,
 )
 from logging_config import logger
+
+
+def _normalize_phone(raw_phone: str | None) -> str:
+    """Sanitize + validate phone; return empty string if invalid."""
+    if not raw_phone:
+        return ""
+    sanitized = sanitize_phone(raw_phone)
+    if not sanitized or not validator.validate_phone(sanitized):
+        return ""
+    return sanitized
+
+
+def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None:
+    sanitized_phone = _normalize_phone(raw_phone)
+    if not sanitized_phone:
+        return
+    try:
+        if hasattr(db, "update_user_phone"):
+            user_model = (
+                db.get_user_model(user_id) if hasattr(db, "get_user_model") else db.get_user(user_id)
+            )
+            current_phone = get_offer_value(user_model, "phone") if user_model else None
+            if not current_phone or current_phone != sanitized_phone:
+                db.update_user_phone(user_id, sanitized_phone)
+    except Exception as e:  # pragma: no cover - defensive
+        logger.warning(f"Could not update user phone for {user_id}: {e}")
+
+
+def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
+    """Return canonical phone: use DB if present, otherwise allow first-time set."""
+    user_model = (
+        db.get_user_model(user_id) if hasattr(db, "get_user_model") else db.get_user(user_id)
+    )
+    stored_phone = _normalize_phone(get_offer_value(user_model, "phone") if user_model else None)
+    candidate = _normalize_phone(raw_phone)
+
+    if stored_phone:
+        if candidate and candidate != stored_phone:
+            raise ValueError("Phone does not match registered number. Update it in the bot.")
+        return stored_phone
+
+    if candidate:
+        _update_phone_if_valid(db, user_id, candidate)
+        return candidate
+
+    raise ValueError("Phone is required")
+
+
+def _validate_store_open(store: Any) -> str | None:
+    if not store:
+        return None
+    if not is_store_open_now(store):
+        time_range = get_store_time_range_label(store)
+        detail = "Do'kon hozir yopiq"
+        if time_range:
+            detail = f"{detail}. Ish vaqti: {time_range}"
+        return detail
+    return None
 
 
 def build_order_handlers(
@@ -64,6 +131,8 @@ def build_order_handlers(
             phone = data.get("phone", "")
             # Support both address and delivery_address field names
             address = data.get("delivery_address") or data.get("address", "")
+            delivery_lat = data.get("delivery_lat") or data.get("lat")
+            delivery_lon = data.get("delivery_lon") or data.get("lon")
             notes = data.get("notes") or data.get("comment", "")
             payment_proof = (
                 data.get("payment_proof")
@@ -155,15 +224,18 @@ def build_order_handlers(
                     {"error": "Cash is not allowed for delivery orders"},
                     400,
                 )
+            try:
+                _resolve_required_phone(db, user_id, phone)
+            except ValueError as e:
+                return _respond({"error": str(e)}, 400)
 
             # Try unified order service first
             created_bookings: list[dict[str, Any]] = []
             failed_items: list[dict[str, Any]] = []
 
             order_service = get_unified_order_service()
+            order_items: list[UnifiedOrderItem] = []
             if order_service and hasattr(db, "create_cart_order"):
-                order_items: list[UnifiedOrderItem] = []
-
                 for item in items:
                     offer_id = item.get("id") or item.get("offer_id")
                     try:
@@ -187,8 +259,14 @@ def build_order_handlers(
                     if not _is_offer_active(offer):
                         failed_items.append({"offer_id": offer_id, "error": "Offer not available"})
                         continue
+                    if not is_offer_available_now(offer):
+                        time_range = get_offer_time_range_label(offer)
+                        detail = "Mahsulot hozir buyurtma uchun mavjud emas"
+                        if time_range:
+                            detail = f"{detail}. Buyurtma vaqti: {time_range}"
+                        return _respond({"error": detail}, 409)
 
-                    price = int(get_offer_value(offer, "discount_price", 0) or 0)
+                    price = int(normalize_price(get_offer_value(offer, "discount_price", 0) or 0))
                     store_id = int(get_offer_value(offer, "store_id"))
                     title = get_offer_value(offer, "title", "Товар")
 
@@ -198,7 +276,7 @@ def build_order_handlers(
                     delivery_price = 0
                     if is_delivery and store:
                         delivery_price = int(
-                            get_offer_value(store, "delivery_price", 0) or 0
+                            normalize_price(get_offer_value(store, "delivery_price", 0) or 0)
                         )
 
                     order_items.append(
@@ -223,10 +301,18 @@ def build_order_handlers(
                         },
                         400,
                     )
+                if order_items:
+                    store_id = order_items[0].store_id
+                    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                    store_err = _validate_store_open(store)
+                    if store_err:
+                        return _respond({"error": store_err}, 409)
                 if is_delivery and order_items:
                     store_id = order_items[0].store_id
                     store = db.get_store(store_id) if hasattr(db, "get_store") else None
-                    min_order = int(get_offer_value(store, "min_order_amount", 0) or 0)
+                    min_order = int(
+                        normalize_price(get_offer_value(store, "min_order_amount", 0) or 0)
+                    )
                     if min_order > 0:
                         calc_items = [
                             {"price": int(i.price), "quantity": int(i.quantity)}
@@ -247,6 +333,8 @@ def build_order_handlers(
                         items=order_items,
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
+                        delivery_lat=delivery_lat if is_delivery else None,
+                        delivery_lon=delivery_lon if is_delivery else None,
                         payment_method=payment_method,
                         notify_customer=True,
                         notify_sellers=True,
@@ -349,7 +437,7 @@ def build_order_handlers(
 
                     # Convert db_items to OrderItem format
                     order_items_list = [
-                        OrderItem(
+                        UnifiedOrderItem(
                             offer_id=int(item["offer_id"]),
                             store_id=int(item["store_id"]),
                             title=item.get("title", ""),
@@ -368,6 +456,8 @@ def build_order_handlers(
                         items=order_items_list,
                         order_type="delivery" if is_delivery else "pickup",
                         delivery_address=address if is_delivery else None,
+                        delivery_lat=delivery_lat if is_delivery else None,
+                        delivery_lon=delivery_lon if is_delivery else None,
                         payment_method=payment_method,
                         notify_customer=True,
                         notify_sellers=True,

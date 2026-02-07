@@ -14,6 +14,7 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
     """Run a single booking expiry/reminder cycle."""
     pending_expiry_minutes = int(os.environ.get("PICKUP_PENDING_EXPIRY_MINUTES", "60"))
     delivery_pending_expiry_minutes = int(os.environ.get("DELIVERY_PENDING_EXPIRY_MINUTES", "120"))
+    online_payment_expiry_minutes = int(os.environ.get("ONLINE_PAYMENT_EXPIRY_MINUTES", "20"))
     ready_expiry_hours = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
 
     order_service = None
@@ -288,6 +289,69 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                     logger.error(f"Error processing expired booking row: {e}")
     except Exception as e:
         logger.error(f"Expired bookings query failed: {e}")
+
+    # 2.5) Pending online payments auto-cancel after timeout
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT o.order_id, o.user_id, o.payment_status, o.payment_method, o.payment_proof_photo_id
+                FROM orders o
+                WHERE o.order_status = 'pending'
+                  AND o.payment_method IN ('click', 'payme')
+                  AND o.created_at < now() - (%s * INTERVAL '1 minute')
+            """,
+                (int(online_payment_expiry_minutes),),
+            )
+            rows = cursor.fetchall()
+            for row in rows:
+                try:
+                    if hasattr(row, "get"):
+                        order_id = row.get("order_id")
+                        user_id = row.get("user_id")
+                        payment_status_raw = row.get("payment_status")
+                        payment_method = row.get("payment_method")
+                        payment_proof_photo_id = row.get("payment_proof_photo_id")
+                    else:
+                        order_id = row[0]
+                        user_id = row[1]
+                        payment_status_raw = row[2] if len(row) > 2 else None
+                        payment_method = row[3] if len(row) > 3 else None
+                        payment_proof_photo_id = row[4] if len(row) > 4 else None
+
+                    normalized_payment_status = PaymentStatus.normalize(
+                        payment_status_raw,
+                        payment_method=payment_method,
+                        payment_proof_photo_id=payment_proof_photo_id,
+                    )
+                    if normalized_payment_status == PaymentStatus.CONFIRMED:
+                        continue
+
+                    try:
+                        if order_service:
+                            await order_service.cancel_order(order_id, entity_type="order")
+                        elif set_order_status_direct:
+                            set_order_status_direct(db, order_id, order_status_cancelled)
+                    except Exception as e:
+                        logger.error(f"Failed to auto-cancel unpaid order {order_id}: {e}")
+
+                    try:
+                        if bot and user_id:
+                            lang = "ru"
+                            try:
+                                lang = db.get_user_language(user_id)
+                            except Exception:
+                                pass
+                            await bot.send_message(
+                                user_id, get_text(lang, "order_payment_expired")
+                            )
+                    except Exception:
+                        pass
+                except Exception as e:
+                    logger.error(f"Error processing unpaid order row: {e}")
+    except Exception as e:
+        logger.error(f"Pending online payments query failed: {e}")
 
     # 3) Pending delivery orders auto-cancel after timeout
     try:

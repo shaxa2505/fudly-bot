@@ -25,6 +25,8 @@ from .utils import (
 
 router = Router()
 
+MIN_DISCOUNT_PERCENT = 20
+
 DECIMAL_UNITS = {"кг", "л"}
 NO_EXPIRY_TOKENS = {
     "-",
@@ -67,11 +69,11 @@ def _price_input_hint(lang: str) -> str:
     if lang == "ru":
         return (
             "Отправьте 2 числа: цена и цена со скидкой (пример: 10000 7000).\n"
-            "Можно отправить процент: 30%."
+            "Можно отправить процент: 30%. Минимум 20%."
         )
     return (
         "2 ta son yuboring: asl narx va chegirmali narx (misol: 10000 7000).\n"
-        "Foiz ham mumkin: 30%."
+        "Foiz ham mumkin: 30%. Kamida 20%."
     )
 
 
@@ -1333,21 +1335,24 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
         await message.answer(get_text(lang, "not_your_offer"), reply_markup=main_menu_seller(lang))
         return
 
-    if edit_field == "price":
-        if "%" in (message.text or ""):
-            percent_values = _extract_numbers(message.text)
-            if len(percent_values) != 1:
-                await message.answer(_price_input_hint(lang))
-                return
-            discount_percent = percent_values[0]
-            if discount_percent < 0 or discount_percent > 99:
-                await message.answer(_price_input_hint(lang))
-                return
-            original_price = int(get_offer_field(offer, "original_price", 0) or 0)
-            if original_price <= 0:
-                await message.answer(get_text(lang, "error_price_gt_zero"))
-                return
-            discount_price = int(original_price * (100 - discount_percent) / 100)
+        if edit_field == "price":
+            if "%" in (message.text or ""):
+                percent_values = _extract_numbers(message.text)
+                if len(percent_values) != 1:
+                    await message.answer(_price_input_hint(lang))
+                    return
+                discount_percent = percent_values[0]
+                if discount_percent < 0 or discount_percent > 99:
+                    await message.answer(_price_input_hint(lang))
+                    return
+                if discount_percent < MIN_DISCOUNT_PERCENT:
+                    await message.answer(get_text(lang, "error_min_discount"))
+                    return
+                original_price = int(get_offer_field(offer, "original_price", 0) or 0)
+                if original_price <= 0:
+                    await message.answer(get_text(lang, "error_price_gt_zero"))
+                    return
+                discount_price = int(original_price * (100 - discount_percent) / 100)
         else:
             numbers = _extract_numbers(message.text)
             if len(numbers) not in (1, 2):
@@ -1364,6 +1369,10 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
                 return
             if discount_price >= original_price:
                 await message.answer(get_text(lang, "error_discount_less_than_original"))
+                return
+            discount_percent = int((1 - discount_price / original_price) * 100)
+            if discount_percent < MIN_DISCOUNT_PERCENT:
+                await message.answer(get_text(lang, "error_min_discount"))
                 return
 
         with db.get_connection() as conn:

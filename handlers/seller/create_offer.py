@@ -31,6 +31,8 @@ bot: Any | None = None
 
 router = Router()
 
+MIN_DISCOUNT_PERCENT = 20
+
 
 def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     """Setup module dependencies."""
@@ -418,12 +420,12 @@ def _parse_price_value(value: str) -> float:
 
 def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, float]:
     if not raw or not raw.strip():
-        return 0, original_price
+        raise ValueError("Discount required")
 
     if "%" in raw:
         percent_value = _parse_price_value(raw)
         discount_percent = int(percent_value)
-        if discount_percent < 0 or discount_percent > 99:
+        if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > 99:
             raise ValueError("Invalid discount percent")
         discount_price = original_price * (1 - discount_percent / 100)
         return discount_percent, discount_price
@@ -432,10 +434,14 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
     if discount_price >= original_price:
         if discount_price <= 99:
             discount_percent = int(discount_price)
+            if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > 99:
+                raise ValueError("Invalid discount percent")
             discount_price = original_price * (1 - discount_percent / 100)
             return discount_percent, discount_price
         raise ValueError("Discount price must be less than original")
     discount_percent = int((1 - discount_price / original_price) * 100)
+    if discount_percent < MIN_DISCOUNT_PERCENT:
+        raise ValueError("Discount too low")
     return discount_percent, discount_price
 
 
@@ -461,8 +467,8 @@ def _quick_add_instructions(lang: str) -> str:
             "\U0001F9FE Формат:\n"
             "Название | Цена | Скидка | Кол-во | Ед | Срок | Категория | Описание\n\n"
             "\U0001F4CC Можно отправить текстом или подписью к фото.\n"
-            "\U0001F4CC Поля после цены — необязательные.\n"
-            "\U0001F3F7 Скидка: % или цена со скидкой (30% или 35000)\n"
+            "\U0001F4CC Поля после скидки — необязательные.\n"
+            "\U0001F3F7 Скидка: минимум 20% (30% или 35000)\n"
             "\u23F3 Срок: ДД.ММ, ДД.ММ.ГГГГ, +3 или 0/без срока\n\n"
             "\U0001F9EA Пример:\n"
             "<code>Хлеб | 12000 | 9000 | 10 | шт | 25.12 | Выпечка | свежий</code>"
@@ -472,8 +478,8 @@ def _quick_add_instructions(lang: str) -> str:
         "\U0001F9FE Format:\n"
         "Nomi | Narx | Chegirma | Miqdor | Birlik | Muddat | Kategoriya | Tavsif\n\n"
         "\U0001F4CC Matn yoki surat osti (caption) bilan yuboring.\n"
-        "\U0001F4CC Narxdan keyingi maydonlar ixtiyoriy.\n"
-        "\U0001F3F7 Chegirma: % yoki chegirmali narx (30% yoki 35000)\n"
+        "\U0001F4CC Chegirmadan keyingi maydonlar ixtiyoriy.\n"
+        "\U0001F3F7 Chegirma: kamida 20% (30% yoki 35000)\n"
         "\u23F3 Muddat: KK.OO, KK.OO.YYYY, +3 yoki 0/muddatsiz\n\n"
         "\U0001F9EA Misol:\n"
         "<code>Non | 12000 | 9000 | 10 | dona | 25.12 | Pishiriq | yangi</code>"
@@ -1173,6 +1179,31 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
                 raise ValueError
 
             discount_percent = int((1 - discount_price / original) * 100)
+            if discount_percent < MIN_DISCOUNT_PERCENT:
+                await state.update_data(original_price=original)
+                data = await state.get_data()
+                text = _compose_step_message(
+                    data,
+                    lang,
+                    5,
+                    "Скидка",
+                    "Chegirma",
+                    "🏷️",
+                    "Выберите % или отправьте цену со скидкой. Минимум 20%."
+                    if lang == "ru"
+                    else "Foizni tanlang yoki chegirmali narxni yuboring. Kamida 20%.",
+                )
+                text = f"{get_text(lang, 'error_min_discount')}\n\n{text}"
+                await _upsert_prompt(
+                    message,
+                    state,
+                    text,
+                    reply_markup=discount_keyboard(lang),
+                    parse_mode="HTML",
+                )
+                await state.set_state(CreateOffer.discount_price)
+                await safe_delete_message(message)
+                return
             await state.update_data(
                 original_price=original,
                 discount_price=discount_price,
@@ -1195,9 +1226,9 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
             "Скидка",
             "Chegirma",
             "🏷️",
-            "Выберите % или отправьте цену со скидкой."
+            "Выберите % или отправьте цену со скидкой. Минимум 20%."
             if lang == "ru"
-            else "Foizni tanlang yoki chegirmali narxni yuboring.",
+            else "Foizni tanlang yoki chegirmali narxni yuboring. Kamida 20%.",
         )
 
         await _upsert_prompt(
@@ -1302,6 +1333,16 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
             raise ValueError
 
         discount_percent = int((1 - discount_price / original_price) * 100)
+        if discount_percent < MIN_DISCOUNT_PERCENT:
+            await _upsert_prompt(
+                message,
+                state,
+                get_text(lang, "error_min_discount"),
+                reply_markup=discount_keyboard(lang),
+                parse_mode="HTML",
+            )
+            await safe_delete_message(message)
+            return
         await state.update_data(discount_percent=discount_percent, discount_price=discount_price)
         await _go_to_unit_step(message, state, lang)
         await safe_delete_message(message)
@@ -1343,6 +1384,16 @@ async def _process_discount(
     target: types.Message, state: FSMContext, lang: str, discount_percent: int
 ) -> None:
     """Process discount and move to unit type step."""
+    if discount_percent < MIN_DISCOUNT_PERCENT:
+        await _upsert_prompt(
+            target,
+            state,
+            get_text(lang, "error_min_discount"),
+            reply_markup=discount_keyboard(lang),
+            parse_mode="HTML",
+        )
+        await state.set_state(CreateOffer.discount_price)
+        return
     data = await state.get_data()
     original_price = data.get("original_price", 0)
     discount_price = original_price * (1 - discount_percent / 100)
@@ -1898,9 +1949,9 @@ async def back_to_discount(callback: types.CallbackQuery, state: FSMContext) -> 
         "Скидка",
         "Chegirma",
         "🏷️",
-        "Выберите % или отправьте цену со скидкой."
+        "Выберите % или отправьте цену со скидкой. Минимум 20%."
         if lang == "ru"
-        else "Foizni tanlang yoki chegirmali narxni yuboring.",
+        else "Foizni tanlang yoki chegirmali narxni yuboring. Kamida 20%.",
     )
 
     await _edit_prompt_from_callback(
