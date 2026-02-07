@@ -1698,9 +1698,8 @@ async def show_store_admins(callback: types.CallbackQuery, state: FSMContext) ->
     store_id = int(callback.data.replace("store_admins_", ""))
 
     # Check if user is owner
-    stores = db.get_user_accessible_stores(callback.from_user.id)
-    if not any(s.get("store_id") == store_id for s in stores):
-        await callback.answer("Доступ запрещён" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     # Get store admins
@@ -2149,9 +2148,8 @@ async def remove_admin(callback: types.CallbackQuery) -> None:
     admin_user_id = int(parts[3])
 
     # Check if user is owner
-    stores = db.get_user_accessible_stores(callback.from_user.id)
-    if not any(s.get("store_id") == store_id for s in stores):
-        await callback.answer("Доступ запрещён" if lang == "ru" else "Ruxsat yo'q", show_alert=True)
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     try:

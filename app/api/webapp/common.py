@@ -144,6 +144,47 @@ def is_offer_available_now(offer: Any, now: datetime | None = None) -> bool:
     return _is_time_in_window(start, end, current)
 
 
+def get_store_time_range_label(store: Any) -> str | None:
+    raw = (
+        get_val(store, "working_hours")
+        or get_val(store, "work_time")
+        or (
+            f"{get_val(store, 'open_time')} - {get_val(store, 'close_time')}"
+            if get_val(store, "open_time") and get_val(store, "close_time")
+            else None
+        )
+    )
+    if not raw:
+        return None
+    start, end = _parse_time_range_from_text(raw)
+    if start and end:
+        return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+    if start:
+        return start.strftime("%H:%M")
+    if end:
+        return end.strftime("%H:%M")
+    return None
+
+
+def is_store_open_now(store: Any, now: datetime | None = None) -> bool:
+    raw = (
+        get_val(store, "working_hours")
+        or get_val(store, "work_time")
+        or (
+            f"{get_val(store, 'open_time')} - {get_val(store, 'close_time')}"
+            if get_val(store, "open_time") and get_val(store, "close_time")
+            else None
+        )
+    )
+    if not raw:
+        return True
+    start, end = _parse_time_range_from_text(raw)
+    if not start or not end:
+        return True
+    current = (now or get_uzb_time()).time()
+    return _is_time_in_window(start, end, current)
+
+
 def _get_offer_quantity(offer: Any) -> int | None:
     raw_qty = get_val(offer, "stock_quantity")
     if raw_qty is None:

@@ -30,7 +30,7 @@ import io
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from typing import Any, Literal
 
 from aiogram import Bot
@@ -39,6 +39,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from PIL import Image
 
 from app.core.geocoding import geocode_store_address
+from app.core.utils import get_uzb_time
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.domain.order import OrderStatus, PaymentStatus
 from app.services.notification_builder import NotificationBuilder
@@ -59,6 +60,91 @@ def _delivery_cash_enabled() -> bool:
         "yes",
         "on",
     }
+
+
+def _parse_time_value(value: object) -> dt_time | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    raw = raw.replace(".", ":")
+    if "T" in raw:
+        raw = raw.split("T", 1)[1]
+    raw = raw.strip()
+    if re.fullmatch(r"\d{1,2}", raw):
+        raw = f"{int(raw):02d}:00"
+    elif re.fullmatch(r"\d{1,2}:\d{1,2}", raw):
+        parts = raw.split(":", 1)
+        raw = f"{int(parts[0]):02d}:{int(parts[1]):02d}"
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_time_range_from_text(value: object) -> tuple[dt_time | None, dt_time | None]:
+    if not value:
+        return None, None
+    raw = str(value)
+    match = re.search(r"(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})", raw)
+    if not match:
+        return None, None
+    start = _parse_time_value(match.group(1))
+    end = _parse_time_value(match.group(2))
+    return start, end
+
+
+def _is_time_in_window(start: dt_time | None, end: dt_time | None, now: dt_time) -> bool:
+    if not start or not end:
+        return True
+    if start <= end:
+        return start <= now <= end
+    return now >= start or now <= end
+
+
+def _get_store_hours_raw(store: Any) -> str | None:
+    if not store:
+        return None
+    if isinstance(store, dict):
+        working_hours = store.get("working_hours") or store.get("work_time")
+        if not working_hours and store.get("open_time") and store.get("close_time"):
+            working_hours = f"{store.get('open_time')} - {store.get('close_time')}"
+        return working_hours
+    working_hours = getattr(store, "working_hours", None) or getattr(store, "work_time", None)
+    if not working_hours:
+        open_time = getattr(store, "open_time", None)
+        close_time = getattr(store, "close_time", None)
+        if open_time and close_time:
+            working_hours = f"{open_time} - {close_time}"
+    return working_hours
+
+
+def _get_store_time_range_label(store: Any) -> str | None:
+    raw = _get_store_hours_raw(store)
+    if not raw:
+        return None
+    start, end = _parse_time_range_from_text(raw)
+    if start and end:
+        return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
+    if start:
+        return start.strftime("%H:%M")
+    if end:
+        return end.strftime("%H:%M")
+    return None
+
+
+def _is_store_open_now(store: Any) -> bool:
+    raw = _get_store_hours_raw(store)
+    if not raw:
+        return True
+    start, end = _parse_time_range_from_text(raw)
+    if not start or not end:
+        return True
+    current = get_uzb_time().time()
+    return _is_time_in_window(start, end, current)
 
 
 def set_order_status_direct(db: Any, order_id: int, status: str) -> bool:
@@ -1037,6 +1123,15 @@ class UnifiedOrderService:
                     "Please place separate orders for each store."
                 ),
             )
+
+        store_id = next(iter(store_ids))
+        store = self.db.get_store(store_id) if hasattr(self.db, "get_store") else None
+        if store and not _is_store_open_now(store):
+            time_range = _get_store_time_range_label(store)
+            detail = "Store is closed now"
+            if time_range:
+                detail = f"{detail}. Order time: {time_range}"
+            return self._error_result(detail)
 
         # Normalize and enforce: sellers should only see paid/cash orders
         if not PaymentStatus.is_cleared(
@@ -2839,7 +2934,11 @@ class UnifiedOrderService:
         existing_message_id = self._get_existing_message_id(entity)
         should_edit = bool(existing_message_id) and user_id and notifications_enabled
         should_force_send = (
-            self.force_telegram_sync and user_id and not existing_message_id and notifications_enabled
+            self.force_telegram_sync
+            and notify_customer
+            and user_id
+            and not existing_message_id
+            and notifications_enabled
         )
 
         logger.info(
@@ -3255,6 +3354,26 @@ class UnifiedOrderService:
                 OrderStatus.CANCELLED,
                 OrderStatus.REJECTED,
             }
+
+            payment_cleared = (
+                normalized_payment_method == "cash"
+                or PaymentStatus.is_cleared(
+                    ctx.payment_status,
+                    payment_method=ctx.payment_method,
+                    payment_proof_photo_id=ctx.payment_proof_photo_id,
+                )
+            )
+            if target_status in (
+                OrderStatus.READY,
+                OrderStatus.DELIVERING,
+                OrderStatus.COMPLETED,
+            ) and not payment_cleared:
+                logger.info(
+                    f"STATUS_UPDATE blocked due to unpaid order: #{entity_id} "
+                    f"status={current_status} -> {target_status}, "
+                    f"payment_status={normalized_payment_status}, method={normalized_payment_method}"
+                )
+                return False
 
             # Idempotent update: requested status already set
             if current_status == target_status:

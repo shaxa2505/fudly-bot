@@ -223,6 +223,23 @@ def build_order_handlers(
                         },
                         400,
                     )
+                if is_delivery and order_items:
+                    store_id = order_items[0].store_id
+                    store = db.get_store(store_id) if hasattr(db, "get_store") else None
+                    min_order = int(get_offer_value(store, "min_order_amount", 0) or 0)
+                    if min_order > 0:
+                        calc_items = [
+                            {"price": int(i.price), "quantity": int(i.quantity)}
+                            for i in order_items
+                        ]
+                        total_check = calc_items_total(calc_items)
+                        if total_check < min_order:
+                            return _respond(
+                                {
+                                    "error": f"Minimum order amount: {min_order}. Your total: {total_check}",
+                                },
+                                400,
+                            )
 
                 try:
                     result: OrderResult = await order_service.create_order(

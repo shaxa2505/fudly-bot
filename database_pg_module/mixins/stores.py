@@ -633,6 +633,47 @@ class StoreMixin:
             
             logger.info(f"Store {store_id} and ALL related data deleted")
 
+    def clear_store_orders(self, store_id: int) -> bool:
+        """Delete all orders/bookings/ratings for a store, keep offers."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT order_id FROM orders WHERE store_id = %s", (store_id,))
+            order_ids = [row[0] for row in cursor.fetchall()]
+
+            if order_ids:
+                cursor.execute(
+                    "DELETE FROM uzum_transactions WHERE order_id = ANY(%s)",
+                    (order_ids,),
+                )
+                cursor.execute(
+                    "DELETE FROM click_fiscalization WHERE order_id = ANY(%s)",
+                    (order_ids,),
+                )
+                cursor.execute(
+                    "DELETE FROM promo_usage WHERE order_id = ANY(%s)",
+                    (order_ids,),
+                )
+                cursor.execute(
+                    "DELETE FROM ratings WHERE order_id = ANY(%s)",
+                    (order_ids,),
+                )
+
+            cursor.execute("SELECT booking_id FROM bookings WHERE store_id = %s", (store_id,))
+            booking_ids = [row[0] for row in cursor.fetchall()]
+
+            if booking_ids:
+                cursor.execute(
+                    "DELETE FROM ratings WHERE booking_id = ANY(%s)",
+                    (booking_ids,),
+                )
+
+            cursor.execute("DELETE FROM orders WHERE store_id = %s", (store_id,))
+            cursor.execute("DELETE FROM bookings WHERE store_id = %s", (store_id,))
+
+            logger.info(f"Store {store_id} orders/bookings cleared")
+            return True
+
     def get_store_owner(self, store_id: int):
         """Get store owner user_id."""
         with self.get_connection() as conn:

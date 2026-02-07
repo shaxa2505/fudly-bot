@@ -43,6 +43,8 @@ from .common import (
     is_offer_active,
     is_offer_available_now,
     get_offer_time_range_label,
+    get_store_time_range_label,
+    is_store_open_now,
     logger,
     normalize_price,
     settings,
@@ -215,6 +217,18 @@ async def _validate_min_order(
         )
 
 
+async def _validate_store_open(db: Any, store_id: int) -> None:
+    store_check = await db.get_store(store_id) if hasattr(db, "get_store") else None
+    if not store_check:
+        return
+    if not is_store_open_now(store_check):
+        time_range = get_store_time_range_label(store_check)
+        detail = "Do'kon hozir yopiq"
+        if time_range:
+            detail = f"{detail}. Ish vaqti: {time_range}"
+        raise HTTPException(status_code=409, detail=detail)
+
+
 @router.post("/orders", response_model=OrderResponse)
 async def create_order(
     order: CreateOrderRequest,
@@ -277,6 +291,7 @@ async def create_order(
         resolved_phone = await _resolve_required_phone(db, user_id, order.phone)
 
         offers_by_id, store_id = await _load_offers_and_store(order.items, db)
+        await _validate_store_open(db, store_id)
 
         if payment_method not in ("cash", "click"):
             raise HTTPException(status_code=400, detail="Unsupported payment method")
@@ -833,6 +848,17 @@ async def cancel_order(
     current_status = OrderStatus.normalize(str(current_status_raw).lower())
     if current_status in ("completed", "cancelled", "rejected"):
         return CancelOrderResponse(success=True, status=str(current_status))
+
+    payment_method = get_val(entity, "payment_method")
+    payment_status_raw = get_val(entity, "payment_status")
+    payment_proof_photo_id = get_val(entity, "payment_proof_photo_id")
+    normalized_payment_status = PaymentStatus.normalize(
+        payment_status_raw,
+        payment_method=payment_method,
+        payment_proof_photo_id=payment_proof_photo_id,
+    )
+    if normalized_payment_status == PaymentStatus.CONFIRMED:
+        raise HTTPException(status_code=409, detail="Paid orders cannot be cancelled")
     if current_status != "pending":
         raise HTTPException(
             status_code=400,

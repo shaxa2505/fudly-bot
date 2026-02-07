@@ -5,6 +5,7 @@ from typing import Any
 
 from app.keyboards import main_menu_customer
 from localization import get_text
+from app.domain.order import PaymentStatus
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +295,8 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT o.order_id, o.user_id, o.order_status, o.delivery_address, o.created_at
+                SELECT o.order_id, o.user_id, o.order_status, o.delivery_address, o.created_at,
+                       o.payment_status, o.payment_method, o.payment_proof_photo_id
                 FROM orders o
                 WHERE o.order_status = 'pending'
                   AND o.order_type = 'delivery'
@@ -308,9 +310,23 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                     if hasattr(row, "get"):
                         order_id = row.get("order_id")
                         user_id = row.get("user_id")
+                        payment_status_raw = row.get("payment_status")
+                        payment_method = row.get("payment_method")
+                        payment_proof_photo_id = row.get("payment_proof_photo_id")
                     else:
                         order_id = row[0]
                         user_id = row[1]
+                        payment_status_raw = row[5] if len(row) > 5 else None
+                        payment_method = row[6] if len(row) > 6 else None
+                        payment_proof_photo_id = row[7] if len(row) > 7 else None
+
+                    normalized_payment_status = PaymentStatus.normalize(
+                        payment_status_raw,
+                        payment_method=payment_method,
+                        payment_proof_photo_id=payment_proof_photo_id,
+                    )
+                    if normalized_payment_status == PaymentStatus.CONFIRMED:
+                        continue
 
                     # Update order status
                     try:
@@ -445,6 +461,71 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                     logger.error(f"Error processing ready pickup order row: {e}")
     except Exception as e:
         logger.error(f"Ready pickup orders query failed: {e}")
+
+    # 4.7) Pending pickup orders expire after configured minutes
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT order_id, user_id, payment_status, payment_method, payment_proof_photo_id
+                FROM orders
+                WHERE order_type = 'pickup'
+                  AND order_status = 'pending'
+                  AND created_at < now() - (%s * INTERVAL '1 minute')
+            """,
+                (int(pending_expiry_minutes),),
+            )
+            rows = cursor.fetchall()
+            for row in rows:
+                try:
+                    if hasattr(row, "get"):
+                        order_id = row.get("order_id")
+                        user_id = row.get("user_id")
+                        payment_status_raw = row.get("payment_status")
+                        payment_method = row.get("payment_method")
+                        payment_proof_photo_id = row.get("payment_proof_photo_id")
+                    else:
+                        order_id = row[0]
+                        user_id = row[1]
+                        payment_status_raw = row[2] if len(row) > 2 else None
+                        payment_method = row[3] if len(row) > 3 else None
+                        payment_proof_photo_id = row[4] if len(row) > 4 else None
+
+                    normalized_payment_status = PaymentStatus.normalize(
+                        payment_status_raw,
+                        payment_method=payment_method,
+                        payment_proof_photo_id=payment_proof_photo_id,
+                    )
+                    if normalized_payment_status == PaymentStatus.CONFIRMED:
+                        continue
+
+                    # Update status to cancelled and restore quantities
+                    try:
+                        if order_service:
+                            await order_service.cancel_order(order_id, entity_type="order")
+                        elif set_order_status_direct:
+                            set_order_status_direct(db, order_id, order_status_cancelled)
+                    except Exception as e:
+                        logger.error(f"Failed to expire pending pickup order {order_id}: {e}")
+
+                    # Notify user if unified order service is unavailable
+                    if bot and user_id and not order_service:
+                        try:
+                            lang = "ru"
+                            try:
+                                lang = db.get_user_language(user_id)
+                            except Exception:
+                                pass
+                            await bot.send_message(
+                                user_id, get_text(lang, "pickup_pending_expired")
+                            )
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.error(f"Error processing pending pickup order row: {e}")
+    except Exception as e:
+        logger.error(f"Pending pickup orders query failed: {e}")
 
     # 5) Pending pickup bookings expire after configured minutes
     try:

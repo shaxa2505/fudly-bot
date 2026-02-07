@@ -17,6 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
+from app.domain.order import PaymentStatus
 from app.domain.order_labels import normalize_order_status, status_emoji, status_label
 from app.services.notification_builder import NotificationBuilder
 from app.services.unified_order_service import (
@@ -25,6 +26,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from handlers.common.utils import fix_mojibake_text, is_my_orders_button
+from localization import get_text
 
 try:
     from logging_config import logger
@@ -923,6 +925,22 @@ async def order_cancel_handler(callback: types.CallbackQuery) -> None:
         else:
             raw_status = _get_field(order, 10)
         status = _normalize_status(raw_status)
+        payment_method = (
+            order.get("payment_method") if hasattr(order, "get") else _get_field(order, 9)
+        )
+        payment_status_raw = (
+            order.get("payment_status") if hasattr(order, "get") else _get_field(order, 11)
+        )
+        normalized_payment_status = PaymentStatus.normalize(
+            payment_status_raw,
+            payment_method=payment_method,
+        )
+        if normalized_payment_status == PaymentStatus.CONFIRMED:
+            await callback.answer(
+                get_text(lang, "paid_order_cancel_blocked"),
+                show_alert=True,
+            )
+            return
         if status != "pending":
             await callback.answer(
                 _t(
