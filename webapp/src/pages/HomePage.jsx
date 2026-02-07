@@ -204,8 +204,15 @@ function HomePage() {
   }
   const trimmedSearch = searchQuery.trim()
   const showHistoryDropdown = showSearchHistory && !trimmedSearch && searchHistory.length > 0
-  const showSuggestionsDropdown = showSearchHistory && trimmedSearch.length >= 2
-  const showSearchDropdown = showHistoryDropdown || showSuggestionsDropdown
+  const showLiveDropdown = showSearchHistory && trimmedSearch.length >= 2
+  const showSuggestionsDropdown = showLiveDropdown
+  const hasOfferResults = (searchResults?.offers || []).length > 0
+  const hasStoreResults = (searchResults?.stores || []).length > 0
+  const showSearchDropdown = showHistoryDropdown || showLiveDropdown
+  const showResultsSection = showLiveDropdown && (
+    searchResultsLoading || hasOfferResults || hasStoreResults
+  )
+  const showResultsEmpty = showLiveDropdown && !searchResultsLoading && !hasOfferResults && !hasStoreResults
   const locationCacheKey = buildLocationCacheKey(location)
 
   useEffect(() => {
@@ -670,6 +677,8 @@ function HomePage() {
     searchInputRef.current?.blur()
     setShowSearchHistory(false)
     setSearchSuggestions([])
+    setSearchResults({ offers: [], stores: [] })
+    setSearchResultsLoading(false)
 
     if (!trimmed) {
       manualSearchRef.current = Date.now()
@@ -699,6 +708,29 @@ function HomePage() {
   // Handle search history item click
   const handleHistoryClick = (query) => {
     handleSearchSubmit(query)
+  }
+
+  const handleSearchOfferClick = (offer) => {
+    const offerId = offer?.id || offer?.offer_id
+    searchInputRef.current?.blur()
+    setShowSearchHistory(false)
+    setSearchSuggestions([])
+    setSearchResults({ offers: [], stores: [] })
+    if (offerId) {
+      navigate(`/product?offer_id=${offerId}`, { state: { offer } })
+    } else {
+      navigate('/product', { state: { offer } })
+    }
+  }
+
+  const handleSearchStoreClick = (store) => {
+    const storeId = store?.id || store?.store_id
+    if (!storeId) return
+    searchInputRef.current?.blur()
+    setShowSearchHistory(false)
+    setSearchSuggestions([])
+    setSearchResults({ offers: [], stores: [] })
+    navigate('/stores', { state: { openStore: { ...store, id: storeId } } })
   }
 
   // Clear search history
@@ -757,6 +789,49 @@ function HomePage() {
         }
       }
     }, 250)
+
+    return () => {
+      isActive = false
+      clearTimeout(timer)
+    }
+  }, [searchQuery, searchFocused, cityForApi, location.region, location.district])
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (!searchFocused || trimmed.length < 2) {
+      setSearchResults({ offers: [], stores: [] })
+      setSearchResultsLoading(false)
+      return
+    }
+
+    let isActive = true
+    const requestId = ++searchResultsRequestRef.current
+    const timer = setTimeout(async () => {
+      setSearchResultsLoading(true)
+      setSearchResults({ offers: [], stores: [] })
+      try {
+        const data = await api.searchAll(trimmed, {
+          city: cityForApi || undefined,
+          region: location.region || undefined,
+          district: location.district || undefined,
+          limit_offers: 4,
+          limit_stores: 4,
+        })
+        if (!isActive || requestId !== searchResultsRequestRef.current) return
+        setSearchResults({
+          offers: Array.isArray(data?.offers) ? data.offers : [],
+          stores: Array.isArray(data?.stores) ? data.stores : [],
+        })
+      } catch (error) {
+        if (isActive && requestId === searchResultsRequestRef.current) {
+          setSearchResults({ offers: [], stores: [] })
+        }
+      } finally {
+        if (isActive && requestId === searchResultsRequestRef.current) {
+          setSearchResultsLoading(false)
+        }
+      }
+    }, 300)
 
     return () => {
       isActive = false
@@ -1008,6 +1083,8 @@ function HomePage() {
                 onClick={() => {
                   setSearchQuery('')
                   setSearchSuggestions([])
+                  setSearchResults({ offers: [], stores: [] })
+                  setSearchResultsLoading(false)
                 }}
                 aria-label="Qidiruvni tozalash"
               >
@@ -1067,7 +1144,7 @@ function HomePage() {
                       )}
                     </div>
                     {searchSuggestions.length === 0 && !suggestionsLoading ? (
-                      <div className="search-suggestions-empty">Topilmadi</div>
+                      <div className="search-suggestions-empty">Tavsiyalar topilmadi</div>
                     ) : (
                       searchSuggestions.map((query, index) => (
                         <button
@@ -1082,6 +1159,122 @@ function HomePage() {
                           <span>{query}</span>
                         </button>
                       ))
+                    )}
+
+                    {showResultsSection && (
+                      <div className="search-results-section">
+                        {searchResultsLoading && (
+                          <div className="search-results-loading">Qidirilmoqda...</div>
+                        )}
+
+                        {hasOfferResults && (
+                          <div className="search-results-group">
+                            <div className="search-results-title">Mahsulotlar</div>
+                            <div className="search-results-list">
+                              {searchResults.offers.map((offer, index) => {
+                                const offerId = offer?.id || offer?.offer_id
+                                const offerTitle = offer?.title || 'Mahsulot'
+                                const storeLabel = offer?.store_name || offer?.storeName || ''
+                                const discountPrice = Number(offer?.discount_price || offer?.discountPrice || 0)
+                                const originalPrice = Number(offer?.original_price || offer?.originalPrice || 0)
+                                const showOriginal = originalPrice > discountPrice && discountPrice > 0
+                                const priceLabel = discountPrice > 0 ? formatPrice(discountPrice) : ''
+                                const originalLabel = showOriginal ? formatPrice(originalPrice) : ''
+                                const offerImage = resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE
+
+                                return (
+                                  <button
+                                    key={offerId ? `offer-${offerId}` : `offer-${index}`}
+                                    type="button"
+                                    className="search-result-item"
+                                    onMouseDown={() => handleSearchOfferClick(offer)}
+                                  >
+                                    <span className="search-result-image">
+                                      <img
+                                        src={offerImage}
+                                        alt={offerTitle}
+                                        loading="lazy"
+                                        decoding="async"
+                                        onError={(event) => {
+                                          event.currentTarget.src = PLACEHOLDER_IMAGE
+                                        }}
+                                      />
+                                    </span>
+                                    <span className="search-result-info">
+                                      <span className="search-result-title">{offerTitle}</span>
+                                      {storeLabel && (
+                                        <span className="search-result-subtitle">{storeLabel}</span>
+                                      )}
+                                    </span>
+                                    <span className="search-result-price">
+                                      {priceLabel && (
+                                        <span className="search-result-price-current">{priceLabel}</span>
+                                      )}
+                                      {originalLabel && (
+                                        <span className="search-result-price-old">{originalLabel}</span>
+                                      )}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {hasStoreResults && (
+                          <div className="search-results-group">
+                            <div className="search-results-title">Do'konlar</div>
+                            <div className="search-results-list">
+                              {searchResults.stores.map((store, index) => {
+                                const storeId = store?.id || store?.store_id
+                                const storeName = store?.name || "Do'kon"
+                                const storeImage = resolveStoreImageUrl(store)
+                                const storeInitial = storeName?.trim()?.charAt(0)?.toUpperCase() || 'D'
+                                const storeSubtitle = store?.address || store?.category || ''
+                                const ratingValue = Number(store?.rating || 0)
+
+                                return (
+                                  <button
+                                    key={storeId ? `store-${storeId}` : `store-${index}`}
+                                    type="button"
+                                    className="search-result-item"
+                                    onMouseDown={() => handleSearchStoreClick(store)}
+                                  >
+                                    <span className="search-result-avatar">
+                                      {storeImage ? (
+                                        <img
+                                          src={storeImage}
+                                          alt={storeName}
+                                          loading="lazy"
+                                          decoding="async"
+                                          onError={(event) => {
+                                            event.currentTarget.src = PLACEHOLDER_IMAGE
+                                          }}
+                                        />
+                                      ) : (
+                                        <span className="search-result-initial">{storeInitial}</span>
+                                      )}
+                                    </span>
+                                    <span className="search-result-info">
+                                      <span className="search-result-title">{storeName}</span>
+                                      {storeSubtitle && (
+                                        <span className="search-result-subtitle">{storeSubtitle}</span>
+                                      )}
+                                    </span>
+                                    {ratingValue > 0 && (
+                                      <span className="search-result-rating">* {ratingValue.toFixed(1)}</span>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {showResultsEmpty && (
+                      <div className="search-results-empty">Natijalar topilmadi</div>
                     )}
                   </>
                 )}

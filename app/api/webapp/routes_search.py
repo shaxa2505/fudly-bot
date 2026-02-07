@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import inspect
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -9,6 +10,19 @@ from .common import get_db, get_val, logger, normalize_price
 from app.core.utils import normalize_city
 
 router = APIRouter()
+
+
+async def _maybe_await(value: Any) -> Any:
+    if inspect.isawaitable(value):
+        return await value
+    return value
+
+
+async def _db_call(db: Any, name: str, *args: Any, **kwargs: Any) -> Any:
+    if not hasattr(db, name):
+        return None
+    result = getattr(db, name)(*args, **kwargs)
+    return await _maybe_await(result)
 
 
 class SearchOfferItem(BaseModel):
@@ -59,22 +73,30 @@ async def search_all(
         offers_raw: list[Any] = []
         stores_raw: list[Any] = []
         if hasattr(db, "search_offers"):
-            offers_raw = db.search_offers(
-                query,
-                city=normalized_city,
-                region=normalized_region,
-                district=normalized_district,
-                limit=limit_offers,
-                offset=offset_offers,
+            offers_raw = (
+                await _db_call(
+                    db,
+                    "search_offers",
+                    query,
+                    city=normalized_city,
+                    region=normalized_region,
+                    district=normalized_district,
+                    limit=limit_offers,
+                    offset=offset_offers,
+                )
             ) or []
         if hasattr(db, "search_stores"):
-            stores_raw = db.search_stores(
-                query,
-                city=normalized_city,
-                region=normalized_region,
-                district=normalized_district,
-                limit=limit_stores,
-                offset=offset_stores,
+            stores_raw = (
+                await _db_call(
+                    db,
+                    "search_stores",
+                    query,
+                    city=normalized_city,
+                    region=normalized_region,
+                    district=normalized_district,
+                    limit=limit_stores,
+                    offset=offset_stores,
+                )
             ) or []
 
         offers = [
