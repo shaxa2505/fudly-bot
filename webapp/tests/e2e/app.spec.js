@@ -62,6 +62,7 @@ const apiState = {
     delivery_price: 0,
     min_order_amount: 0,
   },
+  lastOrderPayload: null,
   orderCreateResponse: {
     success: true,
     order_id: 555,
@@ -94,6 +95,7 @@ const resetApiState = () => {
     delivery_price: 0,
     min_order_amount: 0,
   }
+  apiState.lastOrderPayload = null
   apiState.orderCreateResponse = {
     success: true,
     order_id: 555,
@@ -184,6 +186,11 @@ const setupApiRoutes = async (page) => {
     }
 
     if (path === '/orders' && method === 'POST') {
+      try {
+        apiState.lastOrderPayload = request.postDataJSON()
+      } catch (error) {
+        apiState.lastOrderPayload = null
+      }
       return fulfillJson(route, apiState.orderCreateResponse)
     }
 
@@ -382,6 +389,12 @@ test('places pickup order with cash', async ({ page }) => {
   await page.locator('.checkout-footer-btn').click()
 
   await orderResponse
+  expect(apiState.lastOrderPayload).toBeTruthy()
+  expect(apiState.lastOrderPayload.order_type).toBe('pickup')
+  expect(apiState.lastOrderPayload.payment_method).toBe('cash')
+  expect(apiState.lastOrderPayload.delivery_address).toBeNull()
+  expect(apiState.lastOrderPayload.delivery_fee).toBe(0)
+  expect(apiState.lastOrderPayload.items).toEqual([{ offer_id: 1, quantity: 1 }])
   await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
 })
 

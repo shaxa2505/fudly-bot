@@ -20,6 +20,9 @@ def _with_signed_uid(url: str, user_id: int | None) -> str:
     """
     if not user_id:
         return url
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    if environment not in ("development", "dev", "local", "test"):
+        return url
 
     bot_token = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     if not bot_token:
