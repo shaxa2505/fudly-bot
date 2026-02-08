@@ -6,6 +6,28 @@ export const normalizeOrderStatus = (status) => {
   return normalized
 }
 
+export const normalizePaymentStatus = (status, paymentMethod = null) => {
+  if (status == null) return ''
+  const normalized = String(status).trim().toLowerCase()
+  if (!normalized) return ''
+  if (normalized === 'paid') return 'confirmed'
+  if (normalized === 'payment_rejected') return 'rejected'
+  if (normalized === 'pending') {
+    const method = paymentMethod ? String(paymentMethod).trim().toLowerCase() : ''
+    if (method === 'cash') return 'not_required'
+    return 'awaiting_payment'
+  }
+  return normalized
+}
+
+export const isPaymentPending = (status) => (
+  ['awaiting_payment', 'awaiting_proof', 'proof_submitted'].includes(status)
+)
+
+export const isPaymentSettled = (status) => (
+  ['confirmed', 'not_required'].includes(status)
+)
+
 export const resolveOrderType = (order) => {
   const rawType = order?.order_type
   if (rawType === 'pickup' || rawType === 'delivery') return rawType

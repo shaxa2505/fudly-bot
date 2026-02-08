@@ -612,9 +612,6 @@ test('checkout resumes pending payment when cart matches', async ({ page }) => {
 
   await page.goto('/cart', { waitUntil: 'domcontentloaded' })
 
-  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
-  await expect(page.getByText("To'lov yakunlanmagan")).toBeVisible()
-
   const statusResponse = page.waitForResponse((resp) =>
     resp.url().includes('/api/v1/orders/777/status') && resp.status() === 200
   )
@@ -622,11 +619,8 @@ test('checkout resumes pending payment when cart matches', async ({ page }) => {
     resp.url().includes('/api/v1/payment/create') && resp.status() === 200
   )
 
-  const resumeButton = page
-    .locator('.checkout-pending-banner')
-    .getByRole('button', { name: "To'lovni davom ettirish" })
-  await expect(resumeButton).toBeEnabled()
-  await resumeButton.click()
+  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
+  await expect(page.getByText("To'lov yakunlanmagan")).toBeVisible()
 
   await statusResponse
   await paymentResponse

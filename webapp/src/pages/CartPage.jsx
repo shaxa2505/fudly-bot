@@ -980,15 +980,33 @@ function CartPage({ user }) {
     () => buildCartSignature(cartItems),
     [buildCartSignature, cartItems]
   )
+  const currentCartStoreId = useMemo(() => {
+    const item = cartItems.find(entry => entry?.offer?.store_id)
+    return item?.offer?.store_id ?? null
+  }, [cartItems])
+  const currentCartTotal = useMemo(() => {
+    const raw = Number(cartTotal ?? 0)
+    return Number.isFinite(raw) ? raw : 0
+  }, [cartTotal])
   const pendingCartSignature = useMemo(() => {
     if (!pendingPayment?.cart || typeof pendingPayment.cart !== 'object') return ''
     return buildCartSignature(Object.values(pendingPayment.cart))
   }, [buildCartSignature, pendingPayment?.cart])
+  const pendingStoreId = pendingPayment?.storeId ?? pendingPayment?.store_id ?? null
+  const pendingTotal = Number(pendingPayment?.total ?? pendingPayment?.amount ?? NaN)
+  const hasStoreMatch = pendingStoreId != null && currentCartStoreId != null
+    ? Number(pendingStoreId) === Number(currentCartStoreId)
+    : true
+  const hasTotalMatch = Number.isFinite(pendingTotal)
+    ? Math.abs(pendingTotal - currentCartTotal) <= 1
+    : true
   const hasMatchingPendingCart = Boolean(
     hasPendingPayment &&
     currentCartSignature &&
     pendingCartSignature &&
-    currentCartSignature === pendingCartSignature
+    currentCartSignature === pendingCartSignature &&
+    hasStoreMatch &&
+    hasTotalMatch
   )
   const confirmResumePendingPayment = useCallback(async () => {
     const message = "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
@@ -1206,6 +1224,39 @@ function CartPage({ user }) {
       setPendingActionLoading(false)
     }
   }, [pendingActionLoading, pendingPayment, toast, cartItems])
+
+  useEffect(() => {
+    if (!showCheckoutSheet) {
+      pendingAutoResumeRef.current = null
+      return
+    }
+    if (!pendingPayment?.orderId) return
+    if (!hasMatchingPendingCart) return
+    if (pendingActionLoading) return
+    if (pendingAutoResumeRef.current === pendingPayment.orderId) return
+
+    pendingAutoResumeRef.current = pendingPayment.orderId
+    let isActive = true
+
+    const attemptAutoResume = async () => {
+      const confirmed = await confirmResumePendingPayment()
+      if (!isActive || !confirmed) return
+      await handleResumePayment()
+    }
+
+    attemptAutoResume()
+
+    return () => {
+      isActive = false
+    }
+  }, [
+    showCheckoutSheet,
+    pendingPayment?.orderId,
+    hasMatchingPendingCart,
+    pendingActionLoading,
+    confirmResumePendingPayment,
+    handleResumePayment,
+  ])
 
   const refreshPendingStatus = useCallback(async () => {
     if (!pendingPayment?.orderId) return
