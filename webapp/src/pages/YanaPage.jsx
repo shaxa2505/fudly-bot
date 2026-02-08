@@ -40,6 +40,33 @@ const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
 
 const CANCELABLE_STATUSES = new Set(['pending'])
 
+const toText = (value, fallback = '') => {
+  if (value == null) return fallback
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value)
+  }
+  if (typeof value === 'object') {
+    const candidate =
+      value.city ??
+      value.name ??
+      value.title ??
+      value.label ??
+      value.value ??
+      value.text
+    if (typeof candidate === 'string') return candidate
+    if (typeof candidate === 'number' || typeof candidate === 'boolean') {
+      return String(candidate)
+    }
+    return fallback
+  }
+  try {
+    return String(value)
+  } catch {
+    return fallback
+  }
+}
+
 function YanaPage({ user }) {
   const navigate = useNavigate()
   const [orders, setOrders] = useState([])
@@ -50,14 +77,14 @@ function YanaPage({ user }) {
 
   const cachedUser = getCurrentUser()
   const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user
-  const resolvedPhone = (
+  const resolvedPhone = toText(
     user?.phone ||
-    cachedUser?.phone ||
-    telegramUser?.phone_number ||
-    getStoredPhone() ||
-    ''
-  )
-  const resolvedCity = (() => {
+      cachedUser?.phone ||
+      telegramUser?.phone_number ||
+      getStoredPhone() ||
+      ''
+  ).trim()
+  const resolvedCity = toText((() => {
     if (user?.city) return user.city
     if (cachedUser?.city) return cachedUser.city
     try {
@@ -66,22 +93,23 @@ function YanaPage({ user }) {
     } catch {
       return ''
     }
-  })()
+  })()).trim()
   const [notifications, setNotifications] = useState(true)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notificationsList, setNotificationsList] = useState([])
   const [notificationsLoading, setNotificationsLoading] = useState(true)
   const notificationsRef = useRef([])
   const [showClearCartModal, setShowClearCartModal] = useState(false)
-  const profileName = (
+  const profileName = toText(
     user?.full_name ||
-    user?.name ||
-    [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
-    [telegramUser?.first_name, telegramUser?.last_name].filter(Boolean).join(' ') ||
-    telegramUser?.username ||
+      user?.name ||
+      [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
+      [telegramUser?.first_name, telegramUser?.last_name].filter(Boolean).join(' ') ||
+      telegramUser?.username ||
+      'Foydalanuvchi',
     'Foydalanuvchi'
-  ).trim()
-  const profileHandle = user?.username || telegramUser?.username || ''
+  ).trim() || 'Foydalanuvchi'
+  const profileHandle = toText(user?.username || telegramUser?.username || '').trim()
   const avatarUrl = resolveImageUrl(
     user?.photo_url,
     user?.photo,
@@ -390,12 +418,14 @@ function YanaPage({ user }) {
       ? Math.round((baseTotal || 0) / quantity)
       : (items[0]?.price ?? items[0]?.discount_price ?? 0)
     const offerTitle =
-      order.offer_title ||
-      order.title ||
-      items[0]?.title ||
-      items[0]?.offer_title ||
-      'Buyurtma'
-    const storeName = order.store_name || items[0]?.store_name || "Do'kon"
+      toText(
+        order.offer_title ||
+          order.title ||
+          items[0]?.title ||
+          items[0]?.offer_title ||
+          'Buyurtma'
+      ) || 'Buyurtma'
+    const storeName = toText(order.store_name || items[0]?.store_name || "Do'kon") || "Do'kon"
     const bookingCode = order.booking_code || order.pickup_code
     const photoUrl = resolveImageUrl(
       order.offer_photo,
@@ -431,6 +461,7 @@ function YanaPage({ user }) {
     if (!dateStr) return ''
     try {
       const date = new Date(dateStr)
+      if (Number.isNaN(date.getTime())) return toText(dateStr)
       const now = new Date()
       const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
 
@@ -443,7 +474,7 @@ function YanaPage({ user }) {
         month: 'short'
       })
     } catch {
-      return dateStr
+      return toText(dateStr)
     }
   }
 
@@ -451,7 +482,7 @@ function YanaPage({ user }) {
     if (!dateStr) return ''
     try {
       const date = new Date(dateStr)
-      if (Number.isNaN(date.getTime())) return dateStr
+      if (Number.isNaN(date.getTime())) return toText(dateStr)
       const now = new Date()
       const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
       const time = date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
@@ -466,7 +497,7 @@ function YanaPage({ user }) {
       })
       return `${dateLabel} - ${time}`
     } catch {
-      return dateStr
+      return toText(dateStr)
     }
   }
 
