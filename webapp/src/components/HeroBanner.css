@@ -9,7 +9,7 @@
 .hero-banner {
   position: relative;
   border-radius: 24px;
-  height: 224px;
+  height: 208px;
   overflow: hidden;
   background: #111827;
   color: #FFFFFF;
@@ -128,7 +128,7 @@
 /* Mobile optimizations */
 @media (max-width: 360px) {
   .hero-banner {
-    height: 200px;
+    height: 184px;
   }
 
   .banner-content {

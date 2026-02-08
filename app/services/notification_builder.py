@@ -98,6 +98,7 @@ class NotificationBuilder:
         order_ids: list[int] | None = None,
         is_cart: bool = False,
         store_name: str = "",
+        store_phone: str | None = None,
         store_address: str | None = None,
         delivery_address: str | None = None,
         pickup_code: str | None = None,
@@ -142,7 +143,7 @@ class NotificationBuilder:
             payment_method,
             payment_proof_photo_id=payment_proof_photo_id,
         )
-        if role == "seller" and payment_text:
+        if payment_text:
             if payment_status_text:
                 lines.append(f"{payment_text} — <b>{payment_status_text}</b>")
             else:
@@ -163,6 +164,10 @@ class NotificationBuilder:
 
         if store_name:
             lines.append(f"{get_text(lang, 'label_store')}: {self._esc(store_name)}")
+        if role == "customer" and store_phone:
+            lines.append(
+                f"{get_text(lang, 'label_store_phone')}: <code>{self._esc(store_phone)}</code>"
+            )
 
         if self.order_type == "delivery":
             if delivery_address:
@@ -223,9 +228,6 @@ class NotificationBuilder:
         if total_value:
             lines.append(f"{get_text(lang, 'label_total')}: <b>{total_value:,} {currency}</b>")
 
-        if payment_text and role != "seller":
-            lines.append(payment_text)
-
         if reject_reason and status in ("rejected", "cancelled"):
             lines.append(f"{get_text(lang, 'label_reason')}: {self._esc(reject_reason)}")
 
@@ -237,6 +239,7 @@ class NotificationBuilder:
         lang: str,
         order_id: int,
         store_name: str = "",
+        store_phone: str | None = None,
         store_address: str | None = None,
         pickup_code: str | None = None,
         reject_reason: str | None = None,
@@ -266,6 +269,7 @@ class NotificationBuilder:
             order_ids=order_ids,
             is_cart=is_cart,
             store_name=store_name,
+            store_phone=store_phone,
             store_address=store_address,
             delivery_address=delivery_address,
             pickup_code=pickup_code,
@@ -292,6 +296,7 @@ class NotificationBuilder:
         order_ids: list[int] | None = None,
         is_cart: bool = False,
         store_name: str = "",
+        store_phone: str | None = None,
         store_address: str | None = None,
         delivery_address: str | None = None,
         pickup_code: str | None = None,
@@ -317,6 +322,7 @@ class NotificationBuilder:
             order_ids=order_ids,
             is_cart=is_cart,
             store_name=store_name,
+            store_phone=store_phone,
             store_address=store_address,
             delivery_address=delivery_address,
             pickup_code=pickup_code,

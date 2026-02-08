@@ -566,6 +566,73 @@ test('delivery payment creates online payment link', async ({ page }) => {
   await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
 })
 
+test('checkout resumes pending payment when cart matches', async ({ page }) => {
+  await page.route('**/api/v1/orders/777/status', async (route) => {
+    return fulfillJson(route, {
+      status: 'pending',
+      payment_status: 'awaiting_payment',
+      booking_code: 'A1',
+      offer_title: 'Non',
+      quantity: 1,
+      total_price: 5000,
+      store_name: 'Lavka',
+    })
+  })
+  await page.route('**/api/v1/payment/create', async (route) => {
+    return fulfillJson(route, { payment_url: apiState.paymentLink })
+  })
+
+  await page.addInitScript(() => {
+    const cart = {
+      '1': {
+        offer: {
+          id: 1,
+          title: 'Non',
+          discount_price: 5000,
+          original_price: 10000,
+          store_id: 99,
+        },
+        quantity: 1,
+      },
+    }
+    localStorage.setItem('fudly_cart_v2', JSON.stringify(cart))
+    localStorage.setItem(
+      'fudly_pending_payment_user_123',
+      JSON.stringify({
+        orderId: 777,
+        storeId: 99,
+        total: 5000,
+        provider: 'click',
+        cart,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    )
+  })
+
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' })
+
+  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
+  await expect(page.getByText("To'lov yakunlanmagan")).toBeVisible()
+
+  const statusResponse = page.waitForResponse((resp) =>
+    resp.url().includes('/api/v1/orders/777/status') && resp.status() === 200
+  )
+  const paymentResponse = page.waitForResponse((resp) =>
+    resp.url().includes('/api/v1/payment/create') && resp.status() === 200
+  )
+
+  const resumeButton = page
+    .locator('.checkout-pending-banner')
+    .getByRole('button', { name: "To'lovni davom ettirish" })
+  await expect(resumeButton).toBeEnabled()
+  await resumeButton.click()
+
+  await statusResponse
+  await paymentResponse
+  expect(apiState.lastOrderPayload).toBeNull()
+})
+
 test('order tracking shows status', async ({ page }) => {
   apiState.orderStatus = {
     status: 'confirmed',

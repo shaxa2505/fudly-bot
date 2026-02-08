@@ -625,6 +625,8 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         delivery_price=int(data.get("delivery_price") or 0),
         total=int(total or 0),
         currency=currency,
+        payment_method=data.get("payment_method"),
+        payment_status=data.get("payment_status"),
     )
 
     lines = [card]

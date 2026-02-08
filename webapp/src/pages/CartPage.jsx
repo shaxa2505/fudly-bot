@@ -953,6 +953,53 @@ function CartPage({ user }) {
     return Object.values(cart).reduce((sum, item) => sum + Number(item?.quantity || 0), 0)
   }, [pendingPayment])
   const hasPendingPayment = Boolean(pendingPayment?.orderId)
+  const normalizeCartEntry = useCallback((entry) => {
+    if (!entry) return null
+    const offer = entry.offer || entry
+    const rawId =
+      offer?.id ??
+      offer?.offer_id ??
+      offer?.offerId ??
+      entry?.offerId ??
+      entry?.id
+    if (rawId == null) return null
+    const qtyRaw = entry.quantity ?? entry.qty ?? entry.count ?? 0
+    const qty = Number(qtyRaw)
+    if (!Number.isFinite(qty) || qty <= 0) return null
+    return `${String(rawId)}:${qty}`
+  }, [])
+  const buildCartSignature = useCallback((entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) return ''
+    const normalized = entries
+      .map(normalizeCartEntry)
+      .filter(Boolean)
+      .sort()
+    return normalized.join('|')
+  }, [normalizeCartEntry])
+  const currentCartSignature = useMemo(
+    () => buildCartSignature(cartItems),
+    [buildCartSignature, cartItems]
+  )
+  const pendingCartSignature = useMemo(() => {
+    if (!pendingPayment?.cart || typeof pendingPayment.cart !== 'object') return ''
+    return buildCartSignature(Object.values(pendingPayment.cart))
+  }, [buildCartSignature, pendingPayment?.cart])
+  const hasMatchingPendingCart = Boolean(
+    hasPendingPayment &&
+    currentCartSignature &&
+    pendingCartSignature &&
+    currentCartSignature === pendingCartSignature
+  )
+  const confirmResumePendingPayment = useCallback(async () => {
+    const message = "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
+    const tg = window.Telegram?.WebApp
+    if (tg?.showConfirm) {
+      return new Promise(resolve => {
+        tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)))
+      })
+    }
+    return true
+  }, [])
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
@@ -1796,6 +1843,13 @@ function CartPage({ user }) {
 
   // Proceed to payment
   const proceedToPayment = async () => {
+    if (hasMatchingPendingCart) {
+      const confirmed = await confirmResumePendingPayment()
+      if (confirmed) {
+        await handleResumePayment()
+      }
+      return
+    }
     if (hasUnavailableItems) {
       const message = unavailableTimeRange
         ? `Buyurtma vaqti: ${unavailableTimeRange}`
@@ -2321,6 +2375,39 @@ function CartPage({ user }) {
             <div className="checkout-topbar">
               <h2 className="checkout-title">{checkoutTitle}</h2>
             </div>
+
+            {hasPendingPayment && (
+              <div className="checkout-pending-banner" role="status" aria-live="polite">
+                <div className="checkout-pending-title">To'lov yakunlanmagan</div>
+                <div className="checkout-pending-meta">
+                  Buyurtma #{pendingPayment.orderId}
+                  {pendingPayment.total ? ` • ${formatSum(pendingPayment.total)} so'm` : ''}
+                </div>
+                <p className="checkout-pending-text">
+                  Oldingi buyurtma uchun to'lov kutilmoqda. Xohlasangiz uni davom ettiring.
+                </p>
+                <div className="checkout-pending-actions">
+                  <button
+                    type="button"
+                    className="checkout-pending-btn primary"
+                    onClick={handleResumePayment}
+                    disabled={pendingActionLoading}
+                  >
+                    {pendingActionLoading ? "Tekshirilmoqda..." : "To'lovni davom ettirish"}
+                  </button>
+                  {!hasMatchingPendingCart && (
+                    <button
+                      type="button"
+                      className="checkout-pending-btn secondary"
+                      onClick={handleRestorePendingCart}
+                      disabled={pendingActionLoading}
+                    >
+                      Savatni tiklash
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="cart-modal-body checkout-body">
               {/* Step 1: Order Details */}

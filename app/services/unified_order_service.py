@@ -380,6 +380,7 @@ class NotificationTemplates:
         total: int,
         delivery_price: int,
         currency: str,
+        store_phone: str | None = None,
         awaiting_payment: bool = False,
     ) -> str:
         "Build customer notification for order creation."
@@ -398,6 +399,7 @@ class NotificationTemplates:
             order_ids=order_ids_int or None,
             is_cart=len(order_ids_int) > 1,
             store_name=store_name,
+            store_phone=store_phone,
             store_address=store_address,
             delivery_address=delivery_address,
             pickup_code=pickup_code,
@@ -415,6 +417,7 @@ class NotificationTemplates:
         status: str,
         order_type: str,
         store_name: str | None = None,
+        store_phone: str | None = None,
         store_address: str | None = None,
         pickup_code: str | None = None,
         reject_reason: str | None = None,
@@ -427,6 +430,8 @@ class NotificationTemplates:
         order_ids: list[int] | None = None,
         is_cart: bool = False,
         payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
     ) -> str:
         """
         Build customer notification for status update with visual progress.
@@ -440,6 +445,7 @@ class NotificationTemplates:
             lang=lang,
             order_id=int(order_id) if isinstance(order_id, str) else order_id,
             store_name=store_name or "",
+            store_phone=store_phone,
             store_address=store_address,
             pickup_code=pickup_code,
             reject_reason=reject_reason,
@@ -452,6 +458,8 @@ class NotificationTemplates:
             order_ids=order_ids,
             is_cart=is_cart,
             payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
         )
 
     @staticmethod
@@ -465,12 +473,16 @@ class NotificationTemplates:
         is_cart: bool = True,
         order_ids: list[int] | None = None,
         store_name: str | None = None,
+        store_phone: str | None = None,
         store_address: str | None = None,
         delivery_address: str | None = None,
         delivery_price: int = 0,
         pickup_code: str | None = None,
         reject_reason: str | None = None,
         courier_phone: str | None = None,
+        payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
     ) -> str:
         """Build cart summary status message for customers."""
         normalized_type = "delivery" if order_type == "taxi" else order_type
@@ -480,6 +492,7 @@ class NotificationTemplates:
             lang=lang,
             order_id=int(order_id) if isinstance(order_id, str) else order_id,
             store_name=store_name or "",
+            store_phone=store_phone,
             store_address=store_address,
             delivery_address=delivery_address,
             pickup_code=pickup_code,
@@ -490,6 +503,9 @@ class NotificationTemplates:
             currency=currency,
             order_ids=order_ids,
             is_cart=is_cart,
+            payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
         )
 
     def seller_status_update(
@@ -927,6 +943,18 @@ class UnifiedOrderService:
 
         all_ids = [str(x) for x in (order_ids + booking_ids)]
         items_for_template = self._calc_items_payload(items)
+        store_id = items[0].store_id if items else None
+
+        store_phone = None
+        if store_id and hasattr(self.db, "get_store"):
+            try:
+                store = self.db.get_store(store_id)
+                if isinstance(store, dict):
+                    store_phone = store.get("phone")
+                else:
+                    store_phone = getattr(store, "phone", None)
+            except Exception:
+                store_phone = None
 
         customer_msg = NotificationTemplates.customer_order_created(
             lang=customer_lang,
@@ -938,6 +966,7 @@ class UnifiedOrderService:
             payment_method=payment_method,
             store_name=items[0].store_name if items else "",
             store_address=items[0].store_address if items else "",
+            store_phone=store_phone,
             total=total_price,
             delivery_price=delivery_price,
             currency=currency,
@@ -968,7 +997,6 @@ class UnifiedOrderService:
         entity_ids = [int(x) for x in entity_ids_raw]
         entity_id = entity_ids[0] if entity_ids else None
         entity_type = "order" if order_ids else "booking"
-        store_id = items[0].store_id if items else None
         store_name = items[0].store_name if items else ""
         store_address = items[0].store_address if items else ""
         customer_payload = {"id": int(user_id)} if user_id else None
@@ -2514,6 +2542,7 @@ class UnifiedOrderService:
         entity_type: str,
         order_type: str | None,
         store_name: str,
+        store_phone: str | None,
         store_address: str,
         delivery_address: str | None,
         delivery_price: int,
@@ -2531,6 +2560,9 @@ class UnifiedOrderService:
         existing_message_id: int | None,
         user_id: int | None,
         target_status: str,
+        payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
     ) -> tuple[str, list[dict[str, Any]] | None, str | None, str, list[int] | None, bool]:
         currency = None
         cart_items = self._load_cart_items(is_cart, cart_items_json)
@@ -2572,12 +2604,16 @@ class UnifiedOrderService:
                 is_cart=is_cart or is_grouped,
                 order_ids=group_order_ids,
                 store_name=store_name,
+                store_phone=store_phone,
                 store_address=store_address,
                 delivery_address=delivery_address,
                 delivery_price=delivery_price,
                 pickup_code=pickup_code,
                 reject_reason=reject_reason,
                 courier_phone=courier_phone,
+                payment_method=payment_method,
+                payment_status=payment_status,
+                payment_proof_photo_id=payment_proof_photo_id,
             )
         else:
             if currency is None:
@@ -2588,6 +2624,7 @@ class UnifiedOrderService:
                 status=target_status,
                 order_type=order_type,
                 store_name=store_name,
+                store_phone=store_phone,
                 store_address=store_address,
                 pickup_code=pickup_code,
                 reject_reason=reject_reason,
@@ -2599,6 +2636,9 @@ class UnifiedOrderService:
                 currency=currency,
                 order_ids=group_order_ids,
                 is_cart=is_cart,
+                payment_method=payment_method,
+                payment_status=payment_status,
+                payment_proof_photo_id=payment_proof_photo_id,
             )
 
         return msg, cart_items, currency, aggregated_status, group_order_ids, is_grouped
@@ -3288,6 +3328,9 @@ class UnifiedOrderService:
             store = self.db.get_store(store_id) if store_id else None
             store_name = store.get("name", "") if isinstance(store, dict) else ""
             store_address = store.get("address", "") if isinstance(store, dict) else ""
+            store_phone = (
+                store.get("phone") if isinstance(store, dict) else getattr(store, "phone", None)
+            )
 
             customer_lang = self.db.get_user_language(user_id)
             (
@@ -3302,6 +3345,7 @@ class UnifiedOrderService:
                 entity_type=entity_type,
                 order_type=order_type,
                 store_name=store_name,
+                store_phone=store_phone,
                 store_address=store_address,
                 delivery_address=delivery_address,
                 delivery_price=delivery_price,
@@ -3319,6 +3363,9 @@ class UnifiedOrderService:
                 existing_message_id=existing_message_id,
                 user_id=user_id,
                 target_status=target_status,
+                payment_method=ctx.payment_method,
+                payment_status=ctx.payment_status,
+                payment_proof_photo_id=ctx.payment_proof_photo_id,
             )
 
             photo_ids = self._collect_photos_from_items(cart_items)
@@ -3360,12 +3407,16 @@ class UnifiedOrderService:
                     is_cart=is_cart or is_grouped,
                     order_ids=group_order_ids,
                     store_name=store_name,
+                    store_phone=store_phone,
                     store_address=store_address,
                     delivery_address=delivery_address,
                     delivery_price=delivery_price,
                     pickup_code=pickup_code,
                     reject_reason=reject_reason,
                     courier_phone=courier_phone,
+                    payment_method=ctx.payment_method,
+                    payment_status=ctx.payment_status,
+                    payment_proof_photo_id=ctx.payment_proof_photo_id,
                 )
             else:
                 if currency is None:
@@ -3376,6 +3427,7 @@ class UnifiedOrderService:
                     status=target_status,
                     order_type=order_type,
                     store_name=store_name,
+                    store_phone=store_phone,
                     store_address=store_address,
                     pickup_code=pickup_code,
                     reject_reason=reject_reason,
@@ -3387,6 +3439,9 @@ class UnifiedOrderService:
                     currency=currency,
                     order_ids=group_order_ids,
                     is_cart=is_cart,
+                    payment_method=ctx.payment_method,
+                    payment_status=ctx.payment_status,
+                    payment_proof_photo_id=ctx.payment_proof_photo_id,
                 )
 
             amounts_payload = {"delivery_fee": int(delivery_price or 0)}

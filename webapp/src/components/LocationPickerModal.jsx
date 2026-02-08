@@ -154,9 +154,10 @@ function LocationPickerModal({
   const [mapAddress, setMapAddress] = useState('')
   const [mapLocation, setMapLocation] = useState(null)
   const [mapResolving, setMapResolving] = useState(false)
-  const [pinBump, setPinBump] = useState(false)
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
+  const mapMarkerRef = useRef(null)
+  const markerDraggingRef = useRef(false)
   const lastResolvedRef = useRef(null)
   const activeRef = useRef(false)
   const searchInputRef = useRef(null)
@@ -356,6 +357,8 @@ function LocationPickerModal({
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
       }
+      mapMarkerRef.current = null
+      markerDraggingRef.current = false
     }
   }, [isOpen, mode])
 
@@ -368,7 +371,7 @@ function LocationPickerModal({
     const map = leaflet.map(mapRef.current, {
       center: [center.lat, center.lon],
       zoom: 15,
-      zoomControl: true,
+      zoomControl: false,
       attributionControl: true,
     })
 
@@ -377,25 +380,63 @@ function LocationPickerModal({
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
+    const markerIcon = leaflet.divIcon({
+      className: 'location-picker-map-marker',
+      html: '<span></span>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 30],
+    })
+
+    const marker = leaflet.marker([center.lat, center.lon], {
+      draggable: true,
+      icon: markerIcon,
+    }).addTo(map)
+
+    mapMarkerRef.current = marker
     mapInstanceRef.current = map
 
-    map.on('moveend', () => {
+    const syncMarkerToCenter = () => {
+      if (markerDraggingRef.current || !mapMarkerRef.current) return
       const next = map.getCenter()
+      mapMarkerRef.current.setLatLng(next)
+    }
+
+    const handleMoveEnd = () => {
+      if (markerDraggingRef.current) return
+      const next = map.getCenter()
+      if (mapMarkerRef.current) {
+        mapMarkerRef.current.setLatLng(next)
+      }
       setMapCenter({ lat: next.lat, lon: next.lng })
+    }
+
+    map.on('move', syncMarkerToCenter)
+    map.on('moveend', handleMoveEnd)
+    map.on('dragend', handleMoveEnd)
+    map.on('zoomend', handleMoveEnd)
+    map.on('click', (event) => {
+      if (mapMarkerRef.current) {
+        mapMarkerRef.current.setLatLng(event.latlng)
+      }
+      map.panTo(event.latlng)
+      setMapCenter({ lat: event.latlng.lat, lon: event.latlng.lng })
+    })
+
+    marker.on('dragstart', () => {
+      markerDraggingRef.current = true
+    })
+
+    marker.on('dragend', () => {
+      markerDraggingRef.current = false
+      const pos = marker.getLatLng()
+      map.panTo(pos)
+      setMapCenter({ lat: pos.lat, lon: pos.lng })
     })
 
     setTimeout(() => {
       map.invalidateSize(true)
     }, 0)
   }, [mapLoaded, mapCenter])
-
-  useEffect(() => {
-    if (!isOpen || mode !== 'map') return
-    if (mapCenter?.lat == null || mapCenter?.lon == null) return
-    setPinBump(true)
-    const timer = setTimeout(() => setPinBump(false), 320)
-    return () => clearTimeout(timer)
-  }, [isOpen, mode, mapCenter?.lat, mapCenter?.lon])
 
   useEffect(() => {
     if (!mapLoaded || !mapInstanceRef.current || !mapCenter) return
@@ -405,6 +446,12 @@ function LocationPickerModal({
     const deltaLon = Math.abs(current.lng - mapCenter.lon)
     if (deltaLat < 0.0001 && deltaLon < 0.0001) return
     map.flyTo([mapCenter.lat, mapCenter.lon], map.getZoom(), { duration: 0.5 })
+  }, [mapCenter, mapLoaded])
+
+  useEffect(() => {
+    if (!mapLoaded || !mapMarkerRef.current || !mapCenter) return
+    if (markerDraggingRef.current) return
+    mapMarkerRef.current.setLatLng([mapCenter.lat, mapCenter.lon])
   }, [mapCenter, mapLoaded])
 
   const distanceMeters = (a, b) => {
@@ -487,9 +534,6 @@ function LocationPickerModal({
   }
 
   const showGeoSuggestion = Boolean(canDetect)
-  const geoMessage = coords ? 'Joylashuvingiz aniqlandi' : 'Joriy joylashuvni aniqlash'
-  const geoButtonLabel = coords ? 'Joriy joylashuv' : 'Aniqlash'
-
   return (
     <div className="location-picker-overlay" onClick={onClose}>
       <div className={`location-picker ${mode === 'search' ? 'search-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
@@ -593,6 +637,7 @@ function LocationPickerModal({
                   </span>
                   <span className="location-picker-result-body">
                     <span className="location-picker-result-title">Kiritilgan manzilni ishlatish</span>
+                    <span className="location-picker-result-hint">Aniq manzil topilmasa</span>
                     <span className="location-picker-result-subtitle">{query.trim()}</span>
                   </span>
                 </button>
@@ -604,7 +649,7 @@ function LocationPickerModal({
             <div className="location-picker-header">
               <div className="location-picker-title">
                 <p>Manzilni tanlang</p>
-                <span>Bu manzil uchun mavjudlikni ko'rsatamiz</span>
+                <span>Xaritadan manzilni belgilang</span>
               </div>
               <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -621,28 +666,27 @@ function LocationPickerModal({
                   </div>
                 )}
                 <div ref={mapRef} className="location-picker-map-view" />
-                <div className={`location-picker-map-pin ${pinBump ? 'is-bumping' : ''}`} aria-hidden="true">
-                  <div className="location-picker-map-pin-inner" />
-                </div>
+                {showGeoSuggestion && (
+                  <button
+                    type="button"
+                    className={`location-picker-map-locate${isLocating ? ' is-loading' : ''}`}
+                    onClick={() => onDetectLocation?.()}
+                    disabled={!canDetect || isLocating}
+                    aria-label="Joriy joylashuv"
+                    title="Joriy joylashuv"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.35" />
+                    </svg>
+                  </button>
+                )}
                 <div className="location-picker-map-hint">Xaritani suring</div>
               </div>
             </div>
 
             <div className="location-picker-sheet">
-              {showGeoSuggestion && (
-                <div className="location-picker-geo">
-                  <span>{geoMessage}</span>
-                  <button
-                    type="button"
-                    className="location-picker-geo-btn"
-                    onClick={() => onDetectLocation?.()}
-                    disabled={!canDetect || isLocating}
-                  >
-                    {isLocating ? 'Aniqlanmoqda...' : geoButtonLabel}
-                  </button>
-                </div>
-              )}
-
               <button
                 type="button"
                 className="location-picker-address"
