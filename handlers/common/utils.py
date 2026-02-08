@@ -17,6 +17,7 @@ from app.core.utils import (
     CITY_UZ_TO_RU as CORE_CITY_UZ_TO_RU,
     get_offer_field as core_get_offer_field,
     get_order_field as core_get_order_field,
+    get_store_field as core_get_store_field,
     normalize_city as core_normalize_city,
 )
 from localization import get_text
@@ -103,6 +104,40 @@ def resolve_order_photo(db: DatabaseProtocol | None, order: Any, offer: Any | No
     return resolve_offer_photo(offer)
 
 
+def can_manage_store(
+    db: DatabaseProtocol | None,
+    store_id: int | None,
+    user_id: int,
+    store: Any | None = None,
+) -> bool:
+    """Check if user can manage store (owner or admin)."""
+    if not db or not store_id:
+        return False
+
+    owner_id = core_get_store_field(store, "owner_id") if store else None
+    try:
+        if owner_id is not None and int(owner_id) == user_id:
+            return True
+    except (TypeError, ValueError):
+        pass
+
+    if hasattr(db, "is_store_admin"):
+        try:
+            return bool(db.is_store_admin(store_id, user_id))
+        except Exception as e:
+            logger.debug("is_store_admin check failed: %s", e)
+
+    if hasattr(db, "get_store"):
+        try:
+            store_obj = db.get_store(store_id)
+            owner_id = core_get_store_field(store_obj, "owner_id") if store_obj else None
+            return owner_id == user_id
+        except Exception:
+            return False
+
+    return False
+
+
 # Re-export states for backward compatibility
 from handlers.common.states import (  # noqa: E402
     BookOffer,
@@ -160,6 +195,7 @@ __all__ = [
     "safe_edit_message",
     "resolve_offer_photo",
     "resolve_order_photo",
+    "can_manage_store",
     # Error helpers
     "get_system_error_text",
 ]

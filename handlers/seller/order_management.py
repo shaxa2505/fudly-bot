@@ -18,6 +18,7 @@ from app.interfaces.bot.presenters.order_messages import (
 )
 from app.services.unified_order_service import get_unified_order_service
 from handlers.common.states import CourierHandover
+from handlers.common.utils import can_manage_store
 from localization import get_text
 
 logger = logging.getLogger(__name__)
@@ -116,10 +117,8 @@ async def confirm_order(callback: types.CallbackQuery):
     # Verify store ownership
     store_id = get_order_field(order, "store_id", 2)
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if callback.from_user.id != owner_id:
-        await callback.answer("Ошибка", show_alert=True)
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     if _is_unpaid_online_order(order):
@@ -161,10 +160,8 @@ async def cancel_order(callback: types.CallbackQuery):
     # Verify store ownership
     store_id = get_order_field(order, "store_id", 2)
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if callback.from_user.id != owner_id:
-        await callback.answer("Ошибка", show_alert=True)
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     if _is_paid_click_order(order):
@@ -206,10 +203,8 @@ async def confirm_payment(callback: types.CallbackQuery):
     # Verify store ownership
     store_id = get_order_field(order, "store_id", 2)
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if callback.from_user.id != owner_id:
-        await callback.answer("Ошибка", show_alert=True)
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     # Используем UnifiedOrderService для подтверждения заказа
@@ -255,10 +250,8 @@ async def reject_payment(callback: types.CallbackQuery):
     # Verify store ownership
     store_id = get_order_field(order, "store_id", 2)
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if callback.from_user.id != owner_id:
-        await callback.answer("Ошибка", show_alert=True)
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     if _is_paid_click_order(order):
@@ -304,10 +297,8 @@ async def start_courier_handover(callback: types.CallbackQuery, state: FSMContex
     # Verify store ownership
     store_id = get_order_field(order, "store_id", 2)
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if callback.from_user.id != owner_id:
-        await callback.answer("Ошибка", show_alert=True)
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     if _is_unpaid_online_order(order):

@@ -23,7 +23,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from handlers.common.states import CourierHandover
-from handlers.common.utils import html_escape as _esc
+from handlers.common.utils import can_manage_store, html_escape as _esc
 from localization import get_text
 
 from .common import _get_db, _get_entity_field, _get_store_field, logger
@@ -170,13 +170,11 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
                 store_id = _get_entity_field(offer, "store_id")
 
     store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
+    if not can_manage_store(db_instance, store_id, partner_id, store=store):
         logger.warning(
             "Ownership verification failed: partner=%s, owner=%s, %s=%s",
             partner_id,
-            owner_id,
+            _get_store_field(store, "owner_id") if store else None,
             entity_type,
             entity_id,
         )
@@ -368,13 +366,11 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
                 store_id = _get_entity_field(offer, "store_id")
 
     store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
+    if not can_manage_store(db_instance, store_id, partner_id, store=store):
         logger.warning(
             "Ownership verification failed in reject: partner=%s, owner=%s, %s=%s",
             partner_id,
-            owner_id,
+            _get_store_field(store, "owner_id") if store else None,
             entity_type,
             entity_id,
         )
@@ -467,9 +463,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
 
     store_id = _get_entity_field(order, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
+    if not can_manage_store(db_instance, store_id, partner_id, store=store):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
@@ -600,9 +594,7 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
 
     store_id = _get_entity_field(order, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
+    if not can_manage_store(db_instance, store_id, partner_id, store=store):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
@@ -939,9 +931,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             if offer:
                 store_id = _get_entity_field(offer, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
+    if not can_manage_store(db_instance, store_id, partner_id, store=store):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 

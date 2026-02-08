@@ -12,6 +12,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.geocoding import reverse_geocode_store
 from localization import get_text
+from handlers.common.utils import can_manage_store
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -131,17 +132,8 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
 
 
 def verify_store_owner(user_id: int, store_id: int) -> bool:
-    """Verify that user is owner of the store."""
-    if not db:
-        return False
-    store = db.get_store(store_id)
-    if not store:
-        return False
-    # Handle both dict and tuple
-    if isinstance(store, dict):
-        return store.get("owner_id") == user_id
-    # Tuple: assume owner_id is at index 2
-    return len(store) > 2 and store[2] == user_id
+    """Verify that user can manage the store (owner or admin)."""
+    return can_manage_store(db, store_id, user_id)
 
 
 def store_settings_keyboard(
@@ -231,7 +223,7 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
     store_name = store.get("name", "Магазин")
     has_photo = bool(store.get("photo"))
     has_location = bool(store.get("latitude") and store.get("longitude"))
-    is_owner = store.get("user_role") == "owner" or store.get("owner_id") == user_id
+    is_owner = can_manage_store(db, store_id, user_id, store=store)
     working_hours = _resolve_working_hours(store)
     working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
     delivery_line, min_order_line = _format_delivery_settings(store, lang)
@@ -1846,6 +1838,17 @@ async def process_transfer_contact(message: types.Message, state: FSMContext) ->
         db.add_user(user_id=new_owner_id, first_name=new_owner_name or "User")
         user = db.get_user(new_owner_id)
 
+    if hasattr(db, "get_store_by_owner"):
+        existing_store = db.get_store_by_owner(new_owner_id)
+        existing_store_id = None
+        if isinstance(existing_store, dict):
+            existing_store_id = existing_store.get("store_id")
+        elif isinstance(existing_store, (tuple, list)) and existing_store:
+            existing_store_id = existing_store[0]
+        if existing_store and existing_store_id != store_id:
+            await message.answer(get_text(lang, "store_transfer_owner_has_store"))
+            return
+
     store = db.get_store(store_id) if hasattr(db, "get_store") else None
     store_name = store.get("name") if isinstance(store, dict) and store.get("name") else (
         "Магазин" if lang == "ru" else "Do'kon"
@@ -1912,28 +1915,64 @@ async def confirm_store_transfer(callback: types.CallbackQuery, state: FSMContex
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    if hasattr(db, "get_store_by_owner"):
+        existing_store = db.get_store_by_owner(new_owner_id)
+        existing_store_id = None
+        if isinstance(existing_store, dict):
+            existing_store_id = existing_store.get("store_id")
+        elif isinstance(existing_store, (tuple, list)) and existing_store:
+            existing_store_id = existing_store[0]
+        if existing_store and existing_store_id != store_id:
+            await callback.answer(
+                get_text(lang, "store_transfer_owner_has_store"), show_alert=True
+            )
+            return
+
     old_owner_id = store.get("owner_id") if isinstance(store, dict) else None
     store_name = store.get("name") if isinstance(store, dict) and store.get("name") else (
         "Магазин" if lang == "ru" else "Do'kon"
     )
 
     try:
-        if hasattr(db, "update_store_owner"):
+        transfer_reason = None
+        if hasattr(db, "transfer_store_ownership"):
+            success, transfer_reason = db.transfer_store_ownership(
+                store_id,
+                new_owner_id,
+                keep_access=keep_access,
+                added_by=callback.from_user.id,
+            )
+        elif hasattr(db, "update_store_owner"):
             success = db.update_store_owner(store_id, new_owner_id)
         else:
             success = False
 
         if not success:
+            if transfer_reason == "owner_has_store":
+                await callback.answer(
+                    get_text(lang, "store_transfer_owner_has_store"), show_alert=True
+                )
+                return
+            if transfer_reason == "same_owner":
+                await callback.answer(
+                    get_text(lang, "store_transfer_same_owner"), show_alert=True
+                )
+                return
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
-        if keep_access and old_owner_id and old_owner_id != new_owner_id and hasattr(db, "add_store_admin"):
-            db.add_store_admin(store_id, old_owner_id, callback.from_user.id)
-        if not keep_access and old_owner_id and hasattr(db, "remove_store_admin"):
-            db.remove_store_admin(store_id, old_owner_id)
+        if not hasattr(db, "transfer_store_ownership"):
+            if keep_access and old_owner_id and old_owner_id != new_owner_id and hasattr(
+                db, "add_store_admin"
+            ):
+                db.add_store_admin(store_id, old_owner_id, callback.from_user.id)
+            if not keep_access and old_owner_id and hasattr(db, "remove_store_admin"):
+                db.remove_store_admin(store_id, old_owner_id)
 
-        if hasattr(db, "update_user_role"):
-            db.update_user_role(new_owner_id, "seller")
+            if hasattr(db, "update_user_role"):
+                db.update_user_role(new_owner_id, "seller")
+            if hasattr(db, "set_user_view_mode"):
+                db.set_user_view_mode(new_owner_id, "seller")
 
         new_owner = db.get_user(new_owner_id) if hasattr(db, "get_user") else None
         new_owner_label = _format_user_label(new_owner, new_owner_id)

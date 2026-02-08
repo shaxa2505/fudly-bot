@@ -10,6 +10,7 @@ import {
   LifeBuoy,
   LogOut,
   MapPin,
+  Pencil,
 } from 'lucide-react'
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -551,14 +552,18 @@ function YanaPage({ user }) {
 
       <header className="profile-topbar">
         <div className="profile-topbar-inner">
-          <h1 className="profile-title">Profilim</h1>
-          <button
-            type="button"
-            className="profile-topbar-action"
-            onClick={handleEditProfile}
-          >
-            Tahrirlash
-          </button>
+          <div className="profile-topbar-center">
+            <h1 className="profile-title">Profil</h1>
+            <button
+              type="button"
+              className="profile-topbar-action"
+              onClick={handleEditProfile}
+              aria-label="Tahrirlash"
+              title="Tahrirlash"
+            >
+              <Pencil size={16} strokeWidth={2.2} />
+            </button>
+          </div>
         </div>
       </header>
 

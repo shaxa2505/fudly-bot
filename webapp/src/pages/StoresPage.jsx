@@ -11,7 +11,6 @@ import {
   Heart,
   ShoppingBag,
   Bell,
-  Search,
 } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -473,7 +472,10 @@ function StoresPage() {
       <div className={`sp-subheader ${searchFocused ? 'search-active' : ''}`}>
         <div className="sp-header-search">
           <div className="sp-search-field">
-            <Search size={20} strokeWidth={2} className="sp-search-icon" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="sp-search-icon">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+              <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
             <input
               ref={searchInputRef}
               type="text"
@@ -492,9 +494,7 @@ function StoresPage() {
                 onClick={() => setSearchQuery('')}
                 aria-label="Qidiruvni tozalash"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                x
               </button>
             )}
           </div>

@@ -14,7 +14,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from handlers.common.states import RateBooking
-from handlers.common.utils import html_escape as _esc, resolve_offer_photo
+from handlers.common.utils import can_manage_store, html_escape as _esc, resolve_offer_photo
 from localization import get_text
 from logging_config import logger
 
@@ -116,10 +116,8 @@ async def partner_cancel_booking(callback: types.CallbackQuery) -> None:
         store_id = get_offer_field(offer, "store_id") if offer else None
 
     store = db.get_store(store_id) if store_id else None
-    owner_id = get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
+    if not can_manage_store(db, store_id, partner_id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     # Cancel and restore quantities (prefer unified service for consistency)
@@ -406,9 +404,7 @@ async def partner_confirm_batch_bookings(callback: types.CallbackQuery) -> None:
             offer = db.get_offer(offer_id) if offer_id else None
             store_id = get_offer_field(offer, "store_id") if offer else None
             store = db.get_store(store_id) if store_id else None
-            owner_id = get_store_field(store, "owner_id")
-
-            if partner_id != owner_id:
+            if not can_manage_store(db, store_id, partner_id, store=store):
                 continue
 
             # Confirm booking
@@ -554,9 +550,7 @@ async def partner_reject_batch_bookings(callback: types.CallbackQuery) -> None:
             offer = db.get_offer(offer_id) if offer_id else None
             store_id = get_offer_field(offer, "store_id") if offer else None
             store = db.get_store(store_id) if store_id else None
-            owner_id = get_store_field(store, "owner_id")
-
-            if partner_id != owner_id:
+            if not can_manage_store(db, store_id, partner_id, store=store):
                 continue
 
             # Reject booking

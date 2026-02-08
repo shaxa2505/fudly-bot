@@ -17,7 +17,7 @@
   position: sticky;
   top: var(--app-surface-top);
   z-index: var(--z-sticky);
-  padding: calc(var(--tg-top-inset, 0px) + var(--spacing-sm)) var(--page-padding-x) var(--spacing-sm);
+  padding: var(--app-top-inset) var(--page-padding-x) var(--app-topbar-gap);
   background: rgba(246, 248, 246, 0.94);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(16, 24, 40, 0.05);
@@ -26,8 +26,14 @@
 .profile-topbar-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: var(--spacing-sm);
+}
+
+.profile-topbar-center {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .profile-topbar-btn {
@@ -53,22 +59,33 @@
   font-size: var(--font-lg);
   font-weight: var(--font-bold);
   color: var(--color-text-primary);
-  text-align: left;
+  text-align: center;
+  line-height: 1;
   letter-spacing: -0.01em;
 }
 
 .profile-topbar-action {
-  justify-self: end;
-  font-size: 12px;
-  font-weight: 700;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  background: rgba(15, 118, 110, 0.1);
   color: var(--color-primary);
-  padding: 6px 8px;
-  border-radius: 10px;
-  transition: background var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .profile-topbar-action:active {
-  background: rgba(15, 118, 110, 0.1);
+  transform: scale(0.96);
+  background: rgba(15, 118, 110, 0.18);
+}
+
+.profile-topbar-action:focus-visible {
+  outline: 3px solid rgba(15, 118, 110, 0.25);
+  outline-offset: 2px;
 }
 
 /* Profile Header */
