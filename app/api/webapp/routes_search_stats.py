@@ -112,6 +112,50 @@ async def get_search_suggestions(
                 )
                 suggestions.extend(titles[:limit])
 
+        if len(suggestions) < limit and hasattr(db, "search_offers"):
+            offers = await _db_call(
+                db,
+                "search_offers",
+                query,
+                limit=limit * 2,
+                city=normalized_city,
+                region=normalized_region,
+                district=normalized_district,
+            )
+            if offers:
+                for offer in offers:
+                    title = (
+                        offer.get("title", "")
+                        if isinstance(offer, dict)
+                        else getattr(offer, "title", "")
+                    )
+                    if title and title not in suggestions:
+                        suggestions.append(title)
+                        if len(suggestions) >= limit:
+                            break
+
+        if len(suggestions) < limit and hasattr(db, "search_stores"):
+            stores = await _db_call(
+                db,
+                "search_stores",
+                query,
+                limit=limit * 2,
+                city=normalized_city,
+                region=normalized_region,
+                district=normalized_district,
+            )
+            if stores:
+                for store in stores:
+                    name = (
+                        store.get("name", "")
+                        if isinstance(store, dict)
+                        else getattr(store, "name", "")
+                    )
+                    if name and name not in suggestions:
+                        suggestions.append(name)
+                        if len(suggestions) >= limit:
+                            break
+
         result = suggestions[:limit]
         if cache and cache_key and cache_ttl > 0:
             await cache.set(cache_key, result, ttl=cache_ttl)

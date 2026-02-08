@@ -213,7 +213,12 @@ function HomePage() {
   const showResultsSection = showLiveDropdown && (
     searchResultsLoading || hasOfferResults || hasStoreResults
   )
-  const showResultsEmpty = showLiveDropdown && !searchResultsLoading && !hasOfferResults && !hasStoreResults
+  const showResultsEmpty = showLiveDropdown &&
+    !searchResultsLoading &&
+    !hasOfferResults &&
+    !hasStoreResults &&
+    !suggestionsLoading &&
+    searchSuggestions.length === 0
   const locationCacheKey = buildLocationCacheKey(location)
   const prevLocationKeyRef = useRef(null)
 
@@ -1150,29 +1155,22 @@ function HomePage() {
                 )}
                 {showSuggestionsDropdown && (
                   <>
-                    <div className="search-history-header">
-                      <span>Tavsiyalar</span>
-                      {suggestionsLoading && (
-                        <span className="search-suggestions-loading">Yuklanmoqda...</span>
-                      )}
-                    </div>
-                    {searchSuggestions.length === 0 && !suggestionsLoading ? (
-                      <div className="search-suggestions-empty">Tavsiyalar topilmadi</div>
-                    ) : (
-                      searchSuggestions.map((query, index) => (
-                        <button
-                          key={`${query}-${index}`}
-                          className="search-history-item"
-                          onMouseDown={() => handleSearchSubmit(query)}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                            <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                          <span>{query}</span>
-                        </button>
-                      ))
+                    {suggestionsLoading && (
+                      <div className="search-suggestions-loading">Yuklanmoqda...</div>
                     )}
+                    {searchSuggestions.map((query, index) => (
+                      <button
+                        key={`${query}-${index}`}
+                        className="search-history-item"
+                        onMouseDown={() => handleSearchSubmit(query)}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                          <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                        <span>{query}</span>
+                      </button>
+                    ))}
 
                     {showResultsSection && (
                       <div className="search-results-section">
@@ -1287,7 +1285,7 @@ function HomePage() {
                     )}
 
                     {showResultsEmpty && (
-                      <div className="search-results-empty">Natijalar topilmadi</div>
+                      <div className="search-results-empty">Hech narsa topilmadi</div>
                     )}
                   </>
                 )}

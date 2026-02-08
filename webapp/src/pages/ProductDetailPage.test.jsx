@@ -56,7 +56,7 @@ describe('ProductDetailPage', () => {
 
     expect(screen.getByText('Test Offer')).toBeInTheDocument()
     expect(screen.getByText('Demo Store')).toBeInTheDocument()
-    expect(screen.getByText('Qoldiq')).toBeInTheDocument()
+    expect(screen.getByText('Mavjud miqdor')).toBeInTheDocument()
     expect(screen.getByText(/5 dona/)).toBeInTheDocument()
     expect(screen.getAllByText(/so'm/).length).toBeGreaterThan(0)
 

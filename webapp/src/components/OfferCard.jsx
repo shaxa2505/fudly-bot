@@ -20,18 +20,45 @@ const OfferCard = memo(function OfferCard({
   const [isAdding, setIsAdding] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
   const prevQtyRef = useRef(cartQuantity)
+  const imageWrapRef = useRef(null)
 
   // Get photo URL (handles Telegram file_id conversion)
   const photoUrl = resolveOfferImageUrl(offer)
   const fallbackUrl = PLACEHOLDER_IMAGE
   const resolvedUrl = photoUrl || fallbackUrl
-  const [imageLoaded, setImageLoaded] = useState(() => LOADED_IMAGE_CACHE.has(resolvedUrl))
+  const [shouldLoad, setShouldLoad] = useState(imagePriority)
+  const targetUrl = shouldLoad ? resolvedUrl : fallbackUrl
+  const [imageLoaded, setImageLoaded] = useState(() => LOADED_IMAGE_CACHE.has(targetUrl))
   const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
     setImageError(false)
-    setImageLoaded(LOADED_IMAGE_CACHE.has(resolvedUrl))
-  }, [resolvedUrl])
+    setImageLoaded(LOADED_IMAGE_CACHE.has(targetUrl))
+  }, [targetUrl])
+
+  useEffect(() => {
+    if (imagePriority || shouldLoad) return undefined
+    const node = imageWrapRef.current
+    if (!node) {
+      setShouldLoad(true)
+      return undefined
+    }
+    if (!('IntersectionObserver' in window)) {
+      setShouldLoad(true)
+      return undefined
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoad(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [imagePriority, shouldLoad])
 
   useEffect(() => {
     if (prevQtyRef.current === 0 && cartQuantity > 0) {
@@ -90,6 +117,13 @@ const OfferCard = memo(function OfferCard({
   const discountPrice = Number(offer.discount_price) || 0
   const priceValue = discountPrice > 0 ? discountPrice : originalPrice
   const hasOldPrice = originalPrice > priceValue && priceValue > 0
+  let discountPercent = 0
+  if (offer.discount_percent) {
+    discountPercent = Math.round(offer.discount_percent)
+  } else if (originalPrice > 0 && discountPrice > 0 && originalPrice > discountPrice) {
+    discountPercent = Math.round((1 - discountPrice / originalPrice) * 100)
+  }
+  const showDiscountTag = discountPercent > 0
   const isLowStock = !isOutOfStock && stockLimit > 0 && stockLimit <= 5
   const locationText = offer.store_address || offer.address || offer.district || offer.region || ''
 
@@ -144,22 +178,24 @@ const OfferCard = memo(function OfferCard({
       className={`offer-card ${justAdded ? 'just-added' : ''} ${cartQuantity > 0 ? 'in-cart' : ''} ${isOutOfStock ? 'out-of-stock' : ''} ${isUnavailableNow ? 'is-unavailable' : ''}`}
       onClick={handleCardClick}
     >
-      <div className="offer-image-wrap">
-        {!imageLoaded && !imageError && (
+      <div className="offer-image-wrap" ref={imageWrapRef}>
+        {shouldLoad && !imageLoaded && !imageError && (
           <div className="offer-image-skeleton shimmer" />
         )}
         <img
-          src={resolvedUrl}
+          src={targetUrl}
           alt={titleText}
           className={`offer-image ${imageLoaded ? 'loaded' : ''}`}
           loading={imagePriority ? 'eager' : 'lazy'}
           fetchPriority={imagePriority ? 'high' : 'auto'}
           decoding="async"
-          onLoad={() => {
-            LOADED_IMAGE_CACHE.add(resolvedUrl)
+          onLoad={(e) => {
+            const loadedUrl = e?.currentTarget?.currentSrc || e?.currentTarget?.src || targetUrl
+            LOADED_IMAGE_CACHE.add(loadedUrl)
             setImageLoaded(true)
           }}
           onError={(e) => {
+            if (!shouldLoad) return
             const img = e.target
             if (!img.dataset.refreshAttempted && resolvedUrl.includes('/photo/')) {
               img.dataset.refreshAttempted = 'true'
@@ -180,7 +216,16 @@ const OfferCard = memo(function OfferCard({
           {isUnavailableNow && (
             <span className="offer-tag offer-tag--closed">Hozir yopiq</span>
           )}
-          {timeRange && (
+          {showDiscountTag ? (
+            <span className="offer-tag offer-tag--discount">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="17" cy="17" r="2.5" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              -{discountPercent}%
+            </span>
+          ) : (timeRange && (
             <span className="offer-tag">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
@@ -188,9 +233,16 @@ const OfferCard = memo(function OfferCard({
               </svg>
               {timeRange}
             </span>
-          )}
+          ))}
           {isLowStock && (
-            <span className="offer-tag offer-tag--alert">Kam qoldi</span>
+            <span className="offer-tag offer-tag--alert">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
+                <path d="M12 7v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="12" cy="16.5" r="1" fill="currentColor"/>
+              </svg>
+              Kam qoldi
+            </span>
           )}
         </div>
         <button

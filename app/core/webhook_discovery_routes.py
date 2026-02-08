@@ -177,6 +177,42 @@ def build_discovery_handlers(db: Any):
                     get_offer_value(o, "title", "") for o in offers if get_offer_value(o, "title")
                 }
                 suggestions.extend(list(titles)[:limit])
+
+            if len(suggestions) < limit and hasattr(db, "search_offers"):
+                offers = (
+                    db.search_offers(
+                        query,
+                        city=normalized_city,
+                        limit=limit * 2,
+                        region=normalized_region,
+                        district=normalized_district,
+                    )
+                    or []
+                )
+                for offer in offers:
+                    title = get_offer_value(offer, "title", "")
+                    if title and title not in suggestions:
+                        suggestions.append(title)
+                        if len(suggestions) >= limit:
+                            break
+
+            if len(suggestions) < limit and hasattr(db, "search_stores"):
+                stores = (
+                    db.search_stores(
+                        query,
+                        city=normalized_city,
+                        limit=limit * 2,
+                        region=normalized_region,
+                        district=normalized_district,
+                    )
+                    or []
+                )
+                for store in stores:
+                    name = get_offer_value(store, "name", "")
+                    if name and name not in suggestions:
+                        suggestions.append(name)
+                        if len(suggestions) >= limit:
+                            break
         except Exception as exc:
             logger.error("API search suggestions error: %s", exc)
             suggestions = []

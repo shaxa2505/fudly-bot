@@ -120,7 +120,7 @@ function ProductDetailPage() {
   const stockMeterValue = !hasStock ? 0 : lowStock ? 24 : midStock ? 56 : 92
   const availability = getOfferAvailability(offer)
   const isUnavailableNow = Boolean(availability.timeRange && !availability.isAvailableNow)
-  const showDiscountBadge = discountPercent > 0 && !hasDiscount
+  const showDiscountBadge = discountPercent > 0
   const formatPrice = (value) => Math.round(value || 0).toLocaleString('ru-RU')
 
   const handleQuantityChange = (delta) => {
@@ -315,17 +315,7 @@ function ProductDetailPage() {
               </span>
             </div>
             <div className="pdp-info-item">
-              <span className="pdp-info-label">Buyurtma vaqti</span>
-              <span className={`pdp-info-value ${isUnavailableNow ? 'is-urgent' : ''}`}>
-                {availability.timeRange || '?'}
-              </span>
-            </div>
-            <div className="pdp-info-item">
-              <span className="pdp-info-label">Birlik</span>
-              <span className="pdp-info-value">{displayUnitLabel}</span>
-            </div>
-            <div className="pdp-info-item">
-              <span className="pdp-info-label">Qoldiq</span>
+              <span className="pdp-info-label">Mavjud miqdor</span>
               <span className={`pdp-info-value ${lowStock ? 'is-urgent' : ''}`}>
                 {hasStock ? `${stockValue} ${displayUnitLabel}` : 'Tugagan'}
               </span>
@@ -349,7 +339,7 @@ function ProductDetailPage() {
             )}
           </div>
           <div className="pdp-price-sub">
-            {hasDiscount && totalSavings > 0 && (
+            {hasDiscount && totalSavings > 0 && quantity > 1 && (
               <span className="pdp-total-savings">Jami tejaysiz {formatPrice(totalSavings)} so'm</span>
             )}
           </div>
@@ -371,10 +361,12 @@ function ProductDetailPage() {
           <div className="pdp-card-header">
             <h3 className="pdp-card-title">Yetkazib berish</h3>
           </div>
-          <div className="pdp-card-row">
-            <span>Holat</span>
-            <span>{deliveryEnabled ? "Mavjud" : "Faqat olib ketish"}</span>
-          </div>
+          {!deliveryEnabled && (
+            <div className="pdp-card-row">
+              <span>Yetkazib berish</span>
+              <span>Faqat olib ketish</span>
+            </div>
+          )}
           {deliveryEnabled && deliveryPrice > 0 && (
             <div className="pdp-card-row">
               <span>Narxi</span>
