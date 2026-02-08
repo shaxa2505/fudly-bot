@@ -106,7 +106,7 @@ def _ensure_unified_service(db: DatabaseProtocol):
 async def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     """
     Get user and their store by telegram_id.
-    A partner is defined by having a store (in stores table), not by role in users table.
+    A partner is defined by having a store (owned or admin access), not by role in users table.
     Returns (user, store) tuple.
     Raises HTTPException if user doesn't have a store.
 
@@ -128,13 +128,32 @@ async def get_partner_with_store(telegram_id: int) -> tuple[dict, dict]:
     # users.user_id = telegram_id, stores.owner_id = users.user_id = telegram_id
     store = await db.get_store_by_owner(telegram_id)
 
+    if not store and hasattr(db, "get_user_accessible_stores"):
+        stores = await db.get_user_accessible_stores(telegram_id)
+        if stores:
+            store = next(
+                (
+                    s
+                    for s in stores
+                    if isinstance(s, dict) and s.get("status") in ("active", "approved")
+                ),
+                None,
+            )
+            if store is None:
+                store = stores[0]
+
     if not store:
         logging.error(f"❌ No store found for telegram_id={telegram_id}")
         raise HTTPException(status_code=403, detail="Not a partner - no store found")
 
     if _is_dev_env():
+        store_id_val = None
+        if isinstance(store, dict):
+            store_id_val = store.get("store_id")
+        elif isinstance(store, (tuple, list)) and store:
+            store_id_val = store[0]
         logging.debug(
-            f"Partner resolved: user_id={user.get('user_id')}, store_id={store.get('store_id')}"
+            f"Partner resolved: user_id={user.get('user_id')}, store_id={store_id_val}"
         )
     return user, store
 

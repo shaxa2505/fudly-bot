@@ -24,6 +24,26 @@ def setup_dependencies(database: Any, bot_instance: Any) -> None:
     bot = bot_instance
 
 
+def _get_accessible_store(user_id: int) -> Any | None:
+    if not db:
+        return None
+    if hasattr(db, "get_user_accessible_stores"):
+        stores = db.get_user_accessible_stores(user_id) or []
+        if stores:
+            store = next(
+                (
+                    s
+                    for s in stores
+                    if isinstance(s, dict) and s.get("status") in ("active", "approved")
+                ),
+                None,
+            )
+            return store or stores[0]
+    if hasattr(db, "get_store_by_owner"):
+        return db.get_store_by_owner(user_id)
+    return None
+
+
 class BulkImport(StatesGroup):
     waiting_photos = State()
     waiting_csv = State()
@@ -60,7 +80,7 @@ async def start_bulk_import(message: types.Message, state: FSMContext):
     lang = db.get_user_language(user_id)
 
     # Check if user has a store
-    store = db.get_store_by_owner(user_id)
+    store = _get_accessible_store(user_id)
     if not store:
         await message.answer(
             "У вас нет магазина. Сначала зарегистрируйтесь как партнер."
@@ -219,7 +239,7 @@ async def process_media_group(message: types.Message, state: FSMContext, photos:
     lang = db.get_user_language(user_id)
 
     # Get store
-    store = db.get_store_by_owner(user_id)
+    store = _get_accessible_store(user_id)
     if not store:
         await message.answer("Магазин не найден" if lang == "ru" else "Do'kon topilmadi")
         await state.clear()
@@ -606,7 +626,7 @@ async def receive_zip(message: types.Message, state: FSMContext):
 
     try:
         # Get store
-        store = db.get_store_by_owner(user_id)
+        store = _get_accessible_store(user_id)
         if not store:
             await message.answer("Магазин не найден" if lang == "ru" else "Do'kon topilmadi")
             await state.clear()

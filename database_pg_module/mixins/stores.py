@@ -693,6 +693,75 @@ class StoreMixin:
             logger.info(f"Store {store_id} ownership transferred to {new_owner_id}")
             return cursor.rowcount > 0
 
+    def transfer_store_ownership(
+        self,
+        store_id: int,
+        new_owner_id: int,
+        *,
+        keep_access: bool,
+        added_by: int | None = None,
+    ) -> tuple[bool, str | None]:
+        """Atomically transfer store ownership and adjust access."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT owner_id FROM stores WHERE store_id = %s FOR UPDATE",
+                (store_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False, "store_not_found"
+
+            old_owner_id = row[0]
+            if old_owner_id == new_owner_id:
+                return False, "same_owner"
+
+            cursor.execute(
+                "SELECT store_id FROM stores WHERE owner_id = %s AND store_id <> %s",
+                (new_owner_id, store_id),
+            )
+            if cursor.fetchone():
+                return False, "owner_has_store"
+
+            cursor.execute(
+                "UPDATE stores SET owner_id = %s WHERE store_id = %s",
+                (new_owner_id, store_id),
+            )
+            if cursor.rowcount == 0:
+                return False, "update_failed"
+
+            if keep_access and old_owner_id and old_owner_id != new_owner_id:
+                cursor.execute(
+                    """
+                    INSERT INTO store_admins (store_id, user_id, added_by, role)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (store_id, user_id) DO NOTHING
+                    """,
+                    (store_id, old_owner_id, added_by or old_owner_id, "admin"),
+                )
+            if not keep_access and old_owner_id:
+                cursor.execute(
+                    "DELETE FROM store_admins WHERE store_id = %s AND user_id = %s",
+                    (store_id, old_owner_id),
+                )
+
+            cursor.execute(
+                "UPDATE users SET role = %s WHERE user_id = %s",
+                ("seller", new_owner_id),
+            )
+            cursor.execute(
+                "UPDATE users SET view_mode = %s WHERE user_id = %s",
+                ("seller", new_owner_id),
+            )
+
+            logger.info(
+                "Store %s ownership transferred to %s (keep_access=%s)",
+                store_id,
+                new_owner_id,
+                keep_access,
+            )
+            return True, None
+
     def update_store_photo(self, store_id: int, photo: str | None) -> bool:
         """Update store photo."""
         with self.get_connection() as conn:

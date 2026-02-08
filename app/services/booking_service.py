@@ -122,6 +122,12 @@ class BookingService:
         if not store_id:
             return False
         try:
+            if hasattr(self.db, "is_store_admin"):
+                try:
+                    if self.db.is_store_admin(store_id, user_id):
+                        return True
+                except Exception:
+                    pass
             store = self.db.get_store(store_id)
             owner_id = get_store_field(store, "owner_id") if store else None
             return owner_id == user_id

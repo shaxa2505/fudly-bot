@@ -183,6 +183,68 @@ class TestDatabasePostgres:
         user = db.get_user(user_id)
         assert user["role"] == "store_owner"
 
+    def test_transfer_store_ownership_blocks_existing_owner_store(self, db):
+        """Transfer should fail if new owner already has a store."""
+        owner_id = 777777701
+        new_owner_id = 777777702
+        db.add_user(user_id=owner_id, username="owner")
+        db.add_user(user_id=new_owner_id, username="newowner")
+
+        store_id = db.add_store(
+            owner_id=owner_id,
+            name="Owner Store",
+            city="City",
+            address="Address",
+            description="Desc",
+        )
+        db.add_store(
+            owner_id=new_owner_id,
+            name="New Owner Store",
+            city="City",
+            address="Address",
+            description="Desc",
+        )
+
+        ok, reason = db.transfer_store_ownership(
+            store_id, new_owner_id, keep_access=True, added_by=owner_id
+        )
+        assert ok is False
+        assert reason == "owner_has_store"
+
+        store = db.get_store(store_id)
+        assert store.get("owner_id") == owner_id
+
+    def test_transfer_store_ownership_keeps_admin_and_updates_view_mode(self, db):
+        """Transfer should add old owner as admin and update new owner role/view_mode."""
+        owner_id = 777777801
+        new_owner_id = 777777802
+        db.add_user(user_id=owner_id, username="owner2")
+        db.add_user(user_id=new_owner_id, username="newowner2")
+
+        store_id = db.add_store(
+            owner_id=owner_id,
+            name="Owner Store 2",
+            city="City",
+            address="Address",
+            description="Desc",
+        )
+
+        ok, reason = db.transfer_store_ownership(
+            store_id, new_owner_id, keep_access=True, added_by=owner_id
+        )
+        assert ok is True
+        assert reason is None
+
+        store = db.get_store(store_id)
+        assert store.get("owner_id") == new_owner_id
+
+        admins = db.get_store_admins(store_id)
+        assert any(admin.get("user_id") == owner_id for admin in admins)
+
+        new_owner = db.get_user(new_owner_id)
+        assert new_owner.get("role") == "seller"
+        assert new_owner.get("view_mode") == "seller"
+
 
 class TestDatabaseProtocol:
     """Tests for DatabaseProtocol typing compliance"""
@@ -197,6 +259,7 @@ class TestDatabaseProtocol:
         assert hasattr(db, "get_store")
         assert hasattr(db, "add_user")
         assert hasattr(db, "update_user_role")
+        assert hasattr(db, "transfer_store_ownership")
 
         # Type check (static)
         assert callable(db.get_user)

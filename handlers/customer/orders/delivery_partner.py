@@ -22,7 +22,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from database_protocol import DatabaseProtocol
-from handlers.common.utils import html_escape as _esc, resolve_order_photo
+from handlers.common.utils import can_manage_store, html_escape as _esc, resolve_order_photo
 from localization import get_text
 from logging_config import logger
 
@@ -200,9 +200,8 @@ async def partner_confirm_order_batch(
             # Verify ownership
             store_id = _get_order_field(order, "store_id", 2)
             store = db.get_store(store_id) if store_id else None
-            owner_id = get_store_field(store, "owner_id") if store else None
 
-            if partner_id != owner_id:
+            if not can_manage_store(db, store_id, partner_id, store=store):
                 continue
 
             if _is_unpaid_online_order(order):
@@ -365,9 +364,8 @@ async def partner_reject_order_batch(
             # Verify ownership
             store_id = _get_order_field(order, "store_id", 2)
             store = db.get_store(store_id) if store_id else None
-            owner_id = get_store_field(store, "owner_id") if store else None
 
-            if partner_id != owner_id:
+            if not can_manage_store(db, store_id, partner_id, store=store):
                 continue
 
             if _is_paid_click_order(order):

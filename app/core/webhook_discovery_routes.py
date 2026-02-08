@@ -138,81 +138,121 @@ def build_discovery_handlers(db: Any):
         normalized_city = normalize_city(city) if city else None
         normalized_region = normalize_city(region) if region else None
         normalized_district = normalize_city(district) if district else None
+        fallback_scopes: list[tuple[str | None, str | None, str | None]] = []
+        if normalized_district:
+            fallback_scopes.append((None, normalized_region, normalized_district))
+        if normalized_region:
+            fallback_scopes.append((None, normalized_region, None))
+        if normalized_city:
+            fallback_scopes.append((normalized_city, None, None))
+            if not normalized_region:
+                fallback_scopes.append((None, normalized_city, None))
+        fallback_scopes.append((None, None, None))
         suggestions: list[str] = []
         try:
-            if hasattr(db, "get_search_suggestions"):
-                suggestions = (
-                    db.get_search_suggestions(
-                        query,
-                        limit=limit,
-                        city=normalized_city,
-                        region=normalized_region,
-                        district=normalized_district,
-                    )
-                    or []
-                )
-            elif hasattr(db, "get_offer_suggestions"):
-                suggestions = (
-                    db.get_offer_suggestions(
-                        query,
-                        limit=limit,
-                        city=normalized_city,
-                        region=normalized_region,
-                        district=normalized_district,
-                    )
-                    or []
-                )
-            elif hasattr(db, "search_offers"):
-                offers = (
-                    db.search_offers(
-                        query,
-                        city=normalized_city,
-                        limit=limit * 2,
-                        region=normalized_region,
-                        district=normalized_district,
-                    )
-                    or []
-                )
-                titles = {
-                    get_offer_value(o, "title", "") for o in offers if get_offer_value(o, "title")
-                }
-                suggestions.extend(list(titles)[:limit])
-
-            if len(suggestions) < limit and hasattr(db, "search_offers"):
-                offers = (
-                    db.search_offers(
-                        query,
-                        city=normalized_city,
-                        limit=limit * 2,
-                        region=normalized_region,
-                        district=normalized_district,
-                    )
-                    or []
-                )
-                for offer in offers:
-                    title = get_offer_value(offer, "title", "")
-                    if title and title not in suggestions:
-                        suggestions.append(title)
+            def _append_values(values: list[str]) -> bool:
+                for value in values or []:
+                    if value and value not in suggestions:
+                        suggestions.append(value)
                         if len(suggestions) >= limit:
-                            break
+                            return True
+                return False
 
-            if len(suggestions) < limit and hasattr(db, "search_stores"):
-                stores = (
-                    db.search_stores(
-                        query,
-                        city=normalized_city,
-                        limit=limit * 2,
-                        region=normalized_region,
-                        district=normalized_district,
+            def _fill_from_scope(
+                city_scope: str | None, region_scope: str | None, district_scope: str | None
+            ) -> bool:
+                if hasattr(db, "get_search_suggestions"):
+                    values = (
+                        db.get_search_suggestions(
+                            query,
+                            limit=limit,
+                            city=city_scope,
+                            region=region_scope,
+                            district=district_scope,
+                        )
+                        or []
                     )
-                    or []
-                )
-                for store in stores:
-                    name = get_offer_value(store, "name", "")
-                    if name and name not in suggestions:
-                        suggestions.append(name)
-                        if len(suggestions) >= limit:
-                            break
+                    if _append_values(values):
+                        return True
+                elif hasattr(db, "get_offer_suggestions"):
+                    values = (
+                        db.get_offer_suggestions(
+                            query,
+                            limit=limit,
+                            city=city_scope,
+                            region=region_scope,
+                            district=district_scope,
+                        )
+                        or []
+                    )
+                    if _append_values(values):
+                        return True
+                elif hasattr(db, "search_offers"):
+                    offers = (
+                        db.search_offers(
+                            query,
+                            city=city_scope,
+                            limit=limit * 2,
+                            region=region_scope,
+                            district=district_scope,
+                        )
+                        or []
+                    )
+                    titles = {
+                        get_offer_value(o, "title", "")
+                        for o in offers
+                        if get_offer_value(o, "title")
+                    }
+                    if _append_values(list(titles)[:limit]):
+                        return True
+
+                if len(suggestions) < limit and hasattr(db, "search_offers"):
+                    offers = (
+                        db.search_offers(
+                            query,
+                            city=city_scope,
+                            limit=limit * 2,
+                            region=region_scope,
+                            district=district_scope,
+                        )
+                        or []
+                    )
+                    for offer in offers:
+                        title = get_offer_value(offer, "title", "")
+                        if title and title not in suggestions:
+                            suggestions.append(title)
+                            if len(suggestions) >= limit:
+                                return True
+
+                if len(suggestions) < limit and hasattr(db, "search_stores"):
+                    stores = (
+                        db.search_stores(
+                            query,
+                            city=city_scope,
+                            limit=limit * 2,
+                            region=region_scope,
+                            district=district_scope,
+                        )
+                        or []
+                    )
+                    for store in stores:
+                        name = get_offer_value(store, "name", "")
+                        if name and name not in suggestions:
+                            suggestions.append(name)
+                            if len(suggestions) >= limit:
+                                return True
+                return len(suggestions) >= limit
+
+            _fill_from_scope(normalized_city, normalized_region, normalized_district)
+
+            if len(suggestions) < limit:
+                seen_scopes: set[tuple[str | None, str | None, str | None]] = set()
+                for scope in fallback_scopes:
+                    if scope in seen_scopes:
+                        continue
+                    seen_scopes.add(scope)
+                    if _fill_from_scope(*scope):
+                        break
         except Exception as exc:
             logger.error("API search suggestions error: %s", exc)
             suggestions = []

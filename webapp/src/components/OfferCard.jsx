@@ -117,9 +117,24 @@ const OfferCard = memo(function OfferCard({
   const discountPrice = Number(offer.discount_price) || 0
   const priceValue = discountPrice > 0 ? discountPrice : originalPrice
   const hasOldPrice = originalPrice > priceValue && priceValue > 0
+  const normalizePercent = (value) => {
+    if (value == null) return null
+    let raw = value
+    if (typeof raw === 'string') {
+      raw = raw.replace('%', '').trim()
+    }
+    const num = Number(raw)
+    if (!Number.isFinite(num)) return null
+    if (num > 0 && num <= 1) return num * 100
+    return num
+  }
+
   let discountPercent = 0
-  if (offer.discount_percent) {
-    discountPercent = Math.round(offer.discount_percent)
+  const percentFromOffer = normalizePercent(
+    offer.discount_percent ?? offer.discountPercent ?? offer.discount
+  )
+  if (percentFromOffer && percentFromOffer > 0) {
+    discountPercent = Math.round(percentFromOffer)
   } else if (originalPrice > 0 && discountPrice > 0 && originalPrice > discountPrice) {
     discountPercent = Math.round((1 - discountPrice / originalPrice) * 100)
   }

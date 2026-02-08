@@ -227,6 +227,17 @@ class DatabaseProtocol(Protocol):
         """Transfer store ownership to another user."""
         ...
 
+    def transfer_store_ownership(
+        self,
+        store_id: int,
+        new_owner_id: int,
+        *,
+        keep_access: bool,
+        added_by: int | None = None,
+    ) -> tuple[bool, str | None]:
+        """Atomically transfer store ownership and adjust access."""
+        ...
+
     # ========== GEO REFERENCE METHODS ==========
     def resolve_geo_region(self, value: Any) -> dict[str, Any] | None:
         ...

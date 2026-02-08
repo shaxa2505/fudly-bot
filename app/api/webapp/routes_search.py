@@ -69,6 +69,16 @@ async def search_all(
         normalized_city = normalize_city(city) if city else None
         normalized_region = normalize_city(region) if region else None
         normalized_district = normalize_city(district) if district else None
+        fallback_scopes: list[tuple[str | None, str | None, str | None]] = []
+        if normalized_district:
+            fallback_scopes.append((None, normalized_region, normalized_district))
+        if normalized_region:
+            fallback_scopes.append((None, normalized_region, None))
+        if normalized_city:
+            fallback_scopes.append((normalized_city, None, None))
+            if not normalized_region:
+                fallback_scopes.append((None, normalized_city, None))
+        fallback_scopes.append((None, None, None))
 
         offers_raw: list[Any] = []
         stores_raw: list[Any] = []
@@ -85,6 +95,26 @@ async def search_all(
                     offset=offset_offers,
                 )
             ) or []
+            if not offers_raw:
+                seen: set[tuple[str | None, str | None, str | None]] = set()
+                for scope in fallback_scopes:
+                    if scope in seen:
+                        continue
+                    seen.add(scope)
+                    offers_raw = (
+                        await _db_call(
+                            db,
+                            "search_offers",
+                            query,
+                            city=scope[0],
+                            region=scope[1],
+                            district=scope[2],
+                            limit=limit_offers,
+                            offset=offset_offers,
+                        )
+                    ) or []
+                    if offers_raw:
+                        break
         if hasattr(db, "search_stores"):
             stores_raw = (
                 await _db_call(
@@ -98,6 +128,26 @@ async def search_all(
                     offset=offset_stores,
                 )
             ) or []
+            if not stores_raw:
+                seen: set[tuple[str | None, str | None, str | None]] = set()
+                for scope in fallback_scopes:
+                    if scope in seen:
+                        continue
+                    seen.add(scope)
+                    stores_raw = (
+                        await _db_call(
+                            db,
+                            "search_stores",
+                            query,
+                            city=scope[0],
+                            region=scope[1],
+                            district=scope[2],
+                            limit=limit_stores,
+                            offset=offset_stores,
+                        )
+                    ) or []
+                    if stores_raw:
+                        break
 
         offers = [
             SearchOfferItem(

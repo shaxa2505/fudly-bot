@@ -10,7 +10,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_field, get_store_field
+from app.core.utils import get_field
 from app.domain.order import PaymentStatus
 from app.interfaces.bot.presenters.order_messages import (
     build_seller_payment_confirmed,

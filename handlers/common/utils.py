@@ -112,6 +112,8 @@ def can_manage_store(
 ) -> bool:
     """Check if user can manage store (owner or admin)."""
     if not db or not store_id:
+        store_id = core_get_store_field(store, "store_id") if store else None
+    if not db or not store_id:
         return False
 
     owner_id = core_get_store_field(store, "owner_id") if store else None

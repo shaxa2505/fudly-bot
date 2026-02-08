@@ -25,6 +25,7 @@ from app.keyboards import (
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity, ConfirmOrder, Registration
 from handlers.common.utils import (
+    can_manage_store,
     get_appropriate_menu,
     get_user_view_mode,
     has_approved_store,
@@ -226,7 +227,7 @@ async def handle_qr_pickup(message: types.Message, db: DatabaseProtocol, booking
         )
         customer_phone = getattr(customer, "phone", None) or ""
 
-    is_owner = user_id == owner_id
+    is_owner = can_manage_store(db, store_id, user_id, store=store)
     is_customer = user_id == customer_id
 
     status_info = {

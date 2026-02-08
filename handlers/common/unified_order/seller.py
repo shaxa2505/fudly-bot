@@ -1091,9 +1091,7 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
 
     store_id = _get_entity_field(entity, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
-    owner_id = _get_store_field(store, "owner_id") if store else None
-
-    if not owner_id or partner_id != owner_id:
+    if not can_manage_store(db_instance, store_id, partner_id, store=store):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 

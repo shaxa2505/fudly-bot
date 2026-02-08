@@ -53,6 +53,16 @@ async def get_search_suggestions(
         normalized_city = normalize_city(city) if city else None
         normalized_region = normalize_city(region) if region else None
         normalized_district = normalize_city(district) if district else None
+        fallback_scopes: list[tuple[str | None, str | None, str | None]] = []
+        if normalized_district:
+            fallback_scopes.append((None, normalized_region, normalized_district))
+        if normalized_region:
+            fallback_scopes.append((None, normalized_region, None))
+        if normalized_city:
+            fallback_scopes.append((normalized_city, None, None))
+            if not normalized_region:
+                fallback_scopes.append((None, normalized_city, None))
+        fallback_scopes.append((None, None, None))
         cache_ttl = _get_cache_ttl("WEBAPP_CACHE_SUGGESTIONS_TTL", 30)
         cache_key = None
         cache = None
@@ -67,94 +77,122 @@ async def get_search_suggestions(
             if cached is not None:
                 return cached
 
-        if hasattr(db, "get_search_suggestions"):
-            suggestions = (
-                await _db_call(
-                    db,
-                    "get_search_suggestions",
-                    query,
-                    limit=limit,
-                    city=normalized_city,
-                    region=normalized_region,
-                    district=normalized_district,
-                )
-                or []
-            )
-        elif hasattr(db, "get_offer_suggestions"):
-            suggestions = (
-                await _db_call(
-                    db,
-                    "get_offer_suggestions",
-                    query,
-                    limit=limit,
-                    city=normalized_city,
-                    region=normalized_region,
-                    district=normalized_district,
-                )
-                or []
-            )
-        elif hasattr(db, "search_offers"):
-            offers = await _db_call(
-                db,
-                "search_offers",
-                query,
-                limit=limit * 2,
-                city=normalized_city,
-                region=normalized_region,
-                district=normalized_district,
-            )
-            if offers:
-                titles = list(
-                    {
-                        o.get("title", "") if isinstance(o, dict) else getattr(o, "title", "")
-                        for o in offers
-                    }
-                )
-                suggestions.extend(titles[:limit])
+        def _append_values(values: list[str]) -> bool:
+            for value in values or []:
+                if value and value not in suggestions:
+                    suggestions.append(value)
+                    if len(suggestions) >= limit:
+                        return True
+            return False
 
-        if len(suggestions) < limit and hasattr(db, "search_offers"):
-            offers = await _db_call(
-                db,
-                "search_offers",
-                query,
-                limit=limit * 2,
-                city=normalized_city,
-                region=normalized_region,
-                district=normalized_district,
-            )
-            if offers:
-                for offer in offers:
-                    title = (
-                        offer.get("title", "")
-                        if isinstance(offer, dict)
-                        else getattr(offer, "title", "")
+        async def _fill_from_scope(
+            city_scope: str | None, region_scope: str | None, district_scope: str | None
+        ) -> bool:
+            if hasattr(db, "get_search_suggestions"):
+                values = (
+                    await _db_call(
+                        db,
+                        "get_search_suggestions",
+                        query,
+                        limit=limit,
+                        city=city_scope,
+                        region=region_scope,
+                        district=district_scope,
                     )
-                    if title and title not in suggestions:
-                        suggestions.append(title)
-                        if len(suggestions) >= limit:
-                            break
+                    or []
+                )
+                if _append_values(values):
+                    return True
+            elif hasattr(db, "get_offer_suggestions"):
+                values = (
+                    await _db_call(
+                        db,
+                        "get_offer_suggestions",
+                        query,
+                        limit=limit,
+                        city=city_scope,
+                        region=region_scope,
+                        district=district_scope,
+                    )
+                    or []
+                )
+                if _append_values(values):
+                    return True
+            elif hasattr(db, "search_offers"):
+                offers = await _db_call(
+                    db,
+                    "search_offers",
+                    query,
+                    limit=limit * 2,
+                    city=city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                )
+                if offers:
+                    titles = list(
+                        {
+                            o.get("title", "") if isinstance(o, dict) else getattr(o, "title", "")
+                            for o in offers
+                        }
+                    )
+                    if _append_values(titles[:limit]):
+                        return True
 
-        if len(suggestions) < limit and hasattr(db, "search_stores"):
-            stores = await _db_call(
-                db,
-                "search_stores",
-                query,
-                limit=limit * 2,
-                city=normalized_city,
-                region=normalized_region,
-                district=normalized_district,
-            )
-            if stores:
-                for store in stores:
-                    name = (
-                        store.get("name", "")
-                        if isinstance(store, dict)
-                        else getattr(store, "name", "")
-                    )
-                    if name and name not in suggestions:
-                        suggestions.append(name)
-                        if len(suggestions) >= limit:
-                            break
+            if len(suggestions) < limit and hasattr(db, "search_offers"):
+                offers = await _db_call(
+                    db,
+                    "search_offers",
+                    query,
+                    limit=limit * 2,
+                    city=city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                )
+                if offers:
+                    for offer in offers:
+                        title = (
+                            offer.get("title", "")
+                            if isinstance(offer, dict)
+                            else getattr(offer, "title", "")
+                        )
+                        if title and title not in suggestions:
+                            suggestions.append(title)
+                            if len(suggestions) >= limit:
+                                return True
+
+            if len(suggestions) < limit and hasattr(db, "search_stores"):
+                stores = await _db_call(
+                    db,
+                    "search_stores",
+                    query,
+                    limit=limit * 2,
+                    city=city_scope,
+                    region=region_scope,
+                    district=district_scope,
+                )
+                if stores:
+                    for store in stores:
+                        name = (
+                            store.get("name", "")
+                            if isinstance(store, dict)
+                            else getattr(store, "name", "")
+                        )
+                        if name and name not in suggestions:
+                            suggestions.append(name)
+                            if len(suggestions) >= limit:
+                                return True
+            return len(suggestions) >= limit
+
+        await _fill_from_scope(normalized_city, normalized_region, normalized_district)
+
+        if len(suggestions) < limit:
+            seen_scopes: set[tuple[str | None, str | None, str | None]] = set()
+            for scope in fallback_scopes:
+                if scope in seen_scopes:
+                    continue
+                seen_scopes.add(scope)
+                if await _fill_from_scope(*scope):
+                    break
 
         result = suggestions[:limit]
         if cache and cache_key and cache_ttl > 0:
