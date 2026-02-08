@@ -742,11 +742,21 @@ function CartPage({ user }) {
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
   const originalTotal = calcTotalPrice(subtotal, savingsTotal)
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
-  const deliveryOptions = [
-    { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },
-    { id: 'slot-1', label: 'Bugun', time: '18:00 - 18:30' },
-    { id: 'slot-2', label: 'Bugun', time: '19:00 - 19:30' },
-  ]
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    const deliveryOptions = [
+      { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },
+      {
+        id: 'slot-1',
+        label: nowMinutes > (18 * 60 + 30) ? 'Ertaga' : 'Bugun',
+        time: '18:00 - 18:30',
+      },
+      {
+        id: 'slot-2',
+        label: nowMinutes > (19 * 60 + 30) ? 'Ertaga' : 'Bugun',
+        time: '19:00 - 19:30',
+      },
+    ]
   const deliverySlotLabel = deliveryOptions.find(option => option.id === deliverySlot)?.time || ''
   const autoOrderType = useMemo(() => {
     if (storeInfoLoading) return orderType
@@ -850,7 +860,7 @@ function CartPage({ user }) {
   const hasOnlineProviders = paymentProviders.includes('click')
   const hasPrepayProviders = hasOnlineProviders
   const deliveryCashEnabled = ['1', 'true', 'yes', 'on'].includes(
-    String(import.meta.env.VITE_DELIVERY_CASH_ENABLED ?? '1').toLowerCase()
+    String(import.meta.env.VITE_DELIVERY_CASH_ENABLED ?? '0').toLowerCase()
   )
   const deliveryRequiresPrepay = orderType === 'delivery' && !deliveryCashEnabled
   const checkoutTitle = "Buyurtmani rasmiylashtirish"
@@ -2407,7 +2417,6 @@ function CartPage({ user }) {
                     {orderType === 'delivery' && deliveryStatus && (
                       <div className={`checkout-delivery-result ${deliveryStatus.status || ''}`}>
                         <div className="checkout-delivery-result-row">
-                          <span>Holat</span>
                           <span className={`checkout-delivery-badge ${deliveryStatus.status || ''}`}>
                             {deliveryStatus.label}
                           </span>

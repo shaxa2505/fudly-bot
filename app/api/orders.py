@@ -230,7 +230,7 @@ async def calculate_delivery_cost(city: str, address: str, store_id: int, db) ->
             delivery_cost=None,
             estimated_time=None,
             min_order_amount=None,
-            message=f"Delivery available only in {store_city_raw or 'store city'}",
+            message=f"Yetkazib berish faqat {store_city_raw or 'shahar'}da mavjud",
         )
 
     delivery_cost = int(store_dict.get("delivery_price") or 0)

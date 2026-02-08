@@ -54,7 +54,7 @@ except ImportError:
 
 
 def _delivery_cash_enabled() -> bool:
-    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "1").strip().lower() in {
+    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "0").strip().lower() in {
         "1",
         "true",
         "yes",
