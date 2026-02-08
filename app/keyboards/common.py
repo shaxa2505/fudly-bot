@@ -171,11 +171,10 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
     builder = InlineKeyboardBuilder()
 
     if unit in ("кг", "л"):
-        # For kg - show decimal quantities
-        quantities = [0.5, 1, 2, 3, 5, 10]
+        # For kg/l - use integer quantities (DB stores integers)
+        quantities = [1, 2, 3, 5, 10]
         for q in quantities:
-            label = f"{q}" if q == int(q) else f"{q}"
-            builder.button(text=label, callback_data=f"quantity_{q}")
+            builder.button(text=str(q), callback_data=f"quantity_{q}")
     elif unit in ("г", "мл"):
         quantities = [100, 200, 500, 1000]
         for q in quantities:

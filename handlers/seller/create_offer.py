@@ -445,18 +445,18 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
     return discount_percent, discount_price
 
 
-def _parse_quantity_value(raw: str | None, unit: str) -> float:
+def _parse_quantity_value(raw: str | None, unit: str) -> int:
     if not raw or not raw.strip():
-        return 1.0 if unit in DECIMAL_UNITS else 1
+        return 1
     numbers = re.findall(r"\d+(?:[.,]\d+)?", raw)
     if not numbers:
         raise ValueError("Invalid quantity")
     quantity = float(numbers[0].replace(",", "."))
     if quantity <= 0:
         raise ValueError("Invalid quantity")
-    if unit not in DECIMAL_UNITS and quantity != int(quantity):
+    if quantity != int(quantity):
         raise ValueError("Quantity must be integer")
-    return quantity
+    return int(quantity)
 
 
 def _quick_add_instructions(lang: str) -> str:
@@ -1459,8 +1459,12 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         builder = InlineKeyboardBuilder()
         builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_unit")
 
-        example = "Пример: 2.5" if unit in DECIMAL_UNITS else "Пример: 25"
-        example_uz = "Misol: 2.5" if unit in DECIMAL_UNITS else "Misol: 25"
+        if unit in ("г", "мл"):
+            example = "Пример: 250"
+            example_uz = "Misol: 250"
+        else:
+            example = "Пример: 2"
+            example_uz = "Misol: 2"
 
         await _edit_prompt_from_callback(
             callback,
@@ -1475,7 +1479,15 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         await callback.answer()
         return
 
-    quantity = float(qty_data) if unit in DECIMAL_UNITS else int(float(qty_data))
+    try:
+        quantity_value = float(qty_data)
+        if quantity_value <= 0 or quantity_value != int(quantity_value):
+            raise ValueError
+        quantity = int(quantity_value)
+    except ValueError:
+        await callback.answer(get_text(lang, "quantity_integer_only"), show_alert=True)
+        return
+
     await _process_quantity(callback.message, state, lang, quantity)
     await callback.answer()
 
@@ -1500,14 +1512,11 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         quantity = float(quantity_text)
         if quantity <= 0:
             raise ValueError("Invalid quantity")
-        # For non-decimal units, ensure integer
-        if unit not in DECIMAL_UNITS and quantity != int(quantity):
+        if quantity != int(quantity):
             await _upsert_prompt(
                 message,
                 state,
-                "⚠️ Введите целое число для выбранной единицы"
-                if lang == "ru"
-                else "⚠️ Tanlangan birlik uchun butun son kiriting",
+                get_text(lang, "quantity_integer_only"),
             )
             await safe_delete_message(message)
             return
@@ -1525,7 +1534,7 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
 
 
 async def _process_quantity(
-    target: types.Message, state: FSMContext, lang: str, quantity: float
+    target: types.Message, state: FSMContext, lang: str, quantity: int
 ) -> None:
     """Process quantity and move to expiry step."""
     await state.update_data(quantity=quantity)
@@ -2187,7 +2196,7 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         discount_price = offer.get("discount_price", 0)
         quantity = offer.get("quantity", 0)
         category = offer.get("category", "other")
-        photo = offer.get("photo")
+        photo = offer.get("photo") or offer.get("photo_id")
         store_id = offer.get("store_id")
         expiry_date = offer.get("expiry_date", "")
     else:
@@ -2196,7 +2205,7 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         discount_price = getattr(offer, "discount_price", 0)
         quantity = getattr(offer, "quantity", 0)
         category = getattr(offer, "category", "other")
-        photo = getattr(offer, "photo", None)
+        photo = getattr(offer, "photo", None) or getattr(offer, "photo_id", None)
         store_id = getattr(offer, "store_id", None)
         expiry_date = getattr(offer, "expiry_date", "")
 

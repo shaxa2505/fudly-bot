@@ -43,18 +43,20 @@ def _safe_caption(text: str) -> str:
     return text[: MAX_CAPTION_LENGTH - 3] + "..."
 
 
-def _is_paid_click_order(entity: Any) -> bool:
+def _is_paid_online_order(entity: Any) -> bool:
     payment_method = _get_entity_field(entity, "payment_method")
     payment_status = _get_entity_field(entity, "payment_status")
     payment_proof_photo_id = _get_entity_field(entity, "payment_proof_photo_id")
 
     method_norm = PaymentStatus.normalize_method(payment_method)
+    if method_norm not in ("click", "payme"):
+        return False
     status_norm = PaymentStatus.normalize(
         payment_status,
         payment_method=payment_method,
         payment_proof_photo_id=payment_proof_photo_id,
     )
-    return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
+    return status_norm == PaymentStatus.CONFIRMED
 
 
 def _is_unpaid_online_order(entity: Any) -> bool:
@@ -377,7 +379,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    if entity_type == "order" and _is_paid_click_order(entity):
+    if entity_type == "order" and _is_paid_online_order(entity):
         await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 
@@ -1093,6 +1095,10 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
     store = db_instance.get_store(store_id) if store_id else None
     if not can_manage_store(db_instance, store_id, partner_id, store=store):
         await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if _is_paid_online_order(entity):
+        await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 
     if order_service:

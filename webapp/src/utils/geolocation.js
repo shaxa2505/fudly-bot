@@ -40,6 +40,25 @@ const parseLocationCandidate = (candidate) => {
   };
 };
 
+const normalizeAccuracy = (candidate) => {
+  const value = candidate?.accuracy;
+  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+};
+
+const pickBestLocation = (first, second) => {
+  if (!first) return second || null;
+  if (!second) return first;
+  return normalizeAccuracy(second) < normalizeAccuracy(first) ? second : first;
+};
+
+const isAccurateEnough = (candidate, minAccuracy) => {
+  if (!candidate) return false;
+  if (!Number.isFinite(minAccuracy)) return true;
+  const accuracy = candidate.accuracy;
+  if (!Number.isFinite(accuracy)) return false;
+  return accuracy <= minAccuracy;
+};
+
 const waitForTelegramLocation = async (telegram, timeoutMs) => {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
@@ -100,6 +119,76 @@ const requestBrowserLocation = (options = {}) => {
   });
 };
 
+const requestBrowserLocationWithWatch = (options = {}) => {
+  const {
+    enableHighAccuracy = true,
+    timeout = 12000,
+    maximumAge = 0,
+    minAccuracy,
+  } = options;
+
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation not supported'));
+      return;
+    }
+
+    let best = null;
+    let resolved = false;
+    let watchId = null;
+
+    const finalize = (value, error) => {
+      if (resolved) return;
+      resolved = true;
+      if (watchId != null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      if (value) {
+        resolve(value);
+      } else {
+        reject(error || new Error('Geolocation failed'));
+      }
+    };
+
+    const timer = setTimeout(() => {
+      clearTimeout(timer);
+      if (best) {
+        finalize(best);
+      } else {
+        finalize(null, new Error('Geolocation timeout'));
+      }
+    }, timeout);
+
+    watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const candidate = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        };
+        best = pickBestLocation(best, candidate);
+        if (isAccurateEnough(candidate, minAccuracy)) {
+          clearTimeout(timer);
+          finalize(candidate);
+        }
+      },
+      (error) => {
+        clearTimeout(timer);
+        if (best) {
+          finalize(best);
+        } else {
+          finalize(null, error);
+        }
+      },
+      {
+        enableHighAccuracy,
+        timeout: Math.max(4000, Math.min(timeout, 15000)),
+        maximumAge,
+      }
+    );
+  });
+};
+
 /**
  * Get user's current location
  * @returns {Promise<{latitude: number, longitude: number}>}
@@ -120,36 +209,43 @@ export async function getPreferredLocation(options = {}) {
     highAccuracyMaximumAge = 0,
   } = options;
 
+  let telegramLocation = null;
   if (preferTelegram) {
-    const telegramLocation = await requestTelegramLocation({ timeout });
-    if (telegramLocation) return telegramLocation;
-  }
-
-  const primary = await requestBrowserLocation({
-    enableHighAccuracy,
-    timeout,
-    maximumAge,
-  });
-
-  if (
-    retryOnLowAccuracy &&
-    Number.isFinite(minAccuracy) &&
-    Number.isFinite(primary.accuracy) &&
-    primary.accuracy > minAccuracy
-  ) {
-    try {
-      const refined = await requestBrowserLocation({
-        enableHighAccuracy: true,
-        timeout: highAccuracyTimeout,
-        maximumAge: highAccuracyMaximumAge,
-      });
-      return refined;
-    } catch {
-      return primary;
+    telegramLocation = await requestTelegramLocation({ timeout });
+    if (telegramLocation && isAccurateEnough(telegramLocation, minAccuracy)) {
+      return telegramLocation;
     }
   }
 
-  return primary;
+  let primary = null;
+  try {
+    primary = await requestBrowserLocation({
+      enableHighAccuracy,
+      timeout,
+      maximumAge,
+    });
+  } catch (error) {
+    if (telegramLocation) return telegramLocation;
+    throw error;
+  }
+
+  let best = pickBestLocation(telegramLocation, primary);
+
+  if (retryOnLowAccuracy && !isAccurateEnough(best, minAccuracy)) {
+    try {
+      const refined = await requestBrowserLocationWithWatch({
+        enableHighAccuracy: true,
+        timeout: highAccuracyTimeout,
+        maximumAge: highAccuracyMaximumAge,
+        minAccuracy,
+      });
+      best = pickBestLocation(best, refined);
+    } catch {
+      // Keep the best known result.
+    }
+  }
+
+  return best || primary;
 }
 
 /**

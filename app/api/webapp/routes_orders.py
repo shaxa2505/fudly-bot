@@ -230,7 +230,7 @@ async def _validate_store_open(db: Any, store_id: int) -> None:
         raise HTTPException(status_code=409, detail=detail)
 
 
-@router.post("/orders", response_model=OrderResponse)
+@router.post("/orders", response_model=OrderResponse, status_code=201)
 @limiter.limit("10/minute")
 async def create_order(
     request: Request,
@@ -311,6 +311,10 @@ async def create_order(
         created_items: list[dict[str, Any]] = []
 
         order_service = get_unified_order_service()
+        if not order_service:
+            order_service = _ensure_unified_service(db)
+        if not order_service:
+            raise HTTPException(status_code=503, detail="Order service unavailable")
 
         # If unified service is available, use it as a single entry point
         if order_service and hasattr(db, "create_cart_order"):
@@ -321,6 +325,9 @@ async def create_order(
                     continue
 
                 price = int(normalize_price(get_val(offer, "discount_price", 0)))
+                original_price = int(
+                    normalize_price(get_val(offer, "original_price", price) or price)
+                )
                 offer_store_id = int(get_val(offer, "store_id"))
                 offer_title = get_val(offer, "title", "Tovar")
                 store = await db.get_store(offer_store_id) if hasattr(db, "get_store") else None
@@ -336,13 +343,16 @@ async def create_order(
                         store_id=offer_store_id,
                         title=offer_title,
                         price=price,
-                        original_price=price,
+                        original_price=original_price,
                         quantity=item.quantity,
                         store_name=store_name,
                         store_address=store_address,
                         delivery_price=delivery_price,
                     )
                 )
+
+            if not order_items:
+                raise HTTPException(status_code=400, detail="No valid items provided")
 
             try:
                 from app.services.unified_order_service import OrderResult  # type: ignore
@@ -440,7 +450,7 @@ async def create_order(
                 user_id,
                 idem_hash,
                 response_payload,
-                200,
+                201,
             )
         return OrderResponse(**response_payload)
 

@@ -90,6 +90,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .location-picker-map-canvas {
@@ -115,6 +116,7 @@
   z-index: 2;
   font-weight: 500;
   color: var(--lp-muted);
+  animation: fade-in 0.18s ease;
 }
 
 .location-picker-map-pin {
@@ -132,6 +134,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.location-picker-map-pin.is-bumping {
+  animation: pin-bounce 0.36s ease;
 }
 
 .location-picker-map-pin-inner {
@@ -161,6 +167,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  animation: sheet-rise 0.3s ease;
 }
 
 .location-picker-geo {
@@ -216,6 +223,11 @@
   overflow: hidden;
 }
 
+.location-picker-address-value.is-loading {
+  color: var(--lp-muted);
+  animation: address-pulse 1s ease-in-out infinite;
+}
+
 .location-picker-address-icon {
   width: 28px;
   height: 28px;
@@ -265,6 +277,8 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
+  animation: search-fade 0.22s ease;
 }
 
 .location-picker-search-header {
@@ -358,10 +372,14 @@
 .location-picker-results {
   padding: 10px 20px 18px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
+  touch-action: pan-y;
 }
 
 .location-picker-results-header {
@@ -467,9 +485,69 @@
   }
 }
 
+@keyframes pin-bounce {
+  0% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+  40% {
+    transform: translate(-50%, -115%) scale(1.04);
+  }
+  100% {
+    transform: translate(-50%, -100%) scale(1);
+  }
+}
+
+@keyframes sheet-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes search-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes address-pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .location-picker,
-  .location-picker-result {
+  .location-picker-result,
+  .location-picker-sheet,
+  .location-picker-map-pin.is-bumping,
+  .location-picker-search-view,
+  .location-picker-address-value.is-loading,
+  .location-picker-map-loading {
     animation: none;
   }
 }

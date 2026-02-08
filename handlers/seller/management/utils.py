@@ -140,7 +140,13 @@ async def safe_edit_message(
 def get_offer_field(offer: Any, field: str, default: Any = None) -> Any:
     """Extract field from offer tuple/dict."""
     if isinstance(offer, dict):
-        return offer.get(field, default)
+        if field in offer:
+            return offer.get(field, default)
+        if field == "photo":
+            return offer.get("photo_id", default)
+        if field == "photo_id":
+            return offer.get("photo", default)
+        return default
     if isinstance(offer, (tuple, list)):
         field_map = {
             "offer_id": 0,

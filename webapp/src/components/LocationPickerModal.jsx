@@ -10,7 +10,48 @@ import './LocationPickerModal.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
 const DEFAULT_CENTER = { lat: 41.2995, lon: 69.2401 }
-const SEARCH_DELAY_MS = 350
+const SEARCH_DELAY_MS = 250
+const REVERSE_GEOCODE_DELAY_MS = 280
+const MIN_REVERSE_DISTANCE_M = 18
+
+let leafletAssetsPromise = null
+
+const ensureLeafletAssets = () => {
+  if (window.L) return Promise.resolve(true)
+  if (leafletAssetsPromise) return leafletAssetsPromise
+
+  leafletAssetsPromise = new Promise((resolve) => {
+    const cssHref = `${LEAFLET_CDN}/leaflet.css`
+    const jsSrc = `${LEAFLET_CDN}/leaflet.js`
+
+    if (!document.querySelector(`link[href="${cssHref}"]`)) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = cssHref
+      document.head.appendChild(link)
+    }
+
+    const existingScript = document.querySelector(`script[src="${jsSrc}"]`)
+    if (existingScript) {
+      if (window.L) {
+        resolve(true)
+        return
+      }
+      existingScript.addEventListener('load', () => resolve(true), { once: true })
+      existingScript.addEventListener('error', () => resolve(false), { once: true })
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = jsSrc
+    script.async = true
+    script.onload = () => resolve(true)
+    script.onerror = () => resolve(false)
+    document.body.appendChild(script)
+  })
+
+  return leafletAssetsPromise
+}
 
 const formatDistance = (meters) => {
   const value = Number(meters)
@@ -113,8 +154,10 @@ function LocationPickerModal({
   const [mapAddress, setMapAddress] = useState('')
   const [mapLocation, setMapLocation] = useState(null)
   const [mapResolving, setMapResolving] = useState(false)
+  const [pinBump, setPinBump] = useState(false)
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
+  const lastResolvedRef = useRef(null)
   const activeRef = useRef(false)
   const searchInputRef = useRef(null)
   const canDetect = typeof onDetectLocation === 'function'
@@ -143,6 +186,14 @@ function LocationPickerModal({
     setMapAddress(initialAddress)
     const hasLocationDetails = Boolean(location?.coordinates || location?.address)
     setMapLocation(hasLocationDetails ? location : null)
+    if (coords && initialAddress) {
+      lastResolvedRef.current = {
+        lat: coords.lat,
+        lon: coords.lon,
+        address: initialAddress,
+        location,
+      }
+    }
     setMapResolving(false)
     return () => {
       activeRef.current = false
@@ -249,7 +300,14 @@ function LocationPickerModal({
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
     setMapCenter({ lat, lon })
     setMapLocation(nextLocation)
-    setMapAddress(nextLocation.address || nextLocation.city || '')
+    const resolvedAddress = nextLocation.address || nextLocation.city || ''
+    setMapAddress(resolvedAddress)
+    lastResolvedRef.current = {
+      lat,
+      lon,
+      address: resolvedAddress,
+      location: nextLocation,
+    }
     setMode('map')
   }, [])
 
@@ -286,24 +344,14 @@ function LocationPickerModal({
 
   useEffect(() => {
     if (!isOpen || mode !== 'map') return
-    if (window.L) {
-      setMapLoaded(true)
-      return
-    }
-
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = `${LEAFLET_CDN}/leaflet.css`
-    document.head.appendChild(link)
-
-    const script = document.createElement('script')
-    script.src = `${LEAFLET_CDN}/leaflet.js`
-    script.async = true
-    script.onload = () => setMapLoaded(true)
-    script.onerror = () => setMapLoaded(false)
-    document.body.appendChild(script)
+    let active = true
+    ensureLeafletAssets().then((ok) => {
+      if (!active) return
+      setMapLoaded(ok && Boolean(window.L))
+    })
 
     return () => {
+      active = false
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
@@ -342,6 +390,14 @@ function LocationPickerModal({
   }, [mapLoaded, mapCenter])
 
   useEffect(() => {
+    if (!isOpen || mode !== 'map') return
+    if (mapCenter?.lat == null || mapCenter?.lon == null) return
+    setPinBump(true)
+    const timer = setTimeout(() => setPinBump(false), 320)
+    return () => clearTimeout(timer)
+  }, [isOpen, mode, mapCenter?.lat, mapCenter?.lon])
+
+  useEffect(() => {
     if (!mapLoaded || !mapInstanceRef.current || !mapCenter) return
     const map = mapInstanceRef.current
     const current = map.getCenter()
@@ -351,9 +407,31 @@ function LocationPickerModal({
     map.flyTo([mapCenter.lat, mapCenter.lon], map.getZoom(), { duration: 0.5 })
   }, [mapCenter, mapLoaded])
 
+  const distanceMeters = (a, b) => {
+    if (!a || !b) return Number.POSITIVE_INFINITY
+    const rad = Math.PI / 180
+    const x = (b.lon - a.lon) * rad * Math.cos((a.lat + b.lat) * rad / 2)
+    const y = (b.lat - a.lat) * rad
+    return Math.hypot(x, y) * 6371000
+  }
+
   useEffect(() => {
     if (!isOpen || mode !== 'map') return
     if (!mapCenter?.lat || !mapCenter?.lon) return
+
+    const last = lastResolvedRef.current
+    if (last) {
+      const delta = distanceMeters(
+        { lat: last.lat, lon: last.lon },
+        { lat: mapCenter.lat, lon: mapCenter.lon }
+      )
+      if (delta < MIN_REVERSE_DISTANCE_M && last.address) {
+        setMapAddress(last.address)
+        setMapLocation(last.location)
+        setMapResolving(false)
+        return
+      }
+    }
 
     setMapResolving(true)
     const timer = setTimeout(async () => {
@@ -361,8 +439,15 @@ function LocationPickerModal({
         const data = await api.reverseGeocode(mapCenter.lat, mapCenter.lon, 'uz')
         if (!activeRef.current) return
         const next = buildLocationFromReverseGeocode(data, mapCenter.lat, mapCenter.lon)
+        const resolvedAddress = next.address || next.city || ''
+        lastResolvedRef.current = {
+          lat: mapCenter.lat,
+          lon: mapCenter.lon,
+          address: resolvedAddress,
+          location: next,
+        }
         setMapLocation(next)
-        setMapAddress(next.address || next.city || '')
+        setMapAddress(resolvedAddress)
       } catch (error) {
         if (!activeRef.current) return
         console.error('Map reverse geocode failed', error)
@@ -373,7 +458,7 @@ function LocationPickerModal({
           setMapResolving(false)
         }
       }
-    }, 450)
+    }, REVERSE_GEOCODE_DELAY_MS)
 
     return () => clearTimeout(timer)
   }, [isOpen, mode, mapCenter?.lat, mapCenter?.lon])
@@ -529,14 +614,14 @@ function LocationPickerModal({
             </div>
 
             <div className="location-picker-map">
-              <div className="location-picker-map-canvas">
+                <div className="location-picker-map-canvas">
                 {!mapLoaded && (
                   <div className="location-picker-map-loading">
                     Xarita yuklanmoqda...
                   </div>
                 )}
                 <div ref={mapRef} className="location-picker-map-view" />
-                <div className="location-picker-map-pin" aria-hidden="true">
+                <div className={`location-picker-map-pin ${pinBump ? 'is-bumping' : ''}`} aria-hidden="true">
                   <div className="location-picker-map-pin-inner" />
                 </div>
                 <div className="location-picker-map-hint">Xaritani suring</div>
@@ -564,7 +649,7 @@ function LocationPickerModal({
                 onClick={openSearch}
                 aria-label="Manzilni qo'lda kiritish"
               >
-                <span className="location-picker-address-value">
+                <span className={`location-picker-address-value ${mapResolving ? 'is-loading' : ''}`}>
                   {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Manzil topilmadi')}
                 </span>
                 <span className="location-picker-address-icon" aria-hidden="true">

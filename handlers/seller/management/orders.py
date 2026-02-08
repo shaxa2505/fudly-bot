@@ -34,18 +34,20 @@ def _get_field(entity: Any, field: str, default: Any = None) -> Any:
     return getattr(entity, field, default)
 
 
-def _is_paid_click_order(order: Any) -> bool:
+def _is_paid_online_order(order: Any) -> bool:
     payment_method = _get_field(order, "payment_method")
     payment_status = _get_field(order, "payment_status")
     payment_proof_photo_id = _get_field(order, "payment_proof_photo_id")
 
     method_norm = PaymentStatus.normalize_method(payment_method)
+    if method_norm not in ("click", "payme"):
+        return False
     status_norm = PaymentStatus.normalize(
         payment_status,
         payment_method=payment_method,
         payment_proof_photo_id=payment_proof_photo_id,
     )
-    return method_norm == "click" and status_norm == PaymentStatus.CONFIRMED
+    return status_norm == PaymentStatus.CONFIRMED
 
 
 def _shorten(text: Any, limit: int = 28) -> str:
@@ -688,7 +690,17 @@ async def cancel_order_seller_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "order_not_found"), show_alert=True)
         return
 
-    if _is_paid_click_order(order):
+    store_id = _get_field(order, "store_id")
+    if not store_id:
+        offer_id = _get_field(order, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = _get_field(offer, "store_id") if offer else None
+    store = db.get_store(store_id) if store_id else None
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    if _is_paid_online_order(order):
         await callback.answer(get_text(lang, "paid_click_reject_blocked"), show_alert=True)
         return
 

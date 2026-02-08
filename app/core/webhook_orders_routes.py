@@ -190,6 +190,8 @@ def build_order_handlers(
                 idem_payload = {
                     "items": items_payload,
                     "delivery_address": address or "",
+                    "delivery_lat": delivery_lat,
+                    "delivery_lon": delivery_lon,
                     "phone": phone or "",
                     "comment": notes or "",
                     "payment_method": payment_method,
@@ -267,6 +269,9 @@ def build_order_handlers(
                         return _respond({"error": detail}, 409)
 
                     price = int(normalize_price(get_offer_value(offer, "discount_price", 0) or 0))
+                    original_price = int(
+                        normalize_price(get_offer_value(offer, "original_price", price) or price)
+                    )
                     store_id = int(get_offer_value(offer, "store_id"))
                     title = get_offer_value(offer, "title", "Товар")
 
@@ -285,7 +290,7 @@ def build_order_handlers(
                             store_id=store_id,
                             title=title,
                             price=price,
-                            original_price=price,
+                            original_price=original_price,
                             quantity=quantity,
                             store_name=store_name,
                             store_address=store_address,

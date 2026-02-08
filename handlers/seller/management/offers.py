@@ -1337,24 +1337,24 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
         await message.answer(get_text(lang, "not_your_offer"), reply_markup=main_menu_seller(lang))
         return
 
-        if edit_field == "price":
-            if "%" in (message.text or ""):
-                percent_values = _extract_numbers(message.text)
-                if len(percent_values) != 1:
-                    await message.answer(_price_input_hint(lang))
-                    return
-                discount_percent = percent_values[0]
-                if discount_percent < 0 or discount_percent > 99:
-                    await message.answer(_price_input_hint(lang))
-                    return
-                if discount_percent < MIN_DISCOUNT_PERCENT:
-                    await message.answer(get_text(lang, "error_min_discount"))
-                    return
-                original_price = int(get_offer_field(offer, "original_price", 0) or 0)
-                if original_price <= 0:
-                    await message.answer(get_text(lang, "error_price_gt_zero"))
-                    return
-                discount_price = int(original_price * (100 - discount_percent) / 100)
+    if edit_field == "price":
+        if "%" in (message.text or ""):
+            percent_values = _extract_numbers(message.text)
+            if len(percent_values) != 1:
+                await message.answer(_price_input_hint(lang))
+                return
+            discount_percent = percent_values[0]
+            if discount_percent < 0 or discount_percent > 99:
+                await message.answer(_price_input_hint(lang))
+                return
+            if discount_percent < MIN_DISCOUNT_PERCENT:
+                await message.answer(get_text(lang, "error_min_discount"))
+                return
+            original_price = int(get_offer_field(offer, "original_price", 0) or 0)
+            if original_price <= 0:
+                await message.answer(get_text(lang, "error_price_gt_zero"))
+                return
+            discount_price = int(original_price * (100 - discount_percent) / 100)
         else:
             numbers = _extract_numbers(message.text)
             if len(numbers) not in (1, 2):
@@ -1384,21 +1384,18 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
                 (original_price, discount_price, offer_id),
             )
     elif edit_field == "quantity":
-        unit = get_offer_field(offer, "unit", "шт")
         numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text or "")
         if len(numbers) != 1:
             await message.answer(get_text(lang, "error_qty_gt_zero"))
             return
         quantity = float(numbers[0].replace(",", "."))
-        if unit not in DECIMAL_UNITS and quantity != int(quantity):
-            await message.answer(
-                "Введите целое число" if lang == "ru" else "Butun son kiriting"
-            )
+        if quantity != int(quantity):
+            await message.answer(get_text(lang, "quantity_integer_only"))
             return
         if quantity < 0:
             await message.answer(get_text(lang, "error_qty_gt_zero"))
             return
-        db.update_offer_quantity(offer_id, quantity)
+        db.update_offer_quantity(offer_id, int(quantity))
     elif edit_field == "description":
         description = (message.text or "").strip()
         if not description:
