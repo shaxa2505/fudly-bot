@@ -15,6 +15,7 @@ from app.keyboards import (
     main_menu_customer,
     phone_request_keyboard,
     registration_complete_keyboard,
+    webapp_inline_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import Registration
@@ -139,8 +140,8 @@ async def _after_phone_saved(
         await state.clear()
         await message.answer(
             get_text(lang, "phone_saved"),
-            reply_markup=registration_complete_keyboard(lang),
         )
+        await _send_completion_menu(message, lang)
         return
 
     await state.set_state(Registration.city)
@@ -153,19 +154,25 @@ async def _after_phone_saved(
 
 
 async def _send_completion_menu(message: types.Message, lang: str) -> None:
-    menu = registration_complete_keyboard(lang)
+    inline_menu = webapp_inline_keyboard(lang)
+    sent_inline = False
     if REGISTRATION_COMPLETE_STICKER_ID:
         try:
             await message.answer_sticker(
                 REGISTRATION_COMPLETE_STICKER_ID,
-                reply_markup=menu,
+                reply_markup=inline_menu,
             )
-            return
+            sent_inline = True
         except Exception:
             pass
+    if not sent_inline:
+        await message.answer(
+            get_text(lang, "registration_choose_action"),
+            reply_markup=inline_menu,
+        )
     await message.answer(
-        get_text(lang, "registration_choose_action"),
-        reply_markup=menu,
+        get_text(lang, "main_menu"),
+        reply_markup=registration_complete_keyboard(lang),
     )
 
 
@@ -337,6 +344,10 @@ async def registration_city_callback(
     await callback.message.answer(
         complete_text,
         parse_mode="HTML",
+        reply_markup=webapp_inline_keyboard(lang),
+    )
+    await callback.message.answer(
+        get_text(lang, "main_menu"),
         reply_markup=registration_complete_keyboard(lang),
     )
     await callback.answer()
@@ -416,6 +427,10 @@ async def registration_district_callback(
     await callback.message.answer(
         complete_text,
         parse_mode="HTML",
+        reply_markup=webapp_inline_keyboard(lang),
+    )
+    await callback.message.answer(
+        get_text(lang, "main_menu"),
         reply_markup=registration_complete_keyboard(lang),
     )
     await callback.answer()

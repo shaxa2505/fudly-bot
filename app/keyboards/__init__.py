@@ -98,6 +98,7 @@ from .user import (
     search_cancel_keyboard,
     settings_keyboard,
     stores_list_keyboard,
+    webapp_inline_keyboard,
 )
 
 __all__ = [
@@ -115,6 +116,7 @@ __all__ = [
     # User
     "main_menu_customer",
     "registration_complete_keyboard",
+    "webapp_inline_keyboard",
     "search_cancel_keyboard",
     "settings_keyboard",
     "booking_filters_keyboard",

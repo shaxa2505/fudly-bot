@@ -406,21 +406,30 @@ class StoreMixin:
             rows = [dict(row) for row in cursor.fetchall()]
             return rows
 
-    def get_approved_stores(self, city: str = None):
-        """Get approved stores, optionally filtered by city."""
+    def get_approved_stores(self, owner_id: int | str | None = None, city: str | None = None):
+        """Get approved stores, optionally filtered by owner or city."""
+        if isinstance(owner_id, str) and city is None:
+            city = owner_id
+            owner_id = None
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
+            query = "SELECT * FROM stores WHERE status IN ('approved','active')"
+            params: list[Any] = []
+
+            if owner_id is not None:
+                query += " AND owner_id = %s"
+                params.append(owner_id)
+
             if city:
                 condition, condition_params = self._build_location_filter(
                     city, "city", "", self._get_city_variants
                 )
                 if not condition:
                     return []
-                query = f"SELECT * FROM stores WHERE status = %s AND {condition}"
-                params = ["approved"] + list(condition_params)
-                cursor.execute(query, params)
-            else:
-                cursor.execute("SELECT * FROM stores WHERE status = %s", ("approved",))
+                query += f" AND {condition}"
+                params.extend(condition_params)
+
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
     def get_pending_stores(self):

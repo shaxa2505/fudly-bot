@@ -139,7 +139,9 @@ class DatabaseProtocol(Protocol):
         """Get all stores accessible to user (owned + admin)."""
         ...
 
-    def get_approved_stores(self, owner_id: int) -> RowList:
+    def get_approved_stores(
+        self, owner_id: int | None = None, city: str | None = None
+    ) -> RowList:
         ...
 
     def get_store(self, store_id: int) -> RowType | None:

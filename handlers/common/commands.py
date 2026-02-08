@@ -21,6 +21,7 @@ from app.keyboards import (
     main_menu_customer,
     main_menu_seller,
     phone_request_keyboard,
+    webapp_inline_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import ChangeCity, ConfirmOrder, Registration
@@ -871,8 +872,9 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
             city=normalize_city(user_city) if user_city else get_cities(lang)[0],
         ),
         parse_mode="HTML",
-        reply_markup=menu,
+        reply_markup=webapp_inline_keyboard(lang),
     )
+    await message.answer(get_text(lang, "main_menu"), reply_markup=menu)
 
 
 @router.callback_query(F.data.startswith("reg_lang_"))
