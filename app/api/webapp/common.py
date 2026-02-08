@@ -12,7 +12,7 @@ from typing import Any
 from urllib.parse import parse_qsl, unquote
 
 from fastapi import Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from app.core.config import load_settings
 from app.core.utils import get_uzb_time
@@ -284,18 +284,30 @@ class CategoryResponse(BaseModel):
 
 
 class OrderItem(BaseModel):
-    offer_id: int
+    offer_id: int = Field(validation_alias=AliasChoices("offer_id", "id"))
     quantity: int = Field(..., ge=1)
 
 
 class CreateOrderRequest(BaseModel):
     items: list[OrderItem]
     user_id: int | None = None
-    delivery_address: str | None = None
-    delivery_lat: float | None = None
-    delivery_lon: float | None = None
+    delivery_address: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("delivery_address", "address"),
+    )
+    delivery_lat: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("delivery_lat", "lat", "latitude"),
+    )
+    delivery_lon: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("delivery_lon", "lon", "lng", "longitude"),
+    )
     phone: str | None = None
-    comment: str | None = None
+    comment: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("comment", "notes"),
+    )
     payment_method: str | None = None
 
 

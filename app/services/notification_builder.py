@@ -10,6 +10,7 @@ import html
 import os
 from typing import Literal
 
+from app.domain.order import PaymentStatus
 from app.domain.order_labels import normalize_order_status, status_label
 from localization import get_text
 
@@ -53,6 +54,37 @@ class NotificationBuilder:
             return "Оплата: Payme"
         return "Оплата: онлайн"
 
+    def _payment_status_label(
+        self,
+        lang: str,
+        payment_status: str | None,
+        payment_method: str | None,
+        *,
+        payment_proof_photo_id: str | None = None,
+    ) -> str | None:
+        if not payment_method:
+            return None
+        normalized = PaymentStatus.normalize(
+            payment_status,
+            payment_method=payment_method,
+            payment_proof_photo_id=payment_proof_photo_id,
+        )
+        if normalized is None:
+            normalized = PaymentStatus.initial_for_method(payment_method)
+        if normalized == PaymentStatus.CONFIRMED:
+            return get_text(lang, "payment_status_confirmed")
+        if normalized == PaymentStatus.NOT_REQUIRED:
+            return get_text(lang, "payment_status_not_required")
+        if normalized == PaymentStatus.AWAITING_PAYMENT:
+            return get_text(lang, "payment_status_awaiting_payment")
+        if normalized == PaymentStatus.AWAITING_PROOF:
+            return get_text(lang, "payment_status_awaiting_proof")
+        if normalized == PaymentStatus.PROOF_SUBMITTED:
+            return get_text(lang, "payment_status_proof_submitted")
+        if normalized == PaymentStatus.REJECTED:
+            return get_text(lang, "payment_status_rejected")
+        return None
+
     def _status_label(self, status: str, lang: str) -> str:
         return status_label(status, lang, self.order_type)
 
@@ -76,6 +108,8 @@ class NotificationBuilder:
         total: int | None = None,
         currency: str = "UZS",
         payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
         customer_name: str | None = None,
         customer_phone: str | None = None,
         comment: str | None = None,
@@ -100,6 +134,20 @@ class NotificationBuilder:
 
         lines: list[str] = [header]
         lines.append(f"{get_text(lang, 'label_status')}: {status_text}")
+
+        payment_text = self._payment_label(lang, payment_method)
+        payment_status_text = self._payment_status_label(
+            lang,
+            payment_status,
+            payment_method,
+            payment_proof_photo_id=payment_proof_photo_id,
+        )
+        if role == "seller" and payment_text:
+            if payment_status_text:
+                lines.append(f"{payment_text} — <b>{payment_status_text}</b>")
+            else:
+                lines.append(payment_text)
+
         if role == "customer" and self.order_type == "pickup" and normalized_status == "ready":
             ready_hours = int(os.getenv("PICKUP_READY_EXPIRY_HOURS", "2"))
             lines.append(
@@ -175,8 +223,7 @@ class NotificationBuilder:
         if total_value:
             lines.append(f"{get_text(lang, 'label_total')}: <b>{total_value:,} {currency}</b>")
 
-        payment_text = self._payment_label(lang, payment_method)
-        if payment_text:
+        if payment_text and role != "seller":
             lines.append(payment_text)
 
         if reject_reason and status in ("rejected", "cancelled"):
@@ -200,6 +247,8 @@ class NotificationBuilder:
         total: int | None = None,
         currency: str = "UZS",
         payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
         order_ids: list[int] | None = None,
         is_cart: bool = False,
         customer_name: str | None = None,
@@ -227,6 +276,8 @@ class NotificationBuilder:
             total=total,
             currency=currency,
             payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
             customer_name=customer_name,
             customer_phone=customer_phone,
             comment=comment,
@@ -249,6 +300,8 @@ class NotificationBuilder:
         total: int | None = None,
         currency: str = "UZS",
         payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
         role: Literal["customer", "seller"] = "customer",
         customer_name: str | None = None,
         customer_phone: str | None = None,
@@ -272,6 +325,8 @@ class NotificationBuilder:
             total=total,
             currency=currency,
             payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
             customer_name=customer_name,
             customer_phone=customer_phone,
             comment=comment,

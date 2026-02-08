@@ -321,14 +321,16 @@ class NotificationTemplates:
         items: list[dict],
         order_type: str,
         delivery_address: str | None,
-        comment: str | None,
-        map_url: str | None,
         payment_method: str,
         customer_name: str,
         customer_phone: str,
         total: int,
         delivery_price: int,
         currency: str,
+        comment: str | None = None,
+        map_url: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
     ) -> str:
         "Build seller notification for new order."
         normalized_type = "delivery" if order_type == "taxi" else order_type
@@ -354,6 +356,8 @@ class NotificationTemplates:
             total=total,
             currency=currency,
             payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
             role="seller",
             customer_name=customer_name,
             customer_phone=customer_phone,
@@ -500,6 +504,9 @@ class NotificationTemplates:
         total: int = 0,
         delivery_price: int = 0,
         currency: str = "UZS",
+        payment_method: str | None = None,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
     ) -> str:
         """Build seller notification with a clean status layout."""
         normalized_type = "delivery" if order_type == "taxi" else order_type
@@ -516,6 +523,9 @@ class NotificationTemplates:
             customer_name=customer_name,
             customer_phone=customer_phone,
             role="seller",
+            payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
         )
 
 
@@ -1694,6 +1704,8 @@ class UnifiedOrderService:
         payment_method: str,
         customer_name: str,
         customer_phone: str,
+        payment_status: str | None = None,
+        payment_proof_photo_id: str | None = None,
         send_telegram: bool | None = None,
     ) -> None:
         """Send order notifications to sellers, grouped by store."""
@@ -1738,6 +1750,8 @@ class UnifiedOrderService:
                     comment=comment,
                     map_url=map_url,
                     payment_method=payment_method,
+                    payment_status=payment_status,
+                    payment_proof_photo_id=payment_proof_photo_id,
                     customer_name=customer_name,
                     customer_phone=customer_phone,
                     total=store_total,
@@ -2106,6 +2120,7 @@ class UnifiedOrderService:
                 delivery_lon=delivery_lon,
                 comment=comment,
                 payment_method=PaymentStatus.normalize_method(payment_method),
+                payment_status=PaymentStatus.CONFIRMED,
                 customer_name=customer_name,
                 customer_phone=customer_phone,
             )
@@ -3503,6 +3518,9 @@ class UnifiedOrderService:
                             total=total,
                             delivery_price=delivery_price,
                             currency=currency,
+                            payment_method=ctx.payment_method,
+                            payment_status=normalized_payment_status,
+                            payment_proof_photo_id=ctx.payment_proof_photo_id,
                         )
                         seller_photo = await self._resolve_seller_photo(items, offer_id)
 

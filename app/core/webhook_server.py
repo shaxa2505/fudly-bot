@@ -285,9 +285,18 @@ async def create_webhook_app(
 
     api_calculate_cart = build_cart_handlers(db)
 
-    api_create_order, api_user_orders, api_order_status, api_order_timeline, api_order_qr, api_upload_payment_proof = (
-        build_order_handlers(bot, db, _get_authenticated_user_id)
-    )
+    (
+        api_create_order,
+        api_user_orders,
+        api_user_orders_history,
+        api_user_bookings_history,
+        api_order_status,
+        api_order_timeline,
+        api_order_qr,
+        api_upload_payment_proof,
+        api_cancel_order,
+        api_calculate_delivery,
+    ) = build_order_handlers(bot, db, _get_authenticated_user_id)
 
     api_get_photo, api_get_payment_card = build_media_handlers(bot, db)
 
@@ -513,12 +522,20 @@ async def create_webhook_app(
             app.router.add_options("/api/v1/orders", cors_preflight)
             app.router.add_post("/api/v1/orders", api_create_order)
             app.router.add_get("/api/v1/orders", api_user_orders)
+            app.router.add_options("/api/v1/user/orders", cors_preflight)
+            app.router.add_get("/api/v1/user/orders", api_user_orders_history)
+            app.router.add_options("/api/v1/user/bookings", cors_preflight)
+            app.router.add_get("/api/v1/user/bookings", api_user_bookings_history)
+            app.router.add_options("/api/v1/orders/calculate-delivery", cors_preflight)
+            app.router.add_post("/api/v1/orders/calculate-delivery", api_calculate_delivery)
             app.router.add_options("/api/v1/orders/{order_id}/status", cors_preflight)
             app.router.add_get("/api/v1/orders/{order_id}/status", api_order_status)
             app.router.add_options("/api/v1/orders/{order_id}/timeline", cors_preflight)
             app.router.add_get("/api/v1/orders/{order_id}/timeline", api_order_timeline)
             app.router.add_options("/api/v1/orders/{order_id}/qr", cors_preflight)
             app.router.add_get("/api/v1/orders/{order_id}/qr", api_order_qr)
+            app.router.add_options("/api/v1/orders/{order_id}/cancel", cors_preflight)
+            app.router.add_post("/api/v1/orders/{order_id}/cancel", api_cancel_order)
             app.router.add_options("/api/v1/orders/{order_id}/payment-proof", cors_preflight)
             app.router.add_post("/api/v1/orders/{order_id}/payment-proof", api_upload_payment_proof)
             app.router.add_options("/api/v1/stores/{store_id}/reviews", cors_preflight)

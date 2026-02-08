@@ -266,6 +266,9 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             customer_phone = customer.phone
 
     currency = get_text(lang, "currency")
+    payment_method = _get_entity_field(entity, "payment_method")
+    payment_status = _get_entity_field(entity, "payment_status")
+    payment_proof_photo_id = _get_entity_field(entity, "payment_proof_photo_id")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -279,6 +282,9 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         total=total,
         delivery_price=delivery_price,
         currency=currency,
+        payment_method=payment_method,
+        payment_status=payment_status,
+        payment_proof_photo_id=payment_proof_photo_id,
     )
 
     # Add a short next-step hint so sellers clearly understand
@@ -525,6 +531,9 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
             customer_phone = customer.phone
 
     currency = get_text(lang, "currency")
+    payment_method = _get_entity_field(order, "payment_method")
+    payment_status = _get_entity_field(order, "payment_status")
+    payment_proof_photo_id = _get_entity_field(order, "payment_proof_photo_id")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -538,6 +547,9 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         total=total,
         delivery_price=delivery_price,
         currency=currency,
+        payment_method=payment_method,
+        payment_status=payment_status,
+        payment_proof_photo_id=payment_proof_photo_id,
     )
 
     kb = InlineKeyboardBuilder()
@@ -817,6 +829,9 @@ async def _process_delivery_handover(
             customer_phone_info = customer.phone
 
     currency = get_text(lang, "currency")
+    payment_method = _get_entity_field(order, "payment_method")
+    payment_status = _get_entity_field(order, "payment_status")
+    payment_proof_photo_id = _get_entity_field(order, "payment_proof_photo_id")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -830,6 +845,9 @@ async def _process_delivery_handover(
         total=total,
         delivery_price=delivery_price,
         currency=currency,
+        payment_method=payment_method,
+        payment_status=payment_status,
+        payment_proof_photo_id=payment_proof_photo_id,
     )
 
     if courier_phone:
@@ -1027,6 +1045,9 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             customer_phone = customer.phone
 
     currency = get_text(lang, "currency")
+    payment_method = _get_entity_field(entity, "payment_method")
+    payment_status = _get_entity_field(entity, "payment_status")
+    payment_proof_photo_id = _get_entity_field(entity, "payment_proof_photo_id")
 
     seller_text = NotificationTemplates.seller_status_update(
         lang=lang,
@@ -1040,6 +1061,9 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
         total=total,
         delivery_price=delivery_price,
         currency=currency,
+        payment_method=payment_method,
+        payment_status=payment_status,
+        payment_proof_photo_id=payment_proof_photo_id,
     )
 
     try:

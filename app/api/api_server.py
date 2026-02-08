@@ -16,8 +16,10 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
@@ -172,6 +174,21 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
         redoc_url="/api/redoc" if is_dev else None,
         openapi_url="/api/openapi.json" if is_dev else None,
     )
+
+    def _error_payload(detail: object) -> dict[str, object]:
+        if isinstance(detail, str):
+            return {"detail": detail, "error": detail}
+        return {"detail": detail, "error": "Validation error"}
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(_request: Request, exc: HTTPException):  # type: ignore[override]
+        return JSONResponse(status_code=exc.status_code, content=_error_payload(exc.detail))
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        _request: Request, exc: RequestValidationError
+    ):  # type: ignore[override]
+        return JSONResponse(status_code=422, content=_error_payload(exc.errors()))
 
     # Lightweight profiling middleware (disabled by default)
     if _is_truthy(os.getenv("API_PROFILE", "0")):

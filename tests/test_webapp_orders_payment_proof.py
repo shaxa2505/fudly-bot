@@ -40,7 +40,7 @@ async def test_webapp_order_rejects_delivery_card(aiohttp_client, app, mocker):
     resp = await client.post("/api/v1/orders", data=json.dumps(payload))
     assert resp.status == 400
     data = await resp.json()
-    assert "Unsupported payment method" in data.get("error", "")
+    assert "Unsupported payment method" in data.get("detail", "")
 
 
 @pytest.mark.asyncio
@@ -90,4 +90,4 @@ async def test_webapp_order_rejects_card_with_proof(aiohttp_client, app, mocker)
     resp = await client.post("/api/v1/orders", data=json.dumps(payload))
     assert resp.status == 400
     data = await resp.json()
-    assert "Unsupported payment method" in data.get("error", "")
+    assert "Unsupported payment method" in data.get("detail", "")
