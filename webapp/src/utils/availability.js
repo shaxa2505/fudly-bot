@@ -28,7 +28,7 @@ const extractRangeFromText = (text) => {
   return { start: match[1], end: match[2] }
 }
 
-const getTashkentNowMinutes = () => {
+export const getTashkentNowMinutes = () => {
   try {
     const parts = new Intl.DateTimeFormat('en-GB', {
       timeZone: TIMEZONE,

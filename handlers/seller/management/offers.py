@@ -1189,9 +1189,11 @@ async def edit_expiry_custom(callback: types.CallbackQuery, state: FSMContext) -
     await state.set_state(EditOffer.value)
 
     await callback.message.answer(
-        "Введите дату (ДД.ММ) или 0/без срока"
-        if lang == "ru"
-        else "Sana kiriting (KK.OO) yoki 0/muddatsiz",
+        (
+            "Введите дату (ДД.ММ или ДД.ММ.ГГГГ) или 0/без срока"
+            if lang == "ru"
+            else "Sana kiriting (KK.OO yoki KK.OO.YYYY) yoki 0/muddatsiz"
+        ),
         parse_mode="HTML",
     )
     await callback.answer()
@@ -1413,9 +1415,11 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
             expiry_value = _parse_expiry_input_text(message.text or "")
         except ValueError:
             await message.answer(
-                "Формат: ДД.ММ (например 25.12)"
-                if lang == "ru"
-                else "Format: KK.OO (masalan 25.12)"
+                (
+                    "Формат: ДД.ММ или ДД.ММ.ГГГГ (например 25.12 или 25.12.2027)"
+                    if lang == "ru"
+                    else "Format: KK.OO yoki KK.OO.YYYY (masalan 25.12 yoki 25.12.2027)"
+                )
             )
             return
         db.update_offer_expiry(offer_id, expiry_value)

@@ -12,12 +12,52 @@ import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
 import { getCurrentLocation } from '../utils/geolocation'
 import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../utils/pendingPayment'
-import { getOfferAvailability } from '../utils/availability'
+import { getOfferAvailability, getTashkentNowMinutes } from '../utils/availability'
 import BottomNav from '../components/BottomNav'
 import './CartPage.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
 const DEFAULT_MAP_CENTER = { lat: 41.2995, lon: 69.2401 }
+const DEFAULT_WORKING_HOURS = '08:00 - 23:00'
+const DELIVERY_SLOT_STEP = 30
+const DELIVERY_SLOT_DURATION = 30
+const FAST_DELIVERY_BUFFER = 35
+
+const parseTimeToMinutes = (value) => {
+  if (!value) return null
+  const match = String(value).match(/(\d{1,2}):(\d{2})/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
+  return hours * 60 + minutes
+}
+
+const extractRangeFromText = (text) => {
+  if (!text) return null
+  const match = String(text).match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/)
+  if (!match) return null
+  return { start: match[1], end: match[2] }
+}
+
+const formatMinutesLabel = (value) => {
+  const total = ((value % 1440) + 1440) % 1440
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+const isSlotWithinWindow = (start, duration, windowStart, windowEnd) => {
+  if (windowStart == null || windowEnd == null) return true
+  const slotEnd = start + duration
+  if (windowStart <= windowEnd) {
+    return start >= windowStart && slotEnd <= windowEnd
+  }
+  if (start >= windowStart) {
+    return slotEnd <= 1440
+  }
+  return slotEnd <= windowEnd
+}
 
 const normalizeAddressLabel = (value) => {
   if (!value) return ''
@@ -90,6 +130,7 @@ function CartPage({ user }) {
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
   const [storeCity, setStoreCity] = useState('')
+  const [storeWorkingHours, setStoreWorkingHours] = useState('')
   const [storeInfoLoading, setStoreInfoLoading] = useState(false)
 
   // Payment step for delivery
@@ -625,39 +666,48 @@ function CartPage({ user }) {
   useEffect(() => {
     let isActive = true
     const checkDeliveryAvailability = async () => {
-      if (!cartStoreId) {
-        setStoreDeliveryEnabled(false)
-        setDeliveryFee(0)
-        setMinOrderAmount(0)
-        setStoreCity('')
-        setStoreInfoLoading(false)
-        return
-      }
+        if (!cartStoreId) {
+          setStoreDeliveryEnabled(false)
+          setDeliveryFee(0)
+          setMinOrderAmount(0)
+          setStoreCity('')
+          setStoreWorkingHours('')
+          setStoreInfoLoading(false)
+          return
+        }
 
       setStoreInfoLoading(true)
       try {
         const cartStore = await api.getStore(cartStoreId)
 
-        if (cartStore && isActive) {
-          setStoreDeliveryEnabled(!!cartStore.delivery_enabled)
-          setDeliveryFee(cartStore.delivery_price || 0)
-          setMinOrderAmount(cartStore.min_order_amount || 0)
-          setStoreCity(
-            cartStore.city ||
-            cartStore.store_city ||
-            cartStore.region ||
-            cartStore.city_name ||
-            ''
-          )
-        }
-      } catch (e) {
-        console.warn('Could not fetch store info:', e)
-        if (isActive) {
-          setStoreDeliveryEnabled(false)
-          setDeliveryFee(0)
-          setMinOrderAmount(0)
-          setStoreCity('')
-        }
+          if (cartStore && isActive) {
+            setStoreDeliveryEnabled(!!cartStore.delivery_enabled)
+            setDeliveryFee(cartStore.delivery_price || 0)
+            setMinOrderAmount(cartStore.min_order_amount || 0)
+            setStoreCity(
+              cartStore.city ||
+              cartStore.store_city ||
+              cartStore.region ||
+              cartStore.city_name ||
+              ''
+            )
+            const hoursRaw =
+              cartStore.working_hours ||
+              cartStore.work_time ||
+              (cartStore.open_time && cartStore.close_time
+                ? `${cartStore.open_time} - ${cartStore.close_time}`
+                : '')
+            setStoreWorkingHours(hoursRaw || '')
+          }
+        } catch (e) {
+          console.warn('Could not fetch store info:', e)
+          if (isActive) {
+            setStoreDeliveryEnabled(false)
+            setDeliveryFee(0)
+            setMinOrderAmount(0)
+            setStoreCity('')
+            setStoreWorkingHours('')
+          }
       } finally {
         if (isActive) {
           setStoreInfoLoading(false)
@@ -742,22 +792,75 @@ function CartPage({ user }) {
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
   const originalTotal = calcTotalPrice(subtotal, savingsTotal)
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
-    const now = new Date()
-    const nowMinutes = now.getHours() * 60 + now.getMinutes()
-    const deliveryOptions = [
-      { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },
-      {
-        id: 'slot-1',
-        label: nowMinutes > (18 * 60 + 30) ? 'Ertaga' : 'Bugun',
-        time: '18:00 - 18:30',
-      },
-      {
-        id: 'slot-2',
-        label: nowMinutes > (19 * 60 + 30) ? 'Ertaga' : 'Bugun',
-        time: '19:00 - 19:30',
-      },
-    ]
-  const deliverySlotLabel = deliveryOptions.find(option => option.id === deliverySlot)?.time || ''
+    const deliveryOptions = useMemo(() => {
+      const hoursRaw = storeWorkingHours || DEFAULT_WORKING_HOURS
+      const range = extractRangeFromText(hoursRaw)
+      const startMinutes = parseTimeToMinutes(range?.start || hoursRaw)
+      const endMinutes = parseTimeToMinutes(range?.end || hoursRaw)
+      const nowMinutes = getTashkentNowMinutes()
+
+      if (startMinutes == null || endMinutes == null) {
+        return [
+          { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },
+          { id: 'slot-1', label: 'Bugun', time: '18:00 - 18:30' },
+          { id: 'slot-2', label: 'Bugun', time: '19:00 - 19:30' },
+        ]
+      }
+
+      const options = []
+      const canFast = isSlotWithinWindow(
+        nowMinutes,
+        FAST_DELIVERY_BUFFER,
+        startMinutes,
+        endMinutes
+      )
+      options.push({
+        id: 'fast',
+        label: 'Tezda',
+        time: '25-35 daqiqa',
+        disabled: !canFast,
+      })
+
+      const buildSlotsForDay = (dayOffset, startAtMinutes) => {
+        const label = dayOffset === 0 ? 'Bugun' : 'Ertaga'
+        const slots = []
+        for (
+          let start = startAtMinutes;
+          start <= 1440 - DELIVERY_SLOT_DURATION;
+          start += DELIVERY_SLOT_STEP
+        ) {
+          if (!isSlotWithinWindow(start, DELIVERY_SLOT_DURATION, startMinutes, endMinutes)) {
+            continue
+          }
+          slots.push({
+            id: `slot-${dayOffset}-${start}`,
+            label,
+            time: `${formatMinutesLabel(start)} - ${formatMinutesLabel(start + DELIVERY_SLOT_DURATION)}`,
+          })
+          if (slots.length >= 2) break
+        }
+        return slots
+      }
+
+      const baseStart = Math.ceil(nowMinutes / DELIVERY_SLOT_STEP) * DELIVERY_SLOT_STEP
+      const slots = baseStart < 1440 ? buildSlotsForDay(0, baseStart) : []
+      if (slots.length < 2) {
+        slots.push(...buildSlotsForDay(1, 0))
+      }
+
+      return options.concat(slots)
+    }, [storeWorkingHours])
+    const deliverySlotLabel = useMemo(() => {
+      const option = deliveryOptions.find(item => item.id === deliverySlot)
+      if (!option) return ''
+      if (option.id === 'fast') {
+        return option.time || option.label || ''
+      }
+      if (option.label && option.time) {
+        return `${option.label} ${option.time}`
+      }
+      return option.time || option.label || ''
+    }, [deliveryOptions, deliverySlot])
   const autoOrderType = useMemo(() => {
     if (storeInfoLoading) return orderType
     if (!storeDeliveryEnabled) return 'pickup'
@@ -911,6 +1014,16 @@ function CartPage({ user }) {
       setOrderType(autoOrderType)
     }
   }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled, storeInfoLoading])
+
+  useEffect(() => {
+    if (!deliveryOptions.length) return
+    const current = deliveryOptions.find(option => option.id === deliverySlot && !option.disabled)
+    if (current) return
+    const next = deliveryOptions.find(option => !option.disabled) || deliveryOptions[0]
+    if (next && next.id !== deliverySlot) {
+      setDeliverySlot(next.id)
+    }
+  }, [deliveryOptions, deliverySlot])
 
   useEffect(() => {
     if (orderType !== 'delivery' && showMapEditor) {
@@ -2474,17 +2587,21 @@ function CartPage({ user }) {
                     <section className="checkout-block">
                       <h3>Yetkazib berish vaqti</h3>
                       <div className="checkout-time-scroll">
-                        {deliveryOptions.map(option => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            className={`checkout-time-card ${deliverySlot === option.id ? 'active' : ''}`}
-                            onClick={() => setDeliverySlot(option.id)}
-                          >
-                            <span className="checkout-time-label">{option.label}</span>
-                            <span className="checkout-time-value">{option.time}</span>
-                          </button>
-                        ))}
+                          {deliveryOptions.map(option => (
+                            <button
+                              key={option.id}
+                              type="button"
+                              className={`checkout-time-card ${deliverySlot === option.id ? 'active' : ''}`}
+                              onClick={() => {
+                                if (option.disabled) return
+                                setDeliverySlot(option.id)
+                              }}
+                              disabled={option.disabled}
+                            >
+                              <span className="checkout-time-label">{option.label}</span>
+                              <span className="checkout-time-value">{option.time}</span>
+                            </button>
+                          ))}
                       </div>
                     </section>
                   )}

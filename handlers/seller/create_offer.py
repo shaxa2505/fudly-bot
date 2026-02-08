@@ -1573,9 +1573,17 @@ async def expiry_selected(callback: types.CallbackQuery, state: FSMContext) -> N
             callback,
             state,
             "<b>"
-            + ("⏳ Дата (ДД.ММ)" if lang == "ru" else "⏳ Sana (KK.OO)")
+            + (
+                "⏳ Дата (ДД.ММ или ДД.ММ.ГГГГ)"
+                if lang == "ru"
+                else "⏳ Sana (KK.OO yoki KK.OO.YYYY)"
+            )
             + "</b>\n"
-            + ("Введите дату. Пример: 25.12" if lang == "ru" else "Sana kiriting. Misol: 25.12"),
+            + (
+                "Введите дату. Пример: 25.12 или 25.12.2027"
+                if lang == "ru"
+                else "Sana kiriting. Misol: 25.12 yoki 25.12.2027"
+            ),
             reply_markup=builder.as_markup(),
             parse_mode="HTML",
         )
@@ -1612,9 +1620,11 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
         await _upsert_prompt(
             message,
             state,
-            "⚠️ Формат: ДД.ММ (например 25.12)"
-            if lang == "ru"
-            else "⚠️ Format: KK.OO (masalan 25.12)",
+            (
+                "⚠️ Формат: ДД.ММ или ДД.ММ.ГГГГ (например 25.12 или 25.12.2027)"
+                if lang == "ru"
+                else "⚠️ Format: KK.OO yoki KK.OO.YYYY (masalan 25.12 yoki 25.12.2027)"
+            ),
         )
         await safe_delete_message(message)
         return

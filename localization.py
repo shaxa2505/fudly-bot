@@ -401,7 +401,7 @@ TEXTS = {
         "discount_price": "💸 Введите цену со скидкой (в сумах):",
         "quantity": "📦 Введите количество порций:",
         "time_from": "🕐 Введите время начала (например: 18:00):",
-        "expiry_date": "📅 Введите срок годности (например: 31.12.2025):",
+        "expiry_date": "📅 Введите срок годности (например: 31.12.2027):",
         "time_until": "🕐 Введите время окончания забора (например: 21:00):",
         "offer_created": """✅ <b>Предложение создано!</b>
 
@@ -1206,7 +1206,7 @@ Tuzatilgan ma'lumotlar bilan yangi ariza topshirishingiz mumkin.""",
         "discount_price": "💸 Chegirmali narxni kiriting (so'mda):",
         "quantity": "📦 Portsialar sonini kiriting:",
         "time_from": "🕐 Boshlanish vaqtini kiriting (masalan: 18:00):",
-        "expiry_date": "📅 Yaroqlilik muddatini kiriting (masalan: 31.12.2025):",
+        "expiry_date": "📅 Yaroqlilik muddatini kiriting (masalan: 31.12.2027):",
         "time_until": "🕐 Olib ketish tugash vaqtini kiriting (masalan: 21:00):",
         "offer_created": """✅ <b>Taklif yaratildi!</b>
 
