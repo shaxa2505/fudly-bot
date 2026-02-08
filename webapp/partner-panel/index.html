@@ -2337,7 +2337,10 @@ function renderProducts() {
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
+let lastProductFilterAction = 'filters';
+
 function searchProducts(query) {
+    lastProductFilterAction = 'search';
     const needle = String(query || '').trim().toLowerCase();
     const cards = document.querySelectorAll('.product-card');
     cards.forEach(card => {
@@ -2358,6 +2361,7 @@ function searchProducts(query) {
         // Filter products by category, status, discount
 
 function filterProducts() {
+    lastProductFilterAction = 'filters';
     const categoryFilter = document.getElementById('categoryFilter')?.value || '';
     const statusFilter = document.getElementById('statusFilter')?.value || '';
     const discountFilter = document.getElementById('discountFilter')?.value || '';
@@ -2760,12 +2764,29 @@ async function toggleProductAvailability(id) {
         // ============================================
         // STATS
         // ============================================
-        async function loadStats() {
+        async function loadStats(options = {}) {
+            const { refresh = false } = options;
             showLoading('stats');
 
             try {
+                if (
+                    refresh ||
+                    !Array.isArray(state.orders) ||
+                    !Array.isArray(state.products) ||
+                    (state.orders.length === 0 && state.products.length === 0)
+                ) {
+                    const [orders, products] = await Promise.all([
+                        apiFetch('/api/partner/orders'),
+                        apiFetch('/api/partner/products')
+                    ]);
+                    state.orders = normalizeOrders(orders);
+                    state.products = normalizeProducts(products);
+                    syncAllProducts(state.products);
+                    updateNotificationBadge();
+                }
+
                 // Get stats data
-                const stats = await calculateStats();
+                const stats = calculateStats();
                 renderStats(stats);
             } catch (error) {
                 document.querySelector('.content').innerHTML = `
@@ -4344,21 +4365,94 @@ async function toggleProductAvailability(id) {
             }
         }
 
+        const AUTO_REFRESH_INTERVAL_MS = 30000;
+        let autoRefreshInFlight = false;
+
+        function canAutoRefresh() {
+            if (document.visibilityState !== 'visible') return false;
+            if (document.querySelector('.modal-overlay')) return false;
+            const active = document.activeElement;
+            if (!active) return true;
+            if (active.matches?.('input, textarea, select')) return false;
+            if (active.isContentEditable) return false;
+            return true;
+        }
+
+        function captureProductFilters() {
+            const searchInput = document.getElementById('productSearch');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const discountFilter = document.getElementById('discountFilter');
+
+            return {
+                search: searchInput ? searchInput.value : '',
+                category: categoryFilter ? categoryFilter.value : '',
+                status: statusFilter ? statusFilter.value : '',
+                discount: discountFilter ? discountFilter.value : '',
+                lastAction: lastProductFilterAction || 'filters'
+            };
+        }
+
+        function restoreProductFilters(snapshot) {
+            if (!snapshot) return;
+            const searchInput = document.getElementById('productSearch');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const discountFilter = document.getElementById('discountFilter');
+
+            if (searchInput) searchInput.value = snapshot.search || '';
+            if (categoryFilter) categoryFilter.value = snapshot.category || '';
+            if (statusFilter) statusFilter.value = snapshot.status || '';
+            if (discountFilter) discountFilter.value = snapshot.discount || '';
+
+            const action = snapshot.lastAction || lastProductFilterAction || 'filters';
+            if (action === 'search') {
+                searchProducts(snapshot.search || '');
+            } else {
+                filterProducts();
+            }
+        }
+
+        function runAutoRefresh() {
+            if (autoRefreshInFlight || !canAutoRefresh()) return;
+
+            autoRefreshInFlight = true;
+            const finalize = () => {
+                autoRefreshInFlight = false;
+            };
+            const run = (promise) => Promise.resolve(promise).finally(finalize);
+
+            switch (state.currentView) {
+                case 'orders':
+                    console.log('🔄 Auto-refreshing orders...');
+                    return run(loadOrders());
+                case 'dashboard':
+                    console.log('🔄 Auto-refreshing dashboard...');
+                    return run(loadDashboard());
+                case 'products': {
+                    console.log('🔄 Auto-refreshing products...');
+                    const snapshot = captureProductFilters();
+                    return Promise.resolve(loadProducts())
+                        .then(() => restoreProductFilters(snapshot))
+                        .finally(finalize);
+                }
+                case 'stats':
+                    console.log('🔄 Auto-refreshing stats...');
+                    return run(loadStats({ refresh: true }));
+                default:
+                    finalize();
+            }
+        }
+
         function startAutoRefresh() {
             // Clear existing interval
             if (autoRefreshInterval) {
                 clearInterval(autoRefreshInterval);
             }
 
-            // Auto-refresh orders every 30 seconds
-            autoRefreshInterval = setInterval(() => {
-                if (state.currentView === 'orders') {
-                    console.log('🔄 Auto-refreshing orders...');
-                    loadOrders();
-                }
-            }, 30000); // 30 seconds
+            autoRefreshInterval = setInterval(runAutoRefresh, AUTO_REFRESH_INTERVAL_MS);
 
-            console.log('✅ Auto-refresh started (30s interval)');
+            console.log(`✅ Auto-refresh started (${AUTO_REFRESH_INTERVAL_MS / 1000}s interval)`);
         }
 
         function stopAutoRefresh() {

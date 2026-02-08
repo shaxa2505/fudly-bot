@@ -383,7 +383,11 @@
   background: var(--color-bg-primary);
   border-radius: var(--radius-lg);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   z-index: var(--z-dropdown, 100);
 }
 

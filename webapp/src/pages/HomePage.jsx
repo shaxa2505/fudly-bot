@@ -15,7 +15,7 @@ import LocationPickerModal from '../components/LocationPickerModal'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import { blurOnEnter, formatPrice } from '../utils/helpers'
-import { resolveOfferImageUrl, resolveStoreImageUrl, PLACEHOLDER_IMAGE } from '../utils/imageUtils'
+import { resolveOfferImageUrl, PLACEHOLDER_IMAGE } from '../utils/imageUtils'
 import './HomePage.css'
 
 const CATEGORIES = [
@@ -110,8 +110,6 @@ function HomePage() {
   const [searchHistory, setSearchHistory] = useState([])
   const [showSearchHistory, setShowSearchHistory] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
-  const [searchSuggestions, setSearchSuggestions] = useState([])
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const [searchResults, setSearchResults] = useState({ offers: [], stores: [] })
   const [searchResultsLoading, setSearchResultsLoading] = useState(false)
   const searchInputRef = useRef(null)
@@ -208,17 +206,13 @@ function HomePage() {
   const showLiveDropdown = showSearchHistory && trimmedSearch.length >= 2
   const showSuggestionsDropdown = showLiveDropdown
   const hasOfferResults = (searchResults?.offers || []).length > 0
-  const hasStoreResults = (searchResults?.stores || []).length > 0
   const showSearchDropdown = showHistoryDropdown || showLiveDropdown
   const showResultsSection = showLiveDropdown && (
-    searchResultsLoading || hasOfferResults || hasStoreResults
+    searchResultsLoading || hasOfferResults
   )
   const showResultsEmpty = showLiveDropdown &&
     !searchResultsLoading &&
-    !hasOfferResults &&
-    !hasStoreResults &&
-    !suggestionsLoading &&
-    searchSuggestions.length === 0
+    !hasOfferResults
   const locationCacheKey = buildLocationCacheKey(location)
   const prevLocationKeyRef = useRef(null)
 
@@ -694,7 +688,6 @@ function HomePage() {
     }
     searchInputRef.current?.blur()
     setShowSearchHistory(false)
-    setSearchSuggestions([])
     setSearchResults({ offers: [], stores: [] })
     setSearchResultsLoading(false)
 
@@ -732,23 +725,12 @@ function HomePage() {
     const offerId = offer?.id || offer?.offer_id
     searchInputRef.current?.blur()
     setShowSearchHistory(false)
-    setSearchSuggestions([])
     setSearchResults({ offers: [], stores: [] })
     if (offerId) {
       navigate(`/product?offer_id=${offerId}`, { state: { offer } })
     } else {
       navigate('/product', { state: { offer } })
     }
-  }
-
-  const handleSearchStoreClick = (store) => {
-    const storeId = store?.id || store?.store_id
-    if (!storeId) return
-    searchInputRef.current?.blur()
-    setShowSearchHistory(false)
-    setSearchSuggestions([])
-    setSearchResults({ offers: [], stores: [] })
-    navigate('/stores', { state: { openStore: { ...store, id: storeId } } })
   }
 
   // Clear search history
@@ -777,42 +759,6 @@ function HomePage() {
     }, 200)
   }
 
-  useEffect(() => {
-    const trimmed = searchQuery.trim()
-    if (!searchFocused || trimmed.length < 2) {
-      setSearchSuggestions([])
-      setSuggestionsLoading(false)
-      return
-    }
-
-    let isActive = true
-    const timer = setTimeout(async () => {
-      setSuggestionsLoading(true)
-      try {
-        const suggestions = await api.getSearchSuggestions(trimmed, 5, {
-          city: cityForApi || undefined,
-          region: location.region || undefined,
-          district: location.district || undefined,
-        })
-        if (isActive) {
-          setSearchSuggestions((suggestions || []).filter(Boolean))
-        }
-      } catch (error) {
-        if (isActive) {
-          setSearchSuggestions([])
-        }
-      } finally {
-        if (isActive) {
-          setSuggestionsLoading(false)
-        }
-      }
-    }, 250)
-
-    return () => {
-      isActive = false
-      clearTimeout(timer)
-    }
-  }, [searchQuery, searchFocused, cityForApi, location.region, location.district])
 
   useEffect(() => {
     const trimmed = searchQuery.trim()
@@ -1155,23 +1101,6 @@ function HomePage() {
                 )}
                 {showSuggestionsDropdown && (
                   <>
-                    {suggestionsLoading && (
-                      <div className="search-suggestions-loading">Yuklanmoqda...</div>
-                    )}
-                    {searchSuggestions.map((query, index) => (
-                      <button
-                        key={`${query}-${index}`}
-                        className="search-history-item"
-                        onMouseDown={() => handleSearchSubmit(query)}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                          <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                        <span>{query}</span>
-                      </button>
-                    ))}
-
                     {showResultsSection && (
                       <div className="search-results-section">
                         {searchResultsLoading && (
@@ -1179,106 +1108,53 @@ function HomePage() {
                         )}
 
                         {hasOfferResults && (
-                          <div className="search-results-group">
-                            <div className="search-results-title">Mahsulotlar</div>
-                            <div className="search-results-list">
-                              {searchResults.offers.map((offer, index) => {
-                                const offerId = offer?.id || offer?.offer_id
-                                const offerTitle = offer?.title || 'Mahsulot'
-                                const storeLabel = offer?.store_name || offer?.storeName || ''
-                                const discountPrice = Number(offer?.discount_price || offer?.discountPrice || 0)
-                                const originalPrice = Number(offer?.original_price || offer?.originalPrice || 0)
-                                const showOriginal = originalPrice > discountPrice && discountPrice > 0
-                                const priceLabel = discountPrice > 0 ? formatPrice(discountPrice) : ''
-                                const originalLabel = showOriginal ? formatPrice(originalPrice) : ''
-                                const offerImage = resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE
+                          <div className="search-results-list">
+                            {searchResults.offers.map((offer, index) => {
+                              const offerId = offer?.id || offer?.offer_id
+                              const offerTitle = offer?.title || 'Mahsulot'
+                              const storeLabel = offer?.store_name || offer?.storeName || ''
+                              const discountPrice = Number(offer?.discount_price || offer?.discountPrice || 0)
+                              const originalPrice = Number(offer?.original_price || offer?.originalPrice || 0)
+                              const showOriginal = originalPrice > discountPrice && discountPrice > 0
+                              const priceLabel = discountPrice > 0 ? formatPrice(discountPrice) : ''
+                              const originalLabel = showOriginal ? formatPrice(originalPrice) : ''
+                              const offerImage = resolveOfferImageUrl(offer) || PLACEHOLDER_IMAGE
 
-                                return (
-                                  <button
-                                    key={offerId ? `offer-${offerId}` : `offer-${index}`}
-                                    type="button"
-                                    className="search-result-item"
-                                    onMouseDown={() => handleSearchOfferClick(offer)}
-                                  >
-                                    <span className="search-result-image">
-                                      <img
-                                        src={offerImage}
-                                        alt={offerTitle}
-                                        loading="lazy"
-                                        decoding="async"
-                                        onError={(event) => {
-                                          event.currentTarget.src = PLACEHOLDER_IMAGE
-                                        }}
-                                      />
-                                    </span>
-                                    <span className="search-result-info">
-                                      <span className="search-result-title">{offerTitle}</span>
-                                      {storeLabel && (
-                                        <span className="search-result-subtitle">{storeLabel}</span>
-                                      )}
-                                    </span>
-                                    <span className="search-result-price">
-                                      {priceLabel && (
-                                        <span className="search-result-price-current">{priceLabel}</span>
-                                      )}
-                                      {originalLabel && (
-                                        <span className="search-result-price-old">{originalLabel}</span>
-                                      )}
-                                    </span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {hasStoreResults && (
-                          <div className="search-results-group">
-                            <div className="search-results-title">Do'konlar</div>
-                            <div className="search-results-list">
-                              {searchResults.stores.map((store, index) => {
-                                const storeId = store?.id || store?.store_id
-                                const storeName = store?.name || "Do'kon"
-                                const storeImage = resolveStoreImageUrl(store)
-                                const storeInitial = storeName?.trim()?.charAt(0)?.toUpperCase() || 'D'
-                                const storeSubtitle = store?.address || store?.category || ''
-                                const ratingValue = Number(store?.rating || 0)
-
-                                return (
-                                  <button
-                                    key={storeId ? `store-${storeId}` : `store-${index}`}
-                                    type="button"
-                                    className="search-result-item"
-                                    onMouseDown={() => handleSearchStoreClick(store)}
-                                  >
-                                    <span className="search-result-avatar">
-                                      {storeImage ? (
-                                        <img
-                                          src={storeImage}
-                                          alt={storeName}
-                                          loading="lazy"
-                                          decoding="async"
-                                          onError={(event) => {
-                                            event.currentTarget.src = PLACEHOLDER_IMAGE
-                                          }}
-                                        />
-                                      ) : (
-                                        <span className="search-result-initial">{storeInitial}</span>
-                                      )}
-                                    </span>
-                                    <span className="search-result-info">
-                                      <span className="search-result-title">{storeName}</span>
-                                      {storeSubtitle && (
-                                        <span className="search-result-subtitle">{storeSubtitle}</span>
-                                      )}
-                                    </span>
-                                    {ratingValue > 0 && (
-                                      <span className="search-result-rating">* {ratingValue.toFixed(1)}</span>
+                              return (
+                                <button
+                                  key={offerId ? `offer-${offerId}` : `offer-${index}`}
+                                  type="button"
+                                  className="search-result-item"
+                                  onMouseDown={() => handleSearchOfferClick(offer)}
+                                >
+                                  <span className="search-result-image">
+                                    <img
+                                      src={offerImage}
+                                      alt={offerTitle}
+                                      loading="lazy"
+                                      decoding="async"
+                                      onError={(event) => {
+                                        event.currentTarget.src = PLACEHOLDER_IMAGE
+                                      }}
+                                    />
+                                  </span>
+                                  <span className="search-result-info">
+                                    <span className="search-result-title">{offerTitle}</span>
+                                    {storeLabel && (
+                                      <span className="search-result-subtitle">{storeLabel}</span>
                                     )}
-                                  </button>
-                                )
-                              })}
-                            </div>
+                                  </span>
+                                  <span className="search-result-price">
+                                    {priceLabel && (
+                                      <span className="search-result-price-current">{priceLabel}</span>
+                                    )}
+                                    {originalLabel && (
+                                      <span className="search-result-price-old">{originalLabel}</span>
+                                    )}
+                                  </span>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
                       </div>

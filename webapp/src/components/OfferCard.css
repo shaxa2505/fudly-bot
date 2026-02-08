@@ -205,6 +205,16 @@
   .offer-tag--closed {
     background: rgba(15, 23, 42, 0.85);
   }
+
+  .offer-tag--alert {
+    background: #F43F5E;
+    color: #FFFFFF;
+  }
+
+  .offer-tag--discount {
+    background: #EF4444;
+    color: #FFFFFF;
+  }
 }
 
 .offer-stock-overlay {
