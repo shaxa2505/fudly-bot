@@ -373,10 +373,7 @@ async def create_order(
                         item_total = calc_items_total(
                             [{"price": item_obj.price, "quantity": item_obj.quantity}]
                         )
-                        total = calc_total_price(
-                            item_total,
-                            delivery_price if idx == 0 else 0,
-                        )
+                        total = item_total
                         created_items.append(
                             {
                                 "id": oid,

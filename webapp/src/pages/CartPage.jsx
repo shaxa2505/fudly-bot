@@ -757,12 +757,9 @@ function CartPage({ user }) {
 
   // Calculate totals using context values
   const subtotal = cartTotal
-  const total = calcTotalPrice(
-    subtotal,
-    orderType === 'delivery' ? deliveryFee : 0
-  )
   const serviceFee = 0
-  const checkoutTotal = calcTotalPrice(total, serviceFee)
+  const total = calcTotalPrice(subtotal, serviceFee)
+  const checkoutTotal = total
   const itemsCount = cartCount
   const unavailableCartItems = useMemo(() => {
     return cartItems.filter((item) => {
@@ -2701,6 +2698,11 @@ function CartPage({ user }) {
                           <span>Yetkazib berish</span>
                           <span>{formatSum(deliveryFee)} so'm</span>
                         </div>
+                      )}
+                      {orderType === 'delivery' && (
+                        <p className="checkout-hint neutral">
+                          Yetkazib berish narxi taksiga yetkazilganda to'lanadi. Ilovadagi to'lov faqat mahsulotlar uchun.
+                        </p>
                       )}
                       <div className="checkout-summary-row">
                         <span>Xizmat haqi</span>

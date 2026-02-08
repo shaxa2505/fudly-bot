@@ -16,7 +16,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 logger = logging.getLogger(__name__)
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from handlers.common.utils import html_escape
 
 router = Router(name="admin_legacy")
 
@@ -45,215 +47,480 @@ def setup(bot, db, get_text, moderation_keyboard, get_uzb_time, admin_id, databa
 # ============== СТАТИСТИКА С CSV ==============
 
 
-@router.message(F.text == "📈 Аналитика")
+
+@router.message(F.text == "?? ?????????")
 async def admin_analytics(message: types.Message):
     """
-    Расширенная статистика с экспортом в CSV
+    ??????????? ?????????? ? ????????? ? CSV
 
-    ВАЖНО: Очищена дублирующаяся логика сбора статистики
+    ?????: ??????? ????????????? ?????? ????? ??????????
     """
     if message.from_user.id != _ADMIN_ID:
-        await message.answer("❌ Доступ запрещён")
+        await message.answer("? ?????? ????????")
         return
 
     try:
-        # Собираем статистику один раз
-        conn = _db.get_connection()
-        cursor = conn.cursor()
+        def _safe_int(row) -> int:
+            if not row:
+                return 0
+            value = row[0]
+            return int(value) if value is not None else 0
 
-        # 1. Общая статистика пользователей
-        cursor.execute("SELECT COUNT(*) FROM users")
-        total_users = cursor.fetchone()[0]
+        def _safe_number(row) -> float:
+            if not row:
+                return 0.0
+            value = row[0]
+            return float(value) if value is not None else 0.0
 
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "seller"')
-        total_sellers = cursor.fetchone()[0]
+        lang = "ru"
+        try:
+            lang = _db.get_user_language(message.from_user.id)
+        except Exception:
+            pass
 
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "customer"')
-        total_customers = cursor.fetchone()[0]
+        period_end = _get_uzb_time() if _get_uzb_time else datetime.utcnow()
+        period_start = period_end - timedelta(days=30)
+        period_label = _get_text(lang, "admin_orders_period_30d")
 
-        cursor.execute('SELECT COUNT(*) FROM users WHERE language = "ru"')
-        ru_users = cursor.fetchone()[0]
+        placeholder = "%s" if _DATABASE_URL and "postgres" in _DATABASE_URL else "?"
+        date_filter = f"o.created_at >= {placeholder} AND o.created_at < {placeholder}"
+        date_params = (period_start, period_end)
 
-        cursor.execute('SELECT COUNT(*) FROM users WHERE language = "uz"')
-        uz_users = cursor.fetchone()[0]
+        with _db.get_connection() as conn:
+            cursor = conn.cursor()
 
-        # 2. Статистика магазинов
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "active"')
-        active_stores = cursor.fetchone()[0]
+            # 1. ????? ?????????? ?????????????
+            cursor.execute("SELECT COUNT(*) FROM users")
+            total_users = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "pending"')
-        pending_stores = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'seller'")
+            total_sellers = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM stores WHERE status = "rejected"')
-        rejected_stores = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'customer'")
+            total_customers = _safe_int(cursor.fetchone())
 
-        # 3. Статистика товаров
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "active"')
-        active_offers = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM users WHERE language = 'ru'")
+            ru_users = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "expired"')
-        expired_offers = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM users WHERE language = 'uz'")
+            uz_users = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM offers WHERE status = "sold_out"')
-        sold_out_offers = cursor.fetchone()[0]
+            # 2. ?????????? ?????????
+            cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'active'")
+            active_stores = _safe_int(cursor.fetchone())
 
-        # 4. Статистика бронирований
-        cursor.execute("SELECT COUNT(*) FROM bookings")
-        total_bookings = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'pending'")
+            pending_stores = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "pending"')
-        pending_bookings = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'rejected'")
+            rejected_stores = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "confirmed"')
-        confirmed_bookings = cursor.fetchone()[0]
+            # 3. ?????????? ???????
+            cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'active'")
+            active_offers = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "cancelled"')
-        cancelled_bookings = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'expired'")
+            expired_offers = _safe_int(cursor.fetchone())
 
-        cursor.execute('SELECT COUNT(*) FROM bookings WHERE status = "completed"')
-        completed_bookings = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'sold_out'")
+            sold_out_offers = _safe_int(cursor.fetchone())
 
-        # 5. Топ-5 продавцов по активным товарам
-        cursor.execute(
-            """
-            SELECT u.first_name, COUNT(o.offer_id) as offers_count
-            FROM users u
-            INNER JOIN stores s ON u.user_id = s.owner_id
-            INNER JOIN offers o ON s.store_id = o.store_id
-            WHERE o.status = "active"
-            GROUP BY u.user_id
-            ORDER BY offers_count DESC
-            LIMIT 5
-        """
-        )
-        top_sellers = cursor.fetchall()
+            # 4. ?????? (???????????????)
+            cursor.execute(f"SELECT COUNT(*) FROM orders o WHERE {date_filter}", date_params)
+            total_orders = _safe_int(cursor.fetchone())
 
-        # 6. Самые популярные категории
-        cursor.execute(
-            """
-            SELECT category, COUNT(*) as count
-            FROM offers
-            WHERE status = "active"
-            GROUP BY category
-            ORDER BY count DESC
-            LIMIT 5
-        """
-        )
-        top_categories = cursor.fetchall()
+            cursor.execute(
+                f"""
+                SELECT o.order_status, COUNT(*)
+                FROM orders o
+                WHERE {date_filter}
+                GROUP BY o.order_status
+                """,
+                date_params,
+            )
+            status_rows = cursor.fetchall() or []
+            status_counts = {
+                str(row[0] or "unknown"): int(row[1] or 0) for row in status_rows if row
+            }
 
-        # 7. Средний discount
-        cursor.execute(
-            """
-            SELECT AVG(((original_price - discount_price) * 100.0 / original_price)) as avg_discount
-            FROM offers
-            WHERE status = "active" AND original_price > 0
-        """
-        )
-        avg_discount_result = cursor.fetchone()
-        avg_discount = (
-            round(avg_discount_result[0], 1)
-            if avg_discount_result and avg_discount_result[0]
-            else 0
-        )
+            active_statuses = ("pending", "preparing", "ready", "delivering")
+            active_orders = sum(status_counts.get(s, 0) for s in active_statuses)
+            completed_orders = status_counts.get("completed", 0)
+            cancelled_orders = status_counts.get("cancelled", 0)
+            rejected_orders = status_counts.get("rejected", 0)
 
-        conn.close()
+            cursor.execute(
+                f"""
+                SELECT COALESCE(SUM(COALESCE(o.total_price, off.discount_price * o.quantity, 0)), 0)
+                FROM orders o
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE {date_filter} AND o.order_status = 'completed'
+                """,
+                date_params,
+            )
+            revenue_completed = _safe_number(cursor.fetchone())
+            avg_ticket = revenue_completed / completed_orders if completed_orders else 0
 
-        # Формируем текстовый отчёт
-        report = f"""📊 <b>РАСШИРЕННАЯ АНАЛИТИКА</b>
+            cursor.execute(
+                f"""
+                SELECT COALESCE(NULLIF(o.payment_method, ''), 'unknown') AS method, COUNT(*)
+                FROM orders o
+                WHERE {date_filter}
+                GROUP BY 1
+                ORDER BY COUNT(*) DESC
+                """,
+                date_params,
+            )
+            payment_methods = cursor.fetchall() or []
 
-👥 <b>ПОЛЬЗОВАТЕЛИ</b>
-├ Всего: {total_users}
-├ Продавцы: {total_sellers}
-├ Покупатели: {total_customers}
-├ Русский язык: {ru_users}
-└ Узбекский язык: {uz_users}
+            cursor.execute(
+                f"""
+                SELECT COALESCE(NULLIF(o.payment_status, ''), 'unknown') AS status, COUNT(*)
+                FROM orders o
+                WHERE {date_filter}
+                GROUP BY 1
+                ORDER BY COUNT(*) DESC
+                """,
+                date_params,
+            )
+            payment_statuses = cursor.fetchall() or []
 
-🏪 <b>МАГАЗИНЫ</b>
-├ Активные: {active_stores}
-├ На модерации: {pending_stores}
-└ Отклонённые: {rejected_stores}
+            cursor.execute(
+                f"""
+                SELECT
+                    CASE
+                        WHEN o.order_type IS NULL OR o.order_type = '' THEN
+                            CASE WHEN o.delivery_address IS NULL THEN 'pickup' ELSE 'delivery' END
+                        ELSE o.order_type
+                    END AS order_type,
+                    COUNT(*)
+                FROM orders o
+                WHERE {date_filter}
+                GROUP BY 1
+                ORDER BY COUNT(*) DESC
+                """,
+                date_params,
+            )
+            order_types = cursor.fetchall() or []
 
-🔥 <b>ТОВАРЫ</b>
-├ Активные: {active_offers}
-├ Истекшие: {expired_offers}
-└ Распроданные: {sold_out_offers}
+            cursor.execute(
+                f"""
+                SELECT COALESCE(s.name, '-') AS store_name,
+                       COUNT(*) AS orders_count,
+                       COALESCE(SUM(COALESCE(o.total_price, off.discount_price * o.quantity, 0)), 0) AS revenue
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE {date_filter} AND o.order_status = 'completed'
+                GROUP BY s.name
+                ORDER BY revenue DESC
+                LIMIT 5
+                """,
+                date_params,
+            )
+            top_stores = cursor.fetchall() or []
 
-📦 <b>БРОНИРОВАНИЯ</b>
-├ Всего: {total_bookings}
-├ Ожидают: {pending_bookings}
-├ Подтверждены: {confirmed_bookings}
-├ Отменены: {cancelled_bookings}
-└ Завершены: {completed_bookings}
+            cursor.execute(
+                f"""
+                SELECT o.order_id,
+                       o.created_at,
+                       o.order_status,
+                       o.payment_status,
+                       o.payment_method,
+                       COALESCE(o.total_price, off.discount_price * o.quantity, 0) AS total_price,
+                       COALESCE(s.name, '') AS store_name,
+                       COALESCE(u.first_name, u.username, '') AS customer_name
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN users u ON o.user_id = u.user_id
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE {date_filter}
+                ORDER BY o.created_at DESC
+                LIMIT 10
+                """,
+                date_params,
+            )
+            recent_orders = cursor.fetchall() or []
 
-💰 <b>СРЕДНЯЯ СКИДКА:</b> {avg_discount}%
+            cursor.execute(
+                f"""
+                SELECT o.order_id,
+                       o.created_at,
+                       o.order_status,
+                       o.payment_status,
+                       o.payment_method,
+                       CASE
+                           WHEN o.order_type IS NULL OR o.order_type = '' THEN
+                               CASE WHEN o.delivery_address IS NULL THEN 'pickup' ELSE 'delivery' END
+                           ELSE o.order_type
+                       END AS order_type,
+                       COALESCE(o.total_price, off.discount_price * o.quantity, 0) AS total_price,
+                       COALESCE(s.name, '') AS store_name,
+                       COALESCE(u.first_name, u.username, '') AS customer_name,
+                       COALESCE(u.phone, '') AS phone
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN users u ON o.user_id = u.user_id
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE {date_filter}
+                ORDER BY o.created_at DESC
+                LIMIT 500
+                """,
+                date_params,
+            )
+            order_rows = cursor.fetchall() or []
 
-🏆 <b>ТОП-5 ПРОДАВЦОВ:</b>"""
+            # 5. ???-5 ????????? ?? ???????? ???????
+            cursor.execute(
+                """
+                SELECT u.first_name, COUNT(o.offer_id) as offers_count
+                FROM users u
+                INNER JOIN stores s ON u.user_id = s.owner_id
+                INNER JOIN offers o ON s.store_id = o.store_id
+                WHERE o.status = 'active'
+                GROUP BY u.user_id
+                ORDER BY offers_count DESC
+                LIMIT 5
+                """
+            )
+            top_sellers = cursor.fetchall()
+
+            # 6. ????? ?????????? ?????????
+            cursor.execute(
+                """
+                SELECT category, COUNT(*) as count
+                FROM offers
+                WHERE status = 'active'
+                GROUP BY category
+                ORDER BY count DESC
+                LIMIT 5
+                """
+            )
+            top_categories = cursor.fetchall()
+
+            # 7. ??????? discount
+            cursor.execute(
+                """
+                SELECT AVG(((original_price - discount_price) * 100.0 / original_price)) as avg_discount
+                FROM offers
+                WHERE status = 'active' AND original_price > 0
+                """
+            )
+            avg_discount_result = cursor.fetchone()
+            avg_discount = (
+                round(avg_discount_result[0], 1)
+                if avg_discount_result and avg_discount_result[0]
+                else 0
+            )
+
+
+
+        # ????????? ????????? ?????
+        report_lines = [
+            "?? <b>??????????? ?????????</b>",
+            "",
+            "?? <b>????????????</b>",
+            f"? ?????: {total_users}",
+            f"? ????????: {total_sellers}",
+            f"? ??????????: {total_customers}",
+            f"? ??????? ????: {ru_users}",
+            f"? ????????? ????: {uz_users}",
+            "",
+            "?? <b>????????</b>",
+            f"? ????????: {active_stores}",
+            f"? ?? ?????????: {pending_stores}",
+            f"? ???????????: {rejected_stores}",
+            "",
+            "?? <b>??????</b>",
+            f"? ????????: {active_offers}",
+            f"? ????????: {expired_offers}",
+            f"? ????????????: {sold_out_offers}",
+            "",
+            f"?? <b>??????? ??????:</b> {avg_discount}%",
+            "",
+            "?? <b>???-5 ?????????:</b>",
+        ]
 
         for i, (name, count) in enumerate(top_sellers, 1):
-            report += f"\n{i}. {name} — {count} товаров"
+            report_lines.append(f"{i}. {name} ? {count} ???????")
 
-        report += "\n\n📊 <b>ПОПУЛЯРНЫЕ КАТЕГОРИИ:</b>"
+        report_lines.append("")
+        report_lines.append("?? <b>?????????? ?????????:</b>")
 
         category_names = {
-            "bakery": "🍞 Хлеб",
-            "dairy": "🥛 Молочка",
-            "meat": "🥩 Мясо",
-            "fruits": "🍎 Фрукты",
-            "vegetables": "🥕 Овощи",
-            "ready_food": "🍱 Готовая еда",
+            "bakery": "?? ????",
+            "dairy": "?? ???????",
+            "meat": "?? ????",
+            "fruits": "?? ??????",
+            "vegetables": "?? ?????",
+            "ready_food": "?? ??????? ???",
         }
 
         for i, (cat, count) in enumerate(top_categories, 1):
             cat_name = category_names.get(cat, cat)
-            report += f"\n{i}. {cat_name} — {count} товаров"
+            report_lines.append(f"{i}. {cat_name} ? {count} ???????")
 
+        report_lines.append("")
+        report_lines.append(_get_text(lang, "admin_orders_analytics_title"))
+        report_lines.append(_get_text(lang, "admin_orders_period").format(period=period_label))
+
+        if total_orders == 0:
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_empty"))
+        else:
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_summary"))
+            report_lines.append(_get_text(lang, "admin_orders_total").format(count=total_orders))
+            report_lines.append(_get_text(lang, "admin_orders_active").format(count=active_orders))
+            report_lines.append(_get_text(lang, "admin_orders_completed").format(count=completed_orders))
+            report_lines.append(_get_text(lang, "admin_orders_cancelled").format(count=cancelled_orders))
+            report_lines.append(_get_text(lang, "admin_orders_rejected").format(count=rejected_orders))
+            report_lines.append(
+                _get_text(lang, "admin_orders_revenue").format(amount=f"{int(revenue_completed):,}")
+            )
+            report_lines.append(
+                _get_text(lang, "admin_orders_avg_ticket").format(
+                    amount=f"{int(avg_ticket):,}" if avg_ticket else "0"
+                )
+            )
+
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_status_breakdown"))
+            for status, count in sorted(status_counts.items(), key=lambda x: x[1], reverse=True):
+                report_lines.append(f"? {status}: {count}")
+
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_payment_methods"))
+            for method, count in payment_methods:
+                report_lines.append(f"? {method}: {count}")
+
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_payment_statuses"))
+            for status, count in payment_statuses:
+                report_lines.append(f"? {status}: {count}")
+
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_types"))
+            for order_type, count in order_types:
+                report_lines.append(f"? {order_type}: {count}")
+
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_top_stores"))
+            for idx, row in enumerate(top_stores, 1):
+                store_name = html_escape(row[0]) if row and row[0] else "-"
+                orders_count = int(row[1]) if row and row[1] is not None else 0
+                revenue = int(row[2]) if row and row[2] is not None else 0
+                report_lines.append(f"{idx}. {store_name} ? {orders_count} / {revenue:,} ???")
+
+            report_lines.append("")
+            report_lines.append(_get_text(lang, "admin_orders_recent"))
+            for row in recent_orders:
+                order_id, _, status, _, pay_method, total_price, store_name, customer_name = row
+                store_name = html_escape(store_name) if store_name else "-"
+                customer_name = html_escape(customer_name) if customer_name else "-"
+                total_val = int(total_price) if total_price is not None else 0
+                report_lines.append(f"? #{order_id} | {status or '-'} | {total_val:,} ???")
+                report_lines.append(
+                    f"  {store_name} | {customer_name} | {pay_method or '-'}"
+                )
+
+        report = "\n".join(report_lines)
         await message.answer(report, parse_mode="HTML")
 
-        # Экспорт в CSV
+
+
+        # ??????? ? CSV (????? ?????????)
         csv_filename = f"analytics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
         with open(csv_filename, "w", newline="", encoding="utf-8-sig") as csvfile:
             writer = csv.writer(csvfile)
 
-            # Заголовки и данные
-            writer.writerow(["РАЗДЕЛ", "ПОКАЗАТЕЛЬ", "ЗНАЧЕНИЕ"])
-            writer.writerow(["Пользователи", "Всего", total_users])
-            writer.writerow(["Пользователи", "Продавцы", total_sellers])
-            writer.writerow(["Пользователи", "Покупатели", total_customers])
-            writer.writerow(["Пользователи", "Русский язык", ru_users])
-            writer.writerow(["Пользователи", "Узбекский язык", uz_users])
+            # ????????? ? ??????
+            writer.writerow(["??????", "??????????", "????????"])
+            writer.writerow(["????????????", "?????", total_users])
+            writer.writerow(["????????????", "????????", total_sellers])
+            writer.writerow(["????????????", "??????????", total_customers])
+            writer.writerow(["????????????", "??????? ????", ru_users])
+            writer.writerow(["????????????", "????????? ????", uz_users])
+            writer.writerow(["????????", "????????", active_stores])
+            writer.writerow(["????????", "?? ?????????", pending_stores])
+            writer.writerow(["????????", "???????????", rejected_stores])
             writer.writerow([])
-            writer.writerow(["Магазины", "Активные", active_stores])
-            writer.writerow(["Магазины", "На модерации", pending_stores])
-            writer.writerow(["Магазины", "Отклонённые", rejected_stores])
+            writer.writerow(["??????", "????????", active_offers])
+            writer.writerow(["??????", "????????", expired_offers])
+            writer.writerow(["??????", "????????????", sold_out_offers])
             writer.writerow([])
-            writer.writerow(["Товары", "Активные", active_offers])
-            writer.writerow(["Товары", "Истекшие", expired_offers])
-            writer.writerow(["Товары", "Распроданные", sold_out_offers])
+            writer.writerow(["??????? ??????", "", f"{avg_discount}%"])
             writer.writerow([])
-            writer.writerow(["Бронирования", "Всего", total_bookings])
-            writer.writerow(["Бронирования", "Ожидают", pending_bookings])
-            writer.writerow(["Бронирования", "Подтверждены", confirmed_bookings])
-            writer.writerow(["Бронирования", "Отменены", cancelled_bookings])
-            writer.writerow(["Бронирования", "Завершены", completed_bookings])
-            writer.writerow([])
-            writer.writerow(["Средняя скидка", "", f"{avg_discount}%"])
-            writer.writerow([])
-            writer.writerow(["ТОП-5 ПРОДАВЦОВ", "", ""])
+            writer.writerow(["???-5 ?????????", "", ""])
             for i, (name, count) in enumerate(top_sellers, 1):
                 writer.writerow([i, name, count])
 
-        # Отправляем CSV файл
+        # ?????????? CSV ????
         csv_file = FSInputFile(csv_filename)
-        await message.answer_document(csv_file, caption="📊 Полная аналитика в CSV формате")
+        await message.answer_document(csv_file, caption="?? ?????? ????????? ? CSV ???????")
 
-        # Удаляем временный файл
+        # ??????? ????????? ????
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
 
-    except Exception as e:
-        await message.answer(f"❌ Ошибка при формировании аналитики: {e}")
+        # ??????? ??????? ? CSV
+        orders_csv_filename = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
+        with open(orders_csv_filename, "w", newline="", encoding="utf-8-sig") as csvfile:
+            writer = csv.writer(csvfile)
+            headers = [
+                _get_text(lang, "admin_orders_csv_order_id"),
+                _get_text(lang, "admin_orders_csv_created_at"),
+                _get_text(lang, "admin_orders_csv_status"),
+                _get_text(lang, "admin_orders_csv_payment_status"),
+                _get_text(lang, "admin_orders_csv_payment_method"),
+                _get_text(lang, "admin_orders_csv_order_type"),
+                _get_text(lang, "admin_orders_csv_total_price"),
+                _get_text(lang, "admin_orders_csv_store"),
+                _get_text(lang, "admin_orders_csv_customer"),
+                _get_text(lang, "admin_orders_csv_phone"),
+            ]
+            writer.writerow(headers)
+
+            for row in order_rows:
+                (
+                    order_id,
+                    created_at,
+                    status,
+                    payment_status,
+                    payment_method,
+                    order_type,
+                    total_price,
+                    store_name,
+                    customer_name,
+                    phone,
+                ) = row
+                writer.writerow(
+                    [
+                        order_id,
+                        created_at,
+                        status,
+                        payment_status,
+                        payment_method,
+                        order_type,
+                        int(total_price) if total_price is not None else 0,
+                        store_name,
+                        customer_name,
+                        phone,
+                    ]
+                )
+
+        await message.answer_document(
+            FSInputFile(orders_csv_filename),
+            caption=_get_text(lang, "admin_orders_csv_caption"),
+        )
+
+        if os.path.exists(orders_csv_filename):
+            os.remove(orders_csv_filename)
+
+    except Exception as e:
+        await message.answer(f"? ?????? ??? ???????????? ?????????: {e}")
 
 # ============== МОДЕРАЦИЯ МАГАЗИНОВ ==============
 

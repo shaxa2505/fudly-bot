@@ -65,17 +65,30 @@ def build_admin_payment_proof_caption(
         if len(cart_items) > 5:
             caption += f"   ... и ещё {len(cart_items) - 5}\n" if ru else f"   ... yana {len(cart_items) - 5}\n"
 
-    subtotal = None
-    try:
-        subtotal = (total_price or 0) - (delivery_fee or 0)
-    except Exception:
+    items_total = None
+    if cart_items:
+        try:
+            items_total = sum(
+                int(item.get("price", 0)) * int(item.get("quantity", 1)) for item in cart_items
+            )
+        except Exception:
+            items_total = None
+
+    if items_total is not None and items_total > 0:
+        subtotal = items_total
+        total_with_delivery = subtotal + int(delivery_fee or 0)
+    else:
         subtotal = total_price or 0
+        try:
+            total_with_delivery = total_price or subtotal
+        except Exception:
+            total_with_delivery = subtotal
 
     caption += f"\n💰 <b>{total_label}:</b>\n"
     caption += f"   {items_label}: {_fmt_money(subtotal)} {currency}\n"
     if delivery_fee:
         caption += f"   {delivery_label}: {_fmt_money(delivery_fee)} {currency}\n"
-    caption += f"   <b>Всего: {_fmt_money(total_price)} {currency}</b>\n"
+    caption += f"   <b>Всего: {_fmt_money(total_with_delivery)} {currency}</b>\n"
     caption += (
         "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
         if ru

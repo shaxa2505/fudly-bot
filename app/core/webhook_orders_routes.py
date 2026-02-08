@@ -1413,12 +1413,16 @@ def build_order_handlers(
                         cart_items_json = order.get("cart_items")
                         store_name = order.get("store_name", "")
                         total_price = order.get("total_price", 0)
-                        delivery_fee = order.get("delivery_fee", 0)
+                        delivery_fee = order.get("delivery_fee") or order.get("delivery_price") or 0
                     else:
                         cart_items_json = getattr(order, "cart_items", None)
                         store_name = getattr(order, "store_name", "")
                         total_price = getattr(order, "total_price", 0)
-                        delivery_fee = getattr(order, "delivery_fee", 0)
+                        delivery_fee = (
+                            getattr(order, "delivery_fee", None)
+                            or getattr(order, "delivery_price", None)
+                            or 0
+                        )
 
                     if cart_items_json:
                         cart_items = parse_cart_items(cart_items_json)
@@ -1465,12 +1469,17 @@ def build_order_handlers(
                             admin_msg += f"   ... и ещё {len(cart_items) - 5}\n"
 
                     # Total
-                    subtotal = items_total or max(0, int(total_price) - int(delivery_fee or 0))
+                    if items_total:
+                        subtotal = int(items_total)
+                        total_with_delivery = subtotal + int(delivery_fee or 0)
+                    else:
+                        subtotal = max(0, int(total_price) - int(delivery_fee or 0))
+                        total_with_delivery = int(total_price or 0)
                     admin_msg += "\n💰 <b>Итого:</b>\n"
                     admin_msg += f"   Товары: {int(subtotal):,} сум\n"
                     if delivery_fee:
                         admin_msg += f"   Доставка: {int(delivery_fee):,} сум\n"
-                    admin_msg += f"   <b>Всего: {int(total_price):,} сум</b>\n"
+                    admin_msg += f"   <b>Всего: {int(total_with_delivery):,} сум</b>\n"
 
                     admin_msg += "\n⚠️ <b>ПРОВЕРЬТЕ ЧЕК И ПОДТВЕРДИТЕ ОПЛАТУ</b>"
 

@@ -181,7 +181,7 @@ class OrderMixin:
                     item.get("delivery_price", 0) if order_type in ("delivery", "taxi") else 0
                 )
 
-                total_amount = int((price * quantity) + delivery_price)
+                total_amount = int(price * quantity)
                 item_title = item.get("title") or ""
                 try:
                     item_price = int(price or 0)
@@ -701,8 +701,7 @@ class OrderMixin:
                     price = item.get("price", row[3] or 0)
                     total_price += price * quantity
 
-                # Add delivery price
-                total_price += delivery_price
+                # Delivery fee is stored separately and paid on delivery
 
                 order_type = order_type or ("delivery" if delivery_address else "pickup")
                 pickup_code = None

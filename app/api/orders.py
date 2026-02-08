@@ -304,7 +304,7 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
             store_id = int(first_item.get("store_id") or 0)
 
         try:
-            # Prefer total_price from DB row (includes delivery)
+            # Prefer total_price from DB row when available
             total_price = float(booking_dict.get("total_price") or 0)
         except Exception:
             total_price = 0.0
