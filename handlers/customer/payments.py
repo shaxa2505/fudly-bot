@@ -38,6 +38,18 @@ if not PROVIDER_TOKEN:
     logger.warning("⚠️ TELEGRAM_PAYMENT_PROVIDER_TOKEN not set - payments will not work")
 
 
+def _to_tiyin(amount: int | float) -> int:
+    """Convert stored amount to Telegram's smallest currency unit (tiyin)."""
+    price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").strip().lower()
+    try:
+        value = float(amount or 0)
+    except (TypeError, ValueError):
+        return 0
+    if price_unit in {"kopeks", "tiyin"}:
+        return int(round(value))
+    return int(round(value * 100))
+
+
 def setup(
     database: DatabaseProtocol,
     bot_instance: types.Bot,
@@ -81,13 +93,17 @@ async def create_invoice(
     # Build payload string (will be returned in successful_payment)
     import json
 
+    lang = "ru"
+    if db and hasattr(db, "get_user_language"):
+        try:
+            lang = db.get_user_language(chat_id) or "ru"
+        except Exception:
+            lang = "ru"
+
     payload = json.dumps({"order_id": order_id, "type": "order", **(payload_data or {})})
 
-    # Prices in smallest currency unit (for UZS it's 1 UZS = 100 tiyin, but Telegram uses UZS directly)
-    # For Click via Telegram, amount is in UZS
-    prices = [
-        LabeledPrice(label=title, amount=amount * 100)  # Convert to tiyin
-    ]
+    # Prices in smallest currency unit (tiyin)
+    prices = [LabeledPrice(label=title, amount=_to_tiyin(amount))]
 
     # Send invoice
     invoice_params = {
@@ -136,19 +152,20 @@ async def create_order_invoice(
 
     import json
 
+    lang = "ru"
+    if db and hasattr(db, "get_user_language"):
+        try:
+            lang = db.get_user_language(chat_id) or "ru"
+        except Exception:
+            lang = "ru"
+
     # Build prices list
     prices = []
-    total = 0
 
     for item in items:
         item_total = item["price"] * item["quantity"]
-        total += item_total
         label = f"{item['title']} x{item['quantity']}"
-        prices.append(LabeledPrice(label=label, amount=item_total * 100))
-
-    if delivery_cost > 0:
-        prices.append(LabeledPrice(label="🚚 Yetkazib berish", amount=delivery_cost * 100))
-        total += delivery_cost
+        prices.append(LabeledPrice(label=label, amount=_to_tiyin(item_total)))
 
     # Payload
     payload = json.dumps(
@@ -165,6 +182,14 @@ async def create_order_invoice(
         items_text += f" va yana {len(items) - 3} ta"
 
     description = f"📦 {items_text}\n🏪 {store_name}" if store_name else f"📦 {items_text}"
+    if delivery_cost > 0:
+        delivery_note = None
+        if get_text:
+            delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+            if delivery_note == "delivery_fee_paid_to_courier":
+                delivery_note = None
+        if delivery_note:
+            description += f"\n{delivery_note}"
 
     return await bot.send_invoice(
         chat_id=chat_id,
@@ -380,7 +405,15 @@ async def process_successful_payment(message: types.Message) -> None:
         lines.append(f"   {price_label}: {subtotal:,} {currency}")
 
         if is_delivery and delivery_price:
-            lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
+            delivery_note = None
+            if get_text:
+                delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+                if delivery_note == "delivery_fee_paid_to_courier":
+                    delivery_note = None
+            note_suffix = f" ({delivery_note})" if delivery_note else ""
+            lines.append(
+                f"🚚 {delivery_label}: {delivery_price:,} {currency}{note_suffix}"
+            )
 
         lines.append("")
         lines.append("─" * 25)

@@ -558,6 +558,7 @@ def build_order_handlers(
                             o.order_type,
                             o.pickup_code,
                             o.delivery_address,
+                            o.delivery_price,
                             o.total_price,
                             o.quantity,
                             o.payment_method,
@@ -666,8 +667,10 @@ def build_order_handlers(
                 delivery_fee = calc_delivery_fee(
                     total_price,
                     items_total,
+                    delivery_price=r.get("delivery_price"),
                     order_type=order_type,
                 )
+                total_with_delivery = items_total + delivery_fee
 
                 primary_item = items[0] if items else {}
                 offer_title = primary_item.get("title") or primary_item.get("offer_title")
@@ -692,6 +695,8 @@ def build_order_handlers(
                         "delivery_address": r.get("delivery_address"),
                         "delivery_fee": delivery_fee,
                         "total_price": total_price,
+                        "items_total": items_total,
+                        "total_with_delivery": total_with_delivery,
                         "quantity": qty_total,
                         "created_at": str(r.get("created_at") or ""),
                         "updated_at": str(r.get("updated_at") or "")
@@ -871,6 +876,8 @@ def build_order_handlers(
                                 "offer_photo": offer_photo,
                                 "quantity": quantity,
                                 "total_price": float(total_price),
+                                "items_total": float(total_price),
+                                "total_with_delivery": float(total_price),
                                 "store_id": store_id,
                                 "store_name": get_offer_value(store, "name", "Магазин")
                                 if store
@@ -961,9 +968,11 @@ def build_order_handlers(
                     calc_delivery_fee(
                         total_price,
                         items_total,
+                        delivery_price=order_dict.get("delivery_price"),
                         order_type=order_type,
                     )
                 )
+            total_with_delivery = float(items_total) + float(delivery_cost or 0)
 
             pickup_code = order_dict.get("pickup_code") or ""
             qr_code = None
@@ -991,6 +1000,8 @@ def build_order_handlers(
                 "offer_photo": offer_photo,
                 "quantity": qty_total or 1,
                 "total_price": float(total_price),
+                "items_total": float(items_total),
+                "total_with_delivery": total_with_delivery,
                 "store_id": store_id,
                 "store_name": store_name,
                 "store_address": store_address,

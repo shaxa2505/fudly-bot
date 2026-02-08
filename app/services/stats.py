@@ -96,49 +96,79 @@ def get_partner_stats(db, partner_id: int, period: Period, tz: str, store_id: Op
         partner_id: Current partner ID.
         period: Period with start/end in partner TZ.
         tz: IANA timezone string.
-        store_id: Optional store filter.
+        store_id: Optional store filter (useful for admin-access stores).
 
     Returns:
         PartnerStats dataclass with totals.
     """
-    # Query bookings for revenue, orders, items_sold
+    # Query bookings + orders for revenue, orders, items_sold
     with db.get_connection() as conn:
         cursor = conn.cursor()
+        if store_id is not None:
+            booking_store_filter = "o.store_id = %s"
+            order_store_filter = "ord.store_id = %s"
+            offer_store_filter = "o.store_id = %s"
+            store_param = store_id
+        else:
+            booking_store_filter = "o.store_id IN (SELECT store_id FROM stores WHERE owner_id = %s)"
+            order_store_filter = "ord.store_id IN (SELECT store_id FROM stores WHERE owner_id = %s)"
+            offer_store_filter = "o.store_id IN (SELECT store_id FROM stores WHERE owner_id = %s)"
+            store_param = partner_id
+
         # Revenue and orders: sum of completed bookings (status='completed' or 'confirmed')
         # Items sold: sum(quantity) from bookings
         # Price is from offers.discount_price
         cursor.execute(
-            """
+            f"""
             SELECT
                 COALESCE(SUM(o.discount_price * b.quantity), 0) AS revenue,
                 COUNT(DISTINCT b.booking_id) AS orders,
                 COALESCE(SUM(b.quantity), 0) AS items_sold
             FROM bookings b
             JOIN offers o ON b.offer_id = o.offer_id
-            WHERE o.store_id IN (
-                SELECT store_id FROM stores WHERE owner_id = %s
-            )
+            WHERE {booking_store_filter}
             AND b.status IN ('completed', 'confirmed')
             AND b.created_at >= %s AND b.created_at < %s
             """,
-            (partner_id, period.start, period.end)
+            (store_param, period.start, period.end),
         )
-        row = cursor.fetchone()
-        revenue = Decimal(row[0]) if row else Decimal(0)
-        orders = int(row[1]) if row else 0
-        items_sold = int(row[2]) if row else 0
+        row = cursor.fetchone() or (0, 0, 0)
+        bookings_revenue = Decimal(row[0] or 0)
+        bookings_orders = int(row[1] or 0)
+        bookings_items_sold = int(row[2] or 0)
+
+        # Revenue and orders from delivery/pickup orders table (completed only)
+        cursor.execute(
+            f"""
+            SELECT
+                COALESCE(SUM(ord.total_price), 0) AS revenue,
+                COUNT(DISTINCT ord.order_id) AS orders,
+                COALESCE(SUM(ord.quantity), 0) AS items_sold
+            FROM orders ord
+            WHERE {order_store_filter}
+            AND ord.order_status = 'completed'
+            AND ord.created_at >= %s AND ord.created_at < %s
+            """,
+            (store_param, period.start, period.end),
+        )
+        row = cursor.fetchone() or (0, 0, 0)
+        orders_revenue = Decimal(row[0] or 0)
+        orders_orders = int(row[1] or 0)
+        orders_items_sold = int(row[2] or 0)
+
+        revenue = bookings_revenue + orders_revenue
+        orders = bookings_orders + orders_orders
+        items_sold = bookings_items_sold + orders_items_sold
 
         # Active products: count active offers from partner's stores
         cursor.execute(
-            """
+            f"""
             SELECT COUNT(*) FROM offers o
-            WHERE o.store_id IN (
-                SELECT store_id FROM stores WHERE owner_id = %s
-            )
+            WHERE {offer_store_filter}
             AND o.status = 'active'
             AND (COALESCE(o.stock_quantity, o.quantity) IS NULL OR COALESCE(o.stock_quantity, o.quantity) > 0)
             """,
-            (partner_id,)
+            (store_param,),
         )
         active_products = cursor.fetchone()[0] or 0
 

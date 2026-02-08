@@ -149,3 +149,6 @@ msgid "offer"
 msgid_plural "offers"
 msgstr[0] "{n} ta taklif"
 msgstr[1] "{n} ta taklif"
+#: Payment notes
+msgid "delivery_fee_paid_to_courier"
+msgstr "Yetkazib berish to'lovi qabul qilganda kuryerga to'lanadi."

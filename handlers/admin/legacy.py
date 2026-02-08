@@ -48,15 +48,35 @@ def setup(bot, db, get_text, moderation_keyboard, get_uzb_time, admin_id, databa
 
 
 
-@router.message(F.text == "?? ?????????")
+
+@router.message(
+    F.text.contains("Аналитика")
+    | F.text.contains("Analitika")
+    | F.text.contains("Analytics")
+)
 async def admin_analytics(message: types.Message):
     """
-    ??????????? ?????????? ? ????????? ? CSV
+    Расширенная статистика с экспортом в CSV
 
-    ?????: ??????? ????????????? ?????? ????? ??????????
+    ВАЖНО: Очищена дублирующаяся логика сбора статистики
     """
-    if message.from_user.id != _ADMIN_ID:
-        await message.answer("? ?????? ????????")
+    if not message.from_user:
+        return
+
+    lang = "ru"
+    try:
+        if _db:
+            lang = _db.get_user_language(message.from_user.id)
+    except Exception:
+        pass
+
+    # Prefer DB admin roles; fallback to single ADMIN_ID
+    if _db and hasattr(_db, "is_admin"):
+        if not _db.is_admin(message.from_user.id):
+            await message.answer(_get_text(lang, "no_admin_access"))
+            return
+    elif _ADMIN_ID and message.from_user.id != _ADMIN_ID:
+        await message.answer(_get_text(lang, "no_admin_access"))
         return
 
     try:
@@ -72,12 +92,6 @@ async def admin_analytics(message: types.Message):
             value = row[0]
             return float(value) if value is not None else 0.0
 
-        lang = "ru"
-        try:
-            lang = _db.get_user_language(message.from_user.id)
-        except Exception:
-            pass
-
         period_end = _get_uzb_time() if _get_uzb_time else datetime.utcnow()
         period_start = period_end - timedelta(days=30)
         period_label = _get_text(lang, "admin_orders_period_30d")
@@ -89,7 +103,7 @@ async def admin_analytics(message: types.Message):
         with _db.get_connection() as conn:
             cursor = conn.cursor()
 
-            # 1. ????? ?????????? ?????????????
+            # 1. Общая статистика пользователей
             cursor.execute("SELECT COUNT(*) FROM users")
             total_users = _safe_int(cursor.fetchone())
 
@@ -105,7 +119,7 @@ async def admin_analytics(message: types.Message):
             cursor.execute("SELECT COUNT(*) FROM users WHERE language = 'uz'")
             uz_users = _safe_int(cursor.fetchone())
 
-            # 2. ?????????? ?????????
+            # 2. Статистика магазинов
             cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'active'")
             active_stores = _safe_int(cursor.fetchone())
 
@@ -115,7 +129,7 @@ async def admin_analytics(message: types.Message):
             cursor.execute("SELECT COUNT(*) FROM stores WHERE status = 'rejected'")
             rejected_stores = _safe_int(cursor.fetchone())
 
-            # 3. ?????????? ???????
+            # 3. Статистика товаров
             cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'active'")
             active_offers = _safe_int(cursor.fetchone())
 
@@ -125,7 +139,7 @@ async def admin_analytics(message: types.Message):
             cursor.execute("SELECT COUNT(*) FROM offers WHERE status = 'sold_out'")
             sold_out_offers = _safe_int(cursor.fetchone())
 
-            # 4. ?????? (???????????????)
+            # 4. Заказы (унифицированные)
             cursor.execute(f"SELECT COUNT(*) FROM orders o WHERE {date_filter}", date_params)
             total_orders = _safe_int(cursor.fetchone())
 
@@ -270,7 +284,7 @@ async def admin_analytics(message: types.Message):
             )
             order_rows = cursor.fetchall() or []
 
-            # 5. ???-5 ????????? ?? ???????? ???????
+            # 5. Топ-5 продавцов по активным товарам
             cursor.execute(
                 """
                 SELECT u.first_name, COUNT(o.offer_id) as offers_count
@@ -285,7 +299,7 @@ async def admin_analytics(message: types.Message):
             )
             top_sellers = cursor.fetchall()
 
-            # 6. ????? ?????????? ?????????
+            # 6. Самые популярные категории
             cursor.execute(
                 """
                 SELECT category, COUNT(*) as count
@@ -298,7 +312,7 @@ async def admin_analytics(message: types.Message):
             )
             top_categories = cursor.fetchall()
 
-            # 7. ??????? discount
+            # 7. Средний discount
             cursor.execute(
                 """
                 SELECT AVG(((original_price - discount_price) * 100.0 / original_price)) as avg_discount
@@ -313,52 +327,50 @@ async def admin_analytics(message: types.Message):
                 else 0
             )
 
-
-
-        # ????????? ????????? ?????
+        # Формируем текстовый отчёт
         report_lines = [
-            "?? <b>??????????? ?????????</b>",
+            "📊 <b>РАСШИРЕННАЯ АНАЛИТИКА</b>",
             "",
-            "?? <b>????????????</b>",
-            f"? ?????: {total_users}",
-            f"? ????????: {total_sellers}",
-            f"? ??????????: {total_customers}",
-            f"? ??????? ????: {ru_users}",
-            f"? ????????? ????: {uz_users}",
+            "👥 <b>ПОЛЬЗОВАТЕЛИ</b>",
+            f"├ Всего: {total_users}",
+            f"├ Продавцы: {total_sellers}",
+            f"├ Покупатели: {total_customers}",
+            f"├ Русский язык: {ru_users}",
+            f"└ Узбекский язык: {uz_users}",
             "",
-            "?? <b>????????</b>",
-            f"? ????????: {active_stores}",
-            f"? ?? ?????????: {pending_stores}",
-            f"? ???????????: {rejected_stores}",
+            "🏪 <b>МАГАЗИНЫ</b>",
+            f"├ Активные: {active_stores}",
+            f"├ На модерации: {pending_stores}",
+            f"└ Отклонённые: {rejected_stores}",
             "",
-            "?? <b>??????</b>",
-            f"? ????????: {active_offers}",
-            f"? ????????: {expired_offers}",
-            f"? ????????????: {sold_out_offers}",
+            "🔥 <b>ТОВАРЫ</b>",
+            f"├ Активные: {active_offers}",
+            f"├ Истекшие: {expired_offers}",
+            f"└ Распроданные: {sold_out_offers}",
             "",
-            f"?? <b>??????? ??????:</b> {avg_discount}%",
+            f"💰 <b>СРЕДНЯЯ СКИДКА:</b> {avg_discount}%",
             "",
-            "?? <b>???-5 ?????????:</b>",
+            "🏆 <b>ТОП-5 ПРОДАВЦОВ:</b>",
         ]
 
         for i, (name, count) in enumerate(top_sellers, 1):
-            report_lines.append(f"{i}. {name} ? {count} ???????")
+            report_lines.append(f"{i}. {name} — {count} товаров")
 
         report_lines.append("")
-        report_lines.append("?? <b>?????????? ?????????:</b>")
+        report_lines.append("📊 <b>ПОПУЛЯРНЫЕ КАТЕГОРИИ:</b>")
 
         category_names = {
-            "bakery": "?? ????",
-            "dairy": "?? ???????",
-            "meat": "?? ????",
-            "fruits": "?? ??????",
-            "vegetables": "?? ?????",
-            "ready_food": "?? ??????? ???",
+            "bakery": "🍞 Хлеб",
+            "dairy": "🥛 Молочка",
+            "meat": "🥩 Мясо",
+            "fruits": "🍋 Фрукты",
+            "vegetables": "🥕 Овощи",
+            "ready_food": "🍱 Готовая еда",
         }
 
         for i, (cat, count) in enumerate(top_categories, 1):
             cat_name = category_names.get(cat, cat)
-            report_lines.append(f"{i}. {cat_name} ? {count} ???????")
+            report_lines.append(f"{i}. {cat_name} — {count} товаров")
 
         report_lines.append("")
         report_lines.append(_get_text(lang, "admin_orders_analytics_title"))
@@ -387,22 +399,22 @@ async def admin_analytics(message: types.Message):
             report_lines.append("")
             report_lines.append(_get_text(lang, "admin_orders_status_breakdown"))
             for status, count in sorted(status_counts.items(), key=lambda x: x[1], reverse=True):
-                report_lines.append(f"? {status}: {count}")
+                report_lines.append(f"• {status}: {count}")
 
             report_lines.append("")
             report_lines.append(_get_text(lang, "admin_orders_payment_methods"))
             for method, count in payment_methods:
-                report_lines.append(f"? {method}: {count}")
+                report_lines.append(f"• {method}: {count}")
 
             report_lines.append("")
             report_lines.append(_get_text(lang, "admin_orders_payment_statuses"))
             for status, count in payment_statuses:
-                report_lines.append(f"? {status}: {count}")
+                report_lines.append(f"• {status}: {count}")
 
             report_lines.append("")
             report_lines.append(_get_text(lang, "admin_orders_types"))
             for order_type, count in order_types:
-                report_lines.append(f"? {order_type}: {count}")
+                report_lines.append(f"• {order_type}: {count}")
 
             report_lines.append("")
             report_lines.append(_get_text(lang, "admin_orders_top_stores"))
@@ -410,7 +422,7 @@ async def admin_analytics(message: types.Message):
                 store_name = html_escape(row[0]) if row and row[0] else "-"
                 orders_count = int(row[1]) if row and row[1] is not None else 0
                 revenue = int(row[2]) if row and row[2] is not None else 0
-                report_lines.append(f"{idx}. {store_name} ? {orders_count} / {revenue:,} ???")
+                report_lines.append(f"{idx}. {store_name} — {orders_count} / {revenue:,} сум")
 
             report_lines.append("")
             report_lines.append(_get_text(lang, "admin_orders_recent"))
@@ -419,7 +431,7 @@ async def admin_analytics(message: types.Message):
                 store_name = html_escape(store_name) if store_name else "-"
                 customer_name = html_escape(customer_name) if customer_name else "-"
                 total_val = int(total_price) if total_price is not None else 0
-                report_lines.append(f"? #{order_id} | {status or '-'} | {total_val:,} ???")
+                report_lines.append(f"• #{order_id} | {status or '-'} | {total_val:,} сум")
                 report_lines.append(
                     f"  {store_name} | {customer_name} | {pay_method or '-'}"
                 )
@@ -427,44 +439,43 @@ async def admin_analytics(message: types.Message):
         report = "\n".join(report_lines)
         await message.answer(report, parse_mode="HTML")
 
-
-
-        # ??????? ? CSV (????? ?????????)
+        # Экспорт в CSV (общая аналитика)
         csv_filename = f"analytics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
         with open(csv_filename, "w", newline="", encoding="utf-8-sig") as csvfile:
             writer = csv.writer(csvfile)
 
-            # ????????? ? ??????
-            writer.writerow(["??????", "??????????", "????????"])
-            writer.writerow(["????????????", "?????", total_users])
-            writer.writerow(["????????????", "????????", total_sellers])
-            writer.writerow(["????????????", "??????????", total_customers])
-            writer.writerow(["????????????", "??????? ????", ru_users])
-            writer.writerow(["????????????", "????????? ????", uz_users])
-            writer.writerow(["????????", "????????", active_stores])
-            writer.writerow(["????????", "?? ?????????", pending_stores])
-            writer.writerow(["????????", "???????????", rejected_stores])
+            # Заголовки и данные
+            writer.writerow(["РАЗДЕЛ", "ПОКАЗАТЕЛЬ", "ЗНАЧЕНИЕ"])
+            writer.writerow(["Пользователи", "Всего", total_users])
+            writer.writerow(["Пользователи", "Продавцы", total_sellers])
+            writer.writerow(["Пользователи", "Покупатели", total_customers])
+            writer.writerow(["Пользователи", "Русский язык", ru_users])
+            writer.writerow(["Пользователи", "Узбекский язык", uz_users])
             writer.writerow([])
-            writer.writerow(["??????", "????????", active_offers])
-            writer.writerow(["??????", "????????", expired_offers])
-            writer.writerow(["??????", "????????????", sold_out_offers])
+            writer.writerow(["Магазины", "Активные", active_stores])
+            writer.writerow(["Магазины", "На модерации", pending_stores])
+            writer.writerow(["Магазины", "Отклонённые", rejected_stores])
             writer.writerow([])
-            writer.writerow(["??????? ??????", "", f"{avg_discount}%"])
+            writer.writerow(["Товары", "Активные", active_offers])
+            writer.writerow(["Товары", "Истекшие", expired_offers])
+            writer.writerow(["Товары", "Распроданные", sold_out_offers])
             writer.writerow([])
-            writer.writerow(["???-5 ?????????", "", ""])
+            writer.writerow(["Средняя скидка", "", f"{avg_discount}%"])
+            writer.writerow([])
+            writer.writerow(["ТОП-5 ПРОДАВЦОВ", "", ""])
             for i, (name, count) in enumerate(top_sellers, 1):
                 writer.writerow([i, name, count])
 
-        # ?????????? CSV ????
+        # Отправляем CSV файл
         csv_file = FSInputFile(csv_filename)
-        await message.answer_document(csv_file, caption="?? ?????? ????????? ? CSV ???????")
+        await message.answer_document(csv_file, caption="📊 Полная аналитика в CSV формате")
 
-        # ??????? ????????? ????
+        # Удаляем временный файл
         if os.path.exists(csv_filename):
             os.remove(csv_filename)
 
-        # ??????? ??????? ? CSV
+        # Экспорт заказов в CSV
         orders_csv_filename = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
         with open(orders_csv_filename, "w", newline="", encoding="utf-8-sig") as csvfile:
@@ -520,7 +531,7 @@ async def admin_analytics(message: types.Message):
             os.remove(orders_csv_filename)
 
     except Exception as e:
-        await message.answer(f"? ?????? ??? ???????????? ?????????: {e}")
+        await message.answer(f"❌ Ошибка при формировании аналитики: {e}")
 
 # ============== МОДЕРАЦИЯ МАГАЗИНОВ ==============
 

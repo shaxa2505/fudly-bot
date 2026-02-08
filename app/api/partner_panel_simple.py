@@ -284,8 +284,8 @@ def verify_telegram_webapp(authorization: str) -> int:
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
     init_data = authorization[4:]
-    # Try BOT_TOKEN first, fallback to TELEGRAM_BOT_TOKEN
-    bot_token = os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
+    # Try injected token first, then BOT_TOKEN, fallback to TELEGRAM_BOT_TOKEN
+    bot_token = _bot_token or os.getenv("BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     if not bot_token:
         raise HTTPException(status_code=500, detail="Bot token not configured")
 
@@ -1091,10 +1091,10 @@ async def cancel_order(
         payment_method=payment_method,
         payment_proof_photo_id=payment_proof_photo_id,
     )
-    if method_norm == "click" and status_norm == PaymentStatus.CONFIRMED:
+    if method_norm in ("click", "payme") and status_norm == PaymentStatus.CONFIRMED:
         raise HTTPException(
             status_code=409,
-            detail="Paid Click orders cannot be cancelled by partner",
+            detail="Paid Click/Payme orders cannot be cancelled by partner",
         )
 
     unified_service = _ensure_unified_service(db)
@@ -1378,7 +1378,9 @@ async def confirm_order(
 
     # Use unified service if available; fall back to direct status update.
     if unified_service:
-        await unified_service.confirm_order(order_id, "order")
+        ok = await unified_service.confirm_order(order_id, "order")
+        if not ok:
+            raise HTTPException(status_code=400, detail="Status transition not allowed")
     else:
         if hasattr(db, "update_order_status"):
             if isinstance(order, dict):
@@ -1398,7 +1400,11 @@ async def confirm_order(
     )
     frontend_type = "booking" if db_order_type == "pickup" else "order"
 
-    return {"order_id": order_id, "status": "preparing", "type": frontend_type}
+    response_status = (
+        OrderStatus.READY if db_order_type == "pickup" else OrderStatus.PREPARING
+    )
+
+    return {"order_id": order_id, "status": response_status, "type": frontend_type}
 
 
 # REMOVED: Duplicate cancel endpoint without reason - use v22.0 endpoint above with cancel_reason
@@ -1581,11 +1587,31 @@ async def get_stats(
                         """,
                         (store_id_val, day_start, day_end),
                     )
-                    row = cursor.fetchone()
-                    revenue.append(float(row[0]) if row else 0)
-                    orders.append(int(row[1]) if row else 0)
+                    row = cursor.fetchone() or (0, 0)
+                    bookings_revenue = float(row[0] or 0)
+                    bookings_orders = int(row[1] or 0)
+
+                    cursor.execute(
+                        """
+                        SELECT
+                            COALESCE(SUM(o.total_price), 0) AS revenue,
+                            COUNT(DISTINCT o.order_id) AS orders
+                        FROM orders o
+                        WHERE o.store_id = %s
+                        AND o.order_status = 'completed'
+                        AND o.created_at >= %s AND o.created_at < %s
+                        """,
+                        (store_id_val, day_start, day_end),
+                    )
+                    row = cursor.fetchone() or (0, 0)
+                    orders_revenue = float(row[0] or 0)
+                    orders_count = int(row[1] or 0)
+
+                    revenue.append(bookings_revenue + orders_revenue)
+                    orders.append(bookings_orders + orders_count)
 
                 # Top products (last 30 days)
+                top_map: dict[str, dict[str, float | int | str]] = {}
                 cursor.execute(
                     """
                     SELECT o.title, SUM(b.quantity) as qty, SUM(o.discount_price * b.quantity) as revenue
@@ -1596,14 +1622,47 @@ async def get_stats(
                     AND b.created_at >= %s
                     GROUP BY o.offer_id, o.title
                     ORDER BY qty DESC
-                    LIMIT 5
+                    LIMIT 20
                     """,
                     (store_id_val, now_val - timedelta(days=30)),
                 )
                 for row in cursor.fetchall():
-                    top.append(
-                        {"name": row[0], "qty": int(row[1]), "revenue": float(row[2])}
-                    )
+                    name = row[0] or "Unknown"
+                    qty = int(row[1] or 0)
+                    rev = float(row[2] or 0)
+                    top_map[name] = {"name": name, "qty": qty, "revenue": rev}
+
+                cursor.execute(
+                    """
+                    SELECT COALESCE(off.title, o.item_title, 'Unknown') as title,
+                           COALESCE(SUM(o.quantity), 0) as qty,
+                           COALESCE(SUM(o.total_price), 0) as revenue
+                    FROM orders o
+                    LEFT JOIN offers off ON o.offer_id = off.offer_id
+                    WHERE o.store_id = %s
+                    AND o.order_status = 'completed'
+                    AND COALESCE(o.is_cart_order, 0) = 0
+                    AND o.created_at >= %s
+                    GROUP BY COALESCE(off.title, o.item_title, 'Unknown')
+                    ORDER BY qty DESC
+                    LIMIT 20
+                    """,
+                    (store_id_val, now_val - timedelta(days=30)),
+                )
+                for row in cursor.fetchall():
+                    name = row[0] or "Unknown"
+                    qty = int(row[1] or 0)
+                    rev = float(row[2] or 0)
+                    entry = top_map.get(name)
+                    if not entry:
+                        top_map[name] = {"name": name, "qty": qty, "revenue": rev}
+                    else:
+                        entry["qty"] = int(entry.get("qty", 0)) + qty
+                        entry["revenue"] = float(entry.get("revenue", 0)) + rev
+
+                top = sorted(
+                    top_map.values(), key=lambda item: int(item.get("qty", 0)), reverse=True
+                )[:5]
             return revenue, orders, top
 
         sync_db = db.sync if hasattr(db, "sync") else db
@@ -1643,6 +1702,9 @@ async def update_store(
     authorization: str = Header(None),
 ):
     """Update store settings"""
+    import logging
+
+    logger = logging.getLogger(__name__)
     telegram_id = verify_telegram_webapp(authorization)
     user, store = await get_partner_with_store(telegram_id)
     db = get_db()

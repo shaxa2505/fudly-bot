@@ -184,6 +184,7 @@ function OrderTrackingPage({ user }) {
   const isCancelled = ['cancelled', 'rejected'].includes(normalizedStatus);
   const canShowQR = ['preparing', 'ready'].includes(normalizedStatus) && order.qr_code;
   const orderPhotoUrl = resolveOrderItemImageUrl(order);
+  const displayTotal = Number(order?.total_with_delivery ?? order?.total_price ?? 0);
   const orderCode = order.booking_code || order.booking_id || order.order_id || bookingId;
 
   return (
@@ -222,7 +223,7 @@ function OrderTrackingPage({ user }) {
             {t('Количество', 'Miqdor')}: {order.quantity} {t('шт', 'dona')}
           </p>
           <p className="price">
-            {t('Сумма', 'Summa')}: {Math.round(order.total_price).toLocaleString()} {t('сум', 'so\'m')}
+            {t('Сумма', 'Summa')}: {Math.round(displayTotal).toLocaleString()} {t('сум', 'so\'m')}
           </p>
         </div>
 

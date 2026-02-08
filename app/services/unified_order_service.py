@@ -41,9 +41,11 @@ from PIL import Image
 from app.core.geocoding import geocode_store_address
 from app.core.utils import get_uzb_time
 from app.core.notifications import Notification, NotificationType, get_notification_service
+from app.integrations.payment_service import get_payment_service
 from app.domain.order import OrderStatus, PaymentStatus
 from app.services.notification_builder import NotificationBuilder
 from app.services.notification_unified import build_unified_order_payload
+from localization import get_text
 
 try:
     from logging_config import logger
@@ -931,6 +933,17 @@ class UnifiedOrderService:
             currency=currency,
         )
 
+        reply_markup = None
+        normalized_method = PaymentStatus.normalize_method(payment_method)
+        if normalized_method == "click" and order_type in ("delivery", "taxi"):
+            reply_markup = self._build_click_payment_reply_markup(
+                order_ids=order_ids,
+                total_price=total_price,
+                user_id=user_id,
+                store_id=items[0].store_id if items else None,
+                lang=customer_lang,
+            )
+
         primary_offer_id = items[0].offer_id if items else None
         photo_ids = self._collect_photos_from_items(items)
         customer_photo = None
@@ -990,6 +1003,7 @@ class UnifiedOrderService:
                             photo=customer_photo,
                             caption=customer_msg,
                             parse_mode="HTML",
+                            reply_markup=reply_markup,
                         )
                     except Exception as photo_err:
                         logger.warning(
@@ -997,7 +1011,7 @@ class UnifiedOrderService:
                         )
                 if not sent_msg:
                     sent_msg = await self.bot.send_message(
-                        user_id, customer_msg, parse_mode="HTML"
+                        user_id, customer_msg, parse_mode="HTML", reply_markup=reply_markup
                     )
             except Exception as e:
                 logger.error(f"Failed to notify customer {user_id}: {e}")
@@ -2607,6 +2621,133 @@ class UnifiedOrderService:
             kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
             reply_markup = kb.as_markup()
         return reply_markup
+
+    def _build_click_payment_reply_markup(
+        self,
+        *,
+        order_ids: list[int],
+        total_price: int,
+        user_id: int,
+        store_id: int | None,
+        lang: str,
+    ) -> Any:
+        """Build inline Click payment button for unpaid delivery orders."""
+        if not order_ids or not user_id:
+            return None
+
+        order_id = int(order_ids[0])
+
+        payment_service = get_payment_service()
+        if hasattr(payment_service, "set_database"):
+            payment_service.set_database(self.db)
+
+        credentials = None
+        try:
+            if store_id:
+                credentials = payment_service.get_store_credentials(int(store_id), "click")
+        except Exception:
+            credentials = None
+
+        if not credentials and not payment_service.click_enabled:
+            return None
+
+        order_total = None
+        order_row = None
+        try:
+            if hasattr(self.db, "get_order"):
+                order_row = self.db.get_order(int(order_id))
+                if order_row:
+                    if isinstance(order_row, dict):
+                        order_total = order_row.get("total_price")
+                        payment_status_raw = order_row.get("payment_status")
+                        payment_method_raw = order_row.get("payment_method")
+                    else:
+                        order_total = getattr(order_row, "total_price", None)
+                        payment_status_raw = getattr(order_row, "payment_status", None)
+                        payment_method_raw = getattr(order_row, "payment_method", None)
+
+                    normalized_status = PaymentStatus.normalize(
+                        payment_status_raw, payment_method=payment_method_raw
+                    )
+                    if normalized_status == PaymentStatus.CONFIRMED:
+                        return None
+        except Exception:
+            order_total = None
+
+        amount = int(order_total or total_price or 0)
+        if order_row:
+            def _get_field(row, name, default=None):
+                if isinstance(row, dict):
+                    return row.get(name, default)
+                return getattr(row, name, default)
+
+            order_type = str(_get_field(order_row, "order_type", "") or "").lower()
+            if not order_type:
+                order_type = "delivery" if _get_field(order_row, "delivery_address") else "pickup"
+            is_delivery = order_type in ("delivery", "taxi")
+            if is_delivery:
+                items_total = 0
+                cart_items_raw = _get_field(order_row, "cart_items")
+                if cart_items_raw:
+                    try:
+                        import json
+
+                        cart_items = (
+                            json.loads(cart_items_raw)
+                            if isinstance(cart_items_raw, str)
+                            else cart_items_raw
+                        )
+                    except Exception:
+                        cart_items = None
+                    if isinstance(cart_items, list):
+                        for item in cart_items:
+                            try:
+                                price = int(item.get("price") or 0)
+                            except Exception:
+                                price = 0
+                            try:
+                                qty = int(item.get("quantity") or 1)
+                            except Exception:
+                                qty = 1
+                            items_total += price * qty
+                if items_total <= 0:
+                    try:
+                        qty = int(_get_field(order_row, "quantity", 1) or 1)
+                    except Exception:
+                        qty = 1
+                    try:
+                        price = int(_get_field(order_row, "item_price", 0) or 0)
+                    except Exception:
+                        price = 0
+                    items_total = max(0, price * qty)
+                if items_total > 0:
+                    amount = items_total
+        if amount <= 0:
+            return None
+
+        return_url = None
+        try:
+            webapp_url = os.getenv("WEBAPP_URL", "").strip()
+            if webapp_url:
+                return_url = f"{webapp_url.rstrip('/')}/order/{order_id}/details"
+        except Exception:
+            return_url = None
+
+        try:
+            payment_url = payment_service.generate_click_url(
+                order_id=int(order_id),
+                amount=int(amount),
+                return_url=return_url,
+                user_id=int(user_id),
+                store_id=int(store_id) if store_id else 0,
+            )
+        except Exception as e:
+            logger.error(f"Failed to generate Click link for order #{order_id}: {e}")
+            return None
+
+        kb = InlineKeyboardBuilder()
+        kb.button(text=get_text(lang, "delivery_payment_click_button"), url=payment_url)
+        return kb.as_markup()
 
     async def _send_or_edit_customer_message(
         self,

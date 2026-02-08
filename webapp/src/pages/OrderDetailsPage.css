@@ -653,6 +653,17 @@
   word-break: break-word;
 }
 
+.payment-note {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--details-card-padding);
+  border-radius: 16px;
+  background: rgba(15, 118, 110, 0.08);
+  border: 1px dashed rgba(15, 118, 110, 0.2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+}
+
 .booking-code {
   font-family: 'Courier New', monospace;
   font-size: var(--font-md);

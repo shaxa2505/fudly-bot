@@ -402,7 +402,7 @@ function YanaPage({ user }) {
     const createdAt = order.created_at || order.createdAt
     const orderStatus = normalizeOrderStatus(order.order_status || order.status)
     const quantity = getOrderQuantity(order)
-    const rawTotal = Number(order.total_price ?? order.total_amount ?? order.total ?? 0)
+    const rawTotal = Number(order.total_with_delivery ?? order.total_price ?? order.total_amount ?? order.total ?? 0)
     const itemsTotal = calcItemsTotal(items, {
       getPrice: (item) => Number(item?.price ?? item?.discount_price ?? 0),
       getQuantity: (item) => Number(item?.quantity ?? 0),

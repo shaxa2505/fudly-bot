@@ -2,6 +2,7 @@ import importlib
 import os
 
 import pytest
+from starlette.requests import Request
 
 
 def _get_offers():
@@ -61,6 +62,15 @@ def _sample_offer(offer_id):
 
 async def _call_offers(get_offers, db, **overrides):
     params = {
+        "request": Request(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/offers",
+                "headers": [],
+                "client": ("127.0.0.1", 1234),
+            }
+        ),
         "city": None,
         "region": None,
         "district": None,

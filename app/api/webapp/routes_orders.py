@@ -648,6 +648,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             delivery_price=r.get("delivery_price"),
             order_type=order_type,
         )
+        total_with_delivery = items_total + delivery_fee
 
         primary_item = items[0] if items else {}
         offer_title = primary_item.get("title") or primary_item.get("offer_title")
@@ -672,6 +673,8 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 "delivery_address": r.get("delivery_address"),
                 "delivery_fee": delivery_fee,
                 "total_price": total_price,
+                "items_total": items_total,
+                "total_with_delivery": total_with_delivery,
                 "quantity": qty_total,
                 "created_at": str(r.get("created_at") or ""),
                 "updated_at": str(r.get("updated_at") or "") if r.get("updated_at") else None,

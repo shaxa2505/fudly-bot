@@ -1,6 +1,7 @@
 ﻿"""Payment routes for webhook Mini App API."""
 from __future__ import annotations
 
+import json
 from typing import Any, Callable
 
 from aiohttp import web
@@ -106,6 +107,42 @@ def build_payment_handlers(
                 order_total = order.get("total_price")
                 if order_total is not None and int(amount) != int(order_total):
                     amount = order_total
+
+            order_type = order.get("order_type") if isinstance(order, dict) else None
+            if not order_type:
+                order_type = "delivery" if order.get("delivery_address") else "pickup"
+            is_delivery = str(order_type).lower() in ("delivery", "taxi")
+
+            if is_delivery:
+                items_total = 0
+                cart_items = order.get("cart_items")
+                if cart_items:
+                    if isinstance(cart_items, str):
+                        try:
+                            cart_items = json.loads(cart_items)
+                        except Exception:
+                            cart_items = None
+                    if isinstance(cart_items, list):
+                        for item in cart_items:
+                            try:
+                                price = int(item.get("price") or 0)
+                                qty = int(item.get("quantity") or 1)
+                            except Exception:
+                                price = 0
+                                qty = 1
+                            items_total += price * qty
+                if not items_total:
+                    try:
+                        qty = int(order.get("quantity") or 1)
+                    except Exception:
+                        qty = 1
+                    try:
+                        price = int(order.get("item_price") or 0)
+                    except Exception:
+                        price = 0
+                    items_total = max(0, price * qty)
+                if items_total:
+                    amount = items_total
 
             order_status = str(order.get("order_status") or order.get("status") or "").lower()
             payment_status = str(order.get("payment_status") or "").lower()

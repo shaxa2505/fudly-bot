@@ -13,6 +13,8 @@ const normalizeOrders = (orders) => orders.map(order => ({
   created_at: order.created_at,
   delivery_address: order.delivery_address,
   total_price: order.total_price,
+  items_total: order.items_total,
+  total_with_delivery: order.total_with_delivery,
   items: order.items || [],
   offer_title: order.items?.[0]?.offer_title || order.items?.[0]?.title || 'Buyurtma',
   store_name: order.store_name || order.items?.[0]?.store_name || "Do'kon",

@@ -18,7 +18,7 @@ from app.services.unified_order_service import (
     get_unified_order_service,
     init_unified_order_service,
 )
-from handlers.common.utils import html_escape
+from handlers.common.utils import can_manage_store, html_escape
 from localization import get_text
 from logging_config import logger
 
@@ -422,6 +422,16 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
         await callback.answer("Topilmadi" if lang == "uz" else "?? ???????", show_alert=True)
         return
 
+    store_id = _get_field(order, "store_id")
+    if not store_id:
+        offer_id = _get_field(order, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = _get_field(offer, "store_id") if offer else None
+    store = db.get_store(store_id) if store_id else None
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
     status_raw = (
         _get_field(order, "order_status") or _get_field(order, "status") or OrderStatus.PENDING
     )
@@ -612,6 +622,16 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
 
     if not entity:
         await callback.answer("Ошибка", show_alert=True)
+        return
+
+    store_id = _get_field(entity, "store_id")
+    if not store_id:
+        offer_id = _get_field(entity, "offer_id")
+        offer = db.get_offer(offer_id) if offer_id else None
+        store_id = _get_field(offer, "store_id") if offer else None
+    store = db.get_store(store_id) if store_id else None
+    if not can_manage_store(db, store_id, callback.from_user.id, store=store):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
         return
 
     user_id = _get_field(entity, "user_id")

@@ -51,7 +51,7 @@ def calc_delivery_fee(
     delivery_price: int | float | None = None,
     order_type: str | None = None,
 ) -> int:
-    if order_type and order_type != "delivery":
+    if order_type and order_type not in ("delivery", "taxi"):
         return 0
     if delivery_price is not None:
         try:

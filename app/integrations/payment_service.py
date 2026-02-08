@@ -293,6 +293,14 @@ class PaymentService:
             return default
 
     @staticmethod
+    def _get_order_field(order: Any, key: str, default: Any = None) -> Any:
+        if order is None:
+            return default
+        if isinstance(order, dict):
+            return order.get(key, default)
+        return getattr(order, key, default)
+
+    @staticmethod
     def _amount_to_tiyin(amount: Any) -> int:
         """Convert amount to tiyin based on PRICE_STORAGE_UNIT env."""
         price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").strip().lower()
@@ -323,12 +331,73 @@ class PaymentService:
             return int(round(value * 100))
         return int(round(value))
 
-    def _amounts_match(self, order_total: Any, click_amount: Any) -> bool:
-        if order_total is None:
+    def _is_delivery_order(self, order: Any) -> bool:
+        order_type = str(self._get_order_field(order, "order_type", "") or "").lower()
+        if order_type:
+            return order_type in {"delivery", "taxi"}
+        return bool(self._get_order_field(order, "delivery_address"))
+
+    def _calc_order_items_total(self, order: Any) -> int:
+        items_total = 0
+        cart_items_raw = self._get_order_field(order, "cart_items")
+        if cart_items_raw:
+            cart_items = None
+            if isinstance(cart_items_raw, str):
+                try:
+                    cart_items = json.loads(cart_items_raw)
+                except json.JSONDecodeError:
+                    cart_items = None
+            elif isinstance(cart_items_raw, list):
+                cart_items = cart_items_raw
+            if isinstance(cart_items, list):
+                for item in cart_items:
+                    try:
+                        price = int(item.get("price") or 0)
+                    except Exception:
+                        price = 0
+                    try:
+                        qty = int(item.get("quantity") or 1)
+                    except Exception:
+                        qty = 1
+                    items_total += price * qty
+
+        if items_total <= 0:
+            qty = self._safe_int(self._get_order_field(order, "quantity", 1), 1)
+            if qty <= 0:
+                qty = 1
+            price = self._safe_int(self._get_order_field(order, "item_price", 0), 0)
+            items_total = max(0, price * qty)
+
+        return items_total
+
+    def _expected_click_amount(self, order: Any) -> int | None:
+        if order is None:
+            return None
+        total_raw = self._get_order_field(order, "total_price")
+        order_total = self._safe_int(total_raw, 0) if total_raw is not None else None
+        items_total = self._calc_order_items_total(order)
+
+        if self._is_delivery_order(order):
+            if items_total > 0:
+                return items_total
+            return order_total
+
+        if order_total is not None:
+            return order_total
+        return items_total if items_total > 0 else None
+
+    def _amounts_match(self, order: Any, click_amount: Any) -> bool:
+        if order is None:
             return False
-        expected = self._safe_int(order_total, 0)
         received = self._normalize_click_amount(click_amount)
-        return expected == received
+        expected = self._expected_click_amount(order)
+        if expected is not None and expected == received:
+            return True
+        if self._is_delivery_order(order):
+            total_raw = self._get_order_field(order, "total_price")
+            if total_raw is not None and self._safe_int(total_raw, 0) == received:
+                return True
+        return False
 
     @staticmethod
     def _click_response(
@@ -849,8 +918,7 @@ class PaymentService:
                 error_note="Order cancelled",
             )
 
-        order_total = order.get("total_price") if isinstance(order, dict) else getattr(order, "total_price", None)
-        if not self._amounts_match(order_total, amount):
+        if not self._amounts_match(order, amount):
             return self._click_response(
                 click_trans_id=click_trans_id,
                 merchant_trans_id=merchant_trans_id,
@@ -985,8 +1053,7 @@ class PaymentService:
                 error_note="SIGN CHECK FAILED!",
             )
 
-        order_total = order.get("total_price") if isinstance(order, dict) else getattr(order, "total_price", None)
-        if not self._amounts_match(order_total, amount):
+        if not self._amounts_match(order, amount):
             return self._click_response(
                 click_trans_id=click_trans_id,
                 merchant_trans_id=merchant_trans_id,

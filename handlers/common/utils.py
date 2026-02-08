@@ -575,15 +575,31 @@ def get_appropriate_menu(
             pass
 
     if role == "seller" and not has_active_store:
+        has_any_store = False
         try:
-            db.update_user_role(user_id, "customer")
+            stores = db.get_user_accessible_stores(user_id)
+            has_any_store = bool(stores)
         except Exception:
-            pass
-        try:
-            db.set_user_view_mode(user_id, "customer")
-        except Exception:
-            pass
-        return main_menu_customer(lang)
+            has_any_store = False
+        if not has_any_store and hasattr(db, "get_user_stores"):
+            try:
+                stores = db.get_user_stores(user_id)
+                has_any_store = bool(stores)
+            except Exception:
+                has_any_store = False
+
+        if not has_any_store:
+            try:
+                db.update_user_role(user_id, "customer")
+            except Exception:
+                pass
+            try:
+                db.set_user_view_mode(user_id, "customer")
+            except Exception:
+                pass
+            return main_menu_customer(lang)
+
+        return main_menu_seller(lang, user_id=user_id)
 
     if role == "seller":
         return main_menu_seller(lang, user_id=user_id)

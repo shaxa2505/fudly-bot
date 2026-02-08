@@ -18,6 +18,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
 from app.domain.order import PaymentStatus
+from app.integrations.payment_service import get_payment_service
 from app.domain.order_labels import normalize_order_status, status_emoji, status_label
 from app.services.notification_builder import NotificationBuilder
 from app.services.unified_order_service import (
@@ -498,8 +499,11 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
                 """
                 SELECT
                     o.order_id,
+                    o.store_id,
                     o.order_type,
                     o.order_status,
+                    o.payment_method,
+                    o.payment_status,
                     o.pickup_code,
                     o.delivery_address,
                     o.total_price,
@@ -536,59 +540,63 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         return
 
     # Парсим данные (SQL возвращает tuple, нужен dict)
-    # SELECT: order_id[0], order_type[1], order_status[2], pickup_code[3], delivery_address[4], total_price[5],
-    #         created_at[6], quantity[7], store_name[8], store_address[9], store_phone[10], offer_title[11],
-    #         discount_price[12], original_price[13], unit[14], is_cart_order[15], cart_items[16],
-    #         delivery_price[17], item_title[18], item_price[19], item_original_price[20]
+    # SELECT: order_id[0], store_id[1], order_type[2], order_status[3], payment_method[4], payment_status[5],
+    #         pickup_code[6], delivery_address[7], total_price[8], created_at[9], quantity[10], store_name[11],
+    #         store_address[12], store_phone[13], offer_title[14], discount_price[15], original_price[16],
+    #         unit[17], is_cart_order[18], cart_items[19], delivery_price[20], item_title[21], item_price[22],
+    #         item_original_price[23]
     if hasattr(order, "get"):
         data = order
     else:
         data = {
             "order_id": order[0],
-            "order_type": order[1],
-            "order_status": order[2],
-            "pickup_code": order[3],
-            "delivery_address": order[4],
-            "total_price": order[5],
-            "created_at": order[6],
-            "quantity": order[7],
-            "store_name": order[8],
-            "store_address": order[9],
-            "store_phone": order[10],
-            "offer_title": order[11],
-            "discount_price": order[12],
-            "original_price": order[13],
-            "unit": order[14],
-            "is_cart_order": order[15] if len(order) > 15 else False,
-            "cart_items": order[16] if len(order) > 16 else None,
-            "delivery_price": order[17] if len(order) > 17 else None,
-            "item_title": order[18] if len(order) > 18 else None,
-            "item_price": order[19] if len(order) > 19 else None,
-            "item_original_price": order[20] if len(order) > 20 else None,
+            "store_id": order[1],
+            "order_type": order[2],
+            "order_status": order[3],
+            "payment_method": order[4],
+            "payment_status": order[5],
+            "pickup_code": order[6],
+            "delivery_address": order[7],
+            "total_price": order[8],
+            "created_at": order[9],
+            "quantity": order[10],
+            "store_name": order[11],
+            "store_address": order[12],
+            "store_phone": order[13],
+            "offer_title": order[14],
+            "discount_price": order[15],
+            "original_price": order[16],
+            "unit": order[17],
+            "is_cart_order": order[18] if len(order) > 18 else False,
+            "cart_items": order[19] if len(order) > 19 else None,
+            "delivery_price": order[20] if len(order) > 20 else None,
+            "item_title": order[21] if len(order) > 21 else None,
+            "item_price": order[22] if len(order) > 22 else None,
+            "item_original_price": order[23] if len(order) > 23 else None,
         }
 
     raw_status = data.get("order_status", "pending")
     status = _normalize_status(raw_status)
     order_type = data.get("order_type") or ("delivery" if data.get("delivery_address") else "pickup")
-    is_delivery = order_type == "delivery"
+    is_delivery = order_type in ("delivery", "taxi")
     is_cart = data.get("is_cart_order")
     cart_items_json = data.get("cart_items")
 
-    subtotal = 0
+    items_total = 0
     items: list[dict[str, Any]] = []
     if is_cart and cart_items_json:
         items = parse_cart_items(cart_items_json)
         if items:
-            subtotal = calc_items_total(items)
+            items_total = calc_items_total(items)
         else:
-            subtotal = data.get("total_price", 0) - int(data.get("delivery_price") or 0)
+            items_total = int(data.get("total_price") or 0)
     else:
         title = data.get("item_title") or data.get("offer_title", "Товар")
         qty = data.get("quantity", 1)
         price = data.get("item_price")
         if price is None:
             price = data.get("discount_price", 0)
-        subtotal = int(price or 0) * int(qty or 1)
+        items_total = int(price or 0) * int(qty or 1)
         items = [{"title": title, "quantity": qty, "price": price}]
 
     total_price = data.get("total_price") or 0
@@ -596,11 +604,11 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     if is_delivery:
         delivery_fee = calc_delivery_fee(
             total_price,
-            subtotal,
+            items_total,
             delivery_price=data.get("delivery_price"),
-            order_type="delivery",
+            order_type=order_type,
         )
-    total = total_price or (subtotal + delivery_fee)
+    total = items_total + delivery_fee
     currency = "so'm" if lang == "uz" else "Сум"
 
     builder = NotificationBuilder("delivery" if is_delivery else "pickup")
@@ -654,6 +662,60 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
                 text=_t(lang, "Получил заказ", "Buyurtmani oldim"),
                 callback_data=f"myorder_received_o_{order_id}",
             )
+
+    payment_method = data.get("payment_method")
+    payment_status_raw = data.get("payment_status")
+    normalized_payment_status = PaymentStatus.normalize(
+        payment_status_raw,
+        payment_method=payment_method,
+    )
+    if (
+        is_delivery
+        and PaymentStatus.normalize_method(payment_method) == "click"
+        and normalized_payment_status != PaymentStatus.CONFIRMED
+        and status not in ("cancelled", "rejected", "completed")
+    ):
+        payment_service = get_payment_service()
+        if hasattr(payment_service, "set_database"):
+            payment_service.set_database(db)
+
+        credentials = None
+        store_id = data.get("store_id")
+        try:
+            if store_id:
+                credentials = payment_service.get_store_credentials(int(store_id), "click")
+        except Exception:
+            credentials = None
+
+        if credentials or payment_service.click_enabled:
+            amount = int(total_price or 0)
+            if amount <= 0:
+                amount = int(items_total + int(delivery_fee or 0))
+
+            return_url = None
+            try:
+                import os
+
+                webapp_url = os.getenv("WEBAPP_URL", "").strip()
+                if webapp_url:
+                    return_url = f"{webapp_url.rstrip('/')}/order/{order_id}/details"
+            except Exception:
+                return_url = None
+
+            try:
+                payment_url = payment_service.generate_click_url(
+                    order_id=int(order_id),
+                    amount=int(amount),
+                    return_url=return_url,
+                    user_id=int(user_id),
+                    store_id=int(store_id) if store_id else 0,
+                )
+                kb.button(
+                    text=get_text(lang, "delivery_payment_click_button"),
+                    url=payment_url,
+                )
+            except Exception as e:
+                logger.error(f"Failed to generate Click link for order #{order_id}: {e}")
 
     kb.button(text=_t(lang, "Назад", "Orqaga"), callback_data="myorders_back")
 

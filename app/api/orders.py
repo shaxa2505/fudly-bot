@@ -109,6 +109,8 @@ class OrderStatus(BaseModel):
     offer_photo: str | None
     quantity: int
     total_price: float
+    items_total: float | None = None
+    total_with_delivery: float | None = None
 
     # Store details
     store_id: int
@@ -292,6 +294,8 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     offer_id = booking_dict.get("offer_id")
     quantity = int(booking_dict.get("quantity") or 1)
     delivery_cost = booking_dict.get("delivery_cost", 0) or 0
+    items_total = 0
+    total_price = 0.0
 
     offer_dict: dict[str, Any] = {}
     store_dict: dict[str, Any] = {}
@@ -303,18 +307,19 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
         if not store_id:
             store_id = int(first_item.get("store_id") or 0)
 
+        # Calculate items_total from cart items
+        items_total = calc_items_total(cart_items)
         try:
             # Prefer total_price from DB row when available
-            total_price = float(booking_dict.get("total_price") or 0)
+            total_price = float(booking_dict.get("total_price") or items_total)
         except Exception:
-            total_price = 0.0
+            total_price = float(items_total or 0)
 
         # Calculate delivery_cost if possible (total - items)
-        items_total = calc_items_total(cart_items)
         qty_total = calc_quantity(cart_items)
         quantity = qty_total if qty_total > 0 else quantity
 
-        if total_price and not delivery_cost:
+        if not delivery_cost:
             delivery_cost = calc_delivery_fee(
                 total_price,
                 items_total,
@@ -331,16 +336,25 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
             offer = await db.get_offer(int(offer_id))
             offer_dict = dict(offer) if offer and not isinstance(offer, dict) else offer or {}
 
+        discount_price = int(offer_dict.get("discount_price") or 0)
+        items_total = calc_items_total([{"price": discount_price, "quantity": quantity}])
+
         # If total_price is stored on orders table, prefer it
         if booking_dict.get("total_price") is not None:
             try:
                 total_price = float(booking_dict.get("total_price") or 0)
             except Exception:
-                total_price = 0.0
+                total_price = float(items_total or 0)
         else:
-            discount_price = int(offer_dict.get("discount_price") or 0)
-            items_total = calc_items_total([{"price": discount_price, "quantity": quantity}])
             total_price = float(calc_total_price(items_total, delivery_cost or 0))
+
+        if not delivery_cost:
+            delivery_cost = calc_delivery_fee(
+                total_price,
+                items_total,
+                delivery_price=booking_dict.get("delivery_price"),
+                order_type=order_type,
+            )
 
         if not store_id:
             store_id = int(offer_dict.get("store_id") or 0)
@@ -354,6 +368,9 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     if order_type == "pickup" and status in ["preparing", "confirmed", "ready"] and booking_code:
         qr_code = generate_qr_code(booking_code)
 
+    items_total_value = float(items_total or 0)
+    total_with_delivery = items_total_value + float(delivery_cost or 0)
+
     return OrderStatus(
         booking_id=int(booking_id),
         booking_code=booking_code,
@@ -366,6 +383,8 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
         offer_photo=offer_dict.get("photo") or offer_dict.get("photo_id"),
         quantity=quantity,
         total_price=total_price,
+        items_total=items_total_value,
+        total_with_delivery=total_with_delivery,
         store_id=store_id,
         store_name=store_dict.get("name", "Магазин"),
         store_address=store_dict.get("address"),
@@ -406,6 +425,7 @@ async def get_user_orders(
                         o.order_type,
                         o.pickup_code,
                         o.delivery_address,
+                        o.delivery_price,
                         o.total_price,
                         o.quantity,
                         o.payment_method,
@@ -507,6 +527,13 @@ async def get_user_orders(
             )
 
         total_price = float(r.get("total_price") or items_total)
+        delivery_fee = calc_delivery_fee(
+            total_price,
+            items_total,
+            delivery_price=r.get("delivery_price"),
+            order_type=order_type,
+        )
+        total_with_delivery = items_total + delivery_fee
 
         orders.append(
             {
@@ -516,7 +543,10 @@ async def get_user_orders(
                 "status": order_status,
                 "pickup_code": r.get("pickup_code"),
                 "delivery_address": r.get("delivery_address"),
+                "delivery_fee": delivery_fee,
                 "total_price": total_price,
+                "items_total": items_total,
+                "total_with_delivery": total_with_delivery,
                 "quantity": qty_total,
                 "items_count": len(items),
                 "items": items,

@@ -272,7 +272,7 @@ export default function OrderDetailsPage() {
         'click',
         returnUrl,
         storeId,
-        order.total_price || null
+        Number.isFinite(payableTotal) ? payableTotal : null
       )
 
       if (paymentData?.payment_url) {
@@ -330,6 +330,8 @@ export default function OrderDetailsPage() {
 
   const rawTotalValue = order?.total_price
   const rawTotal = rawTotalValue == null ? null : Number(rawTotalValue || 0)
+  const explicitItemsTotal = order?.items_total
+  const explicitTotalWithDelivery = order?.total_with_delivery
   const hasItemBreakdown = Array.isArray(order.items) && order.items.length > 0
   const rawItemsSubtotal = hasItemBreakdown
     ? calcItemsTotal(order.items, {
@@ -337,16 +339,21 @@ export default function OrderDetailsPage() {
       getQuantity: (item) => Number(item?.quantity || 0),
     })
     : 0
+  const itemsSubtotal = hasItemBreakdown
+    ? rawItemsSubtotal
+    : Number(explicitItemsTotal ?? (rawTotal ?? 0))
   const deliveryFee = isDelivery
-    ? calcDeliveryFee(rawTotal, rawItemsSubtotal, {
+    ? calcDeliveryFee(rawTotal, itemsSubtotal, {
       deliveryFee: order?.delivery_fee,
       isDelivery,
     })
     : 0
-  const itemsSubtotal = hasItemBreakdown
-    ? rawItemsSubtotal
-    : Math.max(0, (rawTotal || 0) - deliveryFee)
-  const totalPrice = calcTotalPrice(rawItemsSubtotal, deliveryFee, { totalPrice: rawTotal })
+  const totalWithDelivery = Number(
+    explicitTotalWithDelivery ?? calcTotalPrice(itemsSubtotal, deliveryFee)
+  )
+  const payableTotal = Number(
+    explicitItemsTotal ?? (hasItemBreakdown ? rawItemsSubtotal : (rawTotal ?? 0))
+  )
   const totalUnits = hasItemBreakdown
     ? calcQuantity(order.items, item => Number(item?.quantity || 0))
     : (order.quantity || 1)
@@ -489,7 +496,7 @@ export default function OrderDetailsPage() {
         <div className="hero-body">
           <div className="hero-total">
             <span className="hero-label">Jami</span>
-            <span className="hero-value">{formatMoney(totalPrice)} so'm</span>
+            <span className="hero-value">{formatMoney(totalWithDelivery)} so'm</span>
           </div>
           {orderPhotoUrl && (
             <div className="hero-photo">
@@ -619,7 +626,7 @@ export default function OrderDetailsPage() {
               <div className="item-body">
                 <div className="item-row">
                   <h3 className="item-title">{order.offer_title}</h3>
-                  <span className="item-total">{formatMoney(totalPrice)} so'm</span>
+                  <span className="item-total">{formatMoney(totalWithDelivery)} so'm</span>
                 </div>
                 <div className="item-sub">
                   <span>{order.quantity || 1} dona</span>
@@ -758,10 +765,15 @@ export default function OrderDetailsPage() {
             )}
             <div className="info-row total-row">
               <span className="info-label">Jami</span>
-              <span className="info-value total-price">{formatMoney(totalPrice)} so'm</span>
+              <span className="info-value total-price">{formatMoney(totalWithDelivery)} so'm</span>
             </div>
           </div>
         </div>
+        {isDelivery && (
+          <div className="payment-note">
+            Yetkazib berish to&apos;lovi buyurtma qabul qilinganda kuryerga alohida to&apos;lanadi.
+          </div>
+        )}
       </div>
 
       <div className="support-section">

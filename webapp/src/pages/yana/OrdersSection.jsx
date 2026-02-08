@@ -102,6 +102,8 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
           {orders.map((order, idx) => {
             const statusInfo = getStatusInfo(order.status, resolveOrderType(order))
             const orderId = order.order_id || order.booking_id
+            const itemsTotal = Number(order.items_total ?? order.total_price ?? 0)
+            const displayTotal = Number(order.total_with_delivery ?? order.total_price ?? itemsTotal ?? 0)
             const photoUrl = resolveImageUrl(
               order.offer_photo,
               order.offer_photo_url,
@@ -144,13 +146,13 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
                     <p className="order-store">🏪 {order.store_name || "Do'kon"}</p>
                     <div className="order-meta">
                       <span>
-                        {order.quantity || 1} × {order.total_price && order.quantity
-                          ? Math.round(order.total_price / order.quantity).toLocaleString()
+                        {order.quantity || 1} x {order.quantity
+                          ? Math.round(itemsTotal / order.quantity).toLocaleString()
                           : '0'} so'm
                       </span>
                       <span className="order-total">
-                        {order.total_price
-                          ? Math.round(order.total_price).toLocaleString()
+                        {displayTotal
+                          ? Math.round(displayTotal).toLocaleString()
                           : '0'} so'm
                       </span>
                     </div>

@@ -98,13 +98,12 @@ function LocationPickerModal({
   location,
   isLocating,
   locationError,
-  geoStatusLabel,
   onClose,
   onDetectLocation,
   onApply,
   onReset,
 }) {
-  const [mode, setMode] = useState('search')
+  const [mode, setMode] = useState('map')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
@@ -117,6 +116,7 @@ function LocationPickerModal({
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const activeRef = useRef(false)
+  const searchInputRef = useRef(null)
   const canDetect = typeof onDetectLocation === 'function'
 
   const coords = useMemo(() => {
@@ -129,7 +129,7 @@ function LocationPickerModal({
   useEffect(() => {
     if (!isOpen) return
     activeRef.current = true
-    setMode('search')
+    setMode('map')
     setSearchError('')
     setResults([])
     const cityLabel = normalizeLocationName(location?.city?.split(',')[0] || '')
@@ -139,10 +139,23 @@ function LocationPickerModal({
     } else {
       setMapCenter(DEFAULT_CENTER)
     }
+    const initialAddress = location?.address || location?.city || ''
+    setMapAddress(initialAddress)
+    const hasLocationDetails = Boolean(location?.coordinates || location?.address)
+    setMapLocation(hasLocationDetails ? location : null)
+    setMapResolving(false)
     return () => {
       activeRef.current = false
     }
-  }, [isOpen, location?.city, coords?.lat, coords?.lon])
+  }, [isOpen, location?.address, location?.city, coords?.lat, coords?.lon])
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'search') return
+    const timer = setTimeout(() => {
+      searchInputRef.current?.focus()
+    }, 80)
+    return () => clearTimeout(timer)
+  }, [isOpen, mode])
 
   useEffect(() => {
     if (!isOpen || mode !== 'search') return
@@ -217,7 +230,7 @@ function LocationPickerModal({
       const cityValue = normalized.includes("O'zbekiston")
         ? normalized
         : `${normalized}, O'zbekiston`
-      onApply?.({
+      setMapLocation({
         city: cityValue,
         address: '',
         coordinates: null,
@@ -225,6 +238,8 @@ function LocationPickerModal({
         district: '',
         source: 'manual',
       })
+      setMapAddress(normalized)
+      setMode('map')
       return
     }
     const lat = Number(item?.lat)
@@ -232,8 +247,11 @@ function LocationPickerModal({
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
     const nextLocation = buildLocationFromReverseGeocode(item, lat, lon)
     window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-    onApply?.(nextLocation)
-  }, [onApply])
+    setMapCenter({ lat, lon })
+    setMapLocation(nextLocation)
+    setMapAddress(nextLocation.address || nextLocation.city || '')
+    setMode('map')
+  }, [])
 
   const handleUseTyped = useCallback(() => {
     const normalized = normalizeCityQuery(query.trim()) || normalizeLocationName(query.trim())
@@ -244,34 +262,26 @@ function LocationPickerModal({
     const cityValue = normalized.includes("O'zbekiston")
       ? normalized
       : `${normalized}, O'zbekiston`
-    onApply?.({
+    setMapLocation({
       city: cityValue,
-      address: '',
+      address: normalized,
       coordinates: null,
       region: '',
       district: '',
       source: 'manual',
     })
-  }, [onApply, query])
-
-  const openMap = useCallback(() => {
-    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
-    if (results.length > 0) {
-      const candidate = results[0]
-      const lat = Number(candidate?.lat)
-      const lon = Number(candidate?.lon)
-      if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        setMapCenter({ lat, lon })
-      }
-    } else if (coords) {
-      setMapCenter({ lat: coords.lat, lon: coords.lon })
-    }
+    setMapAddress(normalized)
     setMode('map')
-  }, [coords, results])
+  }, [query])
 
-  const closeMap = useCallback(() => {
+  const openSearch = useCallback(() => {
     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
     setMode('search')
+  }, [])
+
+  const closeSearch = useCallback(() => {
+    window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
+    setMode('map')
   }, [])
 
   useEffect(() => {
@@ -391,41 +401,32 @@ function LocationPickerModal({
     return formatDistance(raw)
   }
 
+  const showGeoSuggestion = Boolean(canDetect)
+  const geoMessage = coords ? 'Joylashuvingiz aniqlandi' : 'Joriy joylashuvni aniqlash'
+  const geoButtonLabel = coords ? 'Joriy joylashuv' : 'Aniqlash'
+
   return (
     <div className="location-picker-overlay" onClick={onClose}>
-      <div className={`location-picker ${mode === 'map' ? 'map-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
-        <div className="location-picker-header">
-          <div className="location-picker-title">
-            <span>MANZIL</span>
-            <p>{mode === 'map' ? "Xaritadan tanlang" : "Manzilni tanlang"}</p>
-          </div>
-          <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="location-picker-tabs">
-          <button
-            type="button"
-            className={`location-picker-tab ${mode === 'search' ? 'is-active' : ''}`}
-            onClick={() => setMode('search')}
-          >
-            Qidiruv
-          </button>
-          <button
-            type="button"
-            className={`location-picker-tab ${mode === 'map' ? 'is-active' : ''}`}
-            onClick={openMap}
-          >
-            Xarita
-          </button>
-        </div>
-
+      <div className={`location-picker ${mode === 'search' ? 'search-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
         {mode === 'search' ? (
-          <>
-            <div className="location-picker-search">
+          <div className="location-picker-search-view">
+            <div className="location-picker-search-header">
+              <button type="button" className="location-picker-back" onClick={closeSearch}>
+                <span aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                Ortga
+              </button>
+              <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="location-picker-search-field">
               <div className="location-picker-input">
                 <span className="location-picker-input-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -434,10 +435,11 @@ function LocationPickerModal({
                   </svg>
                 </span>
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Shahar, mahalla yoki ko'cha"
+                  placeholder="Manzil, mahalla yoki ko'cha"
                 />
                 {query && (
                   <button
@@ -452,43 +454,6 @@ function LocationPickerModal({
                   </button>
                 )}
               </div>
-
-              <div className="location-picker-actions">
-                <button
-                  type="button"
-                  className="location-picker-action"
-                  onClick={() => onDetectLocation?.()}
-                  disabled={!canDetect || isLocating}
-                >
-                  <span className="location-picker-action-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M12 21s7-7 7-11a7 7 0 1 0-14 0c0 4 7 11 7 11z" stroke="currentColor" strokeWidth="2" fill="none" />
-                      <circle cx="12" cy="10" r="2.5" fill="currentColor" />
-                    </svg>
-                  </span>
-                  {isLocating ? 'Aniqlanmoqda...' : 'Joylashuvni aniqlash'}
-                </button>
-                <button
-                  type="button"
-                  className="location-picker-action secondary"
-                  onClick={openMap}
-                >
-                  <span className="location-picker-action-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M4 6l6-2 6 2 4-2v14l-4 2-6-2-6 2V6z" stroke="currentColor" strokeWidth="2" fill="none" />
-                      <path d="M10 4v14M16 6v14" stroke="currentColor" strokeWidth="2" />
-                    </svg>
-                  </span>
-                  Xaritada tanlash
-                </button>
-              </div>
-
-              {locationError && (
-                <div className="location-picker-error">{locationError}</div>
-              )}
-              {geoStatusLabel && (
-                <div className="location-picker-helper">Oxirgi avto-aniqlash: {geoStatusLabel}</div>
-              )}
             </div>
 
             <div className="location-picker-results">
@@ -542,67 +507,89 @@ function LocationPickerModal({
                     </svg>
                   </span>
                   <span className="location-picker-result-body">
-                    <span className="location-picker-result-title">Kiritilgan manzilni saqlash</span>
+                    <span className="location-picker-result-title">Kiritilgan manzilni ishlatish</span>
                     <span className="location-picker-result-subtitle">{query.trim()}</span>
                   </span>
                 </button>
               )}
             </div>
+          </div>
+        ) : (
+          <>
+            <div className="location-picker-header">
+              <div className="location-picker-title">
+                <p>Manzilni tanlang</p>
+                <span>Bu manzil uchun mavjudlikni ko'rsatamiz</span>
+              </div>
+              <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
 
-            {onReset && (
-              <div className="location-picker-footer">
+            <div className="location-picker-map">
+              <div className="location-picker-map-canvas">
+                {!mapLoaded && (
+                  <div className="location-picker-map-loading">
+                    Xarita yuklanmoqda...
+                  </div>
+                )}
+                <div ref={mapRef} className="location-picker-map-view" />
+                <div className="location-picker-map-pin" aria-hidden="true">
+                  <div className="location-picker-map-pin-inner" />
+                </div>
+                <div className="location-picker-map-hint">Xaritani suring</div>
+              </div>
+            </div>
+
+            <div className="location-picker-sheet">
+              {showGeoSuggestion && (
+                <div className="location-picker-geo">
+                  <span>{geoMessage}</span>
+                  <button
+                    type="button"
+                    className="location-picker-geo-btn"
+                    onClick={() => onDetectLocation?.()}
+                    disabled={!canDetect || isLocating}
+                  >
+                    {isLocating ? 'Aniqlanmoqda...' : geoButtonLabel}
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="location-picker-address"
+                onClick={openSearch}
+                aria-label="Manzilni qo'lda kiritish"
+              >
+                <span className="location-picker-address-value">
+                  {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Manzil topilmadi')}
+                </span>
+                <span className="location-picker-address-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 20l4-1 9-9-3-3-9 9-1 4z" stroke="currentColor" strokeWidth="2" fill="none" />
+                    <path d="M13 7l3 3" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+              </button>
+
+              {locationError && (
+                <div className="location-picker-error">{locationError}</div>
+              )}
+
+              <button type="button" className="location-picker-confirm" onClick={handleConfirmMap}>
+                Manzilni tasdiqlash
+              </button>
+
+              {onReset && (
                 <button type="button" className="location-picker-reset" onClick={onReset}>
                   Joylashuvni tozalash
                 </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="location-picker-map">
-            <div className="location-picker-map-topbar">
-              <button type="button" className="location-picker-map-back" onClick={closeMap}>
-                <span aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </span>
-                Ortga
-              </button>
-                <button
-                  type="button"
-                  className="location-picker-map-gps"
-                  onClick={() => onDetectLocation?.()}
-                  disabled={!canDetect || isLocating}
-                >
-                  {isLocating ? 'Aniqlanmoqda...' : 'Joylashuvim'}
-                </button>
-            </div>
-
-            <div className="location-picker-map-canvas">
-              {!mapLoaded && (
-                <div className="location-picker-map-loading">
-                  Xarita yuklanmoqda...
-                </div>
               )}
-              <div ref={mapRef} className="location-picker-map-view" />
-              <div className="location-picker-map-pin" aria-hidden="true">
-                <div className="location-picker-map-pin-inner" />
-              </div>
-              <div className="location-picker-map-hint">Xaritani suring</div>
             </div>
-
-            <div className="location-picker-map-sheet">
-              <div className="location-picker-map-address">
-                <span className="location-picker-map-label">Tanlangan manzil</span>
-                <span className="location-picker-map-value">
-                  {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Manzil topilmadi')}
-                </span>
-              </div>
-              <button type="button" className="location-picker-confirm" onClick={handleConfirmMap}>
-                Saqlash
-              </button>
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>
