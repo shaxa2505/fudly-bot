@@ -233,11 +233,6 @@ const OfferCard = memo(function OfferCard({
           )}
           {showDiscountTag ? (
             <span className="offer-tag offer-tag--discount">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M19 5L5 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="2"/>
-                <circle cx="17" cy="17" r="2.5" stroke="currentColor" strokeWidth="2"/>
-              </svg>
               -{discountPercent}%
             </span>
           ) : (timeRange && (

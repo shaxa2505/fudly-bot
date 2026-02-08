@@ -266,14 +266,13 @@ class StoreMixin:
             query += " GROUP BY s.store_id ORDER BY avg_rating DESC, s.created_at DESC"
             cursor.execute(query, params)
             rows = [dict(row) for row in cursor.fetchall()]
-            if not rows and city and not region and not district and hasattr(self, "_resolve_city_fallback"):
+            if not rows and city and hasattr(self, "_resolve_city_fallback"):
                 resolved_region, resolved_district = self._resolve_city_fallback(city)
                 if resolved_region or resolved_district:
                     return self.get_stores_by_location(
                         city=None,
                         region=resolved_region,
                         district=resolved_district,
-                        business_type=business_type,
                     )
             return rows
 
@@ -405,15 +404,6 @@ class StoreMixin:
 
             cursor.execute(query, params)
             rows = [dict(row) for row in cursor.fetchall()]
-            if not rows and city and hasattr(self, "_resolve_city_fallback"):
-                resolved_region, resolved_district = self._resolve_city_fallback(city)
-                if resolved_region or resolved_district:
-                    return self.get_stores_by_location(
-                        city=None,
-                        region=resolved_region,
-                        district=resolved_district,
-                        business_type=business_type,
-                    )
             return rows
 
     def get_approved_stores(self, city: str = None):

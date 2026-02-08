@@ -90,6 +90,16 @@ class TestDatabasePostgres:
             assert city_stores[0].get("city") == city
             assert "name" in city_stores[0]
 
+    def test_get_stores_by_city_empty_returns_list(self, db):
+        """Empty city search should return a list (no NameError)."""
+        city_stores = db.get_stores_by_city("NoCityForTest_12345")
+        assert isinstance(city_stores, list)
+
+    def test_get_nearby_stores_empty_returns_list(self, db):
+        """Empty nearby search should return a list (no NameError)."""
+        nearby = db.get_nearby_stores(latitude=41.3, longitude=69.2, limit=5, offset=0)
+        assert isinstance(nearby, list)
+
     def test_get_approved_stores_returns_list_of_dicts(self, db):
         """Test that get_approved_stores returns list of dicts"""
         # Register user and add approved store

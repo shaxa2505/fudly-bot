@@ -134,8 +134,8 @@ async def get_stores(
     try:
         normalized_city = normalize_city(city) if city else None
         normalized_city = normalized_city or None
-        region = region or None
-        district = district or None
+        region = normalize_city(region) if region else None
+        district = normalize_city(district) if district else None
         lat_val = lat if lat is not None else latitude
         lon_val = lon if lon is not None else longitude
 

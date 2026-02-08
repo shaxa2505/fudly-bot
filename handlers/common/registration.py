@@ -34,7 +34,9 @@ def _is_city_selected(user_data: object | None) -> bool:
     city_norm = normalize_city(city_raw)
     region = get_user_field(user_data, "region")
     district = get_user_field(user_data, "district")
-    if city_norm == "Ташкент" and not (region or district):
+    region_id = get_user_field(user_data, "region_id")
+    district_id = get_user_field(user_data, "district_id")
+    if city_norm == "Ташкент" and not (region or district or region_id or district_id):
         return False
     return True
 
@@ -305,7 +307,7 @@ async def registration_city_callback(
             db.update_user_location(
                 callback.from_user.id,
                 city=normalized_city,
-                clear_region=True,
+                region=normalized_city,
                 clear_district=True,
             )
         else:

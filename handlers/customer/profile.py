@@ -328,7 +328,7 @@ async def profile_change_city_cb(callback: types.CallbackQuery, state: FSMContex
         db.update_user_location(
             callback.from_user.id,
             city=normalized_city,
-            clear_region=True,
+            region=normalized_city,
             clear_district=True,
         )
     else:
