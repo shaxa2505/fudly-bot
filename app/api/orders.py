@@ -207,11 +207,24 @@ async def calculate_delivery_cost(city: str, address: str, store_id: int, db) ->
 
     store_dict = dict(store) if not isinstance(store, dict) else store
     store_city_raw = store_dict.get("city", "") or ""
+    store_region_raw = store_dict.get("region", "") or ""
+    store_district_raw = store_dict.get("district", "") or ""
     normalized_city = normalize_city(city or "")
     normalized_store_city = normalize_city(store_city_raw)
+    normalized_store_region = normalize_city(store_region_raw) if store_region_raw else ""
+    normalized_store_district = normalize_city(store_district_raw) if store_district_raw else ""
 
-    # Check if same city using normalized values to align Uzbek/Russian inputs
-    if normalized_city.lower() != normalized_store_city.lower():
+    # Check if city matches store city/region/district using normalized values
+    allowed_keys = {
+        value.lower()
+        for value in (
+            normalized_store_city,
+            normalized_store_region,
+            normalized_store_district,
+        )
+        if value
+    }
+    if normalized_city.lower() not in allowed_keys:
         return DeliveryResult(
             can_deliver=False,
             delivery_cost=None,
