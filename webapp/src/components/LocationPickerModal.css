@@ -8,6 +8,9 @@
   padding: 14px 14px calc(14px + var(--safe-area-bottom));
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(12px) saturate(120%);
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .location-picker {
@@ -355,25 +358,26 @@
 .location-picker-search-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 18px 20px 8px;
 }
 
 .location-picker-back {
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 500;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--lp-border);
+  background: #ffffff;
   color: var(--lp-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
 }
 
 .location-picker-back svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .location-picker-search-field {
@@ -392,8 +396,8 @@
 }
 
 .location-picker-input:focus-within {
-  border-color: rgba(15, 23, 42, 0.2);
-  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.16);
+  box-shadow: none;
 }
 
 .location-picker-input-icon {
@@ -420,6 +424,9 @@
   font-weight: 500;
   color: var(--lp-text);
   background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
 }
 
 .location-picker-clear {

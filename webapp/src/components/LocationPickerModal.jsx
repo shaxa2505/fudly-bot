@@ -317,6 +317,20 @@ function LocationPickerModal({
   }, [isOpen, location?.address, location?.city, coords?.lat, coords?.lon])
 
   useEffect(() => {
+    if (!isOpen) return undefined
+    const body = document.body
+    const html = document.documentElement
+    const prevBodyOverflow = body.style.overflow
+    const prevHtmlOverflow = html.style.overflow
+    body.style.overflow = 'hidden'
+    html.style.overflow = 'hidden'
+    return () => {
+      body.style.overflow = prevBodyOverflow
+      html.style.overflow = prevHtmlOverflow
+    }
+  }, [isOpen])
+
+  useEffect(() => {
     if (!isOpen || mode !== 'search') return
     const timer = setTimeout(() => {
       searchInputRef.current?.focus()
@@ -730,18 +744,17 @@ function LocationPickerModal({
         {mode === 'search' ? (
           <div className="location-picker-search-view">
             <div className="location-picker-search-header">
-              <button type="button" className="location-picker-back" onClick={closeSearch}>
+              <button
+                type="button"
+                className="location-picker-back"
+                onClick={closeSearch}
+                aria-label="Ortga"
+              >
                 <span aria-hidden="true">
                   <svg viewBox="0 0 24 24">
                     <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </span>
-                Ortga
-              </button>
-              <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                </svg>
               </button>
             </div>
 
