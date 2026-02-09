@@ -10,9 +10,16 @@ class ErrorBoundary extends React.Component {
   static isDebugEnabled() {
     if (typeof window === 'undefined') return false;
     try {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('debug') === '1') return true;
+      const search = String(window.location?.search || '');
+      const hash = String(window.location?.hash || '');
+      const href = String(window.location?.href || '');
+      const params = new URLSearchParams(search.startsWith('?') ? search : '');
+      const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : '');
+      if (params.get('debug') === '1' || params.get('debug') === 'true') return true;
+      if (hashParams.get('debug') === '1' || hashParams.get('debug') === 'true') return true;
+      if (href.includes('debug=1') || href.includes('debug=true')) return true;
       if (window.localStorage?.getItem('fudly_debug') === '1') return true;
+      if (window.sessionStorage?.getItem('fudly_debug') === '1') return true;
     } catch {
       return false;
     }
