@@ -393,10 +393,12 @@
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #f8fafc;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  min-height: 48px;
 }
 
 .location-picker-input:focus-within {
-  border-color: rgba(15, 23, 42, 0.16);
+  border-color: rgba(15, 23, 42, 0.08);
   box-shadow: none;
 }
 
@@ -427,6 +429,12 @@
   appearance: none;
   -webkit-appearance: none;
   box-shadow: none;
+  min-width: 0;
+}
+
+.location-picker-input input:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .location-picker-clear {
@@ -440,11 +448,17 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: opacity 0.15s ease;
 }
 
 .location-picker-clear svg {
   width: 16px;
   height: 16px;
+}
+
+.location-picker-clear.is-hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .location-picker-results {

@@ -115,6 +115,79 @@ function AppContent() {
   }, [])
 
   useEffect(() => {
+    const root = document.documentElement
+    const isTouch =
+      window.matchMedia?.('(pointer: coarse)')?.matches ||
+      ['android', 'ios'].includes(window.Telegram?.WebApp?.platform)
+    if (!isTouch) return undefined
+
+    const isInputLike = (el) => {
+      if (!el) return false
+      const tag = el.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return true
+      return Boolean(el.isContentEditable)
+    }
+
+    let baseline = window.visualViewport?.height || window.innerHeight
+    let lastState = false
+    let rafId = 0
+
+    const setKeyboardOpen = (open) => {
+      if (open === lastState) return
+      lastState = open
+      root.classList.toggle('keyboard-open', open)
+    }
+
+    const updateFromViewport = () => {
+      const viewport = window.visualViewport
+      if (!viewport) return
+      const diff = Math.max(0, baseline - viewport.height)
+      const activeInput = isInputLike(document.activeElement)
+      const nextOpen = activeInput && diff > 120
+      setKeyboardOpen(nextOpen)
+      if (!activeInput && diff < 60) {
+        baseline = Math.max(baseline, viewport.height)
+      }
+    }
+
+    const scheduleUpdate = () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(updateFromViewport)
+    }
+
+    const handleFocusIn = (event) => {
+      if (!isInputLike(event.target)) return
+      if (!window.visualViewport) {
+        setKeyboardOpen(true)
+        return
+      }
+      scheduleUpdate()
+    }
+
+    const handleFocusOut = () => {
+      setTimeout(() => {
+        if (!isInputLike(document.activeElement)) {
+          setKeyboardOpen(false)
+        }
+      }, 80)
+    }
+
+    window.visualViewport?.addEventListener('resize', scheduleUpdate)
+    window.visualViewport?.addEventListener('scroll', scheduleUpdate)
+    document.addEventListener('focusin', handleFocusIn)
+    document.addEventListener('focusout', handleFocusOut)
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      window.visualViewport?.removeEventListener('resize', scheduleUpdate)
+      window.visualViewport?.removeEventListener('scroll', scheduleUpdate)
+      document.removeEventListener('focusin', handleFocusIn)
+      document.removeEventListener('focusout', handleFocusOut)
+      root.classList.remove('keyboard-open')
+    }
+  }, [])
+
+  useEffect(() => {
     const container = getScrollContainer()
     if (!container) return
     if (

@@ -49,6 +49,22 @@
   --app-surface-top: 0px;
 }
 
+/* Avoid UI jumping when virtual keyboard opens on mobile */
+.keyboard-open {
+  --bottom-nav-height: 0px;
+}
+
+.keyboard-open .bottom-nav {
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.keyboard-open .app-surface {
+  scroll-behavior: auto;
+  overscroll-behavior: none;
+}
+
 /* iOS Safari: keep the system picker open by avoiding clipped/overflowed parents. */
 .file-picker-open body {
   overflow: visible;
