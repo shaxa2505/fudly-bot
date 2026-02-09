@@ -37,24 +37,37 @@ const getSessionStorage = () => {
   }
 }
 
-const readStoredInitData = (userId = null) => {
-  const storage = getSessionStorage()
-  if (!storage) return null
-  const suffix = userId ? `_${userId}` : ''
-  const initData = storage.getItem(`${INITDATA_KEY}${suffix}`)
-  if (!initData) return null
-  const tsRaw = storage.getItem(`${INITDATA_TS_KEY}${suffix}`)
-  const ts = tsRaw ? Number(tsRaw) : 0
-  if (!ts || Date.now() - ts > INITDATA_TTL_MS) {
-    storage.removeItem(`${INITDATA_KEY}${suffix}`)
-    storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
+const getLocalStorage = () => {
+  try {
+    return window.localStorage
+  } catch {
     return null
   }
-  return initData
+}
+
+const readStoredInitData = (userId = null) => {
+  const suffix = userId ? `_${userId}` : ''
+  const storages = [getSessionStorage(), getLocalStorage()].filter(Boolean)
+  if (!storages.length) return null
+
+  for (const storage of storages) {
+    const initData = storage.getItem(`${INITDATA_KEY}${suffix}`)
+    if (!initData) continue
+    const tsRaw = storage.getItem(`${INITDATA_TS_KEY}${suffix}`)
+    const ts = tsRaw ? Number(tsRaw) : 0
+    if (!ts || Date.now() - ts > INITDATA_TTL_MS) {
+      storage.removeItem(`${INITDATA_KEY}${suffix}`)
+      storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
+      continue
+    }
+    return initData
+  }
+
+  return null
 }
 
 export const saveTelegramInitData = (initData, userId = null) => {
-  const storage = getSessionStorage()
+  const storage = getSessionStorage() || getLocalStorage()
   if (!storage || !initData) return
   const suffix = userId ? `_${userId}` : ''
   storage.setItem(`${INITDATA_KEY}${suffix}`, initData)
@@ -65,13 +78,14 @@ export const saveTelegramInitData = (initData, userId = null) => {
 }
 
 export const clearTelegramInitData = (userId = null) => {
-  const storage = getSessionStorage()
-  if (!storage) return
   const suffix = userId ? `_${userId}` : ''
-  storage.removeItem(`${INITDATA_KEY}${suffix}`)
-  storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
-  if (!userId) {
-    storage.removeItem('fudly_last_user_id')
+  const storages = [getSessionStorage(), getLocalStorage()].filter(Boolean)
+  for (const storage of storages) {
+    storage.removeItem(`${INITDATA_KEY}${suffix}`)
+    storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
+    if (!userId) {
+      storage.removeItem('fudly_last_user_id')
+    }
   }
 }
 
@@ -82,16 +96,12 @@ export const getTelegramInitData = () => {
     return tgInitData
   }
 
-  if (!tgWebApp) {
-    return null
-  }
-
   const tgUserId = tgWebApp?.initDataUnsafe?.user?.id
   if (tgUserId) {
     return readStoredInitData(tgUserId)
   }
 
-  const storage = getSessionStorage()
+  const storage = getSessionStorage() || getLocalStorage()
   const lastUserId = storage?.getItem('fudly_last_user_id')
   if (lastUserId) {
     return readStoredInitData(lastUserId)
@@ -106,7 +116,9 @@ const getCacheScopeKey = () => {
     return `u:${tgUserId}`
   }
   const storage = getSessionStorage()
-  const lastUserId = storage?.getItem('fudly_last_user_id')
+  const lastUserId =
+    storage?.getItem('fudly_last_user_id') ||
+    getLocalStorage()?.getItem('fudly_last_user_id')
   if (lastUserId) {
     return `u:${lastUserId}`
   }
@@ -190,6 +202,17 @@ const serializeParams = (params) => {
 }
 
 const buildCacheKey = (url, params) => `${getCacheScopeKey()}|${url}?${serializeParams(params)}`
+
+const safeJoinUrl = (base, path) => {
+  try {
+    return new URL(path, base).toString()
+  } catch {
+    if (!base) return path
+    const trimmedBase = base.endsWith('/') ? base.slice(0, -1) : base
+    const trimmedPath = path.startsWith('/') ? path : `/${path}`
+    return `${trimmedBase}${trimmedPath}`
+  }
+}
 
 const getCachedEntry = (cacheKey) => {
   const cached = requestCache.get(cacheKey)
@@ -279,11 +302,11 @@ const api = {
     }
 
     if (normalized.startsWith('/')) {
-      return new URL(normalized, API_BASE).toString()
+      return safeJoinUrl(API_BASE, normalized)
     }
 
     if (normalized.startsWith('api/')) {
-      return new URL(`/${normalized}`, API_BASE).toString()
+      return safeJoinUrl(API_BASE, `/${normalized}`)
     }
 
     // Telegram file_id or storage id - use our API endpoint
