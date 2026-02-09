@@ -186,8 +186,14 @@ const scoreCityMatch = (item, cityKey) => {
   if (!cityKey) return 0
   const itemCityKey = buildCitySearchKey(getCityFromItem(item))
   let score = 0
-  if (itemCityKey && itemCityKey === cityKey) {
-    score += 100
+  if (itemCityKey) {
+    if (itemCityKey === cityKey) {
+      score += 120
+    } else if (itemCityKey.startsWith(cityKey) || cityKey.startsWith(itemCityKey)) {
+      score += 60
+    } else {
+      score -= 20
+    }
   }
   if (isCityLikeResult(item)) {
     score += 30
@@ -341,24 +347,35 @@ function LocationPickerModal({
           lat: coords?.lat,
           lon: coords?.lon,
           limit: 8,
+          countrycodes: 'uz',
         })
         let items = Array.isArray(response?.items)
           ? response.items
           : (Array.isArray(response) ? response : [])
         items = items.filter(isUzbekistanResult)
+        const queryCityKey = buildCitySearchKey(citySuggestion || normalized)
+        if (localSuggestions.length && queryCityKey) {
+          const matched = items.filter((item) => {
+            const itemKey = buildCitySearchKey(getCityFromItem(item))
+            return itemKey && (itemKey.startsWith(queryCityKey) || queryCityKey.startsWith(itemKey))
+          })
+          if (matched.length) {
+            items = matched
+          }
+        }
         if (citySuggestion) {
           const cityKey = buildCitySearchKey(citySuggestion)
-          items = items
-            .map((item, index) => ({
-              item,
-              index,
-              score: scoreCityMatch(item, cityKey),
-            }))
-            .sort((a, b) => {
-              if (b.score !== a.score) return b.score - a.score
-              return a.index - b.index
-            })
-            .map(({ item }) => item)
+          const scored = items.map((item, index) => ({
+            item,
+            index,
+            score: scoreCityMatch(item, cityKey),
+          }))
+          const filtered = scored.filter(({ score }) => score > 0)
+          const ranked = (filtered.length ? filtered : []).sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score
+            return a.index - b.index
+          })
+          items = ranked.map(({ item }) => item)
         }
 
         const preferCityResults = Boolean(citySuggestion || localSuggestions.length)
@@ -741,7 +758,7 @@ function LocationPickerModal({
                   type="text"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Manzil, mahalla yoki ko'cha"
+                  placeholder="Shahar, mahalla yoki ko'cha"
                 />
                 {query && (
                   <button
@@ -761,7 +778,7 @@ function LocationPickerModal({
             <div className="location-picker-results">
               <div className="location-picker-results-header">
                 <span>Natijalar</span>
-                <span className="location-picker-results-hint">Tanlash uchun bosing</span>
+                <span className="location-picker-results-hint">Bosib tanlang</span>
               </div>
               {searchLoading && (
                 <div className="location-picker-loading">Qidirilmoqda...</div>
@@ -769,7 +786,7 @@ function LocationPickerModal({
 
               {!searchLoading && !hasResults && query.trim().length >= 2 && (
                 <div className="location-picker-empty">
-                  {searchError || 'Natija topilmadi'}
+                  {searchError || 'Hech narsa topilmadi'}
                 </div>
               )}
 
@@ -809,8 +826,8 @@ function LocationPickerModal({
                     </svg>
                   </span>
                   <span className="location-picker-result-body">
-                    <span className="location-picker-result-title">Kiritilgan manzilni ishlatish</span>
-                    <span className="location-picker-result-hint">Aniq manzil topilmasa</span>
+                    <span className="location-picker-result-title">Kiritilgan manzilni tanlash</span>
+                    <span className="location-picker-result-hint">Agar aniq manzil topilmasa</span>
                     <span className="location-picker-result-subtitle">{query.trim()}</span>
                   </span>
                 </button>
@@ -822,7 +839,7 @@ function LocationPickerModal({
             <div className="location-picker-header">
               <div className="location-picker-title">
                 <p>Manzilni tanlang</p>
-                <span>Xaritadan manzilni belgilang</span>
+                <span>Xaritada manzilni belgilang</span>
               </div>
               <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -855,14 +872,14 @@ function LocationPickerModal({
                     </svg>
                   </button>
                 )}
-                <div className="location-picker-map-hint">Xaritani suring</div>
+                <div className="location-picker-map-hint">Xaritani siljiting</div>
               </div>
             </div>
 
             <div className="location-picker-sheet">
               {showGeoSuggestion && (
                 <div className="location-picker-geo">
-                  <span>Joriy joylashuv</span>
+                  <span>Joriy joylashuvni aniqlash</span>
                   <button
                     type="button"
                     className="location-picker-geo-btn"

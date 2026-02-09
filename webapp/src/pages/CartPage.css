@@ -3018,8 +3018,8 @@
 }
 
 .checkout-payment-icon {
-  width: 42px;
-  height: 26px;
+  width: 46px;
+  height: 28px;
   border-radius: 8px;
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
@@ -3033,11 +3033,22 @@
 }
 
 .checkout-payment-logo {
-  width: 34px;
+  width: 38px;
   height: auto;
-  max-height: 18px;
+  max-height: 20px;
   display: block;
   object-fit: contain;
+}
+
+.checkout-payment-icon--click {
+  width: 64px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.checkout-payment-icon--click .checkout-payment-logo {
+  width: 56px;
+  max-height: 24px;
 }
 
 .checkout-payment-icon--cash {
