@@ -134,6 +134,11 @@ class NotificationBuilder:
         )
 
         lines: list[str] = [header]
+        if normalized_status in ("cancelled", "rejected"):
+            banner_key = "order_cancelled_bold" if normalized_status == "cancelled" else "order_rejected_bold"
+            banner = get_text(lang, banner_key)
+            if banner:
+                lines.append(banner)
         lines.append(f"{get_text(lang, 'label_status')}: {status_text}")
 
         payment_text = self._payment_label(lang, payment_method)
