@@ -1033,9 +1033,16 @@ function CartPage({ user }) {
     const message = "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
     const tg = window.Telegram?.WebApp
     if (tg?.showConfirm) {
-      return new Promise(resolve => {
-        tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)))
-      })
+      try {
+        return new Promise(resolve => {
+          tg.showConfirm(message, (confirmed) => resolve(Boolean(confirmed)))
+        })
+      } catch {
+        // fall back to native confirm
+      }
+    }
+    if (typeof window.confirm === 'function') {
+      return window.confirm(message)
     }
     return true
   }, [])
@@ -1155,12 +1162,16 @@ function CartPage({ user }) {
     const message = "Savatni tozalashni xohlaysizmi?"
     const tg = window.Telegram?.WebApp
     if (tg?.showConfirm) {
-      tg.showConfirm(message, (confirmed) => {
-        if (confirmed) {
-          clearCart()
-        }
-      })
-      return
+      try {
+        tg.showConfirm(message, (confirmed) => {
+          if (confirmed) {
+            clearCart()
+          }
+        })
+        return
+      } catch {
+        // fall back to native confirm
+      }
     }
     if (window.confirm(message)) {
       clearCart()
@@ -1176,14 +1187,18 @@ function CartPage({ user }) {
       const message = "Joriy savat almashtiriladi. Davom etasizmi?"
       const tg = window.Telegram?.WebApp
       if (tg?.showConfirm) {
-        tg.showConfirm(message, (confirmed) => {
-          if (!confirmed) return
-          replaceCart(pendingPayment.cart)
-          clearPendingPayment()
-          setPendingPayment(null)
-          toast.success("Savat tiklandi")
-        })
-        return
+        try {
+          tg.showConfirm(message, (confirmed) => {
+            if (!confirmed) return
+            replaceCart(pendingPayment.cart)
+            clearPendingPayment()
+            setPendingPayment(null)
+            toast.success("Savat tiklandi")
+          })
+          return
+        } catch {
+          // fall back to native confirm
+        }
       }
       if (!window.confirm(message)) {
         return

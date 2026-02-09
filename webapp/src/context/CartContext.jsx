@@ -13,8 +13,16 @@ const getSessionStorage = () => {
   }
 };
 
+const getTelegramUserId = () => {
+  try {
+    return window.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+};
+
 const getStorageKey = () => {
-  const tgUserId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+  const tgUserId = getTelegramUserId();
   if (tgUserId) {
     return `${STORAGE_PREFIX}${tgUserId}`;
   }
