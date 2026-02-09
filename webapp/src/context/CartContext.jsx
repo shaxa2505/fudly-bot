@@ -28,6 +28,39 @@ const getStorageKey = () => {
 };
 
 // Helper to read cart from localStorage
+const normalizeCart = (raw) => {
+  if (!raw) return {};
+
+  const items = Array.isArray(raw)
+    ? raw
+    : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+
+  if (!items.length) return {};
+
+  const normalized = {};
+  items.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const offer =
+      item.offer && typeof item.offer === 'object'
+        ? { ...item.offer }
+        : null;
+    if (!offer) return;
+
+    const offerId = offer.id ?? offer.offer_id ?? offer.offerId ?? item.offer_id ?? item.offerId;
+    const quantity = Number(item.quantity ?? item.qty ?? 0);
+    if (!offerId || !Number.isFinite(quantity) || quantity <= 0) return;
+
+    offer.id = offerId;
+    normalized[String(offerId)] = {
+      ...item,
+      offer,
+      quantity,
+    };
+  });
+
+  return normalized;
+};
+
 const getCartFromStorage = () => {
   try {
     const storageKey = getStorageKey();
@@ -40,10 +73,7 @@ const getCartFromStorage = () => {
     }
     if (!saved) return {};
     const parsed = JSON.parse(saved);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return {};
-    }
-    return parsed;
+    return normalizeCart(parsed);
   } catch {
     return {};
   }

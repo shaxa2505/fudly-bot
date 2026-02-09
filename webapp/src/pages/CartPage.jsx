@@ -86,7 +86,6 @@ function CartPage({ user }) {
     cartItems,
     cartCount,
     cartTotal,
-    isEmpty,
     addToCart,
     updateQuantity,
     updateOfferData,
@@ -94,6 +93,28 @@ function CartPage({ user }) {
     removeItem,
     clearCart
   } = useCart()
+
+  const safeCartItems = useMemo(
+    () => cartItems.filter(item => item?.offer && item.offer.id != null),
+    [cartItems]
+  )
+  const isSafeEmpty = safeCartItems.length === 0
+  const safeItemsCount = useMemo(() => (
+    safeCartItems.reduce((sum, item) => sum + Number(item?.quantity || 0), 0)
+  ), [safeCartItems])
+
+  useEffect(() => {
+    if (!cartItems.length) return
+    if (safeCartItems.length === cartItems.length) return
+    const normalized = {}
+    safeCartItems.forEach((item) => {
+      normalized[String(item.offer.id)] = {
+        offer: item.offer,
+        quantity: item.quantity,
+      }
+    })
+    replaceCart(normalized)
+  }, [cartItems, safeCartItems, replaceCart])
 
   const botUsername = import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'
   const cachedUser = getCurrentUser()
@@ -760,7 +781,7 @@ function CartPage({ user }) {
   const serviceFee = 0
   const total = calcTotalPrice(subtotal, serviceFee)
   const checkoutTotal = total
-  const itemsCount = cartCount
+  const itemsCount = safeItemsCount
   const unavailableCartItems = useMemo(() => {
     return cartItems.filter((item) => {
       const availability = getOfferAvailability(item.offer)
@@ -774,7 +795,7 @@ function CartPage({ user }) {
     return availability.timeRange || ''
   }, [hasUnavailableItems, unavailableCartItems])
   const savingsTotal = useMemo(() => {
-    return cartItems.reduce((sum, item) => {
+    return safeCartItems.reduce((sum, item) => {
       const original = Number(item.offer.original_price)
       const discount = Number(item.offer.discount_price)
       if (!Number.isFinite(original) || !Number.isFinite(discount)) {
@@ -785,7 +806,7 @@ function CartPage({ user }) {
       }
       return sum + (original - discount) * item.quantity
     }, 0)
-  }, [cartItems])
+  }, [safeCartItems])
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
   const originalTotal = calcTotalPrice(subtotal, savingsTotal)
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
@@ -977,13 +998,13 @@ function CartPage({ user }) {
     return normalized.join('|')
   }, [normalizeCartEntry])
   const currentCartSignature = useMemo(
-    () => buildCartSignature(cartItems),
-    [buildCartSignature, cartItems]
+    () => buildCartSignature(safeCartItems),
+    [buildCartSignature, safeCartItems]
   )
   const currentCartStoreId = useMemo(() => {
-    const item = cartItems.find(entry => entry?.offer?.store_id)
+    const item = safeCartItems.find(entry => entry?.offer?.store_id)
     return item?.offer?.store_id ?? null
-  }, [cartItems])
+  }, [safeCartItems])
   const currentCartTotal = useMemo(() => {
     const raw = Number(cartTotal ?? 0)
     return Number.isFinite(raw) ? raw : 0
@@ -1151,7 +1172,7 @@ function CartPage({ user }) {
       toast.error("Savatni tiklab bo'lmadi")
       return
     }
-    if (!isEmpty) {
+    if (!isSafeEmpty) {
       const message = "Joriy savat almashtiriladi. Davom etasizmi?"
       const tg = window.Telegram?.WebApp
       if (tg?.showConfirm) {
@@ -1172,7 +1193,7 @@ function CartPage({ user }) {
     clearPendingPayment()
     setPendingPayment(null)
     toast.success("Savat tiklandi")
-  }, [pendingPayment, replaceCart, toast, isEmpty])
+  }, [pendingPayment, replaceCart, toast, isSafeEmpty])
 
   const handleResumePayment = useCallback(async () => {
     if (!pendingPayment?.orderId) return
@@ -1277,7 +1298,7 @@ function CartPage({ user }) {
 
   const buildCartSnapshot = useCallback(() => {
     const snapshot = {}
-    cartItems.forEach((item) => {
+    safeCartItems.forEach((item) => {
       const offerId = item.offer?.id
       if (!offerId) return
       snapshot[String(offerId)] = {
@@ -1286,7 +1307,7 @@ function CartPage({ user }) {
       }
     })
     return snapshot
-  }, [cartItems])
+  }, [safeCartItems])
 
   useEffect(() => {
     if (!pendingPayment?.orderId) return
@@ -1404,7 +1425,7 @@ function CartPage({ user }) {
 
   // Handle quantity change with delta (+1 or -1)
   const handleQuantityChange = (offerId, delta) => {
-    const item = cartItems.find(i => i.offer.id === offerId)
+    const item = safeCartItems.find(i => i.offer.id === offerId)
     if (item) {
       const newQty = item.quantity + delta
       if (newQty <= 0) {
@@ -1475,11 +1496,11 @@ function CartPage({ user }) {
 
 
   const validateCartWithServer = useCallback(async () => {
-    if (isEmpty) {
+    if (isSafeEmpty) {
       return { ok: false, reason: 'empty' }
     }
 
-    const payload = cartItems
+    const payload = safeCartItems
       .map((item) => ({
         offerId: item.offer?.id,
         quantity: item.quantity,
@@ -1507,7 +1528,7 @@ function CartPage({ user }) {
       const missingIds = []
       const updates = []
 
-      cartItems.forEach((item) => {
+      safeCartItems.forEach((item) => {
         const offerId = item.offer?.id
         if (!offerId) return
         const serverItem = serverMap.get(String(offerId))
@@ -1555,7 +1576,7 @@ function CartPage({ user }) {
       toast.error("Savatni tekshirib bo'lmadi. Qayta urinib ko'ring.")
       return { ok: false, reason: 'error' }
     }
-  }, [cartItems, isEmpty, removeItem, toast, updateOfferData])
+  }, [safeCartItems, isSafeEmpty, removeItem, toast, updateOfferData])
 
   const validateDeliveryWithServer = useCallback(async () => {
     if (orderType !== 'delivery') {
@@ -1818,7 +1839,7 @@ function CartPage({ user }) {
   ])
 
   const handleCheckout = async () => {
-    if (isEmpty) return
+    if (isSafeEmpty) return
     if (hasMultipleStores) {
       toast.error(multiStoreMessage)
       return
@@ -1948,7 +1969,7 @@ function CartPage({ user }) {
 
   // Place order (cash/pickup)
   const placeOrder = async () => {
-    if (isEmpty) return
+    if (isSafeEmpty) return
     if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
       toast.warning(
         `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
@@ -1970,7 +1991,7 @@ function CartPage({ user }) {
       const deliveryLat = orderType === 'delivery' ? (deliveryCoords?.lat ?? null) : null
       const deliveryLon = orderType === 'delivery' ? (deliveryCoords?.lon ?? null) : null
       const orderData = {
-        items: cartItems.map(item => ({
+        items: safeCartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
@@ -2055,7 +2076,7 @@ function CartPage({ user }) {
       const deliveryLon = orderType === 'delivery' ? (deliveryCoords?.lon ?? null) : null
       // First create the order
       const orderData = {
-        items: cartItems.map(item => ({
+        items: safeCartItems.map(item => ({
           offer_id: item.offer.id,
           quantity: item.quantity,
         })),
@@ -2078,7 +2099,7 @@ function CartPage({ user }) {
       }
 
       orderId = result.order_id || result.bookings?.[0]?.booking_id
-      const storeId = cartItems[0]?.offer?.store_id || null
+      const storeId = safeCartItems[0]?.offer?.store_id || null
       const returnUrl = `${window.location.origin}/order/${orderId}/details`
       const pendingPayload = savePendingPayment({
         orderId,
@@ -2117,7 +2138,7 @@ function CartPage({ user }) {
   }
 
   // Empty cart
-  if (isEmpty) {
+  if (isSafeEmpty) {
     return (
       <div className="cart-page cart-page--empty">
         <header className="cart-header">
@@ -2236,7 +2257,7 @@ function CartPage({ user }) {
             <ChevronRight size={16} strokeWidth={2} className="cart-store-arrow" aria-hidden="true" />
           </div>
           <div className="cart-store-items">
-            {cartItems.map((item) => {
+            {safeCartItems.map((item) => {
               const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
               const rawStockLimit = item.offer.stock ?? item.offer.quantity ?? 99
               const parsedStockLimit = Number(rawStockLimit)
@@ -2796,7 +2817,7 @@ function CartPage({ user }) {
                     </div>
                     {orderItemsExpanded && (
                       <div className="checkout-order-items">
-                        {cartItems.map(item => {
+                        {safeCartItems.map(item => {
                           const photoUrl = resolveOfferImageUrl(item.offer) || PLACEHOLDER_IMAGE
                           const rawOriginalPrice = item.offer.original_price
                           const rawDiscountPrice = item.offer.discount_price
