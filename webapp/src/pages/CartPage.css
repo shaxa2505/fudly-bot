@@ -3032,6 +3032,14 @@
   text-transform: uppercase;
 }
 
+.checkout-payment-logo {
+  width: 34px;
+  height: auto;
+  max-height: 18px;
+  display: block;
+  object-fit: contain;
+}
+
 .checkout-payment-icon--cash {
   background: #111827;
   color: #FFFFFF;

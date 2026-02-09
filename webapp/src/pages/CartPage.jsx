@@ -14,6 +14,7 @@ import { getCurrentLocation } from '../utils/geolocation'
 import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../utils/pendingPayment'
 import { getOfferAvailability, getTashkentNowMinutes } from '../utils/availability'
 import BottomNav from '../components/BottomNav'
+import clickLogo from '../assets/click_logo.png'
 import './CartPage.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
@@ -2816,7 +2817,11 @@ function CartPage({ user }) {
                           >
                             <div className="checkout-payment-info">
                               <div className={`checkout-payment-icon checkout-payment-icon--${option.id}`}>
-                                <span>{paymentIconLabels[option.id] || option.label}</span>
+                                {option.id === 'click' ? (
+                                  <img className="checkout-payment-logo" src={clickLogo} alt="Click" />
+                                ) : (
+                                  <span>{paymentIconLabels[option.id] || option.label}</span>
+                                )}
                               </div>
                               <span className="checkout-payment-label">{option.label}</span>
                             </div>
