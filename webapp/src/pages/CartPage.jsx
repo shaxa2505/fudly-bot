@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, LocateFixed } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, LocateFixed, Banknote } from 'lucide-react'
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -2819,6 +2819,8 @@ function CartPage({ user }) {
                               <div className={`checkout-payment-icon checkout-payment-icon--${option.id}`}>
                                 {option.id === 'click' ? (
                                   <img className="checkout-payment-logo" src={clickLogo} alt="Click" />
+                                ) : option.id === 'cash' ? (
+                                  <Banknote className="checkout-payment-cash-icon" size={18} strokeWidth={2} aria-hidden="true" />
                                 ) : (
                                   <span>{paymentIconLabels[option.id] || option.label}</span>
                                 )}

@@ -8,7 +8,7 @@
   padding: 14px 14px calc(14px + var(--safe-area-bottom));
   background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(12px) saturate(120%);
-  height: 100dvh;
+  min-height: 100%;
   overflow: hidden;
   overscroll-behavior: contain;
 }
@@ -20,8 +20,8 @@
   --lp-text: #0f172a;
   --lp-surface: #ffffff;
   width: min(560px, 100%);
-  height: min(88vh, 760px);
-  max-height: min(92vh, 820px);
+  height: 100%;
+  max-height: 820px;
   background: #ffffff;
   border-radius: 20px;
   border: 1px solid var(--lp-border);
@@ -31,24 +31,13 @@
   flex-direction: column;
   overflow: hidden;
   animation: location-picker-rise 0.28s ease;
+  align-self: flex-end;
 }
 
 .location-picker.search-mode {
-  height: min(92vh, 820px);
+  height: 100%;
 }
 
-@supports (height: 1svh) {
-  .location-picker-overlay {
-    height: 100svh;
-  }
-  .location-picker {
-    height: min(88svh, 760px);
-    max-height: min(92svh, 820px);
-  }
-  .location-picker.search-mode {
-    height: min(92svh, 820px);
-  }
-}
 
 @keyframes location-picker-rise {
   from {
@@ -408,6 +397,7 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   width: 100%;
   min-height: 48px;
+  box-shadow: none;
 }
 
 .location-picker-input:focus-within {
@@ -444,6 +434,7 @@
   box-shadow: none;
   min-width: 0;
   height: 100%;
+  caret-color: var(--lp-text);
 }
 
 .location-picker-input input:focus {

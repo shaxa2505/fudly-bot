@@ -3057,6 +3057,10 @@
   border: none;
 }
 
+.checkout-payment-cash-icon {
+  display: block;
+}
+
 .checkout-payment-label {
   font-size: 13px;
   font-weight: 600;
