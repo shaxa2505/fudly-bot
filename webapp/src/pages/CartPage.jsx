@@ -1032,7 +1032,8 @@ function CartPage({ user }) {
     hasStoreMatch &&
     hasTotalMatch
   )
-  const shouldShowPendingCard = hasPendingPayment && pendingStatusChecked && pendingStatus !== 'cleared'
+  const shouldShowPendingCard =
+    hasPendingPayment && pendingStatusChecked && pendingStatus === 'awaiting'
   const confirmResumePendingPayment = useCallback(async () => {
     const message = "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
     const tg = window.Telegram?.WebApp
@@ -2483,7 +2484,7 @@ function CartPage({ user }) {
               <h2 className="checkout-title">{checkoutTitle}</h2>
             </div>
 
-            {hasPendingPayment && (
+            {shouldShowPendingCard && (
               <div className="checkout-pending-banner" role="status" aria-live="polite">
                 <div className="checkout-pending-title">To'lov yakunlanmagan</div>
                 <div className="checkout-pending-meta">
