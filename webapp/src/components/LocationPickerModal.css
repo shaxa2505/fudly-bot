@@ -37,6 +37,19 @@
   height: min(92vh, 820px);
 }
 
+@supports (height: 1svh) {
+  .location-picker-overlay {
+    height: 100svh;
+  }
+  .location-picker {
+    height: min(88svh, 760px);
+    max-height: min(92svh, 820px);
+  }
+  .location-picker.search-mode {
+    height: min(92svh, 820px);
+  }
+}
+
 @keyframes location-picker-rise {
   from {
     transform: translateY(16px);
@@ -430,6 +443,12 @@
   -webkit-appearance: none;
   box-shadow: none;
   min-width: 0;
+  height: 100%;
+}
+
+.location-picker-input input:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 .location-picker-input input:focus-visible {

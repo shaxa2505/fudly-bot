@@ -2823,7 +2823,11 @@ function CartPage({ user }) {
                                   <span>{paymentIconLabels[option.id] || option.label}</span>
                                 )}
                               </div>
-                              <span className="checkout-payment-label">{option.label}</span>
+                              {option.id === 'click' ? (
+                                <span className="visually-hidden">{option.label}</span>
+                              ) : (
+                                <span className="checkout-payment-label">{option.label}</span>
+                              )}
                             </div>
                             <span className={`checkout-payment-radio${isActive ? ' active' : ''}`} aria-hidden="true"></span>
                           </button>

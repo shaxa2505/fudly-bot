@@ -320,13 +320,23 @@ function LocationPickerModal({
     if (!isOpen) return undefined
     const body = document.body
     const html = document.documentElement
+    const appSurface = document.querySelector('.app-surface')
     const prevBodyOverflow = body.style.overflow
     const prevHtmlOverflow = html.style.overflow
+    const prevSurfaceOverflow = appSurface?.style.overflow
     body.style.overflow = 'hidden'
     html.style.overflow = 'hidden'
+    if (appSurface) {
+      appSurface.style.overflow = 'hidden'
+    }
     return () => {
       body.style.overflow = prevBodyOverflow
       html.style.overflow = prevHtmlOverflow
+      if (appSurface && prevSurfaceOverflow != null) {
+        appSurface.style.overflow = prevSurfaceOverflow
+      } else if (appSurface) {
+        appSurface.style.overflow = ''
+      }
     }
   }, [isOpen])
 
