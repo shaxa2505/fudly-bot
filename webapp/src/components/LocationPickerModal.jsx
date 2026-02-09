@@ -5,7 +5,9 @@ import {
   normalizeLocationName,
   normalizeCityQuery,
   buildCitySearchKey,
+  CITY_TRANSLATIONS,
 } from '../utils/cityUtils'
+import { getPreferredLocation } from '../utils/geolocation'
 import './LocationPickerModal.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
@@ -13,6 +15,23 @@ const DEFAULT_CENTER = { lat: 41.2995, lon: 69.2401 }
 const SEARCH_DELAY_MS = 250
 const REVERSE_GEOCODE_DELAY_MS = 280
 const MIN_REVERSE_DISTANCE_M = 18
+const GEO_ACCURACY_METERS = 200
+const CITY_SUGGESTION_LIMIT = 4
+
+const LOCAL_CITY_INDEX = (() => {
+  const seen = new Set()
+  const entries = Object.keys(CITY_TRANSLATIONS || {})
+    .map((name) => {
+      const normalized = normalizeLocationName(name)
+      if (!normalized) return null
+      const key = buildCitySearchKey(normalized)
+      if (!key || seen.has(key)) return null
+      seen.add(key)
+      return { name: normalized, key }
+    })
+    .filter(Boolean)
+  return entries
+})()
 
 let leafletAssetsPromise = null
 
@@ -60,23 +79,77 @@ const formatDistance = (meters) => {
   return `${(value / 1000).toFixed(1)} km`
 }
 
+const getLocalCitySuggestions = (query) => {
+  const normalized = normalizeLocationName(query)
+  const key = buildCitySearchKey(normalized)
+  if (!key || key.length < 2) return []
+  const matches = []
+  for (const entry of LOCAL_CITY_INDEX) {
+    if (entry.key.startsWith(key)) {
+      matches.push(entry.name)
+      if (matches.length >= CITY_SUGGESTION_LIMIT) break
+    }
+  }
+  return matches
+}
+
+const isUzbekistanResult = (item) => {
+  if (!item) return false
+  const address = item.address || {}
+  const code = String(address.country_code || '').toLowerCase()
+  if (code) return code === 'uz'
+  const country = String(address.country || '').toLowerCase()
+  if (country) {
+    return country.includes('uzbek') || country.includes("o'zbek") || country.includes('oʻzbek')
+  }
+  const display = String(item.display_name || '').toLowerCase()
+  if (display) {
+    return display.includes('uzbekistan') || display.includes("o'zbekiston") || display.includes('oʻzbekiston')
+  }
+  return true
+}
+
 const getPrimaryLabel = (item) => {
   if (!item) return ''
   const named = item.namedetails?.name || item.name
-  if (named) return named
   const display = item.display_name || ''
-  return display.split(',')[0]?.trim() || display
+  const raw = named || display.split(',')[0]?.trim() || display
+  return isCityLikeResult(item) ? normalizeLocationName(raw) : raw
 }
 
 const getSecondaryLabel = (item) => {
   if (!item) return ''
   const address = item.address || {}
+  const city = address.city || address.town || address.village || ''
+  const district = address.suburb || address.city_district || address.county || ''
+  const state = address.state || address.region || ''
+  if (isCityLikeResult(item)) {
+    const parts = []
+    const normalizedCity = normalizeLocationName(city)
+    const normalizedDistrict = normalizeLocationName(district)
+    if (normalizedDistrict && normalizedDistrict !== normalizedCity) {
+      parts.push(district)
+    }
+    if (state && normalizeLocationName(state) !== normalizedDistrict) {
+      parts.push(state)
+    }
+    if (!parts.length && address.country) {
+      parts.push(address.country)
+    }
+    return parts.join(', ')
+  }
+  const road = address.road ||
+    address.residential ||
+    address.pedestrian ||
+    address.footway ||
+    address.cycleway ||
+    address.path ||
+    ''
   const parts = [
-    address.road,
-    address.house_number,
-    address.suburb || address.city_district,
-    address.city || address.town || address.village,
-    address.state,
+    road && address.house_number ? `${road} ${address.house_number}` : road,
+    district,
+    city,
+    state,
   ].filter(Boolean)
   if (parts.length) return parts.join(', ')
   const display = item.display_name || ''
@@ -98,6 +171,7 @@ const getCityFromItem = (item) => {
 }
 
 const isCityLikeResult = (item) => {
+  if (item?.__kind === 'city') return true
   const type = String(item?.type || '').toLowerCase()
   const cls = String(item?.class || '').toLowerCase()
   const addrType = String(item?.addresstype || '').toLowerCase()
@@ -130,8 +204,34 @@ const buildCitySuggestionItem = (cityName) => {
     __kind: 'city',
     name: cityName,
     display_name: `${cityName}, O'zbekiston`,
-    address: { city: cityName, country: "O'zbekiston" },
+    address: { city: cityName, country: "O'zbekiston", country_code: 'uz' },
+    type: 'city',
+    class: 'place',
+    addresstype: 'city',
   }
+}
+
+const buildResultKey = (item) => {
+  if (!item) return ''
+  const place = item?.place_id || item?.osm_id
+  if (place != null) return `id:${place}`
+  const primary = normalizeLocationName(getPrimaryLabel(item)).toLowerCase()
+  const secondary = normalizeLocationName(getSecondaryLabel(item)).toLowerCase()
+  const kind = item?.__kind || ''
+  return `${kind}|${primary}|${secondary}`
+}
+
+const mergeAndDedupeResults = (items) => {
+  const seen = new Set()
+  const output = []
+  for (const item of items) {
+    if (!item) continue
+    const key = buildResultKey(item)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    output.push(item)
+  }
+  return output
 }
 
 function LocationPickerModal({
@@ -149,6 +249,8 @@ function LocationPickerModal({
   const [results, setResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState('')
+  const [localLocationError, setLocalLocationError] = useState('')
+  const [localLocating, setLocalLocating] = useState(false)
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapCenter, setMapCenter] = useState(DEFAULT_CENTER)
   const [mapAddress, setMapAddress] = useState('')
@@ -162,6 +264,11 @@ function LocationPickerModal({
   const activeRef = useRef(false)
   const searchInputRef = useRef(null)
   const canDetect = typeof onDetectLocation === 'function'
+  const geoSupported = Boolean(
+    typeof window !== 'undefined' &&
+    (window.Telegram?.WebApp?.requestLocation || window.navigator?.geolocation)
+  )
+  const isDetecting = Boolean(isLocating || localLocating)
 
   const coords = useMemo(() => {
     const lat = location?.coordinates?.lat
@@ -175,6 +282,8 @@ function LocationPickerModal({
     activeRef.current = true
     setMode('map')
     setSearchError('')
+    setLocalLocationError('')
+    setLocalLocating(false)
     setResults([])
     const cityLabel = normalizeLocationName(location?.city?.split(',')[0] || '')
     setQuery(cityLabel)
@@ -224,6 +333,7 @@ function LocationPickerModal({
       setSearchError('')
       try {
         const citySuggestion = normalizeCityQuery(normalized)
+        const localSuggestions = getLocalCitySuggestions(normalized)
         const searchQuery = citySuggestion
           ? `${citySuggestion}, Uzbekistan`
           : normalized
@@ -235,6 +345,7 @@ function LocationPickerModal({
         let items = Array.isArray(response?.items)
           ? response.items
           : (Array.isArray(response) ? response : [])
+        items = items.filter(isUzbekistanResult)
         if (citySuggestion) {
           const cityKey = buildCitySearchKey(citySuggestion)
           items = items
@@ -248,17 +359,33 @@ function LocationPickerModal({
               return a.index - b.index
             })
             .map(({ item }) => item)
+        }
 
-          const hasCanonicalLabel = items.some((item) => (
-            normalizeLocationName(getPrimaryLabel(item)) === citySuggestion
-          ))
-          if (!hasCanonicalLabel) {
-            const suggestionItem = buildCitySuggestionItem(citySuggestion)
-            if (suggestionItem) {
-              items = [suggestionItem, ...items]
-            }
+        const preferCityResults = Boolean(citySuggestion || localSuggestions.length)
+        if (preferCityResults) {
+          const cityItems = items.filter(isCityLikeResult)
+          if (cityItems.length) {
+            items = cityItems
           }
         }
+
+        const suggestionNames = []
+        const suggestionKeys = new Set()
+        const pushSuggestion = (name) => {
+          const normalizedName = normalizeLocationName(name)
+          if (!normalizedName) return
+          const key = buildCitySearchKey(normalizedName)
+          if (!key || suggestionKeys.has(key)) return
+          suggestionKeys.add(key)
+          suggestionNames.push(normalizedName)
+        }
+        if (citySuggestion) pushSuggestion(citySuggestion)
+        localSuggestions.forEach(pushSuggestion)
+
+        const suggestionItems = suggestionNames
+          .map(buildCitySuggestionItem)
+          .filter(Boolean)
+        items = mergeAndDedupeResults([...suggestionItems, ...items]).slice(0, 8)
         if (!activeRef.current) return
         setResults(items)
       } catch (error) {
@@ -342,6 +469,51 @@ function LocationPickerModal({
     window.Telegram?.WebApp?.HapticFeedback?.selectionChanged?.()
     setMode('map')
   }, [])
+
+  const handleDetectClick = useCallback(async () => {
+    if (canDetect) {
+      onDetectLocation?.()
+      return
+    }
+    if (!geoSupported) {
+      setLocalLocationError("Qurilmada geolokatsiya qo'llab-quvvatlanmaydi")
+      return
+    }
+
+    setLocalLocationError('')
+    setLocalLocating(true)
+    try {
+      const coords = await getPreferredLocation({
+        preferTelegram: true,
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+        minAccuracy: GEO_ACCURACY_METERS,
+        retryOnLowAccuracy: true,
+        highAccuracyTimeout: 20000,
+        highAccuracyMaximumAge: 0,
+      })
+      if (!coords?.latitude || !coords?.longitude) {
+        throw new Error('Geolocation failed')
+      }
+      if (activeRef.current) {
+        setMapCenter({ lat: coords.latitude, lon: coords.longitude })
+      }
+    } catch (error) {
+      if (!activeRef.current) return
+      if (error?.code === error.PERMISSION_DENIED) {
+        setLocalLocationError('Geolokatsiyaga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering.')
+      } else if (error?.code === error.TIMEOUT) {
+        setLocalLocationError('Joylashuvni aniqlash vaqti tugadi. Qayta urinib ko\'ring.')
+      } else {
+        setLocalLocationError('Geolokatsiyani olish imkonsiz')
+      }
+    } finally {
+      if (activeRef.current) {
+        setLocalLocating(false)
+      }
+    }
+  }, [canDetect, geoSupported, onDetectLocation])
 
   useEffect(() => {
     if (!isOpen || mode !== 'map') return
@@ -533,7 +705,8 @@ function LocationPickerModal({
     return formatDistance(raw)
   }
 
-  const showGeoSuggestion = Boolean(canDetect)
+  const showGeoSuggestion = Boolean(canDetect || geoSupported)
+  const errorMessage = locationError || localLocationError
   return (
     <div className="location-picker-overlay" onClick={onClose}>
       <div className={`location-picker ${mode === 'search' ? 'search-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
@@ -669,9 +842,9 @@ function LocationPickerModal({
                 {showGeoSuggestion && (
                   <button
                     type="button"
-                    className={`location-picker-map-locate${isLocating ? ' is-loading' : ''}`}
-                    onClick={() => onDetectLocation?.()}
-                    disabled={!canDetect || isLocating}
+                    className={`location-picker-map-locate${isDetecting ? ' is-loading' : ''}`}
+                    onClick={handleDetectClick}
+                    disabled={isDetecting}
                     aria-label="Joriy joylashuv"
                     title="Joriy joylashuv"
                   >
@@ -687,6 +860,19 @@ function LocationPickerModal({
             </div>
 
             <div className="location-picker-sheet">
+              {showGeoSuggestion && (
+                <div className="location-picker-geo">
+                  <span>Joriy joylashuv</span>
+                  <button
+                    type="button"
+                    className="location-picker-geo-btn"
+                    onClick={handleDetectClick}
+                    disabled={isDetecting}
+                  >
+                    {isDetecting ? '...' : 'GPS'}
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 className="location-picker-address"
@@ -704,8 +890,8 @@ function LocationPickerModal({
                 </span>
               </button>
 
-              {locationError && (
-                <div className="location-picker-error">{locationError}</div>
+              {errorMessage && (
+                <div className="location-picker-error">{errorMessage}</div>
               )}
 
               <button type="button" className="location-picker-confirm" onClick={handleConfirmMap}>
