@@ -128,7 +128,10 @@ function CartPage({ user }) {
   const [pendingPayment, setPendingPayment] = useState(() => readPendingPayment())
   const [pendingActionLoading, setPendingActionLoading] = useState(false)
   const [pendingPulse, setPendingPulse] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState('unknown')
+  const [pendingStatusChecked, setPendingStatusChecked] = useState(false)
   const pendingPulseRef = useRef(null)
+  const pendingAutoResumeRef = useRef(null)
   const addressInputRef = useRef(null)
   const commentInputRef = useRef(null)
   const lastDeliveryCheckRef = useRef({ address: '', storeId: null, city: '' })
@@ -1029,6 +1032,7 @@ function CartPage({ user }) {
     hasStoreMatch &&
     hasTotalMatch
   )
+  const shouldShowPendingCard = hasPendingPayment && pendingStatusChecked && pendingStatus !== 'cleared'
   const confirmResumePendingPayment = useCallback(async () => {
     const message = "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
     const tg = window.Telegram?.WebApp
@@ -1236,7 +1240,7 @@ function CartPage({ user }) {
         return
       }
 
-      const storeId = pendingPayment.storeId || cartItems[0]?.offer?.store_id || null
+      const storeId = pendingPayment.storeId || safeCartItems[0]?.offer?.store_id || null
       const returnUrl = `${window.location.origin}/order/${pendingPayment.orderId}/details`
       const paymentData = await api.createPaymentLink(
         pendingPayment.orderId,
@@ -1259,7 +1263,7 @@ function CartPage({ user }) {
     } finally {
       setPendingActionLoading(false)
     }
-  }, [pendingActionLoading, pendingPayment, toast, cartItems])
+  }, [pendingActionLoading, pendingPayment, toast, safeCartItems])
 
   useEffect(() => {
     if (!showCheckoutSheet) {
@@ -1295,19 +1299,31 @@ function CartPage({ user }) {
   ])
 
   const refreshPendingStatus = useCallback(async () => {
-    if (!pendingPayment?.orderId) return
+    if (!pendingPayment?.orderId) {
+      setPendingStatusChecked(false)
+      setPendingStatus('unknown')
+      return
+    }
     try {
       const data = await api.getOrderStatus(pendingPayment.orderId)
       const orderStatus = String(data?.status || data?.order_status || '').toLowerCase()
       const paymentStatus = String(data?.payment_status || '').toLowerCase()
       const awaiting = paymentStatus === 'awaiting_payment' || orderStatus === 'awaiting_payment'
       const doneStatuses = new Set(['completed', 'cancelled', 'rejected', 'delivering', 'ready', 'preparing'])
+
       if (!awaiting && (doneStatuses.has(orderStatus) || paymentStatus === 'confirmed')) {
         clearPendingPayment()
         setPendingPayment(null)
+        setPendingStatus('cleared')
+        setPendingStatusChecked(true)
+        return
       }
+
+      setPendingStatus(awaiting ? 'awaiting' : 'unknown')
+      setPendingStatusChecked(true)
     } catch (error) {
-      // ignore status check errors
+      setPendingStatus('unknown')
+      setPendingStatusChecked(true)
     }
   }, [pendingPayment?.orderId])
 
@@ -1325,7 +1341,11 @@ function CartPage({ user }) {
   }, [safeCartItems])
 
   useEffect(() => {
-    if (!pendingPayment?.orderId) return
+    if (!pendingPayment?.orderId) {
+      setPendingStatusChecked(false)
+      setPendingStatus('unknown')
+      return
+    }
 
     refreshPendingStatus()
     const interval = setInterval(() => {
@@ -1777,7 +1797,7 @@ function CartPage({ user }) {
     toast,
   ])
 
-  const pendingPaymentCard = hasPendingPayment ? (
+  const pendingPaymentCard = shouldShowPendingCard ? (
     <div className={`pending-payment-card animate-in`}>
       <div className="pending-payment-header">
         <div>
