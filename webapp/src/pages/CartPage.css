@@ -3041,14 +3041,14 @@
 }
 
 .checkout-payment-icon--click {
-  width: 64px;
-  height: 34px;
+  width: 88px;
+  height: 38px;
   border-radius: 10px;
 }
 
 .checkout-payment-icon--click .checkout-payment-logo {
-  width: 56px;
-  max-height: 24px;
+  width: 76px;
+  max-height: 28px;
 }
 
 .checkout-payment-icon--cash {
