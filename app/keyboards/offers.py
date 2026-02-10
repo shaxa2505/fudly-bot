@@ -44,39 +44,38 @@ def hot_offers_compact_keyboard(
 
     for offer in offers:
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
-        builder.button(text=add_label, callback_data=f"catalog_add_{offer_id}")
-        builder.button(text=details_label, callback_data=f"catalog_details_{offer_id}")
+        builder.button(text=add_label, callback_data=f"add_to_cart:{offer_id}")
+        builder.button(text=details_label, callback_data=f"product_details:{offer_id}")
 
     if offers:
         builder.adjust(*([2] * len(offers)))
 
+    nav_builder = InlineKeyboardBuilder()
+    prev_cb = f"prev_page:{page - 1}" if page > 0 else "noop"
+    next_cb = f"next_page:{page + 1}" if page < total_pages - 1 else "noop"
+    nav_builder.button(text="◀️", callback_data=prev_cb)
+    nav_builder.button(text=f"{page + 1} / {total_pages}", callback_data="noop")
+    nav_builder.button(text="▶️", callback_data=next_cb)
+    nav_builder.adjust(3)
+
+    builder.attach(nav_builder)
+
     action_builder = InlineKeyboardBuilder()
     if show_filters:
-        action_builder.button(text=get_text(lang, "catalog_filter_button"), callback_data="catalog_filter")
+        action_builder.button(text=get_text(lang, "catalog_filter_button"), callback_data="open_filters")
     if show_stores:
-        action_builder.button(text=get_text(lang, "catalog_stores_button"), callback_data="catalog_stores")
+        action_builder.button(text=get_text(lang, "catalog_stores_button"), callback_data="open_stores")
     if show_reset:
         action_builder.button(text=get_text(lang, "catalog_filter_reset"), callback_data="catalog_filter_reset")
-    action_buttons = list(action_builder.buttons)
-    action_count = len(action_buttons)
+    action_count = int(bool(show_filters)) + int(bool(show_stores)) + int(bool(show_reset))
     if action_count == 1:
         action_builder.adjust(1)
     elif action_count == 2:
         action_builder.adjust(2)
     elif action_count == 3:
         action_builder.adjust(2, 1)
-
-    nav_builder = InlineKeyboardBuilder()
-    prev_cb = f"catalog_page_{page - 1}" if page > 0 else "catalog_noop"
-    next_cb = f"catalog_page_{page + 1}" if page < total_pages - 1 else "catalog_noop"
-    nav_builder.button(text="◀️", callback_data=prev_cb)
-    nav_builder.button(text=f"{page + 1} / {total_pages}", callback_data="catalog_noop")
-    nav_builder.button(text="▶️", callback_data=next_cb)
-    nav_builder.adjust(3)
-
     if action_count:
         builder.attach(action_builder)
-    builder.attach(nav_builder)
 
     if show_entry_back:
         back_builder = InlineKeyboardBuilder()
@@ -168,9 +167,9 @@ def catalog_details_keyboard(lang: str, offer_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
         text=get_text(lang, "catalog_add_detail_button"),
-        callback_data=f"catalog_add_{offer_id}",
+        callback_data=f"add_to_cart:{offer_id}",
     )
-    builder.button(text=get_text(lang, "catalog_filter_back"), callback_data="catalog_back")
+    builder.button(text=get_text(lang, "catalog_back_to_list"), callback_data="back_to_catalog")
     builder.adjust(1, 1)
     return builder.as_markup()
 

@@ -31,20 +31,21 @@ import math
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from typing import Any, Literal
 
 from aiogram import Bot
-from aiogram.types import BufferedInputFile
+from aiogram.types import BufferedInputFile, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from PIL import Image
 
 from app.core.geocoding import geocode_store_address
 from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
-from app.core.utils import get_uzb_time
+from app.core.utils import UZB_TZ, get_uzb_time
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
 from app.domain.order import OrderStatus, PaymentStatus
+from app.domain.order_labels import status_label
 from app.services.notification_builder import NotificationBuilder
 from app.services.notification_unified import build_unified_order_payload
 from localization import get_text
@@ -292,6 +293,103 @@ class NotificationTemplates:
             return "Оплата: Payme"
         return "Оплата: онлайн"
 
+    @staticmethod
+    def _status_emoji(status: str | None) -> str:
+        normalized = (
+            OrderStatus.normalize(str(status).strip().lower()) if status else OrderStatus.PENDING
+        )
+        return {
+            OrderStatus.PENDING: "⏳",
+            OrderStatus.PREPARING: "✅",
+            OrderStatus.READY: "🕒",
+            OrderStatus.DELIVERING: "🚚",
+            OrderStatus.COMPLETED: "✔",
+            OrderStatus.CANCELLED: "❌",
+            OrderStatus.REJECTED: "❌",
+        }.get(normalized, "📦")
+
+    @staticmethod
+    def _build_customer_card(
+        *,
+        lang: str,
+        order_id: int,
+        status: str,
+        order_type: str | None,
+        total: int | None,
+        delivery_price: int = 0,
+        currency: str = "UZS",
+        store_name: str | None = None,
+        store_address: str | None = None,
+        delivery_address: str | None = None,
+        pickup_code: str | None = None,
+        reject_reason: str | None = None,
+        ready_until: str | None = None,
+        items: list[dict] | None = None,
+    ) -> str:
+        normalized_type = "delivery" if order_type == "taxi" else (order_type or "delivery")
+        display_type = "pickup" if normalized_type == "pickup" else "delivery"
+
+        status_text = status_label(status, lang, display_type)
+        normalized_status = OrderStatus.normalize(str(status).strip().lower())
+        if reject_reason and normalized_status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
+            status_text = f"{status_text} — {reject_reason}"
+
+        total_value = int(total or 0)
+        if total_value <= 0 and items:
+            try:
+                total_value = sum(
+                    int(item.get("price") or 0) * int(item.get("quantity") or 1)
+                    for item in items
+                )
+            except Exception:
+                total_value = int(total or 0)
+        if normalized_type in ("delivery", "taxi") and delivery_price:
+            if total_value:
+                total_value += int(delivery_price)
+            else:
+                total_value = int(delivery_price)
+
+        order_label = get_text(lang, "label_order")
+        status_label_text = get_text(lang, "label_status")
+        amount_label = get_text(lang, "label_amount")
+        type_label = get_text(lang, "label_order_type")
+        pickup_type = get_text(lang, "order_type_pickup")
+        delivery_type = get_text(lang, "order_type_delivery")
+        store_label = get_text(lang, "label_store")
+        address_label = get_text(lang, "address")
+        pickup_code_label = get_text(lang, "label_pickup_code")
+        pickup_until_label = get_text(lang, "label_pickup_until")
+
+        type_value = pickup_type if display_type == "pickup" else delivery_type
+        address_value = (
+            delivery_address if display_type == "delivery" else store_address
+        )
+
+        lines = [
+            f"📄 {order_label} #{order_id}",
+            "",
+            f"{status_label_text}: {NotificationTemplates._status_emoji(status)} <b>{status_text}</b>",
+        ]
+
+        if total_value > 0:
+            lines.append(f"{amount_label}: <b>{total_value:,} {currency}</b>")
+        if type_value:
+            lines.append(f"{type_label}: {type_value}")
+        if ready_until:
+            lines.append(f"{pickup_until_label}: <b>{ready_until}</b>")
+
+        if store_name or address_value:
+            lines.append("")
+            if store_name:
+                lines.append(f"📍 {store_label}: {html.escape(str(store_name))}")
+            if address_value:
+                lines.append(f"{address_label}: {html.escape(str(address_value))}")
+
+        if pickup_code and display_type == "pickup":
+            lines.append(f"🔐 {pickup_code_label}: <b>{html.escape(str(pickup_code))}</b>")
+
+        return "\n".join(lines)
+
 
     @staticmethod
     def admin_payment_review(
@@ -402,30 +500,26 @@ class NotificationTemplates:
         awaiting_payment: bool = False,
     ) -> str:
         "Build customer notification for order creation."
-        normalized_type = "delivery" if order_type == "taxi" else order_type
-        builder = NotificationBuilder(normalized_type)  # type: ignore
-        pickup_code = ", ".join(pickup_codes) if pickup_codes else None
+        pickup_code = pickup_codes[0] if pickup_codes else None
         order_ids_int = [int(x) for x in order_ids if x]
         order_id_value = (
             int(order_ids_int[0])
             if order_ids_int
             else int(order_ids[0]) if order_ids else 0
         )
-        return builder.build_created(
+        return NotificationTemplates._build_customer_card(
             lang=lang,
             order_id=order_id_value,
-            order_ids=order_ids_int or None,
-            is_cart=len(order_ids_int) > 1,
+            status=OrderStatus.PENDING,
+            order_type=order_type,
+            total=total,
+            delivery_price=delivery_price,
+            currency=currency,
             store_name=store_name,
-            store_phone=store_phone,
             store_address=store_address,
             delivery_address=delivery_address,
             pickup_code=pickup_code,
             items=items,
-            delivery_price=delivery_price,
-            total=total,
-            currency=currency,
-            payment_method=payment_method,
         )
 
 
@@ -450,34 +544,24 @@ class NotificationTemplates:
         payment_method: str | None = None,
         payment_status: str | None = None,
         payment_proof_photo_id: str | None = None,
+        ready_until: str | None = None,
     ) -> str:
-        """
-        Build customer notification for status update with visual progress.
-
-        Uses NotificationBuilder to eliminate code duplication.
-        """
-        normalized_type = "delivery" if order_type == "taxi" else order_type
-        builder = NotificationBuilder(normalized_type)  # type: ignore
-        return builder.build(
-            status=status,
+        """Build customer notification for status update."""
+        return NotificationTemplates._build_customer_card(
             lang=lang,
             order_id=int(order_id) if isinstance(order_id, str) else order_id,
-            store_name=store_name or "",
-            store_phone=store_phone,
+            status=status,
+            order_type=order_type,
+            total=total,
+            delivery_price=delivery_price,
+            currency=currency,
+            store_name=store_name,
             store_address=store_address,
+            delivery_address=delivery_address,
             pickup_code=pickup_code,
             reject_reason=reject_reason,
-            courier_phone=courier_phone,
+            ready_until=ready_until,
             items=items,
-            delivery_address=delivery_address,
-            delivery_price=delivery_price,
-            total=total,
-            currency=currency,
-            order_ids=order_ids,
-            is_cart=is_cart,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            payment_proof_photo_id=payment_proof_photo_id,
         )
 
     @staticmethod
@@ -501,29 +585,24 @@ class NotificationTemplates:
         payment_method: str | None = None,
         payment_status: str | None = None,
         payment_proof_photo_id: str | None = None,
+        ready_until: str | None = None,
     ) -> str:
         """Build cart summary status message for customers."""
-        normalized_type = "delivery" if order_type == "taxi" else order_type
-        builder = NotificationBuilder(normalized_type)  # type: ignore
-        return builder.build(
-            status=status,
+        return NotificationTemplates._build_customer_card(
             lang=lang,
             order_id=int(order_id) if isinstance(order_id, str) else order_id,
-            store_name=store_name or "",
-            store_phone=store_phone,
+            status=status,
+            order_type=order_type,
+            total=None,
+            delivery_price=delivery_price,
+            currency=currency,
+            store_name=store_name,
             store_address=store_address,
             delivery_address=delivery_address,
             pickup_code=pickup_code,
             reject_reason=reject_reason,
-            courier_phone=courier_phone,
+            ready_until=ready_until,
             items=items,
-            delivery_price=delivery_price,
-            currency=currency,
-            order_ids=order_ids,
-            is_cart=is_cart,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            payment_proof_photo_id=payment_proof_photo_id,
         )
 
     def seller_status_update(
@@ -675,6 +754,85 @@ class UnifiedOrderService:
             return bool(getattr(user, "notifications_enabled", True))
         except Exception:
             return True
+
+    @staticmethod
+    def _pickup_ready_expiry_hours() -> int:
+        try:
+            value = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
+        except Exception:
+            value = 2
+        return max(1, value)
+
+    def _format_pickup_ready_until(self, updated_at: Any | None) -> str | None:
+        hours = self._pickup_ready_expiry_hours()
+        if hours <= 0:
+            return None
+
+        base_time = None
+        if isinstance(updated_at, datetime):
+            base_time = updated_at
+        elif isinstance(updated_at, str) and updated_at:
+            try:
+                base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+            except Exception:
+                base_time = None
+
+        if base_time is None:
+            base_time = get_uzb_time()
+        elif base_time.tzinfo is None:
+            base_time = base_time.replace(tzinfo=UZB_TZ)
+
+        ready_until = base_time + timedelta(hours=hours)
+        return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
+
+    def _build_customer_notification(
+        self,
+        *,
+        lang: str,
+        order_id: int,
+        order_type: str | None,
+        status: str,
+        reject_reason: str | None,
+        courier_phone: str | None,
+    ) -> str | None:
+        normalized_status = OrderStatus.normalize(str(status))
+        normalized_type = "delivery" if order_type == "taxi" else (order_type or "delivery")
+        is_pickup = normalized_type == "pickup"
+
+        key = None
+        if normalized_status == OrderStatus.PREPARING:
+            key = "notification_order_confirmed"
+        elif is_pickup and normalized_status == OrderStatus.READY:
+            key = "notification_order_ready_pickup"
+        elif not is_pickup and normalized_status == OrderStatus.DELIVERING:
+            key = "notification_order_delivering"
+        elif normalized_status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
+            pickup_reason = get_text(lang, "pickup_ready_expired_reason")
+            if is_pickup and reject_reason and pickup_reason and reject_reason.strip() == pickup_reason.strip():
+                key = "notification_order_cancelled_pickup_expired"
+            else:
+                key = "notification_order_cancelled"
+
+        if not key:
+            return None
+
+        try:
+            if key == "notification_order_ready_pickup":
+                hours = self._pickup_ready_expiry_hours()
+                text = get_text(lang, key).format(order_id=order_id, hours=hours)
+            else:
+                text = get_text(lang, key).format(order_id=order_id)
+        except Exception:
+            text = None
+
+        if not text:
+            return None
+
+        if normalized_status == OrderStatus.DELIVERING and courier_phone:
+            courier_label = get_text(lang, "label_courier")
+            text = f"{text}\n{courier_label}: {courier_phone}"
+
+        return text
 
     # ------------------------------------------------------------------
     # Error normalization helpers
@@ -960,8 +1118,9 @@ class UnifiedOrderService:
         notifications_enabled: bool,
     ) -> None:
         # Send notification/event to customer (WebApp sync always; Telegram optional)
-        publish_customer_event = bool(user_id) and notifications_enabled
-        if not (customer_notifications or publish_customer_event):
+        publish_customer_event = bool(user_id)
+        send_card = bool(user_id) and telegram_enabled
+        if not (send_card or publish_customer_event):
             return
 
         all_ids = [str(x) for x in (order_ids + booking_ids)]
@@ -995,16 +1154,19 @@ class UnifiedOrderService:
             currency=currency,
         )
 
-        reply_markup = None
-        normalized_method = PaymentStatus.normalize_method(payment_method)
-        if normalized_method == "click" and order_type in ("delivery", "taxi"):
-            reply_markup = self._build_click_payment_reply_markup(
-                order_ids=order_ids,
-                total_price=total_price,
-                user_id=user_id,
-                store_id=items[0].store_id if items else None,
-                lang=customer_lang,
-            )
+        entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
+        entity_ids = [int(x) for x in entity_ids_raw]
+        entity_id = entity_ids[0] if entity_ids else None
+        entity_type = "order" if order_ids else "booking"
+
+        reply_markup = self._build_customer_reply_markup(
+            target_status=OrderStatus.PENDING,
+            new_status=OrderStatus.PENDING,
+            order_type=order_type,
+            customer_lang=customer_lang,
+            entity_id=entity_id or 0,
+            entity_type=entity_type,
+        )
 
         primary_offer_id = items[0].offer_id if items else None
         photo_ids = self._collect_photos_from_items(items)
@@ -1016,10 +1178,6 @@ class UnifiedOrderService:
         if not customer_photo and primary_offer_id:
             customer_photo = self._get_offer_photo(primary_offer_id)
 
-        entity_ids_raw = [x for x in (order_ids + booking_ids) if x]
-        entity_ids = [int(x) for x in entity_ids_raw]
-        entity_id = entity_ids[0] if entity_ids else None
-        entity_type = "order" if order_ids else "booking"
         store_name = items[0].store_name if items else ""
         store_address = items[0].store_address if items else ""
         customer_payload = {"id": int(user_id)} if user_id else None
@@ -1055,7 +1213,7 @@ class UnifiedOrderService:
         )
 
         sent_msg = None
-        if customer_notifications and telegram_enabled:
+        if send_card:
             try:
                 if customer_photo:
                     try:
@@ -1404,7 +1562,7 @@ class UnifiedOrderService:
         if notify_sellers and stores_orders:
             await self._notify_sellers_new_order(
                 stores_orders=stores_orders,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 delivery_address=delivery_address,
                 delivery_lat=delivery_lat,
                 delivery_lon=delivery_lon,
@@ -1644,7 +1802,7 @@ class UnifiedOrderService:
                     comment=comment,
                     delivery_price=delivery_price,
                     payment_method=payment_method,
-                    order_type=order_type,
+                    order_type=normalized_order_type,
                 )
 
                 if not ok or not order_id:
@@ -1671,7 +1829,7 @@ class UnifiedOrderService:
             result = self.db.create_cart_order(
                 user_id=user_id,
                 items=items,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 delivery_address=delivery_address,
                 delivery_lat=delivery_lat,
                 delivery_lon=delivery_lon,
@@ -1833,7 +1991,7 @@ class UnifiedOrderService:
                     order_ids=order_ids,
                     pickup_codes=pickup_codes,
                     items=store_orders,
-                    order_type=order_type,
+                    order_type=normalized_order_type,
                     delivery_address=delivery_address,
                     comment=comment,
                     map_url=map_url,
@@ -1877,7 +2035,7 @@ class UnifiedOrderService:
                     entity_id=order_id_ints[0] if order_id_ints else None,
                     entity_ids=order_id_ints,
                     is_cart=len(order_id_ints) > 1,
-                    order_type=order_type,
+                    order_type=normalized_order_type,
                     status=OrderStatus.PENDING,
                     pickup_code=pickup_codes[0] if len(pickup_codes) == 1 else None,
                     delivery_address=delivery_address,
@@ -2177,7 +2335,7 @@ class UnifiedOrderService:
                 order_id=order_id,
                 store_id=store_id,
                 store=store,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 cart_items_json=cart_items_json,
                 offer_id=offer_id,
                 quantity=quantity,
@@ -2202,7 +2360,7 @@ class UnifiedOrderService:
 
             await self._notify_sellers_new_order(
                 stores_orders={int(store_id): items},
-                order_type=order_type,
+                order_type=normalized_order_type,
                 delivery_address=delivery_address,
                 delivery_lat=delivery_lat,
                 delivery_lon=delivery_lon,
@@ -2623,6 +2781,7 @@ class UnifiedOrderService:
         payment_method: str | None = None,
         payment_status: str | None = None,
         payment_proof_photo_id: str | None = None,
+        ready_until: str | None = None,
     ) -> tuple[str, list[dict[str, Any]] | None, str | None, str, list[int] | None, bool]:
         currency = None
         cart_items = self._load_cart_items(is_cart, cart_items_json)
@@ -2658,7 +2817,7 @@ class UnifiedOrderService:
                 lang=customer_lang,
                 order_id=entity_id,
                 status=aggregated_status,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 items=cart_items,
                 currency=currency,
                 is_cart=is_cart or is_grouped,
@@ -2674,6 +2833,7 @@ class UnifiedOrderService:
                 payment_method=payment_method,
                 payment_status=payment_status,
                 payment_proof_photo_id=payment_proof_photo_id,
+                ready_until=ready_until,
             )
         else:
             if currency is None:
@@ -2682,7 +2842,7 @@ class UnifiedOrderService:
                 lang=customer_lang,
                 order_id=entity_id,
                 status=target_status,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 store_name=store_name,
                 store_phone=store_phone,
                 store_address=store_address,
@@ -2699,6 +2859,7 @@ class UnifiedOrderService:
                 payment_method=payment_method,
                 payment_status=payment_status,
                 payment_proof_photo_id=payment_proof_photo_id,
+                ready_until=ready_until,
             )
 
         return msg, cart_items, currency, aggregated_status, group_order_ids, is_grouped
@@ -2713,29 +2874,17 @@ class UnifiedOrderService:
         entity_id: int,
         entity_type: str,
     ) -> Any:
-        reply_markup = None
-        if target_status == OrderStatus.COMPLETED:
-            kb = InlineKeyboardBuilder()
-            callback_prefix = (
-                f"rate_order_{entity_id}_"
-                if entity_type == "order"
-                else f"rate_booking_{entity_id}_"
-            )
-            for i in range(1, 6):
-                kb.button(text="⭐" * i, callback_data=f"{callback_prefix}{i}")
-            kb.adjust(5)
-            reply_markup = kb.as_markup()
-        elif new_status == OrderStatus.DELIVERING and order_type in ("delivery", "taxi"):
-            kb = InlineKeyboardBuilder()
-            received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
-            kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
-            reply_markup = kb.as_markup()
-        elif target_status == OrderStatus.READY and order_type == "pickup":
-            kb = InlineKeyboardBuilder()
-            received_text = "✅ Oldim" if customer_lang == "uz" else "✅ Получил"
-            kb.button(text=received_text, callback_data=f"customer_received_{entity_id}")
-            reply_markup = kb.as_markup()
-        return reply_markup
+        _ = target_status, new_status, order_type, entity_type
+        kb = InlineKeyboardBuilder()
+        webapp_url = os.getenv("WEBAPP_URL", "").strip()
+        if webapp_url:
+            order_url = f"{webapp_url.rstrip('/')}/order/{entity_id}"
+            kb.button(text=get_text(customer_lang, "btn_open_order"), web_app=WebAppInfo(url=order_url))
+        else:
+            kb.button(text=get_text(customer_lang, "btn_open_order"), callback_data=f"open_order_{entity_id}")
+        kb.button(text=get_text(customer_lang, "btn_back_menu"), callback_data="back_to_menu")
+        kb.adjust(1)
+        return kb.as_markup()
 
     def _build_click_payment_reply_markup(
         self,
@@ -2844,7 +2993,7 @@ class UnifiedOrderService:
         try:
             webapp_url = os.getenv("WEBAPP_URL", "").strip()
             if webapp_url:
-                return_url = f"{webapp_url.rstrip('/')}/order/{order_id}/details"
+                return_url = f"{webapp_url.rstrip('/')}/order/{order_id}"
         except Exception:
             return_url = None
 
@@ -2874,17 +3023,13 @@ class UnifiedOrderService:
         customer_photo: BufferedInputFile | str | None,
         reply_markup: Any,
         should_edit: bool,
-        should_force_send: bool,
-        should_notify: bool,
+        should_send: bool,
         existing_message_id: int | None,
         group_order_ids: list[int] | None = None,
     ) -> None:
         # Telegram caption limit is 1024 chars; keep photo updates from failing on long text.
         safe_caption = msg if len(msg) <= 1000 else msg[:1000].rstrip() + "..."
-        allow_telegram_updates = (
-            self.telegram_order_notifications or should_edit or should_force_send
-        )
-        if not allow_telegram_updates:
+        if not (should_edit or should_send):
             return
 
         message_sent = None
@@ -2928,9 +3073,7 @@ class UnifiedOrderService:
                         )
                     )
 
-        if not edit_success and (
-            should_force_send or (self.telegram_order_notifications and should_notify)
-        ):
+        if not edit_success and should_send:
             try:
                 if customer_photo:
                     try:
@@ -3129,22 +3272,16 @@ class UnifiedOrderService:
                         callback_data=f"order_complete_{entity_id}",
                     )
         else:
-            if target_status in (
-                OrderStatus.PENDING,
-                OrderStatus.PREPARING,
-                OrderStatus.READY,
-                OrderStatus.DELIVERING,
-            ):
-                if seller_lang == "uz":
-                    kb.button(
-                        text="✅ Berildi",
-                        callback_data=f"order_complete_{entity_id}",
-                    )
-                else:
-                    kb.button(
-                        text="✅ Выдано",
-                        callback_data=f"order_complete_{entity_id}",
-                    )
+            if target_status == OrderStatus.PREPARING:
+                kb.button(
+                    text=get_text(seller_lang, "btn_ready_for_pickup"),
+                    callback_data=f"order_ready_{entity_id}",
+                )
+            elif target_status == OrderStatus.READY:
+                kb.button(
+                    text=get_text(seller_lang, "btn_mark_issued"),
+                    callback_data=f"order_complete_{entity_id}",
+                )
         return kb
 
     async def _resolve_seller_photo(
@@ -3260,39 +3397,53 @@ class UnifiedOrderService:
         quantity = ctx.quantity
         total_price = ctx.total_price
 
-        # Send notification to customer - SMART FILTERING
-        # Skip redundant notifications to avoid spam:
-        # - READY status (internal state, customer doesn't need notification)
-        # - Only important statuses: PREPARING (accepted), DELIVERING, COMPLETED, REJECTED, CANCELLED
+        normalized_order_type = order_type or ("delivery" if delivery_address else "pickup")
+        if normalized_order_type == "taxi":
+            normalized_order_type = "delivery"
+
         notifications_enabled = self._notifications_enabled(user_id)
-        should_notify = notify_customer and user_id and notifications_enabled
         existing_message_id = self._get_existing_message_id(entity)
-        should_edit = bool(existing_message_id) and user_id and notifications_enabled
-        should_force_send = (
-            self.force_telegram_sync
-            and notify_customer
-            and user_id
+        should_edit = bool(existing_message_id) and bool(user_id)
+        should_send_card = (
+            bool(user_id)
             and not existing_message_id
-            and notifications_enabled
+            and (self.force_telegram_sync or self.telegram_order_notifications)
+        )
+        should_send_notification = bool(user_id) and bool(notify_customer) and notifications_enabled
+
+        ready_until = None
+        if normalized_order_type == "pickup" and target_status == OrderStatus.READY:
+            updated_at = (
+                entity.get("updated_at") if isinstance(entity, dict) else getattr(entity, "updated_at", None)
+            )
+            ready_until = self._format_pickup_ready_until(updated_at)
+
+        customer_lang = self.db.get_user_language(user_id) if user_id else "ru"
+        critical_text = (
+            self._build_customer_notification(
+                lang=customer_lang,
+                order_id=entity_id,
+                order_type=normalized_order_type,
+                status=target_status,
+                reject_reason=reject_reason,
+                courier_phone=courier_phone,
+            )
+            if should_send_notification
+            else None
         )
 
         logger.info(
-            f"Notification check for #{entity_id}: "
-            f"status={target_status}, order_type={order_type}, "
-            f"notify_customer={notify_customer}, user_id={user_id}, "
-            f"should_notify={should_notify}, should_edit={should_edit}, "
-            f"should_force_send={should_force_send}"
+            "Notification check for #%s: status=%s, order_type=%s, notify_customer=%s, "
+            "user_id=%s, edit_card=%s, send_card=%s, critical=%s",
+            entity_id,
+            target_status,
+            normalized_order_type,
+            notify_customer,
+            user_id,
+            should_edit,
+            should_send_card,
+            bool(critical_text),
         )
-
-        # OPTIMIZATION: Skip READY notification for delivery orders only
-        # READY is mostly internal for delivery (courier pickup), but it's important for pickup
-        if target_status == OrderStatus.READY and order_type in ("delivery", "taxi"):
-            should_notify = False
-            should_edit = False
-            should_force_send = False
-            logger.info(
-                f"Skipping READY notification for delivery order#{entity_id}"
-            )
 
         if user_id:
             try:
@@ -3305,7 +3456,7 @@ class UnifiedOrderService:
                     entity_id=entity_id,
                     entity_ids=[entity_id],
                     is_cart=is_cart,
-                    order_type=order_type,
+                    order_type=normalized_order_type,
                     status=target_status,
                     payment_status=normalized_payment_status,
                     pickup_code=pickup_code,
@@ -3324,7 +3475,7 @@ class UnifiedOrderService:
                             "entity_id": entity_id,
                             "entity_type": entity_type,
                             "status": target_status,
-                            "order_type": order_type,
+                            "order_type": normalized_order_type,
                             "unified": customer_unified_min,
                         },
                     },
@@ -3340,7 +3491,7 @@ class UnifiedOrderService:
                 entity_id=entity_id,
                 entity_ids=[entity_id],
                 is_cart=is_cart,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 status=target_status,
                 payment_status=normalized_payment_status,
                 pickup_code=pickup_code,
@@ -3375,7 +3526,7 @@ class UnifiedOrderService:
                             "kind": "order_status_changed",
                             "order_id": entity_id,
                             "status": target_status,
-                            "order_type": order_type,
+                            "order_type": normalized_order_type,
                             "unified": partner_unified_min,
                         },
                         priority=0,
@@ -3384,7 +3535,18 @@ class UnifiedOrderService:
             except Exception as notify_error:
                 logger.warning(f"Store status notification failed: {notify_error}")
 
-        if should_notify or should_edit or should_force_send:
+        if critical_text and user_id:
+            try:
+                await self.bot.send_message(int(user_id), critical_text)
+            except Exception as notify_error:
+                logger.warning(
+                    "Failed to send critical notification for %s#%s: %s",
+                    entity_type,
+                    entity_id,
+                    notify_error,
+                )
+
+        if should_edit or should_send_card:
             store = self.db.get_store(store_id) if store_id else None
             store_name = store.get("name", "") if isinstance(store, dict) else ""
             store_address = store.get("address", "") if isinstance(store, dict) else ""
@@ -3392,7 +3554,6 @@ class UnifiedOrderService:
                 store.get("phone") if isinstance(store, dict) else getattr(store, "phone", None)
             )
 
-            customer_lang = self.db.get_user_language(user_id)
             (
                 msg,
                 cart_items,
@@ -3403,7 +3564,7 @@ class UnifiedOrderService:
             ) = self._prepare_customer_status_message(
                 entity_id=entity_id,
                 entity_type=entity_type,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 store_name=store_name,
                 store_phone=store_phone,
                 store_address=store_address,
@@ -3426,6 +3587,7 @@ class UnifiedOrderService:
                 payment_method=ctx.payment_method,
                 payment_status=ctx.payment_status,
                 payment_proof_photo_id=ctx.payment_proof_photo_id,
+                ready_until=ready_until,
             )
 
             photo_ids = self._collect_photos_from_items(cart_items)
@@ -3461,7 +3623,7 @@ class UnifiedOrderService:
                     lang=customer_lang,
                     order_id=entity_id,
                     status=aggregated_status,
-                    order_type=order_type,
+                    order_type=normalized_order_type,
                     items=cart_items,
                     currency=currency,
                     is_cart=is_cart or is_grouped,
@@ -3477,6 +3639,7 @@ class UnifiedOrderService:
                     payment_method=ctx.payment_method,
                     payment_status=ctx.payment_status,
                     payment_proof_photo_id=ctx.payment_proof_photo_id,
+                    ready_until=ready_until,
                 )
             else:
                 if currency is None:
@@ -3485,7 +3648,7 @@ class UnifiedOrderService:
                     lang=customer_lang,
                     order_id=entity_id,
                     status=target_status,
-                    order_type=order_type,
+                    order_type=normalized_order_type,
                     store_name=store_name,
                     store_phone=store_phone,
                     store_address=store_address,
@@ -3502,6 +3665,7 @@ class UnifiedOrderService:
                     payment_method=ctx.payment_method,
                     payment_status=ctx.payment_status,
                     payment_proof_photo_id=ctx.payment_proof_photo_id,
+                    ready_until=ready_until,
                 )
 
             amounts_payload = {"delivery_fee": int(delivery_price or 0)}
@@ -3518,7 +3682,7 @@ class UnifiedOrderService:
                 entity_id=entity_id,
                 entity_ids=group_order_ids or [entity_id],
                 is_cart=is_cart or is_grouped,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 status=aggregated_status,
                 payment_status=normalized_payment_status,
                 pickup_code=pickup_code,
@@ -3533,20 +3697,14 @@ class UnifiedOrderService:
                 items=cart_items,
                 amounts=amounts_payload,
             )
-
-            if should_notify:
-
-
+            if critical_text:
                 try:
                     notif_title = (
-                        f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"Заказ #{entity_id}"
+                        f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"????? #{entity_id}"
                     )
-                    plain_msg = re.sub(r"<[^>]+>", "", msg)
-                    if target_status in (OrderStatus.CANCELLED,):
+                    if target_status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
                         notif_type = NotificationType.BOOKING_CANCELLED
-                    elif target_status in (OrderStatus.COMPLETED,):
-                        notif_type = NotificationType.BOOKING_COMPLETED
-                    elif target_status in (OrderStatus.PREPARING, OrderStatus.DELIVERING):
+                    elif target_status in (OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.DELIVERING):
                         notif_type = NotificationType.BOOKING_CONFIRMED
                     else:
                         notif_type = NotificationType.SYSTEM_ANNOUNCEMENT
@@ -3557,11 +3715,11 @@ class UnifiedOrderService:
                             type=notif_type,
                             recipient_id=int(user_id),
                             title=notif_title,
-                            message=plain_msg,
+                            message=critical_text,
                             data={
                                 "order_id": entity_id,
                                 "status": target_status,
-                                "order_type": order_type,
+                                "order_type": normalized_order_type,
                                 "entity_type": entity_type,
                                 "unified": customer_unified_full,
                             },
@@ -3570,14 +3728,17 @@ class UnifiedOrderService:
                     )
                 except Exception as notify_error:
                     logger.warning(
-                        f"Notification service failed for {entity_type}#{entity_id}: {notify_error}"
+                        "Notification service failed for %s#%s: %s",
+                        entity_type,
+                        entity_id,
+                        notify_error,
                     )
 
             # Add buttons for customer based on status
             reply_markup = self._build_customer_reply_markup(
                 target_status=target_status,
                 new_status=new_status,
-                order_type=order_type,
+                order_type=normalized_order_type,
                 customer_lang=customer_lang,
                 entity_id=entity_id,
                 entity_type=entity_type,
@@ -3591,8 +3752,7 @@ class UnifiedOrderService:
                 customer_photo=customer_photo,
                 reply_markup=reply_markup,
                 should_edit=should_edit,
-                should_force_send=should_force_send,
-                should_notify=should_notify,
+                should_send=should_send_card,
                 existing_message_id=existing_message_id,
                 group_order_ids=group_order_ids,
             )
@@ -3890,17 +4050,8 @@ class UnifiedOrderService:
         entity_id: int,
         entity_type: Literal["order", "booking"],
     ) -> bool:
-        """Seller confirms an order - pickup goes READY, delivery goes PREPARING."""
+        """Seller confirms an order."""
         target_status = OrderStatus.PREPARING
-        try:
-            ctx = self._get_status_update_context(
-                entity_id=entity_id,
-                entity_type=entity_type,
-            )
-            if ctx and ctx.order_type == "pickup":
-                target_status = OrderStatus.READY
-        except Exception as e:
-            logger.warning("Confirm order context check failed: %s", e)
         return await self.update_status(
             entity_id=entity_id,
             entity_type=entity_type,

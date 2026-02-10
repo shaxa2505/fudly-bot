@@ -41,22 +41,22 @@ export const statusText = (status, lang, orderType = 'delivery') => {
 
   const pickup = {
     pending: lang === 'uz' ? 'Tasdiq kutilmoqda' : 'Ожидает подтверждения',
-    preparing: lang === 'uz' ? 'Tayyorlanmoqda' : 'Готовится',
-    ready: lang === 'uz' ? 'Tayyor' : 'Готов к выдаче',
+    preparing: lang === 'uz' ? 'Tasdiqlangan' : 'Подтверждён',
+    ready: lang === 'uz' ? "Olib ketishga tayyor" : 'Готов к выдаче',
     delivering: lang === 'uz' ? "Yo'lda" : 'В пути',
-    completed: lang === 'uz' ? 'Berildi' : 'Выдано',
-    rejected: lang === 'uz' ? 'Rad etildi' : 'Отклонён',
-    cancelled: lang === 'uz' ? 'Bekor qilindi' : 'Отменён',
+    completed: lang === 'uz' ? 'Olib ketildi' : 'Получен',
+    rejected: lang === 'uz' ? 'Bekor qilingan' : 'Отменён',
+    cancelled: lang === 'uz' ? 'Bekor qilingan' : 'Отменён',
   }
 
   const delivery = {
     pending: lang === 'uz' ? 'Tasdiq kutilmoqda' : 'Ожидает подтверждения',
-    preparing: lang === 'uz' ? 'Tayyorlanmoqda' : 'Готовится',
-    ready: lang === 'uz' ? 'Tayyor' : 'Собран',
+    preparing: lang === 'uz' ? 'Tasdiqlangan' : 'Подтверждён',
+    ready: lang === 'uz' ? 'Tasdiqlangan' : 'Подтверждён',
     delivering: lang === 'uz' ? "Yo'lda" : 'В пути',
-    completed: lang === 'uz' ? 'Yetkazildi' : 'Доставлено',
-    rejected: lang === 'uz' ? 'Rad etildi' : 'Отклонён',
-    cancelled: lang === 'uz' ? 'Bekor qilindi' : 'Отменён',
+    completed: lang === 'uz' ? 'Yetkazildi' : 'Доставлен',
+    rejected: lang === 'uz' ? 'Bekor qilingan' : 'Отменён',
+    cancelled: lang === 'uz' ? 'Bekor qilingan' : 'Отменён',
   }
 
   const table = type === 'pickup' ? pickup : delivery
@@ -86,14 +86,5 @@ export const displayStatusText = (status, lang, orderType) => {
 
 export const deriveDisplayStatus = (order) => {
   const baseStatus = normalizeOrderStatus(order?.order_status || order?.status || 'pending')
-  if (['completed', 'cancelled', 'rejected'].includes(baseStatus)) {
-    return baseStatus
-  }
-  const paymentStatus = order?.payment_status
-  if (paymentStatus === 'awaiting_payment') return 'awaiting_payment'
-  if (paymentStatus === 'awaiting_proof') return 'awaiting_proof'
-  if (paymentStatus === 'proof_submitted') return 'proof_submitted'
-  if (paymentStatus === 'rejected') return 'payment_rejected'
-  if (paymentStatus === 'payment_rejected') return 'payment_rejected'
   return baseStatus || 'pending'
 }

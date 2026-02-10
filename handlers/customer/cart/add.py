@@ -121,20 +121,13 @@ def build_catalog_added_keyboard(lang: str) -> InlineKeyboardBuilder:
 def register(router: Router) -> None:
     """Register add-to-cart and related handlers on the given router."""
 
-    @router.callback_query(F.data.startswith("catalog_add_"))
-    async def catalog_add_one(callback: types.CallbackQuery, state: FSMContext) -> None:
-        if not common.db or not callback.message or not callback.data:
+    async def _quick_add_one(callback: types.CallbackQuery, offer_id: int) -> None:
+        if not common.db or not callback.message:
             await callback.answer()
             return
 
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
-
-        try:
-            offer_id = int(callback.data.split("_")[-1])
-        except (ValueError, IndexError):
-            await callback.answer(get_text(lang, "error"), show_alert=True)
-            return
 
         offer = common.db.get_offer(offer_id)
         if not offer:
@@ -186,22 +179,37 @@ def register(router: Router) -> None:
             await callback.answer(get_text(lang, "cart_single_store_only"), show_alert=True)
             return
 
-        text = get_text(lang, "catalog_added_to_cart")
-        kb = build_catalog_added_keyboard(lang)
+        short_title = title[:40] + ("..." if len(title) > 40 else "")
+        toast = get_text(lang, "catalog_added_to_cart_short", title=short_title)
+        await callback.answer(toast, show_alert=False)
+
+    @router.callback_query(F.data.startswith("catalog_add_"))
+    async def catalog_add_one(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not common.db or not callback.message or not callback.data:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = common.db.get_user_language(user_id)
 
         try:
-            if callback.message.photo:
-                await callback.message.edit_caption(
-                    caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-                )
-            else:
-                await callback.message.edit_text(
-                    text, parse_mode="HTML", reply_markup=kb.as_markup()
-                )
-        except Exception:
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+            offer_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        await _quick_add_one(callback, offer_id)
 
-        await callback.answer()
+    @router.callback_query(F.data.startswith("add_to_cart:"))
+    async def add_to_cart_quick(callback: types.CallbackQuery) -> None:
+        if not callback.data:
+            await callback.answer()
+            return
+        try:
+            offer_id = int(callback.data.split(":")[-1])
+        except (ValueError, IndexError):
+            await callback.answer()
+            return
+        await _quick_add_one(callback, offer_id)
 
     @router.callback_query(F.data.startswith("add_to_cart_"))
     async def add_to_cart_start(callback: types.CallbackQuery, state: FSMContext) -> None:

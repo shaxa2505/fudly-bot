@@ -25,8 +25,8 @@ def render_hot_offers_list(
         "",
     ]
 
-    for idx, offer in enumerate(offers, offset + 1):
-        lines.append(_render_catalog_item(lang, offer, idx, labels))
+    for offer in offers:
+        lines.append(_render_catalog_item(lang, offer, labels))
         lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -319,10 +319,9 @@ def _catalog_labels(lang: str) -> dict[str, str]:
         "discount": get_text(lang, "catalog_discount"),
         "price": get_text(lang, "catalog_price"),
         "store": get_text(lang, "catalog_store"),
-        "pickup_until": get_text(lang, "catalog_pickup_until"),
-        "expiry": get_text(lang, "catalog_expiry"),
-        "time_unknown": get_text(lang, "catalog_time_unknown"),
-        "expiry_unknown": get_text(lang, "catalog_expiry_unknown"),
+        "pickup_until_short": get_text(lang, "catalog_pickup_until_short"),
+        "expiry_until": get_text(lang, "catalog_expiry_until"),
+        "was": get_text(lang, "catalog_was"),
         "currency": product_labels["currency"],
     }
 
@@ -330,7 +329,6 @@ def _catalog_labels(lang: str) -> dict[str, str]:
 def _render_catalog_item(
     lang: str,
     offer: OfferListItem,
-    index: int,
     labels: dict[str, str],
 ) -> str:
     title = _escape(_trim_title(offer.title or "", limit=32))
@@ -348,31 +346,29 @@ def _render_catalog_item(
     discount_pct = int(discount_pct) if discount_pct is not None else 0
 
     price_line = (
-        f"{labels['price']}: {_format_money(original_price)} → {_format_money(current_price)} {labels['currency']}"
+        f"–{discount_pct}%   {_format_money(current_price)} {labels['currency']} "
+        f"({labels['was']} {_format_money(original_price)})"
     )
-    discount_line = f"{labels['discount']}: -{discount_pct}%"
 
     store_name = getattr(offer, "store_name", "") or ""
-    store_line = f"{labels['store']}: {_escape(_trim_title(store_name, limit=28))}"
-
     pickup_until = _format_time(getattr(offer, "available_until", None))
-    if not pickup_until:
-        pickup_until = labels["time_unknown"]
-    pickup_line = f"{labels['pickup_until']}: {pickup_until}"
+    expiry_date = (
+        _format_date(getattr(offer, "expiry_date", None))
+        if getattr(offer, "expiry_date", None)
+        else ""
+    )
 
-    expiry_date = _format_date(getattr(offer, "expiry_date", None)) if getattr(offer, "expiry_date", None) else ""
-    if not expiry_date:
-        expiry_date = labels["expiry_unknown"]
-    expiry_line = f"{labels['expiry']}: {expiry_date}"
+    meta_parts = [f"📍 {_escape(_trim_title(store_name, limit=28))}"]
+    if pickup_until:
+        meta_parts.append(f"⏰ {labels['pickup_until_short']} {pickup_until}")
+    if expiry_date:
+        meta_parts.append(f"📅 {labels['expiry_until']} {expiry_date}")
 
     return "\n".join(
         [
-            f"{index}. <b>{title}</b>",
-            discount_line,
+            f"🥗 {title}",
             price_line,
-            store_line,
-            pickup_line,
-            expiry_line,
+            " • ".join(meta_parts),
         ]
     )
 

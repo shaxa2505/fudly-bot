@@ -557,13 +557,14 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
             )
         else:
             kb.button(
-                text="? Berildi" if lang == "uz" else "? ??????",
-                callback_data=f"order_complete_{order_id}",
+                text="?? Olib ketishga tayyor" if lang == "uz" else "?? ????? ? ??????",
+                callback_data=f"order_ready_{order_id}",
             )
         kb.button(
             text="? Bekor" if lang == "uz" else "? ????????",
             callback_data=f"order_cancel_seller_{order_id}",
         )
+
     elif status == OrderStatus.READY:
         if is_delivery:
             kb.button(

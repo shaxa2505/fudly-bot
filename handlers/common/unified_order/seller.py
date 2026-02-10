@@ -210,7 +210,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)
         return
 
-    target_status = OrderStatus.READY if order_type == "pickup" else OrderStatus.PREPARING
+    target_status = OrderStatus.PREPARING
 
     # Use UnifiedOrderService if available, otherwise fallback
     if order_service:
@@ -308,9 +308,10 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
 
     kb = InlineKeyboardBuilder()
     if order_type != "delivery":
-        # Pickup‑заказ, оформленный через orders: не показываем этапы доставки,
-        # сразу даём кнопку "выдано" как для брони.
-        kb.button(text=get_text(lang, "btn_mark_issued"), callback_data=f"order_complete_{entity_id}")
+        kb.button(
+            text=get_text(lang, "btn_ready_for_pickup"),
+            callback_data=f"order_ready_{entity_id}",
+        )
     else:
         # Настоящая доставка: сначала "готов к передаче", затем курьер и т.д.
         kb.button(
@@ -473,11 +474,11 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    # Only delivery orders should go through the courier flow.
-    order_type = _get_entity_field(order, "order_type", "delivery")
-    if order_type != "delivery":
-        await callback.answer(get_text(lang, "error"), show_alert=True)
-        return
+    order_type = _get_entity_field(order, "order_type")
+    if not order_type:
+        delivery_address = _get_entity_field(order, "delivery_address")
+        order_type = "delivery" if delivery_address else "pickup"
+    is_delivery = order_type in ("delivery", "taxi")
 
     store_id = _get_entity_field(order, "store_id")
     store = db_instance.get_store(store_id) if store_id else None
@@ -533,7 +534,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
                 e,
             )
 
-    delivery_price = _get_store_field(store, "delivery_price", 0)
+    delivery_price = _get_store_field(store, "delivery_price", 0) if is_delivery else 0
 
     customer_id = _get_entity_field(order, "user_id")
     customer_name = None
@@ -553,11 +554,11 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         lang=lang,
         order_id=order_id,
         status=OrderStatus.READY,
-        order_type="delivery",
+        order_type="delivery" if is_delivery else "pickup",
         items=items,
         customer_name=customer_name,
         customer_phone=customer_phone,
-        delivery_address=delivery_address,
+        delivery_address=delivery_address if is_delivery else None,
         total=total,
         delivery_price=delivery_price,
         currency=currency,
@@ -567,10 +568,16 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
     )
 
     kb = InlineKeyboardBuilder()
-    kb.button(
-        text=get_text(lang, "btn_delivered_to_courier"),
-        callback_data=f"order_delivering_{order_id}",
-    )
+    if is_delivery:
+        kb.button(
+            text=get_text(lang, "btn_delivered_to_courier"),
+            callback_data=f"order_delivering_{order_id}",
+        )
+    else:
+        kb.button(
+            text=get_text(lang, "btn_mark_issued"),
+            callback_data=f"order_complete_{order_id}",
+        )
     kb.adjust(1)
 
     try:
@@ -589,9 +596,12 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
                 )
     except Exception as e:  # pragma: no cover
         logger.warning(f"Failed to edit ready message: {e}")
-
-    msg = get_text(lang, "order_ready_success")
-    await callback.answer(f"📦 {msg}")
+    if is_delivery:
+        msg = get_text(lang, "order_ready_success")
+        await callback.answer(f"?? {msg}")
+    else:
+        msg = get_text(lang, "status_ready")
+        await callback.answer(f"?? {msg}")
 
 
 async def order_delivering_handler(callback: types.CallbackQuery, state: FSMContext) -> None:

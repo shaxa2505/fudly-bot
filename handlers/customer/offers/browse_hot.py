@@ -169,29 +169,31 @@ def _render_catalog_details(
     unit = offer.unit or ("dona" if lang == "uz" else "шт")
 
     pickup_until = _format_time(getattr(offer, "available_until", None))
-    if not pickup_until:
-        pickup_until = get_text(lang, "catalog_time_unknown")
+    expiry_date = _format_date(getattr(offer, "expiry_date", None))
 
     store_name = getattr(store, "name", None) if store else None
     if not store_name:
         store_name = getattr(offer, "store_name", "") or ""
-    if not store_name:
-        store_name = get_text(lang, "catalog_expiry_unknown")
     store_address = getattr(store, "address", None) if store else None
     if not store_address:
         store_address = getattr(offer, "store_address", "") or ""
 
     lines = [
         f"<b>{title}</b>",
-        f"{get_text(lang, 'catalog_discount')}: -{discount_pct}%",
         f"{get_text(lang, 'catalog_price')}: {_format_money(original)} → {_format_money(current)} {currency}",
+        f"{get_text(lang, 'catalog_discount')}: -{discount_pct}%",
         "",
         f"{get_text(lang, 'catalog_in_stock')}: {qty} {unit}",
-        f"{get_text(lang, 'catalog_pickup_until')}: {pickup_until}",
-        "",
-        f"{get_text(lang, 'catalog_store')}: {store_name}",
-        f"{get_text(lang, 'catalog_address')}: {store_address or get_text(lang, 'catalog_expiry_unknown')}",
     ]
+    if pickup_until:
+        lines.append(f"{get_text(lang, 'catalog_pickup_until')}: {pickup_until}")
+    if expiry_date:
+        lines.append(f"{get_text(lang, 'catalog_expiry_until')}: {expiry_date}")
+    lines.append("")
+    if store_name:
+        lines.append(f"{get_text(lang, 'catalog_store')}: {store_name}")
+    if store_address:
+        lines.append(f"{get_text(lang, 'catalog_address')}: {store_address}")
 
     return "\n".join(lines).rstrip()
 
@@ -572,6 +574,26 @@ def register_hot(
         text = _render_catalog_details(lang, offer, store)
         kb = offer_keyboards.catalog_details_keyboard(lang, offer_id)
 
+        if offer.photo:
+            if getattr(msg, "photo", None):
+                try:
+                    await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
+                    await callback.answer()
+                    return
+                except Exception:
+                    pass
+            try:
+                await msg.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb,
+                )
+                await callback.answer()
+                return
+            except Exception:
+                pass
+
         if await safe_edit_message(msg, text, reply_markup=kb):
             await callback.answer()
             return
@@ -616,6 +638,90 @@ def register_hot(
         text = _render_catalog_details(lang, offer, store)
         kb = offer_keyboards.catalog_details_keyboard(lang, offer_id)
 
+        if offer.photo:
+            if getattr(msg, "photo", None):
+                try:
+                    await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
+                    await callback.answer()
+                    return
+                except Exception:
+                    pass
+            try:
+                await msg.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb,
+                )
+                await callback.answer()
+                return
+            except Exception:
+                pass
+
+        if await safe_edit_message(msg, text, reply_markup=kb):
+            await callback.answer()
+            return
+
+        await safe_delete_message(msg)
+        await msg.answer(text, parse_mode="HTML", reply_markup=kb)
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("product_details:"))
+    async def product_details_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        """Handle new catalog details callback."""
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+
+        try:
+            offer_id = int(callback.data.split(":")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        offer = offer_service.get_offer_details(offer_id)
+        if not offer:
+            not_found = "Mahsulot topilmadi" if lang == "uz" else "Товар не найден"
+            await callback.answer(not_found, show_alert=True)
+            return
+
+        max_quantity = offer.quantity or 0
+        if max_quantity <= 0:
+            sold_out = "Mahsulot tugadi" if lang == "uz" else "Товар закончился"
+            await callback.answer(sold_out, show_alert=True)
+            return
+
+        store = offer_service.get_store(offer.store_id) if offer.store_id else None
+        text = _render_catalog_details(lang, offer, store)
+        kb = offer_keyboards.catalog_details_keyboard(lang, offer_id)
+
+        if offer.photo:
+            if getattr(msg, "photo", None):
+                try:
+                    await msg.edit_caption(caption=text, parse_mode="HTML", reply_markup=kb)
+                    await callback.answer()
+                    return
+                except Exception:
+                    pass
+            try:
+                await msg.answer_photo(
+                    photo=offer.photo,
+                    caption=text,
+                    parse_mode="HTML",
+                    reply_markup=kb,
+                )
+                await callback.answer()
+                return
+            except Exception:
+                pass
+
         if await safe_edit_message(msg, text, reply_markup=kb):
             await callback.answer()
             return
@@ -631,6 +737,10 @@ def register_hot(
 
     @dp.callback_query(F.data == "catalog_noop")
     async def catalog_noop_handler(callback: types.CallbackQuery) -> None:
+        await callback.answer()
+
+    @dp.callback_query(F.data == "noop")
+    async def noop_handler(callback: types.CallbackQuery) -> None:
         await callback.answer()
 
     @dp.callback_query(F.data.startswith("catalog_page_"))
@@ -654,6 +764,90 @@ def register_hot(
             await callback.answer()
             return
 
+        city, region, district, latitude, longitude = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+
+        await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
+            offer_service,
+            logger,
+            page=page,
+            edit_message=True,
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("prev_page:"))
+    async def catalog_prev_page(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        try:
+            page = int(callback.data.split(":")[-1])
+        except (ValueError, IndexError):
+            await callback.answer()
+            return
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+        city, region, district, latitude, longitude = _extract_location(user)
+        search_city = normalize_city(city)
+        search_region = normalize_city(region) if region else None
+        search_district = normalize_city(district) if district else None
+
+        await _send_hot_offers_list(
+            msg,
+            state,
+            lang,
+            city,
+            search_city,
+            search_region,
+            search_district,
+            latitude,
+            longitude,
+            offer_service,
+            logger,
+            page=page,
+            edit_message=True,
+        )
+        await callback.answer()
+
+    @dp.callback_query(F.data.startswith("next_page:"))
+    async def catalog_next_page(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not callback.from_user or not callback.data:
+            await callback.answer()
+            return
+        msg = _callback_message(callback)
+        if not msg:
+            await callback.answer()
+            return
+        try:
+            page = int(callback.data.split(":")[-1])
+        except (ValueError, IndexError):
+            await callback.answer()
+            return
+        user_id = callback.from_user.id
+        lang = db.get_user_language(user_id)
+        user = db.get_user_model(user_id)
+        if not user:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
         city, region, district, latitude, longitude = _extract_location(user)
         search_city = normalize_city(city)
         search_region = normalize_city(region) if region else None
@@ -715,6 +909,10 @@ def register_hot(
         )
         await callback.answer()
 
+    @dp.callback_query(F.data == "back_to_catalog")
+    async def back_to_catalog_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        await catalog_back_handler(callback, state)
+
     @dp.callback_query(F.data == "catalog_continue")
     async def catalog_continue_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
         await catalog_back_handler(callback, state)
@@ -731,6 +929,10 @@ def register_hot(
         lang = db.get_user_language(callback.from_user.id)
         await _send_filter_menu(msg, state, lang)
         await callback.answer()
+
+    @dp.callback_query(F.data == "open_filters")
+    async def open_filters_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        await catalog_filter_handler(callback, state)
 
     @dp.callback_query(F.data == "catalog_filter_reset")
     async def catalog_filter_reset_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -1179,6 +1381,10 @@ def register_hot(
             back_to_filters=False,
         )
         await callback.answer()
+
+    @dp.callback_query(F.data == "open_stores")
+    async def open_stores_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+        await catalog_stores(callback, state)
 
     @dp.callback_query(F.data.startswith("catalog_store_page_"))
     async def catalog_store_page(callback: types.CallbackQuery, state: FSMContext) -> None:

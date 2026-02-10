@@ -1,4 +1,4 @@
-"""Shared status label helpers for orders/bookings UI."""
+﻿"""Shared status label helpers for orders/bookings UI."""
 from __future__ import annotations
 
 from app.domain.order import OrderStatus
@@ -27,26 +27,24 @@ def status_label(
     order_type_norm = (order_type or "delivery").strip().lower()
     if order_type_norm not in ("delivery", "pickup"):
         order_type_norm = "delivery"
-    if order_type_norm == "pickup" and normalized == OrderStatus.PREPARING:
-        normalized = OrderStatus.READY
 
     pickup = {
         "pending": "Tasdiq kutilmoqda" if lang == "uz" else "Ожидает подтверждения",
-        "preparing": "Tayyor" if lang == "uz" else "Готов к выдаче",
-        "ready": "Tayyor" if lang == "uz" else "Готов к выдаче",
+        "preparing": "Tasdiqlangan" if lang == "uz" else "Подтверждён",
+        "ready": "Olib ketishga tayyor" if lang == "uz" else "Готов к выдаче",
         "delivering": "Yo'lda" if lang == "uz" else "В пути",
-        "completed": "Berildi" if lang == "uz" else "Выдано",
-        "rejected": "Rad etildi" if lang == "uz" else "Отклонён",
-        "cancelled": "Bekor qilindi" if lang == "uz" else "Отменён",
+        "completed": "Olib ketildi" if lang == "uz" else "Получен",
+        "rejected": "Bekor qilingan" if lang == "uz" else "Отменён",
+        "cancelled": "Bekor qilingan" if lang == "uz" else "Отменён",
     }
     delivery = {
         "pending": "Tasdiq kutilmoqda" if lang == "uz" else "Ожидает подтверждения",
-        "preparing": "Tayyorlanmoqda" if lang == "uz" else "Готовится",
-        "ready": "Tayyor" if lang == "uz" else "Собран",
+        "preparing": "Tasdiqlangan" if lang == "uz" else "Подтверждён",
+        "ready": "Tasdiqlangan" if lang == "uz" else "Подтверждён",
         "delivering": "Yo'lda" if lang == "uz" else "В пути",
-        "completed": "Yetkazildi" if lang == "uz" else "Доставлено",
-        "rejected": "Rad etildi" if lang == "uz" else "Отклонён",
-        "cancelled": "Bekor qilindi" if lang == "uz" else "Отменён",
+        "completed": "Yetkazildi" if lang == "uz" else "Доставлен",
+        "rejected": "Bekor qilingan" if lang == "uz" else "Отменён",
+        "cancelled": "Bekor qilingan" if lang == "uz" else "Отменён",
     }
 
     table = delivery if order_type_norm == "delivery" else pickup
@@ -57,4 +55,3 @@ def status_emoji(status: str | None) -> str:
     """Return emoji marker for status (currently uniform)."""
     _ = status
     return "•"
-
