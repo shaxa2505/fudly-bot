@@ -131,6 +131,10 @@ class OfferService:
                 latitude,
                 longitude,
             )
+            if raw_offers is None:
+                raw_offers = []
+            elif not isinstance(raw_offers, list):
+                raw_offers = list(raw_offers)
             used_scope = (scope_city, scope_region, scope_district)
             if raw_offers:
                 break
@@ -173,6 +177,10 @@ class OfferService:
                 store_id=store_id,
                 only_today=only_today,
             )
+            if raw_offers is None:
+                raw_offers = []
+            elif not isinstance(raw_offers, list):
+                raw_offers = list(raw_offers)
             total = len(raw_offers)
 
         items = [self._to_offer_list_item(row) for row in raw_offers]
