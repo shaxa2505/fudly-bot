@@ -280,17 +280,12 @@ async def my_orders_handler(message: types.Message) -> None:
         title = _t(lang, "Активные заказы и бронирования", "Faol buyurtmalar va bronlar")
         text_lines.append(f"<b>{title}</b> ({active_total})\n")
         status_label = _t(lang, "Статус", "Holat")
-        type_pickup = _t(lang, "Самовывоз", "Olib ketish")
-        type_delivery = _t(lang, "Доставка", "Yetkazish")
-        code_label = _t(lang, "Код", "Kod")
-        address_label = _t(lang, "Адрес", "Manzil")
 
         # Показываем legacy bookings (самовывоз из таблицы bookings)
         for booking in active_bookings[:5]:
             booking_id = _get_field(booking, "booking_id")
             store_name = _get_field(booking, "name") or "Магазин"  # name в dict, не store_name
             status = _normalize_status(_get_field(booking, "status"))
-            pickup_code = _get_field(booking, "booking_code")
             # Вычисляем total из quantity × discount_price
             quantity = _get_field(booking, "quantity") or 1
             discount_price = _get_field(booking, "discount_price") or 0
@@ -299,16 +294,12 @@ async def my_orders_handler(message: types.Message) -> None:
             emoji, status_text = _get_status_info(status, False, lang)
 
             text_lines.append(f"<b>#{booking_id}</b> • {store_name}")
-            text_lines.append(f"   {type_pickup} • {_format_price(total, lang)}")
-            if pickup_code:
-                text_lines.append(f"   {code_label}: <code>{pickup_code}</code>")
-            text_lines.append(f"   {status_label}: {status_text}")
+            text_lines.append(f"{emoji} {status_text}")
+            text_lines.append(_format_price(total, lang))
             text_lines.append("")
 
-            # Кнопка детализации
-            store_name_str = str(store_name) if store_name else "Магазин"
             kb.button(
-                text=f"{_t(lang, 'Детали', 'Batafsil')} #{booking_id}",
+                text=f"#{booking_id} ➡️",
                 callback_data=f"myorder_detail_b_{booking_id}",
             )
 
@@ -327,20 +318,15 @@ async def my_orders_handler(message: types.Message) -> None:
 
             status = _normalize_status(_get_field(order, "order_status", 10))
             total = _get_field(order, "total_price", 5) or 0
-            pickup_code = _get_field(order, "pickup_code")
-
             emoji, status_text = _get_status_info(status, False, lang)
 
             text_lines.append(f"<b>#{order_id}</b> • {store_name}")
-            text_lines.append(f"   {type_pickup} • {_format_price(total, lang)}")
-            if pickup_code:
-                text_lines.append(f"   {code_label}: <code>{pickup_code}</code>")
-            text_lines.append(f"   {status_label}: {status_text}")
+            text_lines.append(f"{emoji} {status_text}")
+            text_lines.append(_format_price(total, lang))
             text_lines.append("")
 
-            store_name_str = str(store_name) if store_name else "Магазин"
             kb.button(
-                text=f"{_t(lang, 'Детали', 'Batafsil')} #{order_id}",
+                text=f"#{order_id} ➡️",
                 callback_data=f"myorder_detail_o_{order_id}",
             )
 
@@ -359,22 +345,15 @@ async def my_orders_handler(message: types.Message) -> None:
 
             status = _normalize_status(_get_field(order, "order_status", 10))
             total = _get_field(order, "total_price", 5) or 0
-            address = _get_field(order, "delivery_address", 4) or ""
-
             emoji, status_text = _get_status_info(status, True, lang)
 
             text_lines.append(f"<b>#{order_id}</b> • {store_name}")
-            text_lines.append(f"   {type_delivery} • {_format_price(total, lang)}")
-            if address:
-                short_addr = address[:30] + "..." if len(address) > 30 else address
-                text_lines.append(f"   {address_label}: {short_addr}")
-            text_lines.append(f"   {status_label}: {status_text}")
+            text_lines.append(f"{emoji} {status_text}")
+            text_lines.append(_format_price(total, lang))
             text_lines.append("")
 
-            # Кнопка детализации
-            store_name_str = str(store_name) if store_name else "Магазин"
             kb.button(
-                text=f"{_t(lang, 'Детали', 'Batafsil')} #{order_id}",
+                text=f"#{order_id} ➡️",
                 callback_data=f"myorder_detail_o_{order_id}",
             )
 

@@ -53,11 +53,16 @@ def _delivery_cash_enabled() -> bool:
 
 
 async def _remove_location_keyboard(message: types.Message, lang: str) -> None:
-    """Remove reply keyboard with location request if it is still visible."""
+    """Replace location request keyboard with the main menu."""
     try:
+        from app.keyboards import main_menu_customer
+        from .storage import cart_storage
+
+        user_id = message.from_user.id if message.from_user else 0
+        cart_count = cart_storage.get_cart_count(user_id) if user_id else 0
         await message.answer(
             get_text(lang, "cart_delivery_keyboard_removed"),
-            reply_markup=types.ReplyKeyboardRemove(),
+            reply_markup=main_menu_customer(lang, cart_count),
         )
     except Exception:
         pass

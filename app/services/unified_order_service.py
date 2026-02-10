@@ -386,7 +386,8 @@ class NotificationTemplates:
                 lines.append(f"{address_label}: {html.escape(str(address_value))}")
 
         if pickup_code and display_type == "pickup":
-            lines.append(f"🔐 {pickup_code_label}: <b>{html.escape(str(pickup_code))}</b>")
+            lines.append(f"🔐 {pickup_code_label}")
+            lines.append(f"<code>{html.escape(str(pickup_code))}</code>")
 
         return "\n".join(lines)
 
