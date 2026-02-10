@@ -448,6 +448,23 @@ async def order_detail_handler(callback: types.CallbackQuery) -> None:
         await callback.answer(_t(lang, "Ошибка", "Xatolik"))
         return
 
+    # If Mini App is available, keep bot as navigation only.
+    if order_type != "b":
+        webapp_url = os.getenv("WEBAPP_URL", "").strip()
+        if webapp_url:
+            hint = get_text(lang, "order_card_updated_hint")
+            kb = _build_open_app_keyboard(lang, order_id)
+            try:
+                await callback.message.edit_text(
+                    _fmt([hint]), parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+            except Exception:
+                await callback.message.answer(
+                    _fmt([hint]), parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+            await callback.answer()
+            return
+
     if order_type == "b":
         await _show_booking_detail(callback, order_id, lang)
     else:

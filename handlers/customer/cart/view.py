@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from localization import get_text
+from app.keyboards import main_menu_customer
 from handlers.common.utils import is_cart_button
 
 from .common import esc
@@ -131,9 +132,10 @@ def register(router: Router) -> None:
             return
         try:
             lang = common.db.get_user_language(callback.from_user.id)
+            cart_count = cart_storage.get_cart_count(callback.from_user.id)
             await callback.message.answer(
                 get_text(lang, "cart_delivery_keyboard_removed"),
-                reply_markup=types.ReplyKeyboardRemove(),
+                reply_markup=main_menu_customer(lang, cart_count),
             )
         except Exception:
             pass

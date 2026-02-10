@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Trash2, Plus, Minus, LocateFixed, Banknote } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, Banknote } from 'lucide-react'
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -149,8 +149,7 @@ function CartPage({ user }) {
   const [comment, setComment] = useState('')
 
   // Delivery type: 'pickup' or 'delivery'
-  const [orderType, setOrderType] = useState('pickup')
-  const [orderTypeTouched, setOrderTypeTouched] = useState(false)
+  const [orderType, setOrderType] = useState(null)
   const [deliveryFee, setDeliveryFee] = useState(0)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
   const [storeDeliveryEnabled, setStoreDeliveryEnabled] = useState(false)
@@ -883,11 +882,6 @@ function CartPage({ user }) {
       }
       return option.time || option.label || ''
     }, [deliveryOptions, deliverySlot])
-  const autoOrderType = useMemo(() => {
-    if (storeInfoLoading) return orderType
-    if (!storeDeliveryEnabled) return 'pickup'
-    return 'delivery'
-  }, [storeDeliveryEnabled, storeInfoLoading, orderType])
   const deliveryOptionDisabled = storeInfoLoading || !storeDeliveryEnabled
   const deliverySummaryCost = deliveryCheck?.deliveryCost ?? (Number.isFinite(deliveryFee) ? deliveryFee : null)
   const deliverySummaryMin = deliveryCheck?.minOrderAmount ?? (Number.isFinite(minOrderAmount) ? minOrderAmount : null)
@@ -1100,16 +1094,10 @@ function CartPage({ user }) {
 
   useEffect(() => {
     if (storeInfoLoading) return
-    if (!storeDeliveryEnabled && orderType === 'delivery') {
+    if (!storeDeliveryEnabled && orderType !== 'pickup') {
       setOrderType('pickup')
-      setOrderTypeTouched(false)
-      return
     }
-    if (orderTypeTouched) return
-    if (orderType !== autoOrderType) {
-      setOrderType(autoOrderType)
-    }
-  }, [autoOrderType, orderType, orderTypeTouched, storeDeliveryEnabled, storeInfoLoading])
+  }, [orderType, storeDeliveryEnabled, storeInfoLoading])
 
   useEffect(() => {
     if (!deliveryOptions.length) return
@@ -1155,7 +1143,6 @@ function CartPage({ user }) {
     if (orderLoading || cartValidationLoading || deliveryValidationLoading) return
     setShowCheckout(false)
     setShowPaymentSheet(false)
-    setOrderTypeTouched(false)
     setOrderItemsExpanded(false)
     setShowMapEditor(false)
     setMapSearchOpen(false)
@@ -1163,26 +1150,6 @@ function CartPage({ user }) {
       navigate('/cart')
     }
   }
-
-  const handleClearCart = useCallback(() => {
-    const message = "Savatni tozalashni xohlaysizmi?"
-    const tg = window.Telegram?.WebApp
-    if (tg?.showConfirm) {
-      try {
-        tg.showConfirm(message, (confirmed) => {
-          if (confirmed) {
-            clearCart()
-          }
-        })
-        return
-      } catch {
-        // fall back to native confirm
-      }
-    }
-    if (window.confirm(message)) {
-      clearCart()
-    }
-  }, [clearCart])
 
   const handleRestorePendingCart = useCallback(() => {
     if (!pendingPayment?.cart) {
@@ -1899,7 +1866,7 @@ function CartPage({ user }) {
     if (!verifiedPhone) {
       return
     }
-    setOrderType(autoOrderType)
+    setOrderType(null)
     setOrderTypeTouched(false)
     setOrderItemsExpanded(false)
     setShowMapEditor(false)
@@ -1956,6 +1923,9 @@ function CartPage({ user }) {
   }, [orderType, address, entrance, floor, apartment])
 
   const buildOrderComment = useCallback(() => {
+    if (!orderType) {
+      return comment.trim()
+    }
     const lines = [orderType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish']
     if (orderType === 'delivery' && deliverySlotLabel) {
       lines.push(`Yetkazish vaqti: ${deliverySlotLabel}`)
@@ -1982,6 +1952,10 @@ function CartPage({ user }) {
     }
     const resolvedPhone = ensurePhoneOrPrompt()
     if (!resolvedPhone) {
+      return
+    }
+    if (!orderType) {
+      toast.warning('Buyurtma turini tanlang')
       return
     }
     if (orderType === 'delivery' && !address.trim()) {
@@ -2196,15 +2170,6 @@ function CartPage({ user }) {
           <div className="cart-header-inner">
             <div className="cart-header-spacer" aria-hidden="true" />
             <h1 className="cart-header-title">Savat</h1>
-            <button
-              className="cart-header-clear"
-              type="button"
-              onClick={handleClearCart}
-              aria-label="Savatni tozalash"
-              disabled
-            >
-              <Trash2 size={18} strokeWidth={1.8} />
-            </button>
           </div>
         </header>
 
@@ -2244,14 +2209,6 @@ function CartPage({ user }) {
         <div className="cart-header-inner">
           <div className="cart-header-spacer" aria-hidden="true" />
           <h1 className="cart-header-title">Savat</h1>
-          <button
-            className="cart-header-clear"
-            type="button"
-            onClick={handleClearCart}
-            aria-label="Savatni tozalash"
-          >
-            <Trash2 size={18} strokeWidth={1.8} />
-          </button>
         </div>
       </header>
 
@@ -2260,9 +2217,6 @@ function CartPage({ user }) {
         {hasMultipleStores && (
           <div className="cart-alert" role="status">
             <p>{multiStoreMessage}</p>
-            <button type="button" className="cart-alert-action" onClick={handleClearCart}>
-              Savatni tozalash
-            </button>
           </div>
         )}
 
@@ -2544,7 +2498,6 @@ function CartPage({ user }) {
                         className={`order-type-btn ${orderType === 'pickup' ? 'active' : ''}`}
                         onClick={() => {
                           setOrderType('pickup')
-                          setOrderTypeTouched(true)
                         }}
                       >
                         <span className="order-type-icon" aria-hidden="true"></span>
@@ -2557,7 +2510,6 @@ function CartPage({ user }) {
                         onClick={() => {
                           if (deliveryOptionDisabled) return
                           setOrderType('delivery')
-                          setOrderTypeTouched(true)
                         }}
                         disabled={deliveryOptionDisabled}
                       >
@@ -2950,7 +2902,7 @@ function CartPage({ user }) {
                 <button
                   className={`checkout-confirm${checkoutBusy ? ' is-loading' : ''}`}
                   onClick={proceedToPayment}
-                  disabled={checkoutBusy || hasUnavailableItems || !getResolvedPhone() || (orderType === 'delivery' && !address.trim())}
+                  disabled={checkoutBusy || hasUnavailableItems || !getResolvedPhone() || !orderType || (orderType === 'delivery' && !address.trim())}
                 >
                   {checkoutBusy && <span className="checkout-confirm-spinner" aria-hidden="true"></span>}
                   <span>{checkoutButtonLabel}</span>

@@ -173,6 +173,12 @@ def store_settings_keyboard(
         location_text = "Добавить локацию" if lang == "ru" else "Joylashuv qo'shish"
     builder.button(text=location_text, callback_data=f"store_location_setup_{store_id}")
 
+    # Language (moved from profile)
+    builder.button(
+        text=f"🌐 {get_text(lang, 'language')}",
+        callback_data="change_language",
+    )
+
     # Payment integrations (only for owner)
     if is_owner:
         working_hours_text = get_text(lang, "store_working_hours")
