@@ -137,6 +137,7 @@ class Store(Base):
     delivery_enabled = Column(Integer, default=1)
     delivery_price = Column(Integer, default=15000)
     min_order_amount = Column(Integer, default=30000)
+    delivery_radius_km = Column(Integer, default=10)
     photo = Column(Text, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)

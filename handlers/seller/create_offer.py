@@ -10,7 +10,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import get_store_field
+from app.core.utils import calc_discount_percent, get_store_field
 from app.keyboards import (
     discount_keyboard,
     expiry_keyboard,
@@ -439,7 +439,7 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
             discount_price = original_price * (1 - discount_percent / 100)
             return discount_percent, discount_price
         raise ValueError("Discount price must be less than original")
-    discount_percent = int((1 - discount_price / original_price) * 100)
+    discount_percent = calc_discount_percent(original_price, discount_price)
     if discount_percent < MIN_DISCOUNT_PERCENT:
         raise ValueError("Discount too low")
     return discount_percent, discount_price
@@ -1178,7 +1178,7 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
             if original <= 0 or discount_price <= 0 or discount_price >= original:
                 raise ValueError
 
-            discount_percent = int((1 - discount_price / original) * 100)
+            discount_percent = calc_discount_percent(original, discount_price)
             if discount_percent < MIN_DISCOUNT_PERCENT:
                 await state.update_data(original_price=original)
                 data = await state.get_data()
@@ -1332,7 +1332,7 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
                 return
             raise ValueError
 
-        discount_percent = int((1 - discount_price / original_price) * 100)
+        discount_percent = calc_discount_percent(original_price, discount_price)
         if discount_percent < MIN_DISCOUNT_PERCENT:
             await _upsert_prompt(
                 message,
@@ -2210,7 +2210,7 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         expiry_date = getattr(offer, "expiry_date", "")
 
     # Calculate discount percent
-    discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
+    discount_percent = calc_discount_percent(original_price, discount_price)
 
     # Get store name
     stores = db.get_user_stores(callback.from_user.id)

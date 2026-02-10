@@ -108,6 +108,7 @@ class SchemaMixin:
                     delivery_enabled INTEGER DEFAULT 1,
                     delivery_price INTEGER DEFAULT 15000,
                     min_order_amount INTEGER DEFAULT 30000,
+                    delivery_radius_km INTEGER DEFAULT 10,
                     working_hours TEXT DEFAULT '08:00 - 23:00',
                     region_id INTEGER,
                     district_id INTEGER,
@@ -1098,7 +1099,13 @@ class SchemaMixin:
                     "ALTER TABLE stores ADD COLUMN IF NOT EXISTS min_order_amount INTEGER DEFAULT 30000"
                 )
                 cursor.execute(
+                    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS delivery_radius_km INTEGER DEFAULT 10"
+                )
+                cursor.execute(
                     "UPDATE stores SET delivery_enabled = 1 WHERE delivery_enabled IS NULL"
+                )
+                cursor.execute(
+                    "UPDATE stores SET delivery_radius_km = 10 WHERE delivery_radius_km IS NULL"
                 )
                 logger.info("✅ Delivery fields added to stores table")
 

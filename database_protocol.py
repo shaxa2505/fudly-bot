@@ -213,8 +213,9 @@ class DatabaseProtocol(Protocol):
         store_id: int,
         delivery_price: int | None = None,
         min_order_amount: int | None = None,
+        delivery_radius_km: int | None = None,
     ) -> bool:
-        """Update store delivery price and/or minimum order amount."""
+        """Update store delivery price/minimum order/delivery radius."""
         ...
 
     def update_store_working_hours(self, store_id: int, working_hours: str) -> bool:

@@ -331,3 +331,14 @@ def normalize_city(city: str) -> str:
     return CITY_UZ_TO_RU.get(city_clean.lower(), city_clean)
 
 
+def calc_discount_percent(original_price: float, discount_price: float) -> int:
+    """Calculate discount percent, avoiding float artifacts on integer boundaries."""
+    if not original_price or original_price <= 0:
+        return 0
+    percent = ((original_price - discount_price) * 100) / original_price
+    if percent <= 0:
+        return 0
+    # Guard against float rounding turning 20.0 into 19.999999...
+    return int(percent + 1e-9)
+
+

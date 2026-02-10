@@ -25,6 +25,9 @@ class Store(BaseModel):
     delivery_enabled: bool = Field(False, description="Delivery available")
     delivery_price: int = Field(0, description="Delivery price in sum")
     min_order_amount: int = Field(0, description="Minimum order amount in sum")
+    delivery_radius_km: int | None = Field(
+        None, description="Delivery radius in kilometers"
+    )
 
     created_at: datetime | None = Field(None, description="Creation timestamp")
 
@@ -59,6 +62,7 @@ class Store(BaseModel):
             "delivery_enabled": int(self.delivery_enabled),
             "delivery_price": self.delivery_price,
             "min_order_amount": self.min_order_amount,
+            "delivery_radius_km": self.delivery_radius_km,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -90,5 +94,6 @@ class Store(BaseModel):
             delivery_enabled=bool(row[9]) if len(row) > 9 else False,
             delivery_price=row[10] if len(row) > 10 else 0,
             min_order_amount=row[11] if len(row) > 11 else 0,
+            delivery_radius_km=row[13] if len(row) > 13 else None,
             created_at=row[12] if len(row) > 12 else None,
         )

@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_seller
+from app.core.utils import calc_discount_percent
 from handlers.common.states import EditOffer
 from handlers.common.utils import is_main_menu_button
 from localization import get_text
@@ -1372,7 +1373,7 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
             if discount_price >= original_price:
                 await message.answer(get_text(lang, "error_discount_less_than_original"))
                 return
-            discount_percent = int((1 - discount_price / original_price) * 100)
+            discount_percent = calc_discount_percent(original_price, discount_price)
             if discount_percent < MIN_DISCOUNT_PERCENT:
                 await message.answer(get_text(lang, "error_min_discount"))
                 return

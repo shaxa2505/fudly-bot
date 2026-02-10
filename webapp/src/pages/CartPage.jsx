@@ -135,7 +135,7 @@ function CartPage({ user }) {
   const pendingAutoResumeRef = useRef(null)
   const addressInputRef = useRef(null)
   const commentInputRef = useRef(null)
-  const lastDeliveryCheckRef = useRef({ address: '', storeId: null, city: '' })
+  const lastDeliveryCheckRef = useRef({ address: '', storeId: null, city: '', lat: null, lon: null })
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(() => isCheckoutRoute)
@@ -1660,7 +1660,13 @@ function CartPage({ user }) {
     }
 
     const city = resolveDeliveryCity()
-    lastDeliveryCheckRef.current = { address: trimmedAddress, storeId: cartStoreId, city }
+    lastDeliveryCheckRef.current = {
+      address: trimmedAddress,
+      storeId: cartStoreId,
+      city,
+      lat: deliveryCoords?.lat ?? null,
+      lon: deliveryCoords?.lon ?? null,
+    }
     if (!city) {
       if (shouldToast) {
         toast.warning('Shaharni tanlang')
@@ -1683,6 +1689,8 @@ function CartPage({ user }) {
           city,
           address: trimmedAddress,
           store_id: cartStoreId,
+          delivery_lat: deliveryCoords?.lat ?? null,
+          delivery_lon: deliveryCoords?.lon ?? null,
         })
           .then((data) => {
             clearTimeout(timer)
@@ -1797,6 +1805,8 @@ function CartPage({ user }) {
     storeDeliveryEnabled,
     subtotal,
     toast,
+    deliveryCoords?.lat,
+    deliveryCoords?.lon,
   ])
 
   const pendingPaymentCard = shouldShowPendingCard ? (
@@ -1850,7 +1860,9 @@ function CartPage({ user }) {
     if (
       lastCheck.address === trimmedAddress &&
       lastCheck.storeId === cartStoreId &&
-      lastCheck.city === city
+      lastCheck.city === city &&
+      lastCheck.lat === (deliveryCoords?.lat ?? null) &&
+      lastCheck.lon === (deliveryCoords?.lon ?? null)
     ) {
       return
     }
@@ -1870,6 +1882,8 @@ function CartPage({ user }) {
     orderLoading,
     orderType,
     resolveDeliveryCity,
+    deliveryCoords?.lat,
+    deliveryCoords?.lon,
     showCheckoutSheet,
     storeDeliveryEnabled,
     validateDeliveryWithServer,
@@ -2658,6 +2672,7 @@ function CartPage({ user }) {
                           onChange={(event) => {
                             const nextValue = event.target.value
                             setAddress(nextValue)
+                            setDeliveryCoords(null)
                             setMapQuery(nextValue)
                             if (!mapSearchOpen) {
                               setMapSearchOpen(true)

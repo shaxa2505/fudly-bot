@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import html
 import io
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -39,6 +40,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from PIL import Image
 
 from app.core.geocoding import geocode_store_address
+from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
 from app.core.utils import get_uzb_time
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
@@ -62,6 +64,22 @@ def _delivery_cash_enabled() -> bool:
         "yes",
         "on",
     }
+
+
+def _parse_coord(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    rad = math.pi / 180.0
+    x = (lon2 - lon1) * rad * math.cos((lat1 + lat2) * rad / 2.0)
+    y = (lat2 - lat1) * rad
+    return math.hypot(x, y) * 6371.0
 
 
 def _parse_time_value(value: object) -> dt_time | None:
@@ -1257,6 +1275,43 @@ class UnifiedOrderService:
             if time_range:
                 detail = f"{detail}. Order time: {time_range}"
             return self._error_result(detail)
+        if is_delivery and store:
+            store_delivery_enabled = (
+                store.get("delivery_enabled")
+                if isinstance(store, dict)
+                else getattr(store, "delivery_enabled", None)
+            )
+            if store_delivery_enabled is not None and not bool(store_delivery_enabled):
+                return self._error_result("Yetkazib berish mavjud emas")
+
+            store_lat = _parse_coord(
+                store.get("latitude") if isinstance(store, dict) else getattr(store, "latitude", None)
+            )
+            store_lon = _parse_coord(
+                store.get("longitude") if isinstance(store, dict) else getattr(store, "longitude", None)
+            )
+            if store_lat is None or store_lon is None:
+                return self._error_result("Do'kon geolokatsiyasi o'rnatilmagan")
+
+            delivery_lat_val = _parse_coord(delivery_lat)
+            delivery_lon_val = _parse_coord(delivery_lon)
+            if delivery_lat_val is None or delivery_lon_val is None:
+                return self._error_result("Yetkazib berish manzilini xaritada belgilang")
+
+            radius_raw = (
+                store.get("delivery_radius_km")
+                if isinstance(store, dict)
+                else getattr(store, "delivery_radius_km", None)
+            )
+            radius_km = _parse_coord(radius_raw)
+            if radius_km is None or radius_km <= 0:
+                radius_km = float(DEFAULT_DELIVERY_RADIUS_KM)
+
+            distance_km = _distance_km(store_lat, store_lon, delivery_lat_val, delivery_lon_val)
+            if distance_km > radius_km:
+                return self._error_result(
+                    f"Yetkazib berish radiusi {radius_km:.0f} km. Masofa: {distance_km:.1f} km"
+                )
 
         # Normalize and enforce: sellers should only see paid/cash orders
         if not PaymentStatus.is_cleared(

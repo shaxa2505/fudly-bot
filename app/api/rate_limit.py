@@ -29,17 +29,24 @@ def _get_client_ip(request: Request) -> str:
     return get_remote_address(request)
 
 
+def _default_limits() -> list[str]:
+    if os.getenv("RATE_LIMIT_DISABLED", "").strip().lower() in {"1", "true", "yes"}:
+        return []
+    return [os.getenv("RATE_LIMIT_DEFAULT", "100/minute")]
+
+
 _rl_storage = _rate_limit_storage_uri()
+_limits = _default_limits()
 if _rl_storage:
     limiter = Limiter(
         key_func=_get_client_ip,
-        default_limits=["100/minute"],
+        default_limits=_limits,
         storage_uri=_rl_storage,
     )
 else:
     limiter = Limiter(
         key_func=_get_client_ip,
-        default_limits=["100/minute"],
+        default_limits=_limits,
     )
 
 

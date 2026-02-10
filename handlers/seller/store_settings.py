@@ -11,6 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.geocoding import reverse_geocode_store
+from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
 from localization import get_text
 from handlers.common.utils import can_manage_store
 from database_protocol import DatabaseProtocol
@@ -85,17 +86,25 @@ def _parse_amount(text: str | None) -> int | None:
         return None
 
 
-def _format_delivery_settings(store: dict | None, lang: str) -> tuple[str, str]:
-    """Return formatted delivery price and min order lines."""
+def _format_delivery_settings(store: dict | None, lang: str) -> tuple[str, str, str]:
+    """Return formatted delivery price, min order, and radius lines."""
     store = store or {}
     currency = get_text(lang, "currency")
     delivery_price = int(store.get("delivery_price") or 0)
     min_order_amount = int(store.get("min_order_amount") or 0)
+    radius_raw = store.get("delivery_radius_km")
+    try:
+        delivery_radius_km = int(radius_raw) if radius_raw is not None else DEFAULT_DELIVERY_RADIUS_KM
+    except (TypeError, ValueError):
+        delivery_radius_km = DEFAULT_DELIVERY_RADIUS_KM
     delivery_label = get_text(lang, "store_delivery_price_label")
     min_order_label = get_text(lang, "store_min_order_label")
+    radius_label = get_text(lang, "store_delivery_radius_label")
+    km_unit = get_text(lang, "distance_km_unit")
     delivery_line = f"{delivery_label}: {delivery_price:,} {currency}"
     min_order_line = f"{min_order_label}: {min_order_amount:,} {currency}"
-    return delivery_line, min_order_line
+    radius_line = f"{radius_label}: {delivery_radius_km} {km_unit}"
+    return delivery_line, min_order_line, radius_line
 
 
 def _format_user_label(user: dict | None, fallback_id: int) -> str:
@@ -115,6 +124,7 @@ class StoreSettingsStates(StatesGroup):
     waiting_working_hours = State()
     waiting_delivery_price = State()
     waiting_min_order_amount = State()
+    waiting_delivery_radius = State()
     waiting_admin_contact = State()  # Waiting for admin contact/username
     waiting_transfer_contact = State()
     waiting_click_merchant_id = State()
@@ -173,6 +183,12 @@ def store_settings_keyboard(
             callback_data=f"store_delivery_price_{store_id}",
         )
 
+        delivery_radius_text = get_text(lang, "store_delivery_radius_button")
+        builder.button(
+            text=delivery_radius_text,
+            callback_data=f"store_delivery_radius_{store_id}",
+        )
+
         min_order_text = get_text(lang, "store_min_order_button")
         builder.button(
             text=min_order_text,
@@ -226,7 +242,7 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
     is_owner = can_manage_store(db, store_id, user_id, store=store)
     working_hours = _resolve_working_hours(store)
     working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
-    delivery_line, min_order_line = _format_delivery_settings(store, lang)
+    delivery_line, min_order_line, radius_line = _format_delivery_settings(store, lang)
 
     role_text = "" if is_owner else (" (сотрудник)" if lang == "ru" else " (xodim)")
 
@@ -246,7 +262,7 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
             f"Geolokatsiya: {geo_set}"
         )
 
-    text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
+    text = f"{text}\n{delivery_line}\n{min_order_line}\n{radius_line}\n{working_hours_line}"
 
     # Show current photo if exists
     if has_photo and callback.message:
@@ -490,6 +506,101 @@ async def handle_store_delivery_price(message: types.Message, state: FSMContext)
     await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
 
 
+@router.callback_query(F.data.startswith("store_delivery_radius_"))
+async def request_store_delivery_radius(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Request store delivery radius update."""
+    if not db:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    assert callback.from_user is not None
+    lang = db.get_user_language(callback.from_user.id)
+
+    store_id = int(callback.data.replace("store_delivery_radius_", ""))
+
+    if not verify_store_owner(callback.from_user.id, store_id):
+        await callback.answer(get_text(lang, "no_access"), show_alert=True)
+        return
+
+    await state.update_data(store_id=store_id)
+    await state.set_state(StoreSettingsStates.waiting_delivery_radius)
+
+    prompt = get_text(lang, "store_delivery_radius_prompt")
+    cancel_kb = InlineKeyboardBuilder()
+    cancel_kb.button(text=get_text(lang, "cancel"), callback_data="store_delivery_radius_cancel")
+
+    try:
+        await callback.message.edit_text(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+    except Exception:
+        await callback.message.answer(
+            prompt, parse_mode="HTML", reply_markup=cancel_kb.as_markup()
+        )
+
+    await callback.answer()
+
+
+@router.callback_query(F.data == "store_delivery_radius_cancel")
+async def cancel_store_delivery_radius(
+    callback: types.CallbackQuery, state: FSMContext
+) -> None:
+    """Cancel delivery radius update."""
+    await state.clear()
+    await show_store_settings(callback)
+
+
+@router.message(StoreSettingsStates.waiting_delivery_radius, F.text)
+async def handle_store_delivery_radius(message: types.Message, state: FSMContext) -> None:
+    """Handle store delivery radius update."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    data = await state.get_data()
+    store_id = data.get("store_id")
+
+    if not store_id:
+        await state.clear()
+        await message.answer("Error: store not found")
+        return
+
+    if not verify_store_owner(message.from_user.id, store_id):
+        await state.clear()
+        await message.answer(get_text(lang, "no_access"))
+        return
+
+    amount = _parse_amount(message.text)
+    if amount is None:
+        await message.answer(get_text(lang, "store_delivery_radius_invalid"))
+        return
+
+    radius_km = max(1, int(amount))
+
+    try:
+        db.update_store_delivery_settings(store_id, delivery_radius_km=radius_km)
+    except Exception as e:
+        logger.error(f"Failed to update delivery radius: {e}")
+        await message.answer(get_text(lang, "error"))
+        return
+
+    await state.clear()
+
+    success_text = get_text(
+        lang,
+        "store_delivery_radius_saved",
+        amount=f"{radius_km:,}",
+        unit=get_text(lang, "distance_km_unit"),
+    )
+    back_kb = InlineKeyboardBuilder()
+    back_kb.button(text=get_text(lang, "store_settings"), callback_data="my_store_settings")
+
+    await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
+
+
 @router.callback_query(F.data.startswith("store_min_order_"))
 async def request_store_min_order(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Request minimum order amount update."""
@@ -706,7 +817,7 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
         has_location = bool(store.get("latitude") and store.get("longitude"))
         working_hours = _resolve_working_hours(store)
         working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
-        delivery_line, min_order_line = _format_delivery_settings(store, lang)
+        delivery_line, min_order_line, radius_line = _format_delivery_settings(store, lang)
 
         text = (
             f"<b>Настройки магазина</b>\n\n"
@@ -719,7 +830,7 @@ async def cancel_photo_upload(callback: types.CallbackQuery, state: FSMContext) 
             f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
             f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}"
         )
-        text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
+        text = f"{text}\n{delivery_line}\n{min_order_line}\n{radius_line}\n{working_hours_line}"
 
         try:
             await callback.message.edit_text(
@@ -763,7 +874,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
             has_location = bool(store.get("latitude") and store.get("longitude"))
             working_hours = _resolve_working_hours(store)
             working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
-            delivery_line, min_order_line = _format_delivery_settings(store, lang)
+            delivery_line, min_order_line, radius_line = _format_delivery_settings(store, lang)
 
             text = (
                 f"<b>Настройки магазина</b>\n\n"
@@ -778,7 +889,7 @@ async def remove_store_photo(callback: types.CallbackQuery) -> None:
                 f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}\n\n"
                 f"Rasm o'chirildi"
             )
-            text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
+            text = f"{text}\n{delivery_line}\n{min_order_line}\n{radius_line}\n{working_hours_line}"
 
             try:
                 await callback.message.delete()
@@ -975,7 +1086,7 @@ async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext
         has_location = bool(store.get("latitude") and store.get("longitude"))
         working_hours = _resolve_working_hours(store)
         working_hours_line = get_text(lang, "store_working_hours_label", hours=working_hours)
-        delivery_line, min_order_line = _format_delivery_settings(store, lang)
+        delivery_line, min_order_line, radius_line = _format_delivery_settings(store, lang)
 
         text = (
             f"<b>Настройки магазина</b>\n\n"
@@ -988,7 +1099,7 @@ async def cancel_location_setup(callback: types.CallbackQuery, state: FSMContext
             f"Rasm: {'Yuklangan' if has_photo else 'Yuklanmagan'}\n"
             f"Geolokatsiya: {'Ornatilgan' if has_location else 'Ornatilmagan'}"
         )
-        text = f"{text}\n{delivery_line}\n{min_order_line}\n{working_hours_line}"
+        text = f"{text}\n{delivery_line}\n{min_order_line}\n{radius_line}\n{working_hours_line}"
 
         try:
             await callback.message.edit_text(

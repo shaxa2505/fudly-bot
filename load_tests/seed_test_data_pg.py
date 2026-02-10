@@ -86,7 +86,8 @@ def main() -> None:
 
         for j in range(OFFERS_PER_STORE):
             original_price = random.randint(20000, 120000)
-            discount_price = max(1000, int(original_price * random.uniform(0.3, 0.9)))
+            # Ensure discount >= 20% to satisfy MIN_DISCOUNT_PERCENT
+            discount_price = max(1000, int(original_price * random.uniform(0.3, 0.8)))
             quantity = random.randint(1, 50)
             expiry = (date.today() + timedelta(days=random.randint(7, 60))).isoformat()
             category = random.choice(CATEGORIES)

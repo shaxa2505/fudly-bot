@@ -4,16 +4,19 @@ Provides real-time order status, QR codes, and delivery tracking
 """
 import base64
 import io
+import math
 import os
 from typing import Any
 
 import qrcode
 from aiogram import Bot
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, AliasChoices
 
 from app.api.webapp.common import get_current_user
 from app.core.async_db import AsyncDBProxy
+from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
+from app.core.geocoding import geocode_store_address
 from app.core.order_math import (
     calc_delivery_fee,
     calc_items_total,
@@ -21,7 +24,6 @@ from app.core.order_math import (
     calc_total_price,
     parse_cart_items,
 )
-from app.core.utils import normalize_city
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus, PaymentStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
@@ -151,6 +153,14 @@ class DeliveryCalculation(BaseModel):
     city: str
     address: str
     store_id: int
+    delivery_lat: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("delivery_lat", "lat", "latitude"),
+    )
+    delivery_lon: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("delivery_lon", "lon", "lng", "longitude"),
+    )
 
 
 class DeliveryResult(BaseModel):
@@ -195,8 +205,32 @@ def generate_qr_code(booking_code: str) -> str:
     return f"data:image/png;base64,{img_base64}"
 
 
-async def calculate_delivery_cost(city: str, address: str, store_id: int, db) -> DeliveryResult:
-    """Calculate delivery cost based on distance and city."""
+def _parse_coord(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    rad = math.pi / 180.0
+    x = (lon2 - lon1) * rad * math.cos((lat1 + lat2) * rad / 2.0)
+    y = (lat2 - lat1) * rad
+    return math.hypot(x, y) * 6371.0
+
+
+async def calculate_delivery_cost(
+    city: str,
+    address: str,
+    store_id: int,
+    db,
+    *,
+    delivery_lat: float | None = None,
+    delivery_lon: float | None = None,
+) -> DeliveryResult:
+    """Calculate delivery cost based on distance."""
     store = await db.get_store(store_id)
     if not store:
         return DeliveryResult(
@@ -208,31 +242,62 @@ async def calculate_delivery_cost(city: str, address: str, store_id: int, db) ->
         )
 
     store_dict = dict(store) if not isinstance(store, dict) else store
-    store_city_raw = store_dict.get("city", "") or ""
-    store_region_raw = store_dict.get("region", "") or ""
-    store_district_raw = store_dict.get("district", "") or ""
-    normalized_city = normalize_city(city or "")
-    normalized_store_city = normalize_city(store_city_raw)
-    normalized_store_region = normalize_city(store_region_raw) if store_region_raw else ""
-    normalized_store_district = normalize_city(store_district_raw) if store_district_raw else ""
-
-    # Check if city matches store city/region/district using normalized values
-    allowed_keys = {
-        value.lower()
-        for value in (
-            normalized_store_city,
-            normalized_store_region,
-            normalized_store_district,
-        )
-        if value
-    }
-    if normalized_city.lower() not in allowed_keys:
+    if not bool(store_dict.get("delivery_enabled", True)):
         return DeliveryResult(
             can_deliver=False,
             delivery_cost=None,
             estimated_time=None,
             min_order_amount=None,
-            message=f"Yetkazib berish faqat {store_city_raw or 'shahar'}da mavjud",
+            message="Yetkazib berish mavjud emas",
+        )
+
+    store_lat = _parse_coord(store_dict.get("latitude"))
+    store_lon = _parse_coord(store_dict.get("longitude"))
+    if store_lat is None or store_lon is None:
+        return DeliveryResult(
+            can_deliver=False,
+            delivery_cost=None,
+            estimated_time=None,
+            min_order_amount=None,
+            message="Do'kon geolokatsiyasi o'rnatilmagan",
+        )
+
+    delivery_lat_val = _parse_coord(delivery_lat)
+    delivery_lon_val = _parse_coord(delivery_lon)
+    if (delivery_lat_val is None or delivery_lon_val is None) and address:
+        try:
+            geo = await geocode_store_address(address, city)
+            if geo:
+                delivery_lat_val = _parse_coord(geo.get("latitude"))
+                delivery_lon_val = _parse_coord(geo.get("longitude"))
+        except Exception:
+            delivery_lat_val = None
+            delivery_lon_val = None
+
+    if delivery_lat_val is None or delivery_lon_val is None:
+        return DeliveryResult(
+            can_deliver=False,
+            delivery_cost=None,
+            estimated_time=None,
+            min_order_amount=None,
+            message="Yetkazib berish manzilini xaritada belgilang",
+        )
+
+    radius_km = _parse_coord(store_dict.get("delivery_radius_km"))
+    if radius_km is None or radius_km <= 0:
+        radius_km = float(DEFAULT_DELIVERY_RADIUS_KM)
+
+    distance_km = _distance_km(store_lat, store_lon, delivery_lat_val, delivery_lon_val)
+    if distance_km > radius_km:
+        return DeliveryResult(
+            can_deliver=False,
+            delivery_cost=None,
+            estimated_time=None,
+            min_order_amount=None,
+            message=(
+                f"Yetkazib berish radiusi {radius_km:.0f} km. "
+                f"Masofa: {distance_km:.1f} km"
+            ),
         )
 
     delivery_cost = int(store_dict.get("delivery_price") or 0)
@@ -796,7 +861,14 @@ async def calculate_delivery(
     Returns:
         DeliveryResult with cost and availability
     """
-    return await calculate_delivery_cost(request.city, request.address, request.store_id, db)
+    return await calculate_delivery_cost(
+        request.city,
+        request.address,
+        request.store_id,
+        db,
+        delivery_lat=request.delivery_lat,
+        delivery_lon=request.delivery_lon,
+    )
 
 
 @router.get("/{booking_id}/qr")

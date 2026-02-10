@@ -910,6 +910,7 @@ class StoreMixin:
         store_id: int,
         delivery_price: int | None = None,
         min_order_amount: int | None = None,
+        delivery_radius_km: int | None = None,
     ) -> bool:
         """Update store delivery price and/or minimum order amount."""
         fields: list[str] = []
@@ -921,6 +922,9 @@ class StoreMixin:
         if min_order_amount is not None:
             fields.append("min_order_amount = %s")
             params.append(int(min_order_amount))
+        if delivery_radius_km is not None:
+            fields.append("delivery_radius_km = %s")
+            params.append(int(delivery_radius_km))
 
         if not fields:
             return False
@@ -933,10 +937,11 @@ class StoreMixin:
                 tuple(params),
             )
             logger.info(
-                "Store %s delivery settings updated (delivery_price=%s, min_order_amount=%s)",
+                "Store %s delivery settings updated (delivery_price=%s, min_order_amount=%s, delivery_radius_km=%s)",
                 store_id,
                 delivery_price,
                 min_order_amount,
+                delivery_radius_km,
             )
             return True
 

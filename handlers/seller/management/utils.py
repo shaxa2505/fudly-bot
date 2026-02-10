@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, Any
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.utils import calc_discount_percent
+
 if TYPE_CHECKING:
     from database_protocol import DatabaseProtocol
 
@@ -282,7 +284,7 @@ async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None
     available_until = get_offer_field(offer, "available_until")
     expiry_date = get_offer_field(offer, "expiry_date")
 
-    discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
+    discount_percent = calc_discount_percent(original_price, discount_price)
 
     # Build card
     status_label = "Активен" if status == "active" else "Неактивен"
@@ -673,7 +675,7 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
     available_until = get_offer_field(offer, "available_until", "")
     expiry_date = get_offer_field(offer, "expiry_date")
 
-    discount_percent = int((1 - discount_price / original_price) * 100) if original_price > 0 else 0
+    discount_percent = calc_discount_percent(original_price, discount_price)
 
     status_label = "Активен" if status == "active" else "Неактивен"
     if lang != "ru":

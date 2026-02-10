@@ -28,7 +28,7 @@ from fastapi import (
 )
 
 from app.core.async_db import AsyncDBProxy
-from app.core.utils import normalize_city
+from app.core.utils import calc_discount_percent, normalize_city
 from database_pg_module.mixins.offers import canonicalize_geo_slug
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
@@ -686,7 +686,7 @@ async def create_product(
         raise HTTPException(
             status_code=400, detail="discount_price must be less than original_price"
         )
-    discount_percent = int((1 - discount_price / original_price) * 100)
+    discount_percent = calc_discount_percent(original_price, discount_price)
     if discount_percent < MIN_DISCOUNT_PERCENT:
         raise HTTPException(
             status_code=400, detail=f"Minimum discount is {MIN_DISCOUNT_PERCENT}%"
@@ -850,7 +850,7 @@ async def update_product(
             raise HTTPException(
                 status_code=400, detail="discount_price must be less than original_price"
             )
-        discount_percent = int((1 - current_discount / current_original) * 100)
+        discount_percent = calc_discount_percent(current_original, current_discount)
         if discount_percent < MIN_DISCOUNT_PERCENT:
             raise HTTPException(
                 status_code=400, detail=f"Minimum discount is {MIN_DISCOUNT_PERCENT}%"

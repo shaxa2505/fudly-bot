@@ -37,6 +37,7 @@ class StoreDict(TypedDict, total=False):
     delivery_enabled: int
     delivery_price: int | None
     min_order_amount: int | None
+    delivery_radius_km: int | None
 
 
 class OfferDict(TypedDict, total=False):

@@ -219,9 +219,12 @@ const buildCitySuggestionItem = (cityName) => {
 
 const buildResultKey = (item) => {
   if (!item) return ''
+  const primary = normalizeLocationName(getPrimaryLabel(item)).toLowerCase()
+  if (isCityLikeResult(item) && primary) {
+    return `city|${primary}`
+  }
   const place = item?.place_id || item?.osm_id
   if (place != null) return `id:${place}`
-  const primary = normalizeLocationName(getPrimaryLabel(item)).toLowerCase()
   const secondary = normalizeLocationName(getSecondaryLabel(item)).toLowerCase()
   const kind = item?.__kind || ''
   return `${kind}|${primary}|${secondary}`
@@ -426,7 +429,7 @@ function LocationPickerModal({
         const suggestionItems = suggestionNames
           .map(buildCitySuggestionItem)
           .filter(Boolean)
-        items = mergeAndDedupeResults([...suggestionItems, ...items]).slice(0, 8)
+        items = mergeAndDedupeResults([...items, ...suggestionItems]).slice(0, 8)
         if (!activeRef.current) return
         setResults(items)
       } catch (error) {
@@ -445,28 +448,53 @@ function LocationPickerModal({
   }, [query, coords?.lat, coords?.lon, isOpen, mode])
 
   const handleSelectResult = useCallback((item) => {
+    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+
     if (item?.__kind === 'city') {
-      const normalized = normalizeLocationName(item?.name || '')
+      const normalized = normalizeLocationName(item?.name || getPrimaryLabel(item) || '')
+      const cityKey = buildCitySearchKey(normalized)
+      if (cityKey) {
+        const fallback = results.find((candidate) => (
+          candidate?.__kind !== 'city' &&
+          buildCitySearchKey(getCityFromItem(candidate)) === cityKey
+        ))
+        if (fallback) {
+          item = fallback
+        }
+      }
+    }
+
+    if (item?.__kind === 'city') {
+      const normalized = normalizeLocationName(item?.name || getPrimaryLabel(item) || '')
       const cityValue = normalized.includes("O'zbekiston")
         ? normalized
         : `${normalized}, O'zbekiston`
-      setMapLocation({
+      const nextLocation = {
         city: cityValue,
-        address: '',
+        address: normalized,
         coordinates: null,
         region: '',
         district: '',
         source: 'manual',
-      })
+      }
+      setMapLocation(nextLocation)
       setMapAddress(normalized)
+      if (mapCenter?.lat != null && mapCenter?.lon != null) {
+        lastResolvedRef.current = {
+          lat: mapCenter.lat,
+          lon: mapCenter.lon,
+          address: normalized,
+          location: nextLocation,
+        }
+      }
       setMode('map')
       return
     }
+
     const lat = Number(item?.lat)
     const lon = Number(item?.lon)
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
     const nextLocation = buildLocationFromReverseGeocode(item, lat, lon)
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
     setMapCenter({ lat, lon })
     setMapLocation(nextLocation)
     const resolvedAddress = nextLocation.address || nextLocation.city || ''
@@ -478,7 +506,7 @@ function LocationPickerModal({
       location: nextLocation,
     }
     setMode('map')
-  }, [])
+  }, [mapCenter?.lat, mapCenter?.lon, results])
 
   const handleUseTyped = useCallback(() => {
     const normalized = normalizeCityQuery(query.trim()) || normalizeLocationName(query.trim())
