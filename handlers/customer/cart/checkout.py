@@ -259,62 +259,6 @@ def register(router: Router) -> None:
         cart_storage.clear_cart(user_id)
         await state.update_data(cart_confirm_in_progress=False)
 
-        user = common.db.get_user_model(user_id)
-        if isinstance(user, dict):
-            notifications_enabled = bool(user.get("notifications_enabled", True))
-        else:
-            notifications_enabled = bool(getattr(user, "notifications_enabled", True))
-
-        if not notifications_enabled:
-            order_ids = [str(oid) for oid in result.order_ids if oid]
-            pickup_codes = [code for code in result.pickup_codes if code]
-            items_for_template = [
-                {"title": i.title, "price": i.price, "quantity": i.quantity} for i in order_items
-            ]
-            store_name = order_items[0].store_name if order_items else ""
-            store_address = order_items[0].store_address if order_items else ""
-            currency = "so'm" if lang == "uz" else "сум"
-
-            text = NotificationTemplates.customer_order_created(
-                lang=lang,
-                order_ids=order_ids,
-                pickup_codes=pickup_codes,
-                items=items_for_template,
-                order_type="pickup",
-                delivery_address=None,
-                payment_method="cash",
-                store_name=store_name,
-                store_address=store_address,
-                total=int(result.total_price) if hasattr(result, "total_price") else total,
-                delivery_price=0,
-                currency=currency,
-            )
-            text += "\n\n" + get_text(lang, "cart_order_created_menu_hint")
-
-            try:
-                order_photo = next((item.photo for item in order_items if item.photo), None)
-                if not order_photo and order_items and common.db:
-                    try:
-                        offer = common.db.get_offer(int(order_items[0].offer_id))
-                        if isinstance(offer, dict):
-                            order_photo = offer.get("photo") or offer.get("photo_id")
-                        else:
-                            order_photo = getattr(offer, "photo", None) if offer else None
-                            if not order_photo:
-                                order_photo = getattr(offer, "photo_id", None) if offer else None
-                    except Exception:
-                        order_photo = None
-                if order_photo:
-                    await callback.message.answer_photo(
-                        photo=order_photo,
-                        caption=text,
-                        parse_mode="HTML",
-                    )
-                else:
-                    await callback.message.answer(text, parse_mode="HTML")
-            except Exception:
-                pass
-
         await callback.answer()
 
     @router.callback_query(F.data == "back_to_menu")

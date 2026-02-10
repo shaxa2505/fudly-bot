@@ -10,18 +10,22 @@
 from __future__ import annotations
 
 import json
+import os
+from datetime import datetime, timedelta
 from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import WebAppInfo
 
+from app.core.utils import UZB_TZ, get_uzb_time
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
 from app.domain.order import PaymentStatus
 from app.integrations.payment_service import get_payment_service
 from app.domain.order_labels import normalize_order_status, status_emoji, status_label
-from app.services.notification_builder import NotificationBuilder
 from app.services.unified_order_service import (
+    NotificationTemplates,
     OrderStatus,
     get_unified_order_service,
     init_unified_order_service,
@@ -78,6 +82,45 @@ def _format_price(amount: int | float, lang: str) -> str:
 def _fmt(lines: list[str]) -> str:
     """Join lines and fix mojibake (cp1251-decoded UTF-8) if present."""
     return fix_mojibake_text("\n".join(lines))
+
+
+def _format_ready_until(updated_at: Any) -> str | None:
+    try:
+        hours = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
+    except Exception:
+        hours = 2
+    if hours <= 0:
+        return None
+
+    base_time = None
+    if isinstance(updated_at, datetime):
+        base_time = updated_at
+    elif isinstance(updated_at, str) and updated_at:
+        try:
+            base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        except Exception:
+            base_time = None
+
+    if base_time is None:
+        base_time = get_uzb_time()
+    elif base_time.tzinfo is None:
+        base_time = base_time.replace(tzinfo=UZB_TZ)
+
+    ready_until = base_time + timedelta(hours=hours)
+    return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
+
+
+def _build_open_app_keyboard(lang: str, order_id: int) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    webapp_url = os.getenv("WEBAPP_URL", "").strip()
+    if webapp_url:
+        kb.button(
+            text=get_text(lang, "btn_open_order_app"),
+            web_app=WebAppInfo(url=f"{webapp_url.rstrip('/')}/order/{order_id}"),
+        )
+    kb.button(text=get_text(lang, "btn_back_menu"), callback_data="back_to_menu")
+    kb.adjust(1)
+    return kb
 
 
 # =============================================================================
@@ -368,10 +411,9 @@ async def order_detail_handler(callback: types.CallbackQuery) -> None:
 
 
 async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, lang: str) -> None:
-    """Показать детали бронирования (самовывоз)."""
+    """???????? ?????? ???????????? (??????????? fallback)."""
     user_id = callback.from_user.id
 
-    # Получаем детали бронирования
     try:
         with db.get_connection() as conn:
             cursor = conn.cursor()
@@ -382,6 +424,7 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
                     b.status,
                     b.booking_code,
                     b.created_at,
+                    b.updated_at,
                     COALESCE(b.quantity, 1) as quantity,
                     s.name as store_name,
                     s.address as store_address,
@@ -400,86 +443,56 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
             booking = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get booking {booking_id}: {e}")
-        await callback.message.answer(_t(lang, "Ошибка загрузки", "Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "?????? ????????", "Yuklab bo'lmadi"))
         return
 
     if not booking:
-        await callback.message.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "????? ?? ??????", "Buyurtma topilmadi"))
         return
 
-    # Парсим данные
     if hasattr(booking, "get"):
         data = booking
     else:
-        quantity = booking[4] or 1
-        discount_price = booking[9] or 0
+        quantity = booking[5] or 1
+        discount_price = booking[10] or 0
         data = {
             "booking_id": booking[0],
             "status": booking[1],
             "booking_code": booking[2],
             "created_at": booking[3],
+            "updated_at": booking[4],
             "quantity": quantity,
-            "store_name": booking[5],
-            "store_address": booking[6],
-            "store_phone": booking[7],
-            "offer_title": booking[8],
+            "store_name": booking[6],
+            "store_address": booking[7],
+            "store_phone": booking[8],
+            "offer_title": booking[9],
             "discount_price": discount_price,
-            "original_price": booking[10],
-            "unit": booking[11],
-            "total_price": quantity * discount_price,  # Вычисляем
+            "original_price": booking[11],
+            "unit": booking[12],
+            "total_price": quantity * discount_price,
         }
 
     status = _normalize_status(data.get("status", "pending"))
+    total = int(data.get("total_price") or 0)
+    currency = "so'm" if lang == "uz" else "???"
+    ready_until = _format_ready_until(data.get("updated_at")) if status == "ready" else None
 
-    title = data.get("offer_title", "Товар") or "Товар"
-    qty = data.get("quantity") or 1
-    price = data.get("discount_price") or 0
-    total = data.get("total_price") or (price * qty)
-    currency = "so'm" if lang == "uz" else "Сум"
-
-    builder = NotificationBuilder("pickup")
-    card = builder.build(
-        status=status,
+    card = NotificationTemplates.customer_status_update(
         lang=lang,
         order_id=int(data["booking_id"]),
+        status=status,
+        order_type="pickup",
         store_name=str(data.get("store_name") or ""),
         store_address=data.get("store_address"),
-        pickup_code=data.get("booking_code") if status in ("preparing", "ready") else None,
-        items=[{"title": title, "quantity": qty, "price": price}],
-        total=int(total or 0),
+        pickup_code=data.get("booking_code"),
+        total=total,
+        delivery_price=0,
         currency=currency,
+        ready_until=ready_until,
     )
 
     lines = [card]
-
-    # Кнопки действий
-    kb = InlineKeyboardBuilder()
-
-    if status in ("preparing", "ready"):
-        # Активный заказ
-        kb.button(
-            text=_t(lang, "Получил заказ", "Buyurtmani oldim"),
-            callback_data=f"myorder_received_b_{booking_id}",
-        )
-
-        # Показываем телефон магазина в тексте вместо кнопки (Telegram не поддерживает tel: URL)
-        if data.get("store_phone"):
-            lines.append(f"{_t(lang, 'Телефон магазина', 'Do''kon telefoni')}: <code>{data['store_phone']}</code>")
-
-        kb.button(
-            text=_t(lang, "Проблема", "Muammo"),
-            callback_data=f"myorder_problem_b_{booking_id}",
-        )
-
-    elif status == "pending":
-        kb.button(
-            text=_t(lang, "Отменить", "Bekor qilish"),
-            callback_data=f"cancel_booking_{booking_id}",
-        )
-
-    kb.button(text=_t(lang, "Назад", "Orqaga"), callback_data="myorders_back")
-
-    kb.adjust(1)
+    kb = _build_open_app_keyboard(lang, int(data["booking_id"]))
 
     try:
         await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
@@ -488,6 +501,148 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
 
 
 async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang: str) -> None:
+    """???????? ?????? ?????? (??????????? fallback)."""
+    user_id = callback.from_user.id
+
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    o.order_id,
+                    o.store_id,
+                    o.order_type,
+                    o.order_status,
+                    o.payment_method,
+                    o.payment_status,
+                    o.pickup_code,
+                    o.delivery_address,
+                    o.total_price,
+                    o.created_at,
+                    o.updated_at,
+                    o.quantity,
+                    s.name as store_name,
+                    s.address as store_address,
+                    s.phone as store_phone,
+                    off.title as offer_title,
+                    off.discount_price,
+                    off.original_price,
+                    off.unit,
+                    o.is_cart_order,
+                    o.cart_items,
+                    o.delivery_price,
+                    o.item_title,
+                    o.item_price,
+                    o.item_original_price
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE o.order_id = %s AND o.user_id = %s
+            """,
+                (order_id, user_id),
+            )
+            order = cursor.fetchone()
+    except Exception as e:
+        logger.error(f"Failed to get order {order_id}: {e}")
+        await callback.message.answer(_t(lang, "?????? ????????", "Yuklab bo'lmadi"))
+        return
+
+    if not order:
+        await callback.message.answer(_t(lang, "????? ?? ??????", "Buyurtma topilmadi"))
+        return
+
+    if hasattr(order, "get"):
+        data = order
+    else:
+        data = {
+            "order_id": order[0],
+            "store_id": order[1],
+            "order_type": order[2],
+            "order_status": order[3],
+            "payment_method": order[4],
+            "payment_status": order[5],
+            "pickup_code": order[6],
+            "delivery_address": order[7],
+            "total_price": order[8],
+            "created_at": order[9],
+            "updated_at": order[10],
+            "quantity": order[11],
+            "store_name": order[12],
+            "store_address": order[13],
+            "store_phone": order[14],
+            "offer_title": order[15],
+            "discount_price": order[16],
+            "original_price": order[17],
+            "unit": order[18],
+            "is_cart_order": order[19] if len(order) > 19 else False,
+            "cart_items": order[20] if len(order) > 20 else None,
+            "delivery_price": order[21] if len(order) > 21 else None,
+            "item_title": order[22] if len(order) > 22 else None,
+            "item_price": order[23] if len(order) > 23 else None,
+            "item_original_price": order[24] if len(order) > 24 else None,
+        }
+
+    raw_status = data.get("order_status", "pending")
+    status = _normalize_status(raw_status)
+    order_type = data.get("order_type") or ("delivery" if data.get("delivery_address") else "pickup")
+    is_delivery = order_type in ("delivery", "taxi")
+    is_cart = data.get("is_cart_order")
+    cart_items_json = data.get("cart_items")
+
+    items_total = 0
+    if is_cart and cart_items_json:
+        items = parse_cart_items(cart_items_json)
+        if items:
+            items_total = calc_items_total(items)
+        else:
+            items_total = int(data.get("total_price") or 0)
+    else:
+        qty = data.get("quantity", 1)
+        price = data.get("item_price")
+        if price is None:
+            price = data.get("discount_price", 0)
+        items_total = int(price or 0) * int(qty or 1)
+
+    total_price = int(data.get("total_price") or 0)
+    delivery_fee = 0
+    if is_delivery:
+        delivery_fee = calc_delivery_fee(
+            total_price,
+            items_total,
+            delivery_price=data.get("delivery_price"),
+            order_type=order_type,
+        )
+    total_value = total_price if total_price > 0 else items_total
+    currency = "so'm" if lang == "uz" else "???"
+    ready_until = _format_ready_until(data.get("updated_at")) if (not is_delivery and status == "ready") else None
+
+    card = NotificationTemplates.customer_status_update(
+        lang=lang,
+        order_id=int(data["order_id"]),
+        status=status,
+        order_type="delivery" if is_delivery else "pickup",
+        store_name=str(data.get("store_name") or ""),
+        store_address=data.get("store_address"),
+        delivery_address=data.get("delivery_address"),
+        pickup_code=data.get("pickup_code"),
+        total=total_value,
+        delivery_price=int(data.get("delivery_price") or 0),
+        currency=currency,
+        ready_until=ready_until,
+    )
+
+    lines = [card]
+    kb = _build_open_app_keyboard(lang, int(data["order_id"]))
+
+    try:
+        await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        await callback.message.answer(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+# =============================================================================
+# ORDER ACTIONS(callback: types.CallbackQuery, order_id: int, lang: str) -> None:
     """Показать детали заказа (orders table: pickup или delivery)."""
     user_id = callback.from_user.id
 
