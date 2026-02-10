@@ -1782,6 +1782,7 @@ class UnifiedOrderService:
     ) -> dict:
         """Create delivery orders."""
         try:
+            normalized_order_type = "delivery" if order_type == "taxi" else order_type
             # Cart delivery must be a SINGLE order row (per store) to keep payment/proof/admin flow consistent.
             if (
                 len(items) > 1
@@ -1960,6 +1961,7 @@ class UnifiedOrderService:
         telegram_enabled = (
             self.telegram_order_notifications if send_telegram is None else send_telegram
         )
+        normalized_order_type = "delivery" if order_type == "taxi" else order_type
         for store_id, store_orders in stores_orders.items():
             try:
                 store = self.db.get_store(store_id)
@@ -2331,6 +2333,7 @@ class UnifiedOrderService:
 
             if not order_type:
                 order_type = "delivery" if delivery_address else "pickup"
+            normalized_order_type = "delivery" if order_type == "taxi" else order_type
 
             store = self.db.get_store(store_id) if store_id else None
             items = self._build_payment_items(
@@ -2785,6 +2788,7 @@ class UnifiedOrderService:
         payment_proof_photo_id: str | None = None,
         ready_until: str | None = None,
     ) -> tuple[str, list[dict[str, Any]] | None, str | None, str, list[int] | None, bool]:
+        normalized_order_type = "delivery" if order_type == "taxi" else (order_type or "delivery")
         currency = None
         cart_items = self._load_cart_items(is_cart, cart_items_json)
         if not cart_items and offer_id:
