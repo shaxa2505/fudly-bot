@@ -1,3 +1,8 @@
+LANGUAGES = {
+    "ru": "Русский",
+    "uz": "O'zbekcha",
+}
+
 TEXTS = {
     "ru": {
         # Приветствие
