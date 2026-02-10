@@ -133,7 +133,7 @@
         "label_items": "Товары",
         "label_items_more": "… и ещё {count}",
         "label_delivery_fee": "Доставка",
-        "delivery_fee_paid_to_courier": "????????? ???????? ???????????? ??????? ??? ?????????.",
+        "delivery_fee_paid_to_courier": "Стоимость доставки оплачивается курьеру при получении.",
         "label_reason": "Причина",
         "label_comment": "Комментарий",
         "label_map": "Карта",
@@ -235,33 +235,33 @@
         "expires_on": "Годен до",
         # Help and FAQ
         "help_customer": """
-? <b>Fudly ? ???? ??? ????????</b>
+📌 <b>Fudly — инструкция для клиентов</b>
 
-<b>??????? ???????????????</b>
-? <a href="{webapp_url}">??????? Fudly Mini App</a>
-? ???????? ?????/?????, ????????? ? ???????
+<b>Как открыть mini app</b>
+🔗 <a href="{webapp_url}">Открыть Fudly Mini App</a>
+🔎 Выберите город/район, категорию и фильтры
 
-<b>???????? ???????</b>
-? ????? ??????? ? ?????????
-? ?????????
-? ???????
-? ??? ?????? ? ???????
+<b>Основные функции</b>
+🔍 Поиск товаров и магазинов
+⭐ Избранное
+🛒 Корзина
+🧾 Заказы и статусы
 
-<b>??? ??????? ?????</b>
-1) ???????? ?????
-2) ????????? ????? ?????? ? ???????
-3) ???????? ? ???????
-4) ???????? ????????/????????? ? ?????? (???? ????????)
-5) ???????? ??? ??????
+<b>Как оформить заказ</b>
+1) Откройте товар
+2) Проверьте время выдачи и остаток
+3) Добавьте в корзину
+4) Выберите доставку/самовывоз и способ оплаты (если доступно)
+5) Получите код выдачи
 
-<b>?????</b>
-???? ??????? ?????? ? ????? ??????? ????????? ? ?? ??????????? ? ???????.
+<b>Важно</b>
+Если магазин закрыт — товар помечается как «Закрыто» и не добавляется в корзину.
 
-<b>???????</b>
-??????? ? ????????? ? ????? ? ?????? ? ? ???? ? ???????? / ???????
+<b>Статусы</b>
+Ожидает → Готовится → Готов → В пути → Завершён / Отменён
 
-<b>?????????</b>
-???? ???? ???????: @fudly_support
+<b>Поддержка</b>
+Если есть вопросы: @fudly_support
 """,
         "help_partner": """<b>Партнёрский кабинет — кратко</b>
 
@@ -594,10 +594,10 @@
         "cart_delivery_button": "🚚 Доставка",
         "cart_checkout_button": "Оформить заказ",
         "cart_clear_button": "Очистить",
-        "cart_store_label": "???????",
-        "cart_remove_button": "???????",
-        "cart_max_quantity_alert": "????????: {max}",
-        "cart_continue_shopping_button": "?????????? ???????",
+        "cart_store_label": "Магазин",
+        "cart_remove_button": "Удалить",
+        "cart_max_quantity_alert": "Максимум: {max}",
+        "cart_continue_shopping_button": "Продолжить покупки",
         "cart_back_button": "Назад",
         "cart_confirm_button": "✅ Подтвердить",
         "cart_order_created_title": "<b>Заказ создан</b>",
@@ -639,27 +639,27 @@
         "cart_delivery_payment_click": "Click",
         "cart_delivery_payment_card": "Карта",
         "cart_delivery_back_button": "Назад",
-        "delivery_card_title": "?? ????????",
-        "delivery_price_label": "????",
-        "delivery_qty_label": "??????????",
-        "delivery_delivery_label": "????????",
-        "delivery_total_label": "?????",
-        "delivery_qty_hint": "???????? ??????????",
-        "delivery_address_hint": "??????? ????? ??? ????????",
-        "delivery_payment_hint": "???????? ?????? ??????",
-        "delivery_processing_hint": "? ????????...",
-        "delivery_next_button": "?? ??????????",
-        "delivery_new_address_button": "? ????? ?????",
-        "delivery_payment_click_button": "?? Click",
-        "delivery_address_input_title": "??????? ?????:",
-        "delivery_address_input_example": "????????: ????????, 5-??????, ??? 10",
-        "delivery_unavailable": "???????? ??????????",
-        "delivery_cancelled": "????????.",
-        "delivery_address_too_short": "????? ??????? ????????.",
-        "delivery_click_unavailable": "Click ???????? ??????????. ?????????? ?????.",
-        "delivery_pay_click_prompt": "??????? ?????? ????, ????? ???????? ????? Click.",
-        "delivery_service_unavailable": "?????? ???????? ??????????. ?????????? ?????.",
-        "delivery_quantity_invalid": "??????? ?????.",
+        "delivery_card_title": "🚚 Доставка",
+        "delivery_price_label": "Цена",
+        "delivery_qty_label": "Количество",
+        "delivery_delivery_label": "Доставка",
+        "delivery_total_label": "Итого",
+        "delivery_qty_hint": "Выберите количество",
+        "delivery_address_hint": "Введите адрес или выберите",
+        "delivery_payment_hint": "Выберите способ оплаты",
+        "delivery_processing_hint": "В процессе...",
+        "delivery_next_button": "➡️ Продолжить",
+        "delivery_new_address_button": "➕ Новый адрес",
+        "delivery_payment_click_button": "💳 Click",
+        "delivery_address_input_title": "Введите адрес:",
+        "delivery_address_input_example": "Например: Чиланзар, 5-массив, дом 10",
+        "delivery_unavailable": "Доставка недоступна",
+        "delivery_cancelled": "Отменено.",
+        "delivery_address_too_short": "Адрес слишком короткий.",
+        "delivery_click_unavailable": "Click временно недоступен. Попробуйте позже.",
+        "delivery_pay_click_prompt": "Нажмите кнопку ниже, чтобы оплатить через Click.",
+        "delivery_service_unavailable": "Сервис временно недоступен. Попробуйте позже.",
+        "delivery_quantity_invalid": "Введите число.",
         "store_not_found": "Магазин не найден",
         "store_offers_list_title": "Товары:",
         "store_offers_stock_label": "В наличии",
@@ -672,7 +672,7 @@
         "cart_payment_cancel_button": "Отмена",
         "cart_payment_data_missing": "Нет данных для оплаты.",
         "cart_payment_click_unavailable": "Click временно недоступен. Попробуйте позже.",
-        "cart_payment_click_prompt": "??????? ?????? ????, ????? ???????? ????? Click.",
+        "cart_payment_click_prompt": "Нажмите кнопку ниже, чтобы оплатить через Click.",
         "cart_payment_select_title": "💳 Способ оплаты",
         "cart_payment_service_unavailable": "Сервис оплаты недоступен.",
         "cart_payment_order_failed": "Не удалось оформить заказ.",
@@ -1018,7 +1018,7 @@ Menyu pastda.""",
         "cart_delivery_payment_click": "Click",
         "cart_delivery_payment_card": "Karta",
         "cart_delivery_back_button": "Orqaga",
-        "delivery_card_title": "?? Yetkazib berish",
+        "delivery_card_title": "🚚 Yetkazib berish",
         "delivery_price_label": "Narx",
         "delivery_qty_label": "Miqdor",
         "delivery_delivery_label": "Yetkazish",
@@ -1027,9 +1027,9 @@ Menyu pastda.""",
         "delivery_address_hint": "Manzilni kiriting yoki tanlang",
         "delivery_payment_hint": "To'lov usulini tanlang",
         "delivery_processing_hint": "Jarayonda...",
-        "delivery_next_button": "?? Davom etish",
-        "delivery_new_address_button": "? Yangi manzil",
-        "delivery_payment_click_button": "?? Click",
+        "delivery_next_button": "➡️ Davom etish",
+        "delivery_new_address_button": "➕ Yangi manzil",
+        "delivery_payment_click_button": "💳 Click",
         "delivery_address_input_title": "Manzilni kiriting:",
         "delivery_address_input_example": "Masalan: Chilonzor, 5-mavze, 10-uy",
         "delivery_unavailable": "Yetkazib berish mavjud emas",
@@ -1090,33 +1090,33 @@ Menyu pastda.""",
         "expires_on": "Yaroqlilik muddati",
         # Help and FAQ
         "help_customer": """
-? <b>Fudly ? mijozlar uchun qo?llanma</b>
+📌 <b>Fudly — mijozlar uchun qo'llanma</b>
 
 <b>Mini appni ochish</b>
-? <a href="{webapp_url}">Fudly Mini App?ni ochish</a>
-? Shahar/tuman, kategoriya va filtrlarni tanlang
+🔗 <a href="{webapp_url}">Fudly Mini App'ni ochish</a>
+🔎 Shahar/tuman, kategoriya va filtrlarni tanlang
 
 <b>Asosiy funksiyalar</b>
-? Mahsulot va do?kon qidiruvi
-? Sevimlilar
-? Savat
-? Buyurtmalar va holatlar
+🔍 Mahsulot va do'kon qidiruvi
+⭐ Sevimlilar
+🛒 Savat
+🧾 Buyurtmalar va holatlar
 
 <b>Buyurtma berish</b>
 1) Mahsulotni oching
 2) Berish vaqti va qoldiqni tekshiring
-3) Savatga qo?shing
-4) Yetkazib berish/olib ketish va to?lovni tanlang (agar mavjud bo?lsa)
+3) Savatga qo'shing
+4) Yetkazib berish/olib ketish va to'lovni tanlang (agar mavjud bo'lsa)
 5) Berish kodini oling
 
 <b>Muhim</b>
-Agar do?kon yopiq bo?lsa ? mahsulot ?Yopiq? deb belgilanadi va savatga qo?shilmaydi.
+Agar do'kon yopiq bo'lsa — mahsulot "Yopiq" deb belgilanadi va savatga qo'shilmaydi.
 
 <b>Holatlar</b>
-Kutilmoqda ? Tayyorlanmoqda ? Tayyor ? Yo?lda ? Yakunlandi / Bekor qilindi
+Kutilmoqda → Tayyorlanmoqda → Tayyor → Yo'lda → Yakunlandi / Bekor qilindi
 
-<b>Qo?llab?quvvatlash</b>
-Savollar bo?lsa: @fudly_support
+<b>Qo'llab-quvvatlash</b>
+Savollar bo'lsa: @fudly_support
 """,
         "help_partner": """
 <b>Hamkor kabineti ? qisqa qo?llanma</b>
