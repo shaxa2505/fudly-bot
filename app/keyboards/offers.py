@@ -57,7 +57,8 @@ def hot_offers_compact_keyboard(
         action_builder.button(text=get_text(lang, "catalog_stores_button"), callback_data="catalog_stores")
     if show_reset:
         action_builder.button(text=get_text(lang, "catalog_filter_reset"), callback_data="catalog_filter_reset")
-    action_count = len(action_builder.buttons)
+    action_buttons = list(action_builder.buttons)
+    action_count = len(action_buttons)
     if action_count == 1:
         action_builder.adjust(1)
     elif action_count == 2:
