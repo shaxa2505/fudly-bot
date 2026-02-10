@@ -2880,8 +2880,14 @@ class UnifiedOrderService:
         entity_id: int,
         entity_type: str,
     ) -> Any:
-        _ = target_status, new_status, order_type, entity_type
+        _ = new_status, entity_type
+        normalized_type = "delivery" if order_type == "taxi" else (order_type or "delivery")
         kb = InlineKeyboardBuilder()
+        if normalized_type == "delivery" and target_status == OrderStatus.DELIVERING:
+            kb.button(
+                text=get_text(customer_lang, "btn_order_received"),
+                callback_data=f"customer_received_{entity_id}",
+            )
         webapp_url = os.getenv("WEBAPP_URL", "").strip()
         if webapp_url:
             order_url = f"{webapp_url.rstrip('/')}/order/{entity_id}"
@@ -3758,6 +3764,38 @@ class UnifiedOrderService:
                 existing_message_id=existing_message_id,
                 group_order_ids=group_order_ids,
             )
+
+        # Send rating prompt once the order is completed.
+        if (
+            user_id
+            and entity_type == "order"
+            and target_status == OrderStatus.COMPLETED
+        ):
+            try:
+                already_rated = False
+                if hasattr(self.db, "has_rated_order"):
+                    already_rated = bool(self.db.has_rated_order(int(entity_id)))
+                if not already_rated:
+                    prompt = (
+                        f"{get_text(customer_lang, 'order_completed_thanks')}\n"
+                        f"{get_text(customer_lang, 'order_rating_prompt')}"
+                    )
+                    kb = InlineKeyboardBuilder()
+                    for i in range(1, 6):
+                        kb.button(text="⭐" * i, callback_data=f"rate_order_{entity_id}_{i}")
+                    kb.adjust(5)
+                    await self.bot.send_message(
+                        int(user_id),
+                        prompt,
+                        parse_mode="HTML",
+                        reply_markup=kb.as_markup(),
+                    )
+            except Exception as notify_error:
+                logger.warning(
+                    "Failed to send rating prompt for order %s: %s",
+                    entity_id,
+                    notify_error,
+                )
 
         # Update seller message in Telegram if it exists (partner bot sync) if it exists (partner bot sync)
         if entity_type == "order":

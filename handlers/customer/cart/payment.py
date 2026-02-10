@@ -191,12 +191,12 @@ def register(router: Router) -> None:
             )
 
         try:
-            await callback.message.edit_reply_markup(reply_markup=None)
+            await callback.message.delete()
         except Exception as e:
             from logging_config import logger
 
             logger.warning(
-                "Failed to clear cart payment keyboard for user %s: %s",
+                "Failed to delete cart payment message for user %s: %s",
                 user_id,
                 e,
             )
@@ -321,12 +321,12 @@ def register(router: Router) -> None:
             )
 
         try:
-            await callback.message.edit_reply_markup(reply_markup=None)
+            await callback.message.delete()
         except Exception as e:
             from logging_config import logger
 
             logger.warning(
-                "Failed to clear cart payment keyboard for user %s: %s",
+                "Failed to delete cart payment message for user %s: %s",
                 user_id,
                 e,
             )

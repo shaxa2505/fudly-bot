@@ -155,35 +155,28 @@ async def customer_received_handler(callback: types.CallbackQuery) -> None:
     store = db_instance.get_store(store_id) if store_id else None
     store_name = _get_store_field(store, "name", "")
 
-    completed_text = NotificationTemplates.customer_status_update(
-        lang=lang,
-        order_id=order_id,
-        status=OrderStatus.COMPLETED,
-        order_type=order_type,
-        store_name=store_name,
-    )
-
-    kb = InlineKeyboardBuilder()
-    for i in range(1, 6):
-        kb.button(text="⭐" * i, callback_data=f"rate_order_{order_id}_{i}")
-    kb.adjust(5)
-
-    try:
-        if callback.message:
+    # Fallback: if service is unavailable, update the card here.
+    if not order_service and callback.message:
+        completed_text = NotificationTemplates.customer_status_update(
+            lang=lang,
+            order_id=order_id,
+            status=OrderStatus.COMPLETED,
+            order_type=order_type,
+            store_name=store_name,
+        )
+        try:
             if getattr(callback.message, "caption", None):
                 await callback.message.edit_caption(
                     caption=_safe_caption(completed_text),
                     parse_mode="HTML",
-                    reply_markup=kb.as_markup(),
                 )
             else:
                 await callback.message.edit_text(
                     text=completed_text,
                     parse_mode="HTML",
-                    reply_markup=kb.as_markup(),
                 )
-    except Exception as e:  # pragma: no cover
-        logger.warning(f"Failed to edit customer received message: {e}")
+        except Exception as e:  # pragma: no cover
+            logger.warning(f"Failed to edit customer received message: {e}")
 
     msg = get_text(lang, "order_completed_thanks")
     await callback.answer(f"✅ {msg}", show_alert=True)
