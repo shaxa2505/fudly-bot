@@ -12,7 +12,7 @@ WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
 
 
 def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
-    """Main menu for customers - 2 compact rows with clear actions.
+    """Main menu for customers - 3 compact rows with clear actions.
 
     Args:
         lang: Interface language
@@ -24,14 +24,15 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
     # Row 1: Main action - discounted food catalog
     builder.button(text=hot_offers_text)
 
-    # Row 2: Search + Cart
-    builder.button(text=f"🔍 {get_text(lang, 'search')}")
+    # Row 2: Cart + Orders
     cart_text = f"🛒 {get_text(lang, 'my_cart')}"
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
     builder.button(text=cart_text)
     builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
+    # Row 3: Profile + Support
     builder.button(text=f"👤 {get_text(lang, 'profile')}")
+    builder.button(text=f"🆘 {get_text(lang, 'support')}")
 
     # Layout: 1 button, then 2 + 2
     builder.adjust(1, 2, 2)

@@ -190,6 +190,7 @@ __all__ = [
     "is_search_button",
     "is_my_orders_button",
     "is_profile_button",
+    "is_support_button",
     "is_partner_button",
     "is_customer_menu_button",
     # Safe message operations
@@ -223,6 +224,8 @@ MAIN_MENU_BUTTONS = {
     "💙 Sevimlilar",
     "👤 Профиль",
     "👤 Profil",
+    "🆘 Поддержка",
+    "🆘 Yordam",
     # Seller menu
     "📦 Мои товары",
     "📦 Mening tovarlarim",
@@ -288,7 +291,7 @@ LEGACY_MAIN_MENU_BUTTONS = {
 @lru_cache(maxsize=1)
 def _menu_labels() -> dict[str, set[str]]:
     """Return localized menu labels for RU and UZ."""
-    keys = ["hot_offers", "search", "my_cart", "my_orders", "profile"]
+    keys = ["hot_offers", "search", "my_cart", "my_orders", "profile", "support"]
     labels: dict[str, set[str]] = {}
     for key in keys:
         labels[key] = {get_text("ru", key), get_text("uz", key)}
@@ -375,6 +378,14 @@ def is_profile_button(text: str | None) -> bool:
         return False
     return stripped in _menu_labels()["profile"] or stripped in {"👤 Профиль", "👤 Profil"}
 
+
+def is_support_button(text: str | None) -> bool:
+    stripped = _strip(text)
+    if not stripped:
+        return False
+    return stripped in _menu_labels()["support"] or stripped in {"🆘 Поддержка", "🆘 Yordam"}
+
+
 def is_partner_button(text: str | None) -> bool:
     stripped = _strip(text)
     if not stripped:
@@ -427,6 +438,7 @@ def is_main_menu_button(text: str | None) -> bool:
             is_cart_button(text),
             is_my_orders_button(text),
             is_profile_button(text),
+            is_support_button(text),
             is_partner_button(text),
             is_customer_menu_button(text),
             _strip(text) in MAIN_MENU_BUTTONS,
