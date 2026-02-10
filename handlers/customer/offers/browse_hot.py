@@ -44,6 +44,7 @@ _CATEGORY_IDS = [
     "sweets",
     "other",
 ]
+CATALOG_BUILD = "2026-02-10T23:59"
 
 
 def _format_time(value: str | Any | None) -> str:
@@ -261,7 +262,7 @@ def register_hot(
 
     @dp.message(F.text.func(is_hot_offers_button))
     async def hot_offers_handler(message: types.Message, state: FSMContext) -> None:
-        logger.info(f"[HOT_OFFERS] Handler triggered, text='{message.text}'")
+        logger.info(f"[HOT_OFFERS] Handler triggered, text='{message.text}' build={CATALOG_BUILD}")
         if not message.from_user:
             return
         # Clear any active FSM state when returning to main menu
@@ -1704,6 +1705,7 @@ def register_hot(
         """Send catalog list with compact view. Returns False for empty filtered lists."""
         ITEMS_PER_PAGE = OFFERS_PER_PAGE
         try:
+            items: list[OfferListItem] = []
             state_data = await state.get_data()
             filters = _catalog_filters_from_state(state_data)
             offset = max(0, page) * ITEMS_PER_PAGE
@@ -1793,7 +1795,12 @@ def register_hot(
             return True
 
         except Exception as exc:  # pragma: no cover
-            log.error("Failed to send hot offers: %s", exc)
+            log.error(
+                "Failed to send hot offers: %s (build=%s, items_type=%s)",
+                exc,
+                CATALOG_BUILD,
+                type(items).__name__,
+            )
             await target.answer(get_text(lang, "error"))
             return False
 
