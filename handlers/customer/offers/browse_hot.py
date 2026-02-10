@@ -1752,7 +1752,7 @@ def register_hot(
                     only_today=filters.get("only_today", False),
                 )
 
-            items = result.items
+            items = list(result.items)
             await state.set_state(BrowseOffers.offer_list)
             await state.update_data(
                 offer_list=[offer.id for offer in items],

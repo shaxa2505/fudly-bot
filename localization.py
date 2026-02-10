@@ -633,7 +633,7 @@ TEXTS = {
         "rate_limit_exceeded": "Слишком много запросов. Попробуйте позже.",
         # Корзина
         "cart_title": "<b>Корзина</b>",
-        "cart_empty": "<b>Корзина пустая</b>\nДобавьте товары из акций или поиска.",
+        "cart_empty": "<b>Корзина пустая</b>\nДобавьте товары из каталога или поиска.",
         "cart_empty_alert": "Корзина пуста",
         "cart_empty_cta": "К предложениям",
         "cart_cleared": "Корзина очищена",
@@ -1056,7 +1056,7 @@ Menyu pastda.""",
         "offer_creation_cancelled": "❌ Mahsulot yaratish bekor qilindi",
         # Savat
         "cart_title": "<b>Savat</b>",
-        "cart_empty": "<b>Savat bo'sh</b>\nAksiya yoki qidiruvdan mahsulot qo'shing.",
+        "cart_empty": "<b>Savat bo'sh</b>\nKatalog yoki qidiruvdan mahsulot qo'shing.",
         "cart_empty_alert": "Savat bo'sh",
         "cart_empty_cta": "Takliflarga",
         "cart_cleared": "Savat tozalandi",
@@ -1474,7 +1474,7 @@ Bu harakatni qaytarib bo\'lmaydi!""",
         "error_general": "Xatolik yuz berdi. Keyinroq urinib ko'ring.",
         "system_error": "Tizim xatosi. Keyinroq urinib ko'ring yoki qo'llab-quvvatlash xizmatiga yozing.",
         # Yaxshilangan bo'sh holatlar
-        "cart_empty": "<b>Savat bo'sh</b>\nAksiya yoki qidiruvdan mahsulot qo'shing.",
+        "cart_empty": "<b>Savat bo'sh</b>\nKatalog yoki qidiruvdan mahsulot qo'shing.",
         "cart_empty_cta": "Takliflarga",
         "continue_shopping": "🔙 Xaridni davom ettirish",
         # Miqdor tugmalari

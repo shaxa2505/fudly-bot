@@ -92,10 +92,10 @@ async def open_webapp_button(message: types.Message, db: Any) -> None:
     text = (
         "🛍️ <b>Откройте каталог товаров</b>\n\n"
         "Нажмите кнопку ниже, чтобы открыть удобный каталог "
-        "со всеми акциями и скидками!"
+        "со всеми скидками и свежими предложениями!"
         if lang == "ru"
         else "🛍️ <b>Mahsulotlar katalogini oching</b>\n\n"
-        "Barcha aksiya va chegirmalar bilan qulay katalogni "
+        "Barcha chegirmali takliflar bilan qulay katalogni "
         "ochish uchun quyidagi tugmani bosing!"
     )
 

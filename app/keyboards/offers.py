@@ -12,7 +12,7 @@ from localization import get_text
 
 
 def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Entry keyboard for the main 'Магазины и акции' button."""
+    """Entry keyboard for the main discounted food catalog button."""
     builder = InlineKeyboardBuilder()
     deals = get_text(lang, "hot_offers")
     stores = get_text(lang, "catalog_stores_button")
@@ -37,6 +37,7 @@ def hot_offers_compact_keyboard(
 ) -> InlineKeyboardMarkup:
     """Compact catalog keyboard with add/details buttons and pagination."""
     builder = InlineKeyboardBuilder()
+    offers = list(offers)
 
     add_label = get_text(lang, "catalog_add_button")
     details_label = get_text(lang, "catalog_details_button")
@@ -228,7 +229,7 @@ def offer_in_cart_keyboard(lang: str, source: str = "generic") -> InlineKeyboard
 
     # Context-aware back
     if source == "hot":
-        back_text = "⬅️ Назад к акциям" if lang == "ru" else "⬅️ Aksiyalarga qaytish"
+        back_text = "⬅️ Назад к каталогу" if lang == "ru" else "⬅️ Katalogga qaytish"
         back_data = "back_to_hot"
     elif source == "search":
         back_text = "⬅️ Назад к результатам" if lang == "ru" else "⬅️ Natijalarga qaytish"
