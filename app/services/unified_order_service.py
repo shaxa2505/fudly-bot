@@ -1307,7 +1307,8 @@ class UnifiedOrderService:
         if publish_customer_event:
             try:
                 notification_service = get_notification_service()
-                title = "Buyurtma qabul qilindi" if customer_lang == "uz" else "????? ??????"
+                title_html = get_text(customer_lang, "cart_order_created_title")
+                title = re.sub(r"<[^>]+>", "", title_html)
                 plain_msg = re.sub(r"<[^>]+>", "", customer_msg)
                 await notification_service.notify_user(
                     Notification(
@@ -3696,9 +3697,8 @@ class UnifiedOrderService:
             )
             if critical_text:
                 try:
-                    notif_title = (
-                        f"Buyurtma #{entity_id}" if customer_lang == "uz" else f"????? #{entity_id}"
-                    )
+                    order_label = get_text(customer_lang, "label_order")
+                    notif_title = f"{order_label} #{entity_id}"
                     if target_status in (OrderStatus.CANCELLED, OrderStatus.REJECTED):
                         notif_type = NotificationType.BOOKING_CANCELLED
                     elif target_status in (OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.DELIVERING):

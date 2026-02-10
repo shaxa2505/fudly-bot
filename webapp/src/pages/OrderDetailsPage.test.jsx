@@ -63,9 +63,9 @@ describe('OrderDetailsPage', () => {
 
     renderWithProviders(
       <Routes>
-        <Route path="/order/:orderId/details" element={<OrderDetailsPage />} />
+        <Route path="/order/:orderId" element={<OrderDetailsPage />} />
       </Routes>,
-      { initialEntries: ['/order/123/details'] }
+      { initialEntries: ['/order/123'] }
     )
 
     expect(await screen.findByText('Buyurtma #123')).toBeInTheDocument()

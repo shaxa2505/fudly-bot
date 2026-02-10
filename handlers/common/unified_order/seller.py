@@ -600,10 +600,10 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         logger.warning(f"Failed to edit ready message: {e}")
     if is_delivery:
         msg = get_text(lang, "order_ready_success")
-        await callback.answer(f"?? {msg}")
+        await callback.answer(f"✅ {msg}")
     else:
         msg = get_text(lang, "status_ready")
-        await callback.answer(f"?? {msg}")
+        await callback.answer(f"✅ {msg}")
 
 
 async def order_delivering_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -788,7 +788,7 @@ async def _process_delivery_handover(
         return
 
     order_type = _get_entity_field(order, "order_type", "delivery")
-    if order_type != "delivery":
+    if order_type not in ("delivery", "taxi"):
         # Safety guard: pickup orders should not hit courier flow
         return
 

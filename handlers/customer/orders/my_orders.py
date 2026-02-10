@@ -75,7 +75,7 @@ def _get_status_info(status: str, is_delivery: bool, lang: str) -> tuple[str, st
 
 def _format_price(amount: int | float, lang: str) -> str:
     """Format price with currency."""
-    currency = "сум" if lang == "ru" else "so'm"
+    currency = get_text(lang, "currency")
     return f"{int(amount):,} {currency}".replace(",", " ")
 
 
@@ -474,7 +474,7 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
 
     status = _normalize_status(data.get("status", "pending"))
     total = int(data.get("total_price") or 0)
-    currency = "so'm" if lang == "uz" else "???"
+    currency = get_text(lang, "currency")
     ready_until = _format_ready_until(data.get("updated_at")) if status == "ready" else None
 
     card = NotificationTemplates.customer_status_update(
@@ -614,7 +614,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
             order_type=order_type,
         )
     total_value = total_price if total_price > 0 else items_total
-    currency = "so'm" if lang == "uz" else "???"
+    currency = get_text(lang, "currency")
     ready_until = _format_ready_until(data.get("updated_at")) if (not is_delivery and status == "ready") else None
 
     card = NotificationTemplates.customer_status_update(

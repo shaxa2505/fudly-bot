@@ -359,7 +359,7 @@ async def open_order_handler(callback: types.CallbackQuery) -> None:
         )
         pickup_code = _get_entity_field(booking, "booking_code") or _get_entity_field(booking, "pickup_code")
 
-    currency = "so'm" if lang == "uz" else "сум"
+    currency = get_text(lang, "currency")
     card = NotificationTemplates.customer_status_update(
         lang=lang,
         order_id=order_id,
