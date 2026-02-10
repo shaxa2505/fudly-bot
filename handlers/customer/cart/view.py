@@ -130,13 +130,11 @@ def register(router: Router) -> None:
             await callback.answer()
             return
         try:
-            msg = await callback.message.answer(
-                " ", reply_markup=types.ReplyKeyboardRemove()
+            lang = common.db.get_user_language(callback.from_user.id)
+            await callback.message.answer(
+                get_text(lang, "cart_delivery_keyboard_removed"),
+                reply_markup=types.ReplyKeyboardRemove(),
             )
-            try:
-                await msg.delete()
-            except Exception:
-                pass
         except Exception:
             pass
         await show_cart(callback, state, is_callback=True)

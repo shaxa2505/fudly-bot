@@ -1754,6 +1754,9 @@ async def update_store(
                 detail="Invalid working_hours format. Use HH:MM - HH:MM",
             )
         working_hours_value = normalized_hours
+    # Normalize hours for syncing offer availability with store hours.
+    old_hours_norm = _normalize_working_hours(store.get("working_hours")) or DEFAULT_WORKING_HOURS
+    new_hours_norm = _normalize_working_hours(working_hours_value) or old_hours_norm
 
     region_value = settings.get("region", store.get("region"))
     district_value = settings.get("district", store.get("district"))
@@ -1780,6 +1783,38 @@ async def update_store(
 
     region_slug = canonicalize_geo_slug(region_value) if region_value else None
     district_slug = canonicalize_geo_slug(district_value) if district_value else None
+
+    async def _sync_offer_hours(from_norm: str, to_norm: str) -> None:
+        if from_norm == to_norm:
+            return
+        old_start, old_end = _parse_time_range(from_norm)
+        new_start, new_end = _parse_time_range(to_norm)
+        if not (old_start and old_end and new_start and new_end):
+            return
+        await db.execute(
+            """
+            UPDATE offers
+            SET available_from = %s,
+                available_until = %s
+            WHERE store_id = %s
+              AND available_from = %s
+              AND available_until = %s
+            """,
+            (
+                new_start.isoformat(),
+                new_end.isoformat(),
+                store["store_id"],
+                old_start.isoformat(),
+                old_end.isoformat(),
+            ),
+        )
+
+    # If store working hours are updated, keep offers that used store defaults in sync.
+    if "working_hours" in settings:
+        if new_hours_norm != old_hours_norm:
+            await _sync_offer_hours(old_hours_norm, new_hours_norm)
+        elif new_hours_norm != DEFAULT_WORKING_HOURS:
+            await _sync_offer_hours(DEFAULT_WORKING_HOURS, new_hours_norm)
 
     # Update existing store via SQL
     await db.execute(

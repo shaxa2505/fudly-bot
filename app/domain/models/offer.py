@@ -55,9 +55,9 @@ class OfferCreate(BaseModel):
     
     @model_validator(mode='after')
     def validate_time_order(self):
-        """Validate that available_from is before available_until."""
-        if self.available_from >= self.available_until:
-            raise ValueError('Время начала должно быть раньше времени окончания')
+        """Validate time window (allow overnight ranges)."""
+        if self.available_from == self.available_until:
+            raise ValueError('Время начала и окончания не должны совпадать')
         return self
     
     @field_validator('available_from', 'available_until', mode='before')
