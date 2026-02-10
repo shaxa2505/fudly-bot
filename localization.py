@@ -201,6 +201,7 @@ TEXTS = {
         "label_open": "Открыть",
         "btn_open_order": "📦 Открыть заказ",
         "btn_open_order_app": "📦 Открыть в приложении",
+        "order_card_updated_hint": "Карточка заказа обновлена. Откройте заказ.",
         "btn_back_menu": "← В меню",
         # Статусы (унифицированные)
         "status_pending": "Ожидает подтверждения",
@@ -1027,6 +1028,7 @@ Bo'limni tanlang.""",
         "label_open": "Ochish",
         "btn_open_order": "📦 Buyurtmani ochish",
         "btn_open_order_app": "📦 Ilovada ochish",
+        "order_card_updated_hint": "Buyurtma kartasi yangilandi. Buyurtmani oching.",
         "btn_back_menu": "← Menyuga",
         # Statuslar (yagona)
         "status_pending": "Tasdiqlash kutilmoqda",

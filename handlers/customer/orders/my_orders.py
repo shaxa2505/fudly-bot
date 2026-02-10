@@ -110,6 +110,73 @@ def _format_ready_until(updated_at: Any) -> str | None:
     return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
 
 
+def _safe_caption(text: str, limit: int = 1000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 3)] + "..."
+
+
+def _get_existing_customer_message_id(entity_type: str, entity_id: int) -> int | None:
+    if not db:
+        return None
+    try:
+        if entity_type == "order" and hasattr(db, "get_order"):
+            entity = db.get_order(entity_id)
+        elif entity_type == "booking" and hasattr(db, "get_booking"):
+            entity = db.get_booking(entity_id)
+        else:
+            return None
+    except Exception:
+        return None
+
+    if not entity:
+        return None
+    if isinstance(entity, dict):
+        return entity.get("customer_message_id")
+    return getattr(entity, "customer_message_id", None)
+
+
+async def _update_existing_customer_card(
+    *,
+    user_id: int,
+    entity_type: str,
+    entity_id: int,
+    card: str,
+    keyboard: InlineKeyboardBuilder,
+    current_message_id: int | None = None,
+) -> bool:
+    if not bot:
+        return False
+
+    existing_message_id = _get_existing_customer_message_id(entity_type, entity_id)
+    if not existing_message_id:
+        return False
+    if current_message_id and int(existing_message_id) == int(current_message_id):
+        return False
+
+    try:
+        await bot.edit_message_caption(
+            chat_id=user_id,
+            message_id=int(existing_message_id),
+            caption=_safe_caption(card),
+            parse_mode="HTML",
+            reply_markup=keyboard.as_markup(),
+        )
+        return True
+    except Exception:
+        try:
+            await bot.edit_message_text(
+                chat_id=user_id,
+                message_id=int(existing_message_id),
+                text=card,
+                parse_mode="HTML",
+                reply_markup=keyboard.as_markup(),
+            )
+            return True
+        except Exception:
+            return False
+
+
 def _build_open_app_keyboard(lang: str, order_id: int) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     webapp_url = os.getenv("WEBAPP_URL", "").strip()
@@ -494,6 +561,25 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
     lines = [card]
     kb = _build_open_app_keyboard(lang, int(data["booking_id"]))
 
+    updated_existing = await _update_existing_customer_card(
+        user_id=user_id,
+        entity_type="booking",
+        entity_id=int(data["booking_id"]),
+        card=card,
+        keyboard=kb,
+        current_message_id=callback.message.message_id if callback.message else None,
+    )
+    if updated_existing and callback.message:
+        note = get_text(lang, "order_card_updated_hint")
+        try:
+            await callback.message.edit_text(note, parse_mode="HTML", reply_markup=kb.as_markup())
+        except Exception:
+            try:
+                await callback.message.answer(note, parse_mode="HTML", reply_markup=kb.as_markup())
+            except Exception:
+                pass
+        return
+
     try:
         await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
@@ -634,6 +720,25 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
 
     lines = [card]
     kb = _build_open_app_keyboard(lang, int(data["order_id"]))
+
+    updated_existing = await _update_existing_customer_card(
+        user_id=user_id,
+        entity_type="order",
+        entity_id=int(data["order_id"]),
+        card=card,
+        keyboard=kb,
+        current_message_id=callback.message.message_id if callback.message else None,
+    )
+    if updated_existing and callback.message:
+        note = get_text(lang, "order_card_updated_hint")
+        try:
+            await callback.message.edit_text(note, parse_mode="HTML", reply_markup=kb.as_markup())
+        except Exception:
+            try:
+                await callback.message.answer(note, parse_mode="HTML", reply_markup=kb.as_markup())
+            except Exception:
+                pass
+        return
 
     try:
         await callback.message.edit_text(_fmt(lines), parse_mode="HTML", reply_markup=kb.as_markup())
