@@ -42,9 +42,9 @@ def hot_offers_compact_keyboard(
     add_label = get_text(lang, "catalog_add_button")
     details_label = get_text(lang, "catalog_details_button")
 
-    for offer in offers:
+    for idx, offer in enumerate(offers, start=1):
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
-        builder.button(text=add_label, callback_data=f"add_to_cart:{offer_id}")
+        builder.button(text=f"{idx} {add_label}", callback_data=f"add_to_cart:{offer_id}")
         builder.button(text=details_label, callback_data=f"product_details:{offer_id}")
 
     if offers:

@@ -1395,6 +1395,7 @@ class UnifiedOrderService:
             return self._error_result("Invalid item quantity")
 
         is_delivery = order_type in ("delivery", "taxi")
+        normalized_order_type = "delivery" if order_type == "taxi" else order_type
         if is_delivery and not delivery_address:
             return self._error_result("Delivery address required")
 
