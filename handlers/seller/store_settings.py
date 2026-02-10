@@ -13,7 +13,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.geocoding import reverse_geocode_store
 from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
 from localization import get_text
-from handlers.common.utils import can_manage_store
+from handlers.common.cancel import is_cancel_text
+from handlers.common.utils import can_manage_store, is_main_menu_button
 from database_protocol import DatabaseProtocol
 from logging_config import logger
 
@@ -373,6 +374,9 @@ async def handle_store_working_hours(message: types.Message, state: FSMContext) 
 
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
+    if is_cancel_text(message.text) or is_main_menu_button(message.text):
+        await state.clear()
+        return
 
     data = await state.get_data()
     store_id = data.get("store_id")
