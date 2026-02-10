@@ -1706,6 +1706,7 @@ def register_hot(
         ITEMS_PER_PAGE = OFFERS_PER_PAGE
         try:
             items: list[OfferListItem] = []
+            result: Any | None = None
             state_data = await state.get_data()
             filters = _catalog_filters_from_state(state_data)
             offset = max(0, page) * ITEMS_PER_PAGE
@@ -1795,11 +1796,13 @@ def register_hot(
             return True
 
         except Exception as exc:  # pragma: no cover
-            log.error(
-                "Failed to send hot offers: %s (build=%s, items_type=%s)",
-                exc,
+            result_items = getattr(result, "items", None) if result is not None else None
+            log.exception(
+                "Failed to send hot offers (build=%s, items_type=%s, result_items_type=%s, result_total_type=%s)",
                 CATALOG_BUILD,
                 type(items).__name__,
+                type(result_items).__name__ if result_items is not None else "none",
+                type(getattr(result, "total", None)).__name__ if result is not None else "none",
             )
             await target.answer(get_text(lang, "error"))
             return False
