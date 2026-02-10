@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+import os
+
 from aiogram import F, Router, types
 from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
@@ -39,6 +41,15 @@ def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
         resize_keyboard=True,
         one_time_keyboard=True,
     )
+
+
+def _delivery_cash_enabled() -> bool:
+    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 async def _send_cart_payment_selection(
@@ -82,6 +93,12 @@ async def _send_cart_payment_selection(
     text = "\n".join(lines)
 
     kb = InlineKeyboardBuilder()
+    cash_enabled = _delivery_cash_enabled()
+    if cash_enabled:
+        kb.button(
+            text=get_text(lang, "cart_delivery_payment_cash"),
+            callback_data="cart_pay_cash",
+        )
     kb.button(
         text=get_text(lang, "cart_delivery_payment_click"),
         callback_data="cart_pay_click",
@@ -90,7 +107,10 @@ async def _send_cart_payment_selection(
         text=get_text(lang, "cart_delivery_back_button"),
         callback_data="cart_back_to_address",
     )
-    kb.adjust(1, 1)
+    if cash_enabled:
+        kb.adjust(1, 1, 1)
+    else:
+        kb.adjust(1, 1)
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 

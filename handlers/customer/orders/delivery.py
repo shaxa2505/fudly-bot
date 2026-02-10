@@ -968,6 +968,115 @@ async def dlv_pay_click(
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("dlv_pay_cash_"))
+async def dlv_pay_cash(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+) -> None:
+    """Process cash payment for delivery - create order and notify."""
+    if not callback.from_user:
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    user_id = callback.from_user.id
+    lang = db.get_user_language(user_id)
+
+    if data.get("delivery_payment_in_progress"):
+        await callback.answer(get_text(lang, "cart_confirm_in_progress"), show_alert=True)
+        return
+    await state.update_data(delivery_payment_in_progress=True)
+
+    # Ensure we have address and other required data
+    address = data.get("address")
+    if not address:
+        logger.error("No address in state for cash payment")
+        await _return_to_address_step(callback.message, state, data, lang)
+        await state.update_data(delivery_payment_in_progress=False)
+        await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
+        return
+
+    order_service = get_unified_order_service()
+    if not order_service and bot:
+        order_service = init_unified_order_service(db, bot)
+    if not order_service:
+        logger.warning("UnifiedOrderService unavailable for cash delivery")
+        await state.update_data(delivery_payment_in_progress=False)
+        await callback.answer(get_text(lang, "system_error"), show_alert=True)
+        return
+
+    try:
+        offer_id = data.get("offer_id")
+        store_id = data.get("store_id")
+        quantity = int(data.get("quantity", 1))
+        delivery_price = int(data.get("delivery_price", 0))
+
+        offer = db.get_offer(offer_id)
+        store = db.get_store(store_id)
+
+        title = get_offer_field(offer, "title", "")
+        price = int(
+            get_offer_field(offer, "discount_price", 0)
+            or get_offer_field(offer, "price", 0)
+            or get_offer_field(offer, "original_price", 0)
+        )
+        offer_photo = get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id")
+        store_name = get_store_field(store, "name", "")
+        store_address = get_store_field(store, "address", "")
+
+        order_item = OrderItem(
+            offer_id=int(offer_id),
+            store_id=int(store_id),
+            title=title,
+            price=price,
+            original_price=price,
+            quantity=quantity,
+            store_name=store_name,
+            store_address=store_address,
+            photo=offer_photo,
+            delivery_price=delivery_price,
+        )
+
+        order_type = data.get("order_type", "delivery")
+        result = await order_service.create_order(
+            user_id=user_id,
+            items=[order_item],
+            order_type=order_type,
+            delivery_address=address if order_type == "delivery" else None,
+            payment_method="cash",
+            notify_customer=True,
+            notify_sellers=True,
+            telegram_notify=True,
+        )
+
+        if not result.success:
+            logger.error(
+                "Failed to create cash delivery order: %s", result.error_message
+            )
+            await state.update_data(delivery_payment_in_progress=False)
+            await callback.answer(get_text(lang, "system_error"), show_alert=True)
+            return
+    except Exception as e:
+        logger.error(f"Error creating cash delivery order: {e}", exc_info=True)
+        await state.update_data(delivery_payment_in_progress=False)
+        await callback.answer(get_text(lang, "system_error"), show_alert=True)
+        return
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception as e:
+        logger.warning("Failed to clear delivery payment keyboard for user %s: %s", user_id, e)
+
+    await state.clear()
+
+    notify_text = get_text(lang, "delivery_pay_cash_prompt")
+    try:
+        await callback.message.answer(notify_text)
+    except Exception as e:
+        logger.warning("Failed to send delivery cash prompt to user %s: %s", user_id, e)
+
+    await callback.answer()
+
+
 async def _return_to_address_step(message: types.Message, state: FSMContext, data: dict, lang: str) -> None:
     offer_id = data.get("offer_id")
     if not offer_id:

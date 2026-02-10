@@ -10,7 +10,7 @@ from handlers.common.utils import is_cart_button
 from .common import esc
 from . import common
 from .storage import cart_storage
-from app.core.order_math import calc_items_total, calc_total_price
+from app.core.order_math import calc_items_total
 
 
 async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | None:
@@ -54,20 +54,6 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
     lines.append("\n" + "-" * 25)
     lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
 
-    delivery_enabled = any(item.delivery_enabled for item in items)
-    delivery_price = max(
-        (item.delivery_price for item in items if item.delivery_enabled), default=0
-    )
-
-    if delivery_enabled:
-        lines.append(
-            f"\n{get_text(lang, 'cart_delivery_label')}: +{delivery_price:,} {currency}"
-        )
-        grand_total = calc_total_price(total, delivery_price)
-        lines.append(
-            f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
-        )
-
     text = "\n".join(lines)
 
     kb = InlineKeyboardBuilder()
@@ -87,14 +73,9 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
         text=get_text(lang, "cart_empty_cta"),
         callback_data="hot_offers",
     )
-    kb.button(
-        text=get_text(lang, "cart_clear_button"),
-        callback_data="cart_clear",
-    )
-
     num_items = len(items)
     adjust_pattern = [4] * num_items
-    adjust_pattern.extend([1, 1, 1])
+    adjust_pattern.extend([1, 1])
 
     kb.adjust(*adjust_pattern)
 

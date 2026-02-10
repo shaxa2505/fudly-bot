@@ -5,6 +5,8 @@ Extracted from delivery.py for maintainability.
 """
 from __future__ import annotations
 
+import os
+
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.order_math import calc_total_price
@@ -140,7 +142,14 @@ def build_delivery_payment_keyboard(
     """Build payment method selection keyboard."""
     kb = InlineKeyboardBuilder()
 
-    # Payment options (Click only)
+    cash_enabled = _delivery_cash_enabled()
+    if cash_enabled:
+        kb.button(
+            text=get_text(lang, "delivery_payment_cash_button"),
+            callback_data=f"dlv_pay_cash_{offer_id}",
+        )
+
+    # Payment options (Click)
     kb.button(
         text=get_text(lang, "delivery_payment_click_button"),
         callback_data=f"dlv_pay_click_{offer_id}",
@@ -150,5 +159,17 @@ def build_delivery_payment_keyboard(
     kb.button(text=get_text(lang, "back"), callback_data=f"dlv_back_address_{offer_id}")
     kb.button(text=get_text(lang, "cancel"), callback_data="dlv_cancel")
 
-    kb.adjust(1, 2)
+    if cash_enabled:
+        kb.adjust(1, 1, 2)
+    else:
+        kb.adjust(1, 2)
     return kb
+
+
+def _delivery_cash_enabled() -> bool:
+    return os.getenv("FUDLY_DELIVERY_CASH_ENABLED", "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }

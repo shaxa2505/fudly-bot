@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_customer
-from app.core.order_math import calc_items_total, calc_total_price
+from app.core.order_math import calc_items_total
 from app.services.unified_order_service import OrderItem, OrderResult, get_unified_order_service
 from localization import get_text
 
@@ -107,9 +107,6 @@ def register(router: Router) -> None:
             return
 
         delivery_enabled = any(item.delivery_enabled for item in items)
-        delivery_price = max(
-            (item.delivery_price for item in items if item.delivery_enabled), default=0
-        )
 
         currency = "so'm" if lang == "uz" else "сум"
         total = calc_items_total(
@@ -131,32 +128,25 @@ def register(router: Router) -> None:
         lines.append("")
         lines.append("-" * 25)
         lines.append(f"<b>{get_text(lang, 'cart_total_label')}: {total:,} {currency}</b>")
-        if delivery_enabled:
-            lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
-            grand_total = calc_total_price(total, delivery_price)
-            lines.append(
-                f"<b>{get_text(lang, 'cart_grand_total_label')}: {grand_total:,} {currency}</b>"
-            )
+        lines.append("")
+        lines.append(get_text(lang, "cart_receive_method_prompt"))
 
         text = "\n".join(lines)
 
         kb = InlineKeyboardBuilder()
 
+        kb.button(
+            text=get_text(lang, "cart_pickup_button"),
+            callback_data="cart_confirm_pickup",
+        )
         if delivery_enabled:
-            kb.button(
-                text=get_text(lang, "cart_pickup_button"),
-                callback_data="cart_confirm_pickup",
-            )
             kb.button(
                 text=get_text(lang, "cart_delivery_button"),
                 callback_data="cart_confirm_delivery",
             )
             kb.adjust(2)
         else:
-            kb.button(
-                text=get_text(lang, "cart_confirm_button"),
-                callback_data="cart_confirm_pickup",
-            )
+            kb.adjust(1)
 
         kb.button(
             text=get_text(lang, "cart_back_button"),

@@ -129,12 +129,6 @@ def build_cart_view_keyboard(
             callback_data="hot_offers",
         )
 
-        # Clear cart
-        kb.button(
-            text=get_text(lang, "cart_clear_button"),
-            callback_data="cart_clear",
-        )
-
         kb.adjust(1)
     else:
         # Empty cart - just continue shopping
