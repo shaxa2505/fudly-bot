@@ -6,12 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.keyboards import main_menu_customer
 from app.core.order_math import calc_items_total, calc_total_price
-from app.services.unified_order_service import (
-    NotificationTemplates,
-    OrderItem,
-    OrderResult,
-    get_unified_order_service,
-)
+from app.services.unified_order_service import OrderItem, OrderResult, get_unified_order_service
 from localization import get_text
 
 from . import common

@@ -205,6 +205,8 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             order_type = "delivery" if delivery_address else "pickup"
     else:
         order_type = "pickup"
+    if order_type == "taxi":
+        order_type = "delivery"
 
     if entity_type == "order" and _is_unpaid_online_order(entity):
         await callback.answer(get_text(lang, "payment_not_confirmed"), show_alert=True)

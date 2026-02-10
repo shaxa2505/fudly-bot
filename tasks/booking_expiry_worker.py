@@ -499,10 +499,21 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                         order_id = row[0]
                         user_id = row[1]
 
+                    lang = "ru"
+                    try:
+                        if user_id:
+                            lang = db.get_user_language(user_id)
+                    except Exception:
+                        lang = "ru"
+
+                    cancel_reason = get_text(lang, "pickup_ready_expired_reason")
+
                     # Update status to cancelled and restore quantities
                     try:
                         if order_service:
-                            await order_service.cancel_order(order_id, entity_type="order")
+                            await order_service.cancel_order(
+                                order_id, entity_type="order", reason=cancel_reason
+                            )
                         elif set_order_status_direct:
                             set_order_status_direct(db, order_id, order_status_cancelled)
                     except Exception as e:
@@ -511,11 +522,6 @@ async def run_booking_expiry_cycle(db: Any, bot: Any) -> None:
                     # Notify user if unified order service is unavailable
                     if bot and user_id and not order_service:
                         try:
-                            lang = "ru"
-                            try:
-                                lang = db.get_user_language(user_id)
-                            except Exception:
-                                pass
                             await bot.send_message(
                                 user_id, get_text(lang, "pickup_ready_expired")
                             )

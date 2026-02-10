@@ -929,7 +929,7 @@ async def dlv_pay_click(
 
         webapp_url = os.getenv("WEBAPP_URL", "").strip()
         if webapp_url:
-            return_url = f"{webapp_url.rstrip('/')}/order/{order_id}/details"
+            return_url = f"{webapp_url.rstrip('/')}/order/{order_id}"
     except Exception:
         return_url = None
 

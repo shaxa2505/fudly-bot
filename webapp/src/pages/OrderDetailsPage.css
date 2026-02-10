@@ -297,6 +297,11 @@
   flex-wrap: wrap;
 }
 
+.hero-deadline {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
 .hero-body {
   display: flex;
   align-items: center;

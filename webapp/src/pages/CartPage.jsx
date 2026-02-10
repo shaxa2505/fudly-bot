@@ -1243,7 +1243,7 @@ function CartPage({ user }) {
       }
 
       const storeId = pendingPayment.storeId || safeCartItems[0]?.offer?.store_id || null
-      const returnUrl = `${window.location.origin}/order/${pendingPayment.orderId}/details`
+      const returnUrl = `${window.location.origin}/order/${pendingPayment.orderId}`
       const paymentData = await api.createPaymentLink(
         pendingPayment.orderId,
         pendingPayment.provider || 'click',
@@ -2151,7 +2151,7 @@ function CartPage({ user }) {
 
       orderId = result.order_id || result.bookings?.[0]?.booking_id
       const storeId = safeCartItems[0]?.offer?.store_id || null
-      const returnUrl = `${window.location.origin}/order/${orderId}/details`
+      const returnUrl = `${window.location.origin}/order/${orderId}`
       const pendingPayload = savePendingPayment({
         orderId,
         storeId,

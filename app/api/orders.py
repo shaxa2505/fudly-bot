@@ -7,6 +7,7 @@ import io
 import logging
 import math
 import os
+from datetime import datetime, timedelta
 from typing import Any
 
 import qrcode
@@ -25,6 +26,7 @@ from app.core.order_math import (
     calc_total_price,
     parse_cart_items,
 )
+from app.core.utils import UZB_TZ, get_uzb_time
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus, PaymentStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
@@ -108,6 +110,7 @@ class OrderStatus(BaseModel):
     order_type: str | None = None
     created_at: str
     updated_at: str | None
+    ready_until: str | None = None
 
     # Offer details
     offer_title: str
@@ -222,6 +225,37 @@ def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     x = (lon2 - lon1) * rad * math.cos((lat1 + lat2) * rad / 2.0)
     y = (lat2 - lat1) * rad
     return math.hypot(x, y) * 6371.0
+
+
+def _pickup_ready_expiry_hours() -> int:
+    try:
+        value = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
+    except Exception:
+        value = 2
+    return max(1, value)
+
+
+def _format_ready_until(updated_at: Any) -> str | None:
+    hours = _pickup_ready_expiry_hours()
+    if hours <= 0:
+        return None
+
+    base_time = None
+    if isinstance(updated_at, datetime):
+        base_time = updated_at
+    elif isinstance(updated_at, str) and updated_at:
+        try:
+            base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        except Exception:
+            base_time = None
+
+    if base_time is None:
+        base_time = get_uzb_time()
+    elif base_time.tzinfo is None:
+        base_time = base_time.replace(tzinfo=UZB_TZ)
+
+    ready_until = base_time + timedelta(hours=hours)
+    return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
 
 
 async def calculate_delivery_cost(
@@ -344,6 +378,10 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     delivery_address = booking_dict.get("delivery_address")
     order_type = booking_dict.get("order_type") or ("delivery" if delivery_address else "pickup")
 
+    ready_until = None
+    if order_type == "pickup" and status == UnifiedOrderStatus.READY:
+        ready_until = _format_ready_until(booking_dict.get("updated_at"))
+
     booking_code = booking_dict.get("pickup_code") or booking_dict.get("booking_code") or ""
     payment_status = PaymentStatus.normalize(
         booking_dict.get("payment_status"),
@@ -447,6 +485,7 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
         order_type=order_type,
         created_at=str(booking_dict.get("created_at", "")),
         updated_at=str(booking_dict.get("updated_at")) if booking_dict.get("updated_at") else None,
+        ready_until=ready_until,
         offer_title=offer_dict.get("title", "Товар"),
         offer_photo=offer_dict.get("photo") or offer_dict.get("photo_id"),
         quantity=quantity,
@@ -749,73 +788,68 @@ async def get_order_timeline(
     is_pickup = order_type == "pickup"
 
     # Build timeline based on status
-    timeline = []
+    timeline: list[StatusUpdate] = []
 
     # Always have "created" status
-    timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="Заказ создан"))
+    timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="????? ??????"))
 
-    # v23+ statuses: pending, preparing, ready, delivering, completed, rejected, cancelled
-    if not is_pickup:
-        if status in ["preparing", "confirmed", "ready", "delivering", "completed"]:
+    if is_pickup:
+        if status in ["preparing", "ready", "completed", "cancelled", "rejected"]:
             timeline.append(
                 StatusUpdate(
                     status="preparing",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="Заказ подтвержден магазином",
+                    message="????? ??????????? ?????????",
                 )
             )
-    else:
-        if status in ["preparing", "confirmed", "ready", "completed"]:
+        if status in ["ready", "completed"]:
             timeline.append(
                 StatusUpdate(
                     status="ready",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="Заказ готов к выдаче",
+                    message="????? ????? ? ??????",
+                )
+            )
+        if status == "completed":
+            timeline.append(
+                StatusUpdate(
+                    status="completed",
+                    timestamp=str(order_dict.get("updated_at", created_at)),
+                    message="????? ???????",
+                )
+            )
+    else:
+        if status in ["preparing", "delivering", "completed"]:
+            timeline.append(
+                StatusUpdate(
+                    status="preparing",
+                    timestamp=str(order_dict.get("updated_at", created_at)),
+                    message="????? ??????????? ?????????",
+                )
+            )
+        if status in ["delivering", "completed"]:
+            timeline.append(
+                StatusUpdate(
+                    status="delivering",
+                    timestamp=str(order_dict.get("updated_at", created_at)),
+                    message="????? ? ????",
+                )
+            )
+        if status == "completed":
+            timeline.append(
+                StatusUpdate(
+                    status="completed",
+                    timestamp=str(order_dict.get("updated_at", created_at)),
+                    message="????? ?????????",
                 )
             )
 
-    if not is_pickup and status in ["ready", "delivering", "completed"]:
-        timeline.append(
-            StatusUpdate(
-                status="ready",
-                timestamp=str(order_dict.get("updated_at", created_at)),
-                message="Заказ готов к выдаче",
-            )
-        )
-
-    if not is_pickup and status == "delivering":
-        timeline.append(
-            StatusUpdate(
-                status="delivering",
-                timestamp=str(order_dict.get("updated_at", created_at)),
-                message="Buyurtma yetkazib berilmoqda",
-            )
-        )
-
-    if status == "completed":
-        timeline.append(
-            StatusUpdate(
-                status="completed",
-                timestamp=str(order_dict.get("updated_at", created_at)),
-                message="Заказ завершен",
-            )
-        )
-
-    if status == "rejected":
-        timeline.append(
-            StatusUpdate(
-                status="rejected",
-                timestamp=str(order_dict.get("updated_at", created_at)),
-                message="Buyurtma rad etildi",
-            )
-        )
-
-    if status == "cancelled":
+    if status in ["rejected", "cancelled"]:
         timeline.append(
             StatusUpdate(
                 status="cancelled",
                 timestamp=str(order_dict.get("updated_at", created_at)),
-                message="Заказ отменен",
+                message="????? ???????",
             )
         )
 

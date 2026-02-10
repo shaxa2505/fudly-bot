@@ -1,4 +1,4 @@
-"""Ensure Click payment button appears in order details for unpaid delivery orders."""
+"""Ensure order details no longer include Click payment buttons in bot fallback."""
 from __future__ import annotations
 
 import importlib
@@ -13,7 +13,7 @@ import handlers.customer.orders.my_orders as my_orders_mod
 
 
 @pytest.mark.asyncio
-async def test_my_orders_detail_shows_click_button(db, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_my_orders_detail_shows_open_app_button(db, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CLICK_MERCHANT_ID", "test_merchant")
     monkeypatch.setenv("CLICK_SERVICE_ID", "test_service")
     monkeypatch.setenv("CLICK_SECRET_KEY", "test_secret")
@@ -105,8 +105,15 @@ async def test_my_orders_detail_shows_click_button(db, monkeypatch: pytest.Monke
         for button in row
         if getattr(button, "url", None)
     ]
-    assert any("my.click.uz/services/pay" in url for url in urls)
-    assert any(f"transaction_param={order_id}" in url for url in urls)
+    assert not any("my.click.uz/services/pay" in url for url in urls)
+
+    webapps = [
+        button.web_app.url
+        for row in markup.inline_keyboard
+        for button in row
+        if getattr(button, "web_app", None)
+    ]
+    assert any(f"/order/{order_id}" in url for url in webapps)
 
 
 @pytest.mark.asyncio

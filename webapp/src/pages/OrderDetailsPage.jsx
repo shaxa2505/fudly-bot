@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
-import { deriveDisplayStatus, displayStatusText, normalizeOrderStatus, paymentStatusText, resolveOrderType } from '../utils/orderStatus'
+import { deriveDisplayStatus, displayStatusText, normalizeOrderStatus, normalizePaymentStatus, paymentStatusText, resolveOrderType } from '../utils/orderStatus'
 import { readPendingPayment, clearPendingPayment } from '../utils/pendingPayment'
 import { getUserId } from '../utils/auth'
 import './OrderDetailsPage.css'
@@ -266,7 +266,7 @@ export default function OrderDetailsPage() {
         return
       }
 
-      const returnUrl = window.location.origin + `/order/${orderId}/details`
+      const returnUrl = window.location.origin + `/order/${orderId}`
       const paymentData = await apiClient.createPaymentLink(
         order.order_id,
         'click',
@@ -321,7 +321,7 @@ export default function OrderDetailsPage() {
   const fulfillmentStatus = order.fulfillment_status || normalizeOrderStatus(order.order_status || order.status)
   const orderType = resolveOrderType(order)
   const isDelivery = orderType === 'delivery'
-  const displayFulfillmentStatus = (!isDelivery && fulfillmentStatus === 'preparing') ? 'ready' : fulfillmentStatus
+  const displayFulfillmentStatus = fulfillmentStatus
   const statusInfo = getStatusInfo(displayFulfillmentStatus || order.status, orderType)
   const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
   const canPayOnline = order.payment_method === 'click'
@@ -365,8 +365,10 @@ export default function OrderDetailsPage() {
     payme: 'Payme',
   }
 
+  const normalizedPaymentStatus = normalizePaymentStatus(order.payment_status, order.payment_method)
+
   const paymentNotice = (() => {
-    switch (order.status) {
+    switch (normalizedPaymentStatus) {
       case 'awaiting_payment':
         return {
           title: "To'lovni yakunlang",
@@ -405,19 +407,19 @@ export default function OrderDetailsPage() {
   })()
 
   const payButtonLabel = "Click bilan to'lash"
-  const showPayButton = canPayOnline && order.status === 'awaiting_payment'
+  const showPayButton = canPayOnline && normalizedPaymentStatus === 'awaiting_payment'
   const isPayPrimary = showPayButton
 
   const statusSteps = isDelivery
     ? [
         { key: 'pending', label: 'Yaratildi' },
-        { key: 'preparing', label: 'Tayyorlanmoqda' },
-        { key: 'ready', label: 'Tayyor' },
+        { key: 'preparing', label: 'Tasdiqlandi' },
         { key: 'delivering', label: "Yo'lda" },
         { key: 'completed', label: 'Yakunlandi' },
       ]
     : [
         { key: 'pending', label: 'Yaratildi' },
+        { key: 'preparing', label: 'Tasdiqlandi' },
         { key: 'ready', label: 'Tayyor' },
         { key: 'completed', label: 'Berildi' },
       ]
@@ -425,6 +427,7 @@ export default function OrderDetailsPage() {
   const activeStepIndex = Math.max(0, statusSteps.findIndex(step => step.key === displayFulfillmentStatus))
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
   const showPickupReadyNote = !isDelivery && displayFulfillmentStatus === 'ready'
+  const pickupReadyUntil = order?.ready_until
   const hasDeliveryInfo = Boolean(order.delivery_address || order.phone || order.delivery_notes)
   const hasStoreInfo = Boolean(order.store_name || order.store_address || order.store_phone)
 
@@ -492,6 +495,11 @@ export default function OrderDetailsPage() {
               {statusInfo.text}
             </span>
           </div>
+          {showPickupReadyNote && pickupReadyUntil && (
+            <div className="hero-deadline">
+              Olib ketishgacha: {pickupReadyUntil}
+            </div>
+          )}
         </div>
         <div className="hero-body">
           <div className="hero-total">
@@ -562,7 +570,11 @@ export default function OrderDetailsPage() {
           <div className="pickup-ready-icon">i</div>
           <div className="pickup-ready-content">
             <h3>Buyurtma tayyor</h3>
-            <p>2 soat ichida olib ketishingiz kerak, aks holda buyurtma bekor qilinadi.</p>
+            <p>
+              {pickupReadyUntil
+                ? `Olib ketishgacha: ${pickupReadyUntil}`
+                : "2 soat ichida olib ketishingiz kerak, aks holda buyurtma bekor qilinadi."}
+            </p>
           </div>
         </div>
       )}

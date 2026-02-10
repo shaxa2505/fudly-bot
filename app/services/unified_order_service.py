@@ -3413,10 +3413,7 @@ class UnifiedOrderService:
 
         ready_until = None
         if normalized_order_type == "pickup" and target_status == OrderStatus.READY:
-            updated_at = (
-                entity.get("updated_at") if isinstance(entity, dict) else getattr(entity, "updated_at", None)
-            )
-            ready_until = self._format_pickup_ready_until(updated_at)
+            ready_until = self._format_pickup_ready_until(get_uzb_time())
 
         customer_lang = self.db.get_user_language(user_id) if user_id else "ru"
         critical_text = (
@@ -4118,6 +4115,7 @@ class UnifiedOrderService:
         self,
         entity_id: int,
         entity_type: Literal["order", "booking"],
+        reason: str | None = None,
     ) -> bool:
         """Customer cancels an order."""
         return await self.update_status(
@@ -4125,6 +4123,7 @@ class UnifiedOrderService:
             entity_type=entity_type,
             new_status=OrderStatus.CANCELLED,
             notify_customer=True,
+            reject_reason=reason,
         )
 
 
