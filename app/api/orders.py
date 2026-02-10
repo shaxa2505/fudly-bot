@@ -819,7 +819,7 @@ async def get_order_timeline(
                 )
             )
     else:
-        if status in ["preparing", "delivering", "completed"]:
+        if status in ["preparing", "ready", "delivering", "completed"]:
             timeline.append(
                 StatusUpdate(
                     status="preparing",
@@ -855,7 +855,7 @@ async def get_order_timeline(
 
     # Estimate ready time based on status
     estimated_ready = None
-    if not is_pickup and status in ["preparing", "confirmed"]:
+    if not is_pickup and status in ["preparing", "ready", "confirmed"]:
         # Calculate estimated time based on when order was confirmed
         from datetime import datetime, timedelta
         try:
