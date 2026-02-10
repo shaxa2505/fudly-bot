@@ -7,6 +7,7 @@ const PAGE_ROUTES = {
   'home': '/',
   'stores': '/stores',
   'cart': '/cart',
+  'orders': '/orders',
   'profile': '/profile',
 }
 
@@ -23,6 +24,7 @@ function BottomNav({ currentPage, cartCount }) {
     if (path === '/') return 'home'
     if (path === '/stores') return 'stores'
     if (path === '/cart') return 'cart'
+    if (path.startsWith('/order')) return 'orders'
     if (path === '/profile' || path === '/yana') return 'profile'
     return 'home'
   })()
@@ -53,6 +55,17 @@ function BottomNav({ currentPage, cartCount }) {
             <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h8.72a2 2 0 002-1.61L22 6H6" stroke={color} strokeWidth={strokeW} strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )
+      case 'orders':
+        return (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <circle cx="4" cy="7" r="1.5" fill={color} />
+            <circle cx="4" cy="12" r="1.5" fill={color} />
+            <circle cx="4" cy="17" r="1.5" fill={color} />
+            <path d="M8 7h12" stroke={color} strokeWidth={strokeW} strokeLinecap="round" />
+            <path d="M8 12h12" stroke={color} strokeWidth={strokeW} strokeLinecap="round" />
+            <path d="M8 17h12" stroke={color} strokeWidth={strokeW} strokeLinecap="round" />
+          </svg>
+        )
       case 'profile':
         return (
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -69,6 +82,7 @@ function BottomNav({ currentPage, cartCount }) {
     { id: 'home', label: 'Asosiy' },
     { id: 'stores', label: "Do'konlar" },
     { id: 'cart', label: 'Savat', badge: cartCount },
+    { id: 'orders', label: 'Buyurtmalar' },
     { id: 'profile', label: 'Profil' },
   ]
 

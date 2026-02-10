@@ -42,12 +42,13 @@ describe('YanaPage', () => {
     apiMocks.getPhotoUrl.mockReset()
   })
 
-  it('renders empty orders state', async () => {
+  it('renders profile header and saved metric', async () => {
     apiMocks.getOrders.mockResolvedValueOnce({ orders: [], bookings: [] })
 
     renderWithProviders(<YanaPage />)
 
-    expect(await screen.findByText("Buyurtmalar yo'q")).toBeInTheDocument()
+    expect(await screen.findByText('Profil')).toBeInTheDocument()
+    expect(screen.getByText(/ovqat qutqarildi/i)).toBeInTheDocument()
   })
 
   it('switches to notifications section', async () => {

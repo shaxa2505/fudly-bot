@@ -15,10 +15,11 @@ describe('BottomNav', () => {
   it('renders all navigation items', () => {
     renderBottomNav()
 
-    expect(screen.getByText('Bosh sahifa')).toBeInTheDocument()
+    expect(screen.getByText('Asosiy')).toBeInTheDocument()
     expect(screen.getByText("Do'konlar")).toBeInTheDocument()
     expect(screen.getByText('Savat')).toBeInTheDocument()
-    expect(screen.getByText('Yana')).toBeInTheDocument()
+    expect(screen.getByText('Buyurtmalar')).toBeInTheDocument()
+    expect(screen.getByText('Profil')).toBeInTheDocument()
   })
 
   it('shows cart badge when cartCount > 0', () => {

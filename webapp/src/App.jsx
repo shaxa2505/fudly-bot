@@ -20,6 +20,7 @@ const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
 const StoresPage = lazy(() => import('./pages/StoresPage'))
 const CategoryProductsPage = lazy(() => import('./pages/CategoryProductsPage'))
 const FavoritesPage = lazy(() => import('./pages/FavoritesPage'))
+const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 
 // LoadingScreen and PageLoader are now imported from components/PageLoader
 const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
@@ -408,6 +409,10 @@ function AppContent() {
               <Route
                 path="/stores"
                 element={<StoresPage user={user} />}
+              />
+              <Route
+                path="/orders"
+                element={<OrdersPage user={user} />}
               />
               <Route
                 path="/favorites"
