@@ -648,8 +648,13 @@ class UnifiedOrderService:
         for admin_id in admin_ids[:3]:
             try:
                 await self.bot.send_message(admin_id, text)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to notify admin %s about refund for order %s: %s",
+                    admin_id,
+                    ctx.entity_id,
+                    e,
+                )
 
     def _esc(self, val: Any) -> str:
         """HTML-escape helper."""
@@ -2505,7 +2510,7 @@ class UnifiedOrderService:
                         )
 
         if not item_title:
-            item_title = "Mahsulot" if customer_lang == "uz" else "РўРѕРІР°СЂ"
+            item_title = "Mahsulot" if customer_lang == "uz" else "Товар"
 
         if item_price is None and total_price is not None and quantity:
             try:
@@ -2672,7 +2677,7 @@ class UnifiedOrderService:
             )
         else:
             if currency is None:
-                currency = "so'm" if customer_lang == "uz" else "СЃСѓРј"
+                currency = "so'm" if customer_lang == "uz" else "сум"
             msg = NotificationTemplates.customer_status_update(
                 lang=customer_lang,
                 order_id=entity_id,
@@ -3475,7 +3480,7 @@ class UnifiedOrderService:
                 )
             else:
                 if currency is None:
-                    currency = "so'm" if customer_lang == "uz" else "СЃСѓРј"
+                    currency = "so'm" if customer_lang == "uz" else "сум"
                 msg = NotificationTemplates.customer_status_update(
                     lang=customer_lang,
                     order_id=entity_id,
@@ -3837,13 +3842,23 @@ class UnifiedOrderService:
                     if item_offer_id:
                         try:
                             self.db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to restore quantity for offer %s (qty=%s): %s",
+                                item_offer_id,
+                                item_qty,
+                                e,
+                            )
             elif offer_id:
                 try:
                     self.db.increment_offer_quantity_atomic(offer_id, int(quantity))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to restore quantity for offer %s (qty=%s): %s",
+                        offer_id,
+                        quantity,
+                        e,
+                    )
 
             # Release pickup slot capacity for bookings (best-effort).
             if (
@@ -3854,8 +3869,14 @@ class UnifiedOrderService:
             ):
                 try:
                     self.db.release_pickup_slot(int(store_id), pickup_time, int(quantity or 0))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to release pickup slot for store %s (time=%s, qty=%s): %s",
+                        store_id,
+                        pickup_time,
+                        quantity,
+                        e,
+                    )
 
         except Exception as e:
             logger.error(f"Failed to restore quantities: {e}")

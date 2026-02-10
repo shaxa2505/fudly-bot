@@ -147,8 +147,14 @@ def register(router: Router) -> None:
             logger.error(f"Failed to generate Click link for cart order #{order_id}: {e}")
             try:
                 await order_service.cancel_order(int(order_id), "order")
-            except Exception:
-                pass
+            except Exception as cancel_err:
+                from logging_config import logger
+
+                logger.warning(
+                    "Failed to cancel cart order %s after Click link error: %s",
+                    order_id,
+                    cancel_err,
+                )
             await state.update_data(cart_payment_in_progress=False)
             await callback.answer(get_text(lang, "cart_payment_click_unavailable"), show_alert=True)
             return

@@ -473,7 +473,7 @@ class OfferService:
     def _to_offer_list_item(self, data: Any) -> OfferListItem:
         offer_id = int(get_offer_field(data, "offer_id", get_field(data, 0, 0)) or 0)
         store_id = int(get_offer_field(data, "store_id", get_field(data, 1, 0)) or 0)
-        title = str(get_offer_field(data, "title", get_field(data, 2, "РўРѕРІР°СЂ")))
+        title = str(get_offer_field(data, "title", get_field(data, 2, "Товар")))
         original_price = self._safe_float(
             get_offer_field(data, "original_price", get_field(data, 4, 0))
         )
@@ -482,10 +482,10 @@ class OfferService:
         )
         quantity = get_offer_field(data, "quantity", get_field(data, 6, 0))
         expiry_date = get_offer_field(data, "expiry_date", get_field(data, 9, ""))
-        store_name = str(get_field(data, "store_name", get_field(data, 14, "РњР°РіР°Р·РёРЅ")))
+        store_name = str(get_field(data, "store_name", get_field(data, 14, "Магазин")))
         store_address = get_field(data, "address", get_field(data, 15, ""))
         store_category = get_field(data, "store_category", get_field(data, 17, ""))
-        unit = get_offer_field(data, "unit", get_field(data, 13, "С€С‚"))
+        unit = get_offer_field(data, "unit", get_field(data, 13, "шт"))
         discount_percent_src = get_field(data, "discount_percent", get_field(data, 18, 0))
         discount_percent = self._safe_float(discount_percent_src, 0.0)
         # Safe discount calculation - handle edge cases
@@ -536,7 +536,7 @@ class OfferService:
 
     def _to_store_summary(self, store: Any) -> StoreSummary:
         store_id = int(get_store_field(store, "store_id", get_field(store, 0, 0)) or 0)
-        name = get_store_field(store, "name", get_field(store, 2, "РњР°РіР°Р·РёРЅ"))
+        name = get_store_field(store, "name", get_field(store, 2, "Магазин"))
         city = get_store_field(store, "city", get_field(store, 3, ""))
         address = get_store_field(store, "address", get_field(store, 4, ""))
         business_type = get_store_field(store, "business_type", get_field(store, 11, "supermarket"))

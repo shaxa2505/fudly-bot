@@ -333,20 +333,20 @@ async def register_store_category(message: types.Message, state: FSMContext) -> 
         # CRITICAL: Normalize business type to Russian for DB consistency
         normalized_category = normalize_business_type(cat_text)
         business_type_map = {
-            "РЎСѓРїРµСЂРјР°СЂРєРµС‚": "supermarket",
+            "Супермаркет": "supermarket",
             "Supermarket": "supermarket",
-            "Р РµСЃС‚РѕСЂР°РЅ": "restaurant",
+            "Ресторан": "restaurant",
             "Restaurant": "restaurant",
-            "РџРµРєР°СЂРЅСЏ": "bakery",
+            "Пекарня": "bakery",
             "Nonvoyxona": "bakery",
-            "РљР°С„Рµ": "cafe",
+            "Кафе": "cafe",
             "Kafe": "cafe",
-            "РљРѕРЅРґРёС‚РµСЂСЃРєР°СЏ": "confectionery",
+            "Кондитерская": "confectionery",
             "Qandolatchilik": "confectionery",
-            "Р¤Р°СЃС‚С„СѓРґ": "fastfood",
+            "Фастфуд": "fastfood",
             "Fastfud": "fastfood",
             "Boshqa": "other",
-            "Р”СЂСѓРіРѕРµ": "other",
+            "Другое": "other",
         }
         business_type = business_type_map.get(cat_text) or business_type_map.get(
             normalized_category

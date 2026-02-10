@@ -113,13 +113,23 @@ async def _restore_quantities_fallback(db_instance: Any, entity: Any, entity_typ
                 if item_offer_id:
                     try:
                         db_instance.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
-                    except Exception:  # pragma: no cover - non-critical logging
-                        pass
+                    except Exception as e:  # pragma: no cover - defensive logging
+                        logger.warning(
+                            "Failed to restore quantity for offer %s (qty=%s): %s",
+                            item_offer_id,
+                            item_qty,
+                            e,
+                        )
         elif offer_id:
             try:
                 db_instance.increment_offer_quantity_atomic(offer_id, int(quantity))
-            except Exception:  # pragma: no cover - non-critical logging
-                pass
+            except Exception as e:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Failed to restore quantity for offer %s (qty=%s): %s",
+                    offer_id,
+                    quantity,
+                    e,
+                )
 
     except Exception as e:  # pragma: no cover - defensive logging
         logger.error(f"Failed to restore quantities: {e}")

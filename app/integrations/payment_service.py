@@ -664,8 +664,13 @@ class PaymentService:
                 existing = self._db.get_click_fiscalization(int(order_id), str(payment_id))
                 if existing and str(existing.get("status", "")).lower() == "success":
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Click fiscalization lookup failed for order %s payment %s: %s",
+                    order_id,
+                    payment_id,
+                    e,
+                )
 
         store_id = order.get("store_id") if isinstance(order, dict) else getattr(order, "store_id", None)
         creds = None
@@ -732,8 +737,13 @@ class PaymentService:
                     status="pending",
                     request_payload=payload,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to upsert Click fiscalization (pending) for order %s payment %s: %s",
+                    order_id,
+                    payment_id,
+                    e,
+                )
 
         auth_header = self._build_click_auth_header(merchant_user_id, secret_key)
         url = f"{self.click_api_url}/payment/ofd_data/submit_items"
@@ -770,8 +780,13 @@ class PaymentService:
                                 error_note=str(data.get("error_note", "")),
                                 response_payload=data,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to upsert Click fiscalization QR for order %s payment %s: %s",
+                                order_id,
+                                payment_id,
+                                e,
+                            )
 
                     if error_code == 0 and config.get("fetch_qrcode"):
                         await self.fetch_click_fiscal_data(
@@ -823,8 +838,13 @@ class PaymentService:
                                 qr_code_url=str(qr_url),
                                 response_payload=data,
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to upsert Click fiscalization QR for order %s payment %s: %s",
+                                order_id,
+                                payment_id,
+                                e,
+                            )
         except Exception as e:
             logger.warning(f"Click fiscalization fetch failed: {e}")
 
@@ -972,8 +992,13 @@ class PaymentService:
                     amount=str(amount),
                     status="prepared",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to record Click prepare transaction %s for order %s: %s",
+                    click_trans_id,
+                    order_id,
+                    e,
+                )
 
         return self._click_response(
             click_trans_id=click_trans_id,
@@ -1110,8 +1135,12 @@ class PaymentService:
                         amount=str(amount),
                         status="confirmed",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to upsert Click transaction on confirm for order %s: %s",
+                        order_id,
+                        e,
+                    )
             tx = {"status": "confirmed"}
 
         stored_prepare_id = str(tx.get("merchant_prepare_id") or "")
@@ -1156,13 +1185,21 @@ class PaymentService:
                         error_code=error,
                         error_note="Cancelled by Click",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to mark Click transaction cancelled for order %s: %s",
+                        order_id,
+                        e,
+                    )
             if order_id and self._db and hasattr(self._db, "update_payment_status"):
                 try:
                     self._db.update_payment_status(int(order_id), "rejected")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to update payment status to rejected for order %s: %s",
+                        order_id,
+                        e,
+                    )
             if order_id:
                 try:
                     from app.services.unified_order_service import get_unified_order_service
@@ -1175,10 +1212,18 @@ class PaymentService:
                             from app.services.unified_order_service import set_order_status_direct
 
                             set_order_status_direct(self._db, int(order_id), "cancelled")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                        except Exception as e:
+                            logger.warning(
+                                "Failed to set cancelled status directly for order %s: %s",
+                                order_id,
+                                e,
+                            )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to cancel order %s after Click cancellation: %s",
+                        order_id,
+                        e,
+                    )
             return self._click_response(
                 click_trans_id=click_trans_id,
                 merchant_trans_id=merchant_trans_id,
@@ -1213,8 +1258,12 @@ class PaymentService:
                     amount=str(amount),
                     status="confirmed",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to upsert Click transaction (confirmed) for order %s: %s",
+                    order_id,
+                    e,
+                )
 
         # Fire-and-forget fiscalization (do not block Click callback)
         if order_id:

@@ -699,7 +699,7 @@ def register_stores(
 
         store = offer_service.get_store(store_id)
         if not store:
-            await callback.answer("РњР°РіР°Р·РёРЅ РЅРµ РЅР°Р№РґРµРЅ", show_alert=True)
+            await callback.answer("Магазин не найден", show_alert=True)
             return
 
         data = await state.get_data()

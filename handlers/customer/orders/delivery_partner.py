@@ -129,8 +129,8 @@ async def cancel_order_customer(
             await callback.message.edit_text(
                 callback.message.text + f"\n\n❌ {msg}", parse_mode="HTML"
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to update cancellation message for order %s: %s", order_id, e)
 
     # Notify seller
     store = db.get_store(_get_order_field(order, "store_id", 2))
@@ -142,8 +142,8 @@ async def cancel_order_customer(
                 f"ℹ️ Buyurtma #{order_id} bekor qilindi\n👤 {callback.from_user.first_name}",
                 parse_mode="HTML",
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to notify seller %s about cancellation for order %s: %s", owner_id, order_id, e)
 
     await callback.answer()
 
@@ -402,8 +402,12 @@ async def partner_reject_order_batch(
                         f"⚠️ Заказ #{order_id} отклонён продавцом\n💰 Требуется возврат средств",
                         parse_mode="HTML",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Failed to notify admin about rejected order %s: %s",
+                        order_id,
+                        e,
+                    )
     
         except Exception as e:
             logger.error(f"Failed to reject order {order_id}: {e}")

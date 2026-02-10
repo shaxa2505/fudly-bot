@@ -361,26 +361,26 @@ async def receive_payment_proof(message: types.Message, state: FSMContext) -> No
             error_map = {
                 "db_error": _service_unavailable(lang),
                 "processing_error": _service_unavailable(lang),
-                "not_found": _t(lang, "Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ.", "Buyurtma topilmadi."),
-                "forbidden": _t(lang, "Р­С‚Рѕ РЅРµ РІР°С€ Р·Р°РєР°Р·.", "Bu buyurtma sizniki emas."),
+                "not_found": _t(lang, "Заказ не найден.", "Buyurtma topilmadi."),
+                "forbidden": _t(lang, "Это не ваш заказ.", "Bu buyurtma sizniki emas."),
                 "already_submitted": _t(
                     lang,
-                    "Р§РµРє СѓР¶Рµ РѕС‚РїСЂР°РІР»РµРЅ. РћР¶РёРґР°Р№С‚Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ.",
+                    "Чек уже отправлен. Ожидайте подтверждения.",
                     "Chek allaqachon yuborilgan. Tasdiqlanishini kuting.",
                 ),
                 "already_confirmed": _t(
                     lang,
-                    "РћРїР»Р°С‚Р° СѓР¶Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅР°.",
+                    "Оплата уже подтверждена.",
                     "To'lov allaqachon tasdiqlangan.",
                 ),
                 "not_required": _t(
                     lang,
-                    "Р”Р»СЏ СЌС‚РѕРіРѕ Р·Р°РєР°Р·Р° РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ РѕРїР»Р°С‚Р°.",
+                    "Для этого заказа не требуется оплата.",
                     "Bu buyurtma uchun to'lov kerak emas.",
                 ),
                 "not_allowed": _t(
                     lang,
-                    "Р”Р»СЏ СЌС‚РѕРіРѕ Р·Р°РєР°Р·Р° РЅРµ С‚СЂРµР±СѓРµС‚СЃСЏ РѕС‚РїСЂР°РІР»СЏС‚СЊ С‡РµРє.",
+                    "Для этого заказа не требуется отправлять чек.",
                     "Bu buyurtma uchun chek yuborish kerak emas.",
                 ),
             }

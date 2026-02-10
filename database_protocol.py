@@ -125,7 +125,7 @@ class DatabaseProtocol(Protocol):
         district_id: int | None = None,
         address: str | None = None,
         description: str | None = None,
-        category: str = "Р РµСЃС‚РѕСЂР°РЅ",
+        category: str = "Ресторан",
         phone: str | None = None,
         business_type: str = "supermarket",
         photo: str | None = None,
@@ -295,7 +295,7 @@ class DatabaseProtocol(Protocol):
         available_until: str,
         photo: str | None = None,
         expiry_date: str | None = None,
-        unit: str = "С€С‚",
+        unit: str = "шт",
         category: str = "other",
     ) -> int:
         ...

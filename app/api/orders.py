@@ -4,6 +4,7 @@ Provides real-time order status, QR codes, and delivery tracking
 """
 import base64
 import io
+import logging
 import math
 import os
 from typing import Any
@@ -27,6 +28,8 @@ from app.core.order_math import (
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus, PaymentStatus
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
+
+logger = logging.getLogger(__name__)
 
 # Global database instance (set by api_server.py)
 _db_instance = None
@@ -684,8 +687,12 @@ async def get_order_status(
                 if int(booking_dict.get("user_id") or 0) != user_id:
                     raise HTTPException(status_code=403, detail="Access denied")
                 return await format_booking_to_order_status(booking[0], db)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch bookings_archive status for booking_id=%s: %s",
+                booking_id,
+                e,
+            )
     
     raise HTTPException(status_code=404, detail="Заказ не найден")
 
@@ -720,8 +727,12 @@ async def get_order_timeline(
             )
             if result:
                 order = result[0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch bookings_archive timeline for booking_id=%s: %s",
+                booking_id,
+                e,
+            )
     
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
@@ -902,8 +913,12 @@ async def get_order_qr_code(
             )
             if result:
                 order = result[0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch bookings_archive QR for booking_id=%s: %s",
+                booking_id,
+                e,
+            )
     
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
