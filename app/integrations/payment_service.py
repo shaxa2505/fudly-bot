@@ -1155,6 +1155,22 @@ class PaymentService:
 
         tx_status = str(tx.get("status", "")).lower()
         if tx_status == "confirmed":
+            # Ensure order payment is confirmed even if we already stored tx as confirmed.
+            if order_id:
+                try:
+                    from app.services.unified_order_service import get_unified_order_service
+
+                    order_service = get_unified_order_service()
+                    if order_service:
+                        await order_service.confirm_payment(int(order_id))
+                    elif hasattr(self._db, "update_payment_status"):
+                        self._db.update_payment_status(int(order_id), "confirmed")
+                except Exception as e:
+                    logger.warning(
+                        "Failed to ensure Click order confirmation for order %s: %s",
+                        order_id,
+                        e,
+                    )
             return self._click_response(
                 click_trans_id=click_trans_id,
                 merchant_trans_id=merchant_trans_id,

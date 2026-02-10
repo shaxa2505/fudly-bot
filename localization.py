@@ -1,4 +1,5 @@
-"ru": {
+TEXTS = {
+    "ru": {
         # Приветствие
         "choose_language": "Выберите язык / Tilni tanlang.",
         "language_changed": "Язык обновлён.",

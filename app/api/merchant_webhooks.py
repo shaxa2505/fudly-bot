@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import secrets
 import time
@@ -107,6 +108,105 @@ def _get(data: dict, key: str, default: Any = None) -> Any:
     return data.get(key, default) if isinstance(data, dict) else default
 
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _get_order_field(order: Any, key: str, default: Any = None) -> Any:
+    if order is None:
+        return default
+    if isinstance(order, dict):
+        return order.get(key, default)
+    return getattr(order, key, default)
+
+
+def _normalize_amount(amount: Any) -> int:
+    """Normalize provider amount to match stored units based on PRICE_STORAGE_UNIT."""
+    price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").strip().lower()
+    try:
+        value = float(amount)
+    except (TypeError, ValueError):
+        return 0
+    if price_unit in {"kopeks", "tiyin"}:
+        return int(round(value * 100))
+    return int(round(value))
+
+
+def _is_delivery_order(order: Any) -> bool:
+    order_type = str(_get_order_field(order, "order_type", "") or "").lower()
+    if order_type:
+        return order_type in {"delivery", "taxi"}
+    return bool(_get_order_field(order, "delivery_address"))
+
+
+def _calc_items_total(order: Any) -> int:
+    items_total = 0
+    cart_items_raw = _get_order_field(order, "cart_items")
+    if cart_items_raw:
+        cart_items = None
+        if isinstance(cart_items_raw, str):
+            try:
+                cart_items = json.loads(cart_items_raw)
+            except json.JSONDecodeError:
+                cart_items = None
+        elif isinstance(cart_items_raw, list):
+            cart_items = cart_items_raw
+        if isinstance(cart_items, list):
+            for item in cart_items:
+                try:
+                    price = int(item.get("price") or 0)
+                except Exception:
+                    price = 0
+                try:
+                    qty = int(item.get("quantity") or 1)
+                except Exception:
+                    qty = 1
+                items_total += price * qty
+
+    if items_total <= 0:
+        qty = _safe_int(_get_order_field(order, "quantity", 1), 1)
+        if qty <= 0:
+            qty = 1
+        price = _safe_int(_get_order_field(order, "item_price", 0), 0)
+        items_total = max(0, price * qty)
+
+    return items_total
+
+
+def _expected_order_amount(order: Any) -> int | None:
+    if order is None:
+        return None
+    total_raw = _get_order_field(order, "total_price")
+    order_total = _safe_int(total_raw, 0) if total_raw is not None else None
+    items_total = _calc_items_total(order)
+
+    if _is_delivery_order(order):
+        if items_total > 0:
+            return items_total
+        return order_total
+
+    if order_total is not None:
+        return order_total
+    return items_total if items_total > 0 else None
+
+
+def _amounts_match(order: Any, amount: Any) -> bool:
+    if order is None:
+        return False
+    received = _normalize_amount(amount)
+    expected = _expected_order_amount(order)
+    if expected is not None and expected == received:
+        return True
+    if _is_delivery_order(order):
+        total_raw = _get_order_field(order, "total_price")
+        if total_raw is not None and _safe_int(total_raw, 0) == received:
+            return True
+    return False
+
+
 def _require_db():
     if _db is None:
         raise HTTPException(status_code=500, detail="Database not configured")
@@ -177,6 +277,7 @@ async def check(
     """Webhook: validate if payment is possible."""
     service_id = _get(payload, "serviceId")
     timestamp = _get(payload, "timestamp", _now_ms())
+    amount = _get(payload, "amount")
     params = _get(payload, "params", {})
     order_id = _extract_order_id(params)
 
@@ -188,6 +289,8 @@ async def check(
         raise HTTPException(status_code=400, detail="Order not found")
     if _payment_is_confirmed(order):
         raise HTTPException(status_code=409, detail="Order already paid")
+    if amount is not None and not _amounts_match(order, amount):
+        raise HTTPException(status_code=400, detail="Amount mismatch")
 
     return {
         "serviceId": service_id,
@@ -221,6 +324,8 @@ async def create(
         raise HTTPException(status_code=400, detail="Order not found")
     if _payment_is_confirmed(order):
         raise HTTPException(status_code=409, detail="Order already paid")
+    if not _amounts_match(order, amount):
+        raise HTTPException(status_code=400, detail="Amount mismatch")
 
     # Prevent duplicate transId
     existing = await _fetch_transaction(db, trans_id)
@@ -310,6 +415,8 @@ async def confirm(
     order = await db.get_order(order_id) if order_id else None
     if not order:
         raise HTTPException(status_code=400, detail="Order not found")
+    if not _amounts_match(order, amount):
+        raise HTTPException(status_code=400, detail="Amount mismatch")
     try:
         await db.update_uzum_transaction_status(trans_id, "CONFIRMED", payload)
         service = None
