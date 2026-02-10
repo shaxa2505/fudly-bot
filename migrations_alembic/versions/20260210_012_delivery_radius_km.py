@@ -1,7 +1,7 @@
 """add_delivery_radius_km
 
 Revision ID: 012_delivery_radius_km
-Revises: 006_sync_runtime_schema
+Revises: 011_store_working_hours
 Create Date: 2026-02-10 00:00:00.000000
 """
 from typing import Sequence, Union
@@ -10,7 +10,7 @@ from alembic import op
 
 
 revision: str = "012_delivery_radius_km"
-down_revision: Union[str, None] = "006_sync_runtime_schema"
+down_revision: Union[str, None] = "011_store_working_hours"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
