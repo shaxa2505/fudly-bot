@@ -129,6 +129,16 @@ def register(router: Router) -> None:
         if not callback.message or not callback.from_user:
             await callback.answer()
             return
+        try:
+            msg = await callback.message.answer(
+                " ", reply_markup=types.ReplyKeyboardRemove()
+            )
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+        except Exception:
+            pass
         await show_cart(callback, state, is_callback=True)
 
     @router.callback_query(F.data.startswith("cart_qty_inc_"))

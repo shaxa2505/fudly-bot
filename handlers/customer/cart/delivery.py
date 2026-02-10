@@ -52,6 +52,18 @@ def _delivery_cash_enabled() -> bool:
     }
 
 
+async def _remove_location_keyboard(message: types.Message) -> None:
+    """Remove reply keyboard with location request if it is still visible."""
+    try:
+        sent = await message.answer(" ", reply_markup=types.ReplyKeyboardRemove())
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 async def _send_cart_payment_selection(
     message: types.Message,
     state: FSMContext,
@@ -68,6 +80,7 @@ async def _send_cart_payment_selection(
         await state.clear()
         return
 
+    await _remove_location_keyboard(message)
     await state.update_data(address=delivery_address)
     await state.set_state(OrderDelivery.payment_method_select)
 
