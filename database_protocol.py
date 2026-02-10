@@ -315,6 +315,11 @@ class DatabaseProtocol(Protocol):
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        category: str | list[str] | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> list[tuple[Any, ...]]:
         ...
 
@@ -327,19 +332,35 @@ class DatabaseProtocol(Protocol):
     ) -> int:
         ...
 
+    def count_offers_by_filters(
+        self,
+        city: str | None = None,
+        region: str | None = None,
+        district: str | None = None,
+        category: str | list[str] | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+    ) -> int:
+        ...
+
     def get_nearby_offers(
         self,
         latitude: float,
         longitude: float,
         limit: int = 20,
         offset: int = 0,
-        category: str | None = None,
+        category: str | list[str] | None = None,
         business_type: str | None = None,
         max_distance_km: float | None = None,
         sort_by: str | None = None,
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
     ) -> list[dict]:
         ...
 

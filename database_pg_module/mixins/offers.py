@@ -464,6 +464,11 @@ class OfferMixin:
                         min_price=min_price,
                         max_price=max_price,
                         min_discount=min_discount,
+                        category=category,
+                        store_id=store_id,
+                        only_today=only_today,
+                        latitude=latitude,
+                        longitude=longitude,
                     )
             return rows
 
@@ -505,15 +510,31 @@ class OfferMixin:
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        category: str | list[str] | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ):
         """Get hot offers (top by discount and expiry date)."""
         with self.get_connection() as conn:
             cursor = conn.cursor(row_factory=dict_row)
 
-            query = """
+            use_distance = latitude is not None and longitude is not None
+            distance_expr = (
+                "6371 * 2 * ASIN(SQRT("
+                "POWER(SIN(RADIANS(%s - s.latitude) / 2), 2) + "
+                "COS(RADIANS(s.latitude)) * COS(RADIANS(%s)) * "
+                "POWER(SIN(RADIANS(%s - s.longitude) / 2), 2)"
+                "))"
+            )
+            distance_select = f", {distance_expr} as distance_km" if use_distance else ""
+
+            query = f"""
                 SELECT o.*, s.name as store_name, s.address, s.city, s.rating as store_rating, s.category as store_category,
                        s.delivery_enabled, s.delivery_price, s.min_order_amount,
                        CASE WHEN o.original_price > 0 THEN CAST((1.0 - o.discount_price::numeric / o.original_price::numeric) * 100 AS INTEGER) ELSE 0 END as discount_percent
+                       {distance_select}
                 FROM offers o
                 JOIN stores s ON o.store_id = s.store_id
                 WHERE o.status = 'active'
@@ -522,7 +543,9 @@ class OfferMixin:
                 AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
             """
 
-            params = []
+            params: list[Any] = []
+            if use_distance:
+                params.extend([latitude, latitude, longitude])
             if city:
                 condition, condition_params = self._build_location_filter(
                     city, "city", "s", self._get_city_variants
@@ -551,6 +574,22 @@ class OfferMixin:
                 query += " AND s.category = %s"
                 params.append(business_type)
 
+            categories = self._normalize_category_filter(category)
+            if categories:
+                if len(categories) == 1:
+                    query += " AND o.category = %s"
+                    params.append(categories[0])
+                else:
+                    query += " AND o.category = ANY(%s)"
+                    params.append(categories)
+
+            if store_id is not None:
+                query += " AND o.store_id = %s"
+                params.append(store_id)
+
+            if only_today:
+                query += " AND o.expiry_date = CURRENT_DATE"
+
             if min_price is not None:
                 query += " AND o.discount_price >= %s"
                 params.append(min_price)
@@ -564,8 +603,11 @@ class OfferMixin:
                 )
                 params.append(min_discount)
 
+            today_expr = "CASE WHEN o.expiry_date = CURRENT_DATE THEN 1 ELSE 0 END"
             order_by = (
-                "discount_percent DESC, COALESCE(o.expiry_date, '9999-12-31') ASC, o.created_at DESC"
+                f"{today_expr} DESC, discount_percent DESC"
+                + (", distance_km ASC" if use_distance else "")
+                + ", COALESCE(o.expiry_date, '9999-12-31') ASC, o.created_at DESC"
             )
             if sort_by:
                 sort_key = sort_by.lower()
@@ -675,6 +717,8 @@ class OfferMixin:
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
     ) -> int:
         """Count offers matching filters (active, in-stock, not expired)."""
         with self.get_connection() as conn:
@@ -736,6 +780,13 @@ class OfferMixin:
                 )
                 params.append(min_discount)
 
+            if store_id is not None:
+                query += " AND o.store_id = %s"
+                params.append(store_id)
+
+            if only_today:
+                query += " AND o.expiry_date = CURRENT_DATE"
+
             cursor.execute(query, params)
             count = cursor.fetchone()[0]
             if count == 0 and city and not region and not district:
@@ -749,6 +800,8 @@ class OfferMixin:
                         min_price=min_price,
                         max_price=max_price,
                         min_discount=min_discount,
+                        store_id=store_id,
+                        only_today=only_today,
                     )
             return count
 
@@ -825,6 +878,8 @@ class OfferMixin:
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
     ) -> list[dict]:
         """Get offers nearest to the provided coordinates."""
         with self.get_connection() as conn:
@@ -881,11 +936,19 @@ class OfferMixin:
                     " AND (1.0 - t.discount_price::numeric / t.original_price::numeric) * 100 >= %s"
                 )
                 params.append(min_discount)
+            if store_id is not None:
+                where_parts.append("t.store_id = %s")
+                params.append(store_id)
+            if only_today:
+                where_parts.append("t.expiry_date = CURRENT_DATE")
 
             if where_parts:
                 query += " WHERE " + " AND ".join(where_parts)
 
-            order_by = "t.distance_km ASC, t.discount_percent DESC, t.created_at DESC"
+            today_expr = "CASE WHEN t.expiry_date = CURRENT_DATE THEN 1 ELSE 0 END"
+            order_by = (
+                f"{today_expr} DESC, t.discount_percent DESC, t.distance_km ASC, t.created_at DESC"
+            )
             if sort_by:
                 sort_key = sort_by.lower()
                 if sort_key == "price_asc":

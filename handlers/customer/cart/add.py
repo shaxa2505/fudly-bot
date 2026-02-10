@@ -110,8 +110,98 @@ def build_cart_add_card_keyboard(
 
     return kb
 
+
+def build_catalog_added_keyboard(lang: str) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    kb.button(text=get_text(lang, "catalog_checkout_cta"), callback_data="view_cart")
+    kb.button(text=get_text(lang, "catalog_continue_cta"), callback_data="catalog_continue")
+    kb.adjust(1, 1)
+    return kb
+
 def register(router: Router) -> None:
     """Register add-to-cart and related handlers on the given router."""
+
+    @router.callback_query(F.data.startswith("catalog_add_"))
+    async def catalog_add_one(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not common.db or not callback.message or not callback.data:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = common.db.get_user_language(user_id)
+
+        try:
+            offer_id = int(callback.data.split("_")[-1])
+        except (ValueError, IndexError):
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
+
+        offer = common.db.get_offer(offer_id)
+        if not offer:
+            await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
+            return
+
+        def get_field(data: object, key: str, default: object = None) -> object:
+            if isinstance(data, dict):
+                return data.get(key, default)
+            return default
+
+        max_qty = int(get_field(offer, "quantity", 0) or 0)
+        if max_qty <= 0:
+            await callback.answer(get_text(lang, "cart_add_out_of_stock"), show_alert=True)
+            return
+
+        price = float(get_field(offer, "discount_price", 0) or 0)
+        original_price = float(get_field(offer, "original_price", 0) or 0)
+        title = str(get_field(offer, "title", get_text(lang, "offer_not_found")))
+        unit = str(get_field(offer, "unit", "шт"))
+        expiry_date = str(get_field(offer, "expiry_date", "") or "")
+        store_id = get_field(offer, "store_id")
+        offer_photo = get_field(offer, "photo", None)
+
+        store = common.db.get_store(store_id) if store_id else None
+        store_name = str(get_field(store, "name", ""))
+        store_address = str(get_field(store, "address", ""))
+        delivery_enabled = bool(get_field(store, "delivery_enabled", 0) == 1)
+        delivery_price = float(get_field(store, "delivery_price", 0) or 0)
+
+        added = cart_storage.add_item(
+            user_id=user_id,
+            offer_id=offer_id,
+            store_id=store_id,
+            title=title,
+            price=price,
+            quantity=1,
+            original_price=original_price,
+            max_quantity=max_qty,
+            store_name=store_name,
+            store_address=store_address,
+            photo=offer_photo,
+            unit=unit,
+            expiry_date=expiry_date,
+            delivery_enabled=delivery_enabled,
+            delivery_price=delivery_price,
+        )
+        if not added:
+            await callback.answer(get_text(lang, "cart_single_store_only"), show_alert=True)
+            return
+
+        text = get_text(lang, "catalog_added_to_cart")
+        kb = build_catalog_added_keyboard(lang)
+
+        try:
+            if callback.message.photo:
+                await callback.message.edit_caption(
+                    caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+            else:
+                await callback.message.edit_text(
+                    text, parse_mode="HTML", reply_markup=kb.as_markup()
+                )
+        except Exception:
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+        await callback.answer()
 
     @router.callback_query(F.data.startswith("add_to_cart_"))
     async def add_to_cart_start(callback: types.CallbackQuery, state: FSMContext) -> None:

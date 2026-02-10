@@ -23,6 +23,8 @@ class OfferListItem:
     store_category: str | None = None
     quantity: int | None = None
     unit: str | None = None
+    available_from: str | None = None
+    available_until: str | None = None
     expiry_date: str | None = None
     delivery_enabled: bool = False
     delivery_price: float = 0.0
@@ -103,6 +105,9 @@ class OfferService:
         min_price: float | None = None,
         max_price: float | None = None,
         min_discount: float | None = None,
+        category: str | list[str] | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
     ) -> OfferListResult:
         """Return hot offers with optional location scoping and fallback."""
         raw_offers: list[Any] = []
@@ -120,6 +125,11 @@ class OfferService:
                 min_price,
                 max_price,
                 min_discount,
+                category,
+                store_id,
+                only_today,
+                latitude,
+                longitude,
             )
             used_scope = (scope_city, scope_region, scope_district)
             if raw_offers:
@@ -127,7 +137,21 @@ class OfferService:
 
         total = 0
         if raw_offers:
-            if hasattr(self._db, "count_hot_offers"):
+            if hasattr(self._db, "count_offers_by_filters"):
+                total = int(
+                    self._db.count_offers_by_filters(
+                        city=used_scope[0],
+                        region=used_scope[1],
+                        district=used_scope[2],
+                        category=category,
+                        min_price=min_price,
+                        max_price=max_price,
+                        min_discount=min_discount,
+                        store_id=store_id,
+                        only_today=only_today,
+                    )
+                )
+            elif hasattr(self._db, "count_hot_offers"):
                 total = int(
                     self._db.count_hot_offers(
                         used_scope[0],
@@ -141,11 +165,13 @@ class OfferService:
                 longitude=longitude,
                 limit=limit,
                 offset=offset,
-                category=None,
+                category=category,
                 sort_by=sort_by,
                 min_price=min_price,
                 max_price=max_price,
                 min_discount=min_discount,
+                store_id=store_id,
+                only_today=only_today,
             )
             total = len(raw_offers)
 
@@ -207,6 +233,49 @@ class OfferService:
         logger.info(f"à??ٍ Found {len(raw_stores)} raw stores")
 
         return [self._to_store_summary(store) for store in raw_stores]
+
+    def list_active_stores(
+        self,
+        city: str | None,
+        region: str | None = None,
+        district: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> list[StoreSummary]:
+        """Return stores with active offers, sorted by offers count."""
+        raw_stores: list[Any] = []
+        scopes = self._build_location_scopes(city, region, district)
+
+        for scope_city, scope_region, scope_district in scopes:
+            if hasattr(self._db, "get_stores_by_location"):
+                raw_stores = self._db.get_stores_by_location(
+                    city=scope_city,
+                    region=scope_region,
+                    district=scope_district,
+                    business_type=None,
+                )
+            elif scope_city and hasattr(self._db, "get_stores_by_city"):
+                raw_stores = self._db.get_stores_by_city(scope_city)
+            if raw_stores:
+                break
+
+        if (
+            not raw_stores
+            and latitude is not None
+            and longitude is not None
+            and hasattr(self._db, "get_nearby_stores")
+        ):
+            raw_stores = self._db.get_nearby_stores(
+                latitude=latitude,
+                longitude=longitude,
+                limit=1000,
+                offset=0,
+                business_type=None,
+            )
+
+        stores = [self._to_store_summary(store) for store in raw_stores]
+        active = [store for store in stores if (store.offers_count or 0) > 0]
+        return sorted(active, key=lambda s: (-s.offers_count, s.name or ""))
 
     def _fetch_delivery_enabled_stores(
         self,
@@ -289,6 +358,11 @@ class OfferService:
         min_price: float | None,
         max_price: float | None,
         min_discount: float | None,
+        category: str | list[str] | None,
+        store_id: int | None,
+        only_today: bool,
+        latitude: float | None,
+        longitude: float | None,
     ) -> list[Any]:
         use_cache = (
             self._cache is not None
@@ -300,6 +374,11 @@ class OfferService:
             and min_price is None
             and max_price is None
             and min_discount is None
+            and category is None
+            and store_id is None
+            and not only_today
+            and latitude is None
+            and longitude is None
         )
         if use_cache:
             return self._cache.get_hot_offers(city, limit, offset)
@@ -313,6 +392,11 @@ class OfferService:
             min_price=min_price,
             max_price=max_price,
             min_discount=min_discount,
+            category=category,
+            store_id=store_id,
+            only_today=only_today,
+            latitude=latitude,
+            longitude=longitude,
         )
 
     def _fetch_stores_by_scope(
@@ -437,6 +521,8 @@ class OfferService:
             store_category=base.store_category,
             quantity=base.quantity,
             unit=base.unit,
+            available_from=base.available_from,
+            available_until=base.available_until,
             expiry_date=base.expiry_date,
             description=get_offer_field(offer, "description", ""),
             photo=get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id"),
@@ -481,6 +567,8 @@ class OfferService:
             get_offer_field(data, "discount_price", get_field(data, 5, 0))
         )
         quantity = get_offer_field(data, "quantity", get_field(data, 6, 0))
+        available_from = get_offer_field(data, "available_from", get_field(data, 7, ""))
+        available_until = get_offer_field(data, "available_until", get_field(data, 8, ""))
         expiry_date = get_offer_field(data, "expiry_date", get_field(data, 9, ""))
         store_name = str(get_field(data, "store_name", get_field(data, 14, "Магазин")))
         store_address = get_field(data, "address", get_field(data, 15, ""))
@@ -526,6 +614,8 @@ class OfferService:
             store_category=store_category,
             quantity=int(quantity or 0),
             unit=unit,
+            available_from=str(available_from) if available_from else None,
+            available_until=str(available_until) if available_until else None,
             expiry_date=expiry_date,
             delivery_enabled=delivery_enabled,
             delivery_price=delivery_price,

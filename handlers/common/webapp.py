@@ -13,6 +13,8 @@ from aiogram import F, Router, types
 from aiogram.types import InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from localization import get_text
+
 logger = logging.getLogger(__name__)
 
 router = Router(name="webapp")
@@ -66,7 +68,7 @@ def main_menu_with_webapp(lang: str = "ru") -> InlineKeyboardMarkup:
 
     # Other quick actions
     builder.button(
-        text="🔥 Акции" if lang == "ru" else "🔥 Aksiyalar",
+        text=get_text(lang, "hot_offers"),
         callback_data="hot_offers",
     )
     builder.button(

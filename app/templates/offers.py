@@ -6,6 +6,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from app.services.offer_service import OfferDetails, OfferListItem, StoreDetails, StoreSummary
+from localization import get_text
 
 
 def render_hot_offers_list(
@@ -16,34 +17,23 @@ def render_hot_offers_list(
     select_hint: str,
     offset: int = 0,
 ) -> str:
-    header = _hot_header(lang, total_count)
-    city_label = "Город" if lang == "ru" else "Shahar"
-    shown_text = "Ko'rsatilgan" if lang == "uz" else "Показано"
-    of_text = "dan" if lang == "uz" else "из"
-    shown = offset + len(offers)
-    lines = [header, f"{city_label}: {city} | {shown_text}: {shown} {of_text} {total_count}"]
-    lines.append("")
+    labels = _catalog_labels(lang)
+    lines = [
+        labels["title"],
+        f"{city} • {labels['today']}",
+        get_text(lang, "catalog_found", count=total_count),
+        "",
+    ]
+
     for idx, offer in enumerate(offers, offset + 1):
-        name = _escape(_trim_title(offer.title))
-        price_line = _format_price_line(offer, lang)
-        meta_parts = [price_line]
-        store_name = getattr(offer, "store_name", "") or ""
-        if store_name:
-            meta_parts.append(_escape(_trim_title(store_name, limit=28)))
-        meta = " | ".join(meta_parts)
-        lines.append(f"{idx}. <b>{name}</b> - {meta}")
+        lines.append(_render_catalog_item(lang, offer, idx, labels))
+        lines.append("")
 
     return "\n".join(lines).rstrip()
 
 
 def render_hot_offers_empty(lang: str) -> str:
-    header = _hot_header(lang)
-    wait_text = (
-        "Пока нет предложений."
-        if lang == "ru"
-        else "Hozircha takliflar yo'q."
-    )
-    return f"{header}\n\n{wait_text}"
+    return f"{get_text(lang, 'catalog_empty_title')}\n\n{get_text(lang, 'catalog_empty_subtitle')}"
 
 
 def render_business_type_store_list(
@@ -321,6 +311,72 @@ def formatProductCard(product: OfferListItem, lang: str = "ru") -> str:
     return format_product_card(product, lang=lang)
 
 
+def _catalog_labels(lang: str) -> dict[str, str]:
+    product_labels = _product_card_labels(lang)
+    return {
+        "title": get_text(lang, "catalog_title"),
+        "today": get_text(lang, "catalog_today"),
+        "discount": get_text(lang, "catalog_discount"),
+        "price": get_text(lang, "catalog_price"),
+        "store": get_text(lang, "catalog_store"),
+        "pickup_until": get_text(lang, "catalog_pickup_until"),
+        "expiry": get_text(lang, "catalog_expiry"),
+        "time_unknown": get_text(lang, "catalog_time_unknown"),
+        "expiry_unknown": get_text(lang, "catalog_expiry_unknown"),
+        "currency": product_labels["currency"],
+    }
+
+
+def _render_catalog_item(
+    lang: str,
+    offer: OfferListItem,
+    index: int,
+    labels: dict[str, str],
+) -> str:
+    title = _escape(_trim_title(offer.title or "", limit=32))
+
+    current_price = getattr(offer, "discount_price", None)
+    if current_price is None:
+        current_price = getattr(offer, "price", 0) or 0
+    original_price = getattr(offer, "original_price", 0) or 0
+    if not original_price or original_price < current_price:
+        original_price = current_price
+
+    discount_pct = getattr(offer, "discount_percent", 0) or 0
+    if not discount_pct and original_price and original_price > current_price:
+        discount_pct = round((1 - current_price / original_price) * 100)
+    discount_pct = int(discount_pct) if discount_pct is not None else 0
+
+    price_line = (
+        f"{labels['price']}: {_format_money(original_price)} → {_format_money(current_price)} {labels['currency']}"
+    )
+    discount_line = f"{labels['discount']}: -{discount_pct}%"
+
+    store_name = getattr(offer, "store_name", "") or ""
+    store_line = f"{labels['store']}: {_escape(_trim_title(store_name, limit=28))}"
+
+    pickup_until = _format_time(getattr(offer, "available_until", None))
+    if not pickup_until:
+        pickup_until = labels["time_unknown"]
+    pickup_line = f"{labels['pickup_until']}: {pickup_until}"
+
+    expiry_date = _format_date(getattr(offer, "expiry_date", None)) if getattr(offer, "expiry_date", None) else ""
+    if not expiry_date:
+        expiry_date = labels["expiry_unknown"]
+    expiry_line = f"{labels['expiry']}: {expiry_date}"
+
+    return "\n".join(
+        [
+            f"{index}. <b>{title}</b>",
+            discount_line,
+            price_line,
+            store_line,
+            pickup_line,
+            expiry_line,
+        ]
+    )
+
+
 def _product_card_labels(lang: str) -> dict[str, str]:
     if lang == "ru":
         return {
@@ -376,6 +432,22 @@ def _format_date(value: str | Any) -> str:
         return str(value)[:10]
 
 
+def _format_time(value: str | Any) -> str:
+    try:
+        if value is None:
+            return ""
+        if hasattr(value, "strftime"):
+            return value.strftime("%H:%M")
+        text = str(value)
+        if "T" in text:
+            text = text.split("T")[-1]
+        if len(text) >= 5:
+            return text[:5]
+        return text
+    except Exception:
+        return ""
+
+
 def _days_until(value: str | Any) -> int:
     try:
         from datetime import datetime
@@ -418,7 +490,7 @@ def _trim_title(title: str, limit: int = 30) -> str:
 
 
 def _hot_header(lang: str, total: int = 0) -> str:
-    title = "Акции" if lang == "ru" else "Aksiyalar"
+    title = "🥗 Еда со скидкой" if lang == "ru" else "🥗 Chegirmali taomlar"
     if total > 0:
         return f"<b>{title}</b> ({total})"
     return f"<b>{title}</b>"

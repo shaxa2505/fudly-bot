@@ -141,11 +141,12 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "Акции" in result
-        assert "Город: Ташкент" in result
+        assert "Еда со скидкой" in result
+        assert "Ташкент" in result and "сегодня" in result
+        assert "Найдено: 1 товаров" in result
         assert "Хлеб белый" in result
-        assert "Показано: 1 из 1" in result
-        assert "5 000 сум (-50%)" in result
+        assert "Скидка: -50%" in result
+        assert "10 000" in result and "5 000" in result
         assert "Супермаркет Тест" in result
 
     def test_render_with_offers_uz(self, sample_offer_item: OfferListItem) -> None:
@@ -159,10 +160,10 @@ class TestRenderHotOffersList:
             offset=0,
         )
 
-        assert "Aksiyalar" in result
-        assert "Shahar: Toshkent" in result
-        assert "Ko'rsatilgan" in result
-        assert "5 000 so'm (-50%)" in result
+        assert "Chegirmali taomlar" in result
+        assert "Toshkent" in result and "bugun" in result
+        assert "Topildi: 1 ta" in result
+        assert "5 000" in result
 
     def test_render_with_offset(self, sample_offer_item: OfferListItem) -> None:
         """Test rendering with pagination offset."""
@@ -175,7 +176,8 @@ class TestRenderHotOffersList:
             offset=5,
         )
 
-        assert "Показано: 6 из 10" in result
+        assert "Найдено: 10 товаров" in result
+        assert "6. <b>" in result
 
     def test_store_line_present(self, sample_offer_item: OfferListItem) -> None:
         """Test that store line is present in list."""
@@ -210,14 +212,14 @@ class TestRenderHotOffersEmpty:
     def test_empty_ru(self) -> None:
         """Test empty offers message in Russian."""
         result = render_hot_offers_empty(lang="ru")
-        assert "Акции" in result
-        assert "Пока нет предложений" in result
+        assert "Сегодня рядом с вами нет товаров со скидкой" in result
+        assert "Мы сообщим" in result
 
     def test_empty_uz(self) -> None:
         """Test empty offers message in Uzbek."""
         result = render_hot_offers_empty(lang="uz")
-        assert "Aksiyalar" in result
-        assert "Hozircha takliflar yo'q" in result
+        assert "Bugun atrofingizda chegirmali mahsulotlar yo'q" in result
+        assert "xabar beramiz" in result
 
 
 # =============================================================================

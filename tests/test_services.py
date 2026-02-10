@@ -52,6 +52,7 @@ class TestOfferService:
             ),
         ]
         db.count_hot_offers.return_value = 1
+        db.count_offers_by_filters.return_value = 1
         return db
 
     @pytest.fixture
@@ -87,11 +88,22 @@ class TestOfferService:
             min_price=None,
             max_price=None,
             min_discount=None,
+            category=None,
+            store_id=None,
+            only_today=False,
+            latitude=None,
+            longitude=None,
         )
-        mock_db.count_hot_offers.assert_called_once_with(
-            city,
+        mock_db.count_offers_by_filters.assert_called_once_with(
+            city=city,
             region=None,
             district=None,
+            category=None,
+            min_price=None,
+            max_price=None,
+            min_discount=None,
+            store_id=None,
+            only_today=False,
         )
 
     def test_get_store_returns_details(self, mock_db: MagicMock) -> None:
@@ -253,6 +265,7 @@ class TestServiceIntegration:
             ),
         ]
         mock_db.count_hot_offers.return_value = 1
+        mock_db.count_offers_by_filters.return_value = 1
 
         service = OfferService(db=mock_db, cache=mock_cache)
         result = service.list_hot_offers(city="Ташкент", limit=10, offset=0)
@@ -293,6 +306,7 @@ class TestServiceIntegration:
             ),
         ]
         mock_db.count_hot_offers.return_value = 1
+        mock_db.count_offers_by_filters.return_value = 1
 
         service = OfferService(db=mock_db, cache=None)
         result = service.list_hot_offers(city="Ташкент", limit=10, offset=0)

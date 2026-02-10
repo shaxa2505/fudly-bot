@@ -29,6 +29,11 @@ class DummyOffersDb:
         min_price=None,
         max_price=None,
         min_discount=None,
+        category=None,
+        store_id=None,
+        only_today=False,
+        latitude=None,
+        longitude=None,
     ):
         return list(self._hot_offers)
 
@@ -44,6 +49,8 @@ class DummyOffersDb:
         max_price=None,
         min_discount=None,
         max_distance_km=None,
+        store_id=None,
+        only_today=False,
     ):
         return list(self._nearby_offers)
 

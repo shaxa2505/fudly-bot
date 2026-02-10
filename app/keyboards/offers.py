@@ -14,8 +14,8 @@ from localization import get_text
 def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
     """Entry keyboard for the main 'Магазины и акции' button."""
     builder = InlineKeyboardBuilder()
-    deals = "Акции" if lang == "ru" else "Aksiyalar"
-    stores = "Магазины" if lang == "ru" else "Do'konlar"
+    deals = get_text(lang, "hot_offers")
+    stores = get_text(lang, "catalog_stores_button")
     change_city = "Сменить город" if lang == "ru" else "Shaharni almashtirish"
 
     builder.button(text=deals, callback_data="hot_entry_offers")
@@ -31,43 +31,49 @@ def hot_offers_compact_keyboard(
     page: int,
     total_pages: int,
     show_entry_back: bool = False,
+    show_filters: bool = True,
+    show_stores: bool = True,
+    show_reset: bool = False,
 ) -> InlineKeyboardMarkup:
-    """Compact keyboard for hot offers with item buttons and pagination."""
+    """Compact catalog keyboard with add/details buttons and pagination."""
     builder = InlineKeyboardBuilder()
 
-    # Add one action button per offer - keep label short and clean
-    action = "✅ Применить" if lang == "ru" else "✅ Qo'llash"
+    add_label = get_text(lang, "catalog_add_button")
+    details_label = get_text(lang, "catalog_details_button")
+
     for offer in offers:
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
-        title = offer.title if hasattr(offer, "title") else offer.get("title", "")
-        short_title = title[:24] + ".." if len(title) > 26 else title
-        builder.button(
-            text=f"{action} - {short_title}",
-            callback_data=f"hot_offer_{offer_id}",
-        )
+        builder.button(text=add_label, callback_data=f"catalog_add_{offer_id}")
+        builder.button(text=details_label, callback_data=f"catalog_details_{offer_id}")
 
-    # Adjust offer buttons: 1 per row for better readability
-    builder.adjust(1)
+    if offers:
+        builder.adjust(*([2] * len(offers)))
 
-    # Pagination row - only prev/next and refresh
+    action_builder = InlineKeyboardBuilder()
+    if show_filters:
+        action_builder.button(text=get_text(lang, "catalog_filter_button"), callback_data="catalog_filter")
+    if show_stores:
+        action_builder.button(text=get_text(lang, "catalog_stores_button"), callback_data="catalog_stores")
+    if show_reset:
+        action_builder.button(text=get_text(lang, "catalog_filter_reset"), callback_data="catalog_filter_reset")
+    action_count = len(action_builder.buttons)
+    if action_count == 1:
+        action_builder.adjust(1)
+    elif action_count == 2:
+        action_builder.adjust(2)
+    elif action_count == 3:
+        action_builder.adjust(2, 1)
+
     nav_builder = InlineKeyboardBuilder()
-    if page > 0:
-        nav_builder.button(text="Назад" if lang == "ru" else "Oldingi", callback_data=f"hot_page_{page - 1}")
-    if page < total_pages - 1:
-        nav_builder.button(text="Далее" if lang == "ru" else "Keyingi", callback_data=f"hot_page_{page + 1}")
+    prev_cb = f"catalog_page_{page - 1}" if page > 0 else "catalog_noop"
+    next_cb = f"catalog_page_{page + 1}" if page < total_pages - 1 else "catalog_noop"
+    nav_builder.button(text="◀️", callback_data=prev_cb)
+    nav_builder.button(text=f"{page + 1} / {total_pages}", callback_data="catalog_noop")
+    nav_builder.button(text="▶️", callback_data=next_cb)
+    nav_builder.adjust(3)
 
-    # Refresh button
-    nav_builder.button(text="Обновить" if lang == "ru" else "Yangilash", callback_data="hot_offers_refresh")
-
-    # Adjust nav: pagination buttons + refresh
-    if page > 0 and page < total_pages - 1:
-        nav_builder.adjust(3)  # ◀️ ▶️ 🔄
-    elif page > 0 or page < total_pages - 1:
-        nav_builder.adjust(2)  # ◀️ 🔄 or ▶️ 🔄
-    else:
-        nav_builder.adjust(1)  # Just 🔄
-
-    # Combine keyboards
+    if action_count:
+        builder.attach(action_builder)
     builder.attach(nav_builder)
 
     if show_entry_back:
@@ -152,6 +158,18 @@ def offer_details_with_back_keyboard(
     builder.button(text=back, callback_data=back_callback)
 
     builder.adjust(2, 1)  # 2 buttons top row, 1 bottom
+    return builder.as_markup()
+
+
+def catalog_details_keyboard(lang: str, offer_id: int) -> InlineKeyboardMarkup:
+    """Catalog details screen: add to cart + back."""
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=get_text(lang, "catalog_add_detail_button"),
+        callback_data=f"catalog_add_{offer_id}",
+    )
+    builder.button(text=get_text(lang, "catalog_filter_back"), callback_data="catalog_back")
+    builder.adjust(1, 1)
     return builder.as_markup()
 
 

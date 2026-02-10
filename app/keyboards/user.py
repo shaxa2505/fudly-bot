@@ -18,14 +18,14 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
         lang: Interface language
         cart_count: Number of items in cart (shown on button)
     """
-    hot_offers_text = f"🛍 {get_text(lang, 'hot_offers')}"
+    hot_offers_text = get_text(lang, "hot_offers")
     builder = ReplyKeyboardBuilder()
 
-    # Row 1: Main actions - offers and search
+    # Row 1: Main action - discounted food catalog
     builder.button(text=hot_offers_text)
-    builder.button(text=f"🔍 {get_text(lang, 'search')}")
 
-    # Row 2: Cart with counter + My Orders + Profile
+    # Row 2: Search + Cart
+    builder.button(text=f"🔍 {get_text(lang, 'search')}")
     cart_text = f"🛒 {get_text(lang, 'my_cart')}"
     if cart_count > 0:
         cart_text = f"{cart_text} ({cart_count})"
@@ -33,8 +33,8 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
     builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
     builder.button(text=f"👤 {get_text(lang, 'profile')}")
 
-    # Layout: 2 columns first row, 3 buttons second row
-    builder.adjust(2, 3)
+    # Layout: 1 button, then 2 + 2
+    builder.adjust(1, 2, 2)
     return builder.as_markup(resize_keyboard=True)
 
 

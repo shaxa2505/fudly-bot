@@ -205,6 +205,8 @@ __all__ = [
 # Main menu button texts (Russian and Uzbek)
 MAIN_MENU_BUTTONS = {
     # Customer menu
+    "🥗 Еда со скидкой",
+    "🥗 Chegirmali taomlar",
     "🛍 Акции и магазины",
     "🛍 Aksiyalar va do'konlar",
     "🏪 Горячее",
@@ -333,6 +335,8 @@ def is_hot_offers_button(text: str | None) -> bool:
     if not stripped:
         return False
     return stripped in _menu_labels()["hot_offers"] or stripped in {
+        "🥗 Еда со скидкой",
+        "🥗 Chegirmali taomlar",
         "🛍 Акции и магазины",
         "🛍 Aksiyalar va do'konlar",
         "🏪 Горячее",

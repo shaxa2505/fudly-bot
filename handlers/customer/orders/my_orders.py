@@ -312,8 +312,8 @@ async def _show_empty_orders(message: types.Message, lang: str) -> None:
     )
     hint = _t(
         lang,
-        "Откройте «Акции и магазины» — там товары со скидками до 70%",
-        "“Aksiyalar va do'konlar” bo'limini sinab ko'ring — u yerda 70% gacha chegirmalar",
+        "Откройте «🥗 Еда со скидкой» — там товары со скидками до 70%",
+        "“🥗 Chegirmali taomlar” bo'limini sinab ko'ring — u yerda 70% gacha chegirmalar",
     )
 
     kb = InlineKeyboardBuilder()

@@ -30,6 +30,7 @@ from app.core.security import (
     start_background_tasks,
 )
 from database_protocol import DatabaseProtocol
+from localization import get_text
 
 # NOTE: Sentry initialization moved to _init_sentry() function below for better configuration
 
@@ -236,10 +237,10 @@ async def fallback_photo_handler(message: types.Message, state: FSMContext) -> N
             "Это может произойти если:\n"
             "• Прошло много времени между шагами\n"
             "• Сервер был перезапущен\n\n"
-            "Пожалуйста, начните заново через 🔥 Акции"
+            f"Пожалуйста, начните заново через {get_text(lang, 'hot_offers')}"
             if lang == "ru"
             else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-            "Iltimos, 🔥 Aksiyalar orqali qaytadan boshlang"
+            f"Iltimos, {get_text(lang, 'hot_offers')} orqali qaytadan boshlang"
         )
         await state.clear()
         await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
@@ -276,10 +277,10 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
             "Это может произойти если:\n"
             "• Прошло много времени между шагами\n"
             "• Сервер был перезапущен\n\n"
-            "Пожалуйста, начните заново через 🔥 Акции"
+            f"Пожалуйста, начните заново через {get_text(lang, 'hot_offers')}"
             if lang == "ru"
             else "⚠️ Xatolik: buyurtma ma'lumotlari yo'qoldi.\n\n"
-            "Iltimos, 🔥 Aksiyalar orqali qaytadan boshlang"
+            f"Iltimos, {get_text(lang, 'hot_offers')} orqali qaytadan boshlang"
         )
         await state.clear()
         await message.answer(error_text, reply_markup=get_appropriate_menu(user_id, lang))
@@ -288,9 +289,9 @@ async def fallback_text_handler(message: types.Message, state: FSMContext) -> No
     # Help users who type numbers without context
     if text.isdigit():
         hint = (
-            "Чтобы выбрать товар по номеру, сначала откройте 🔥 Акции"
+            f"Чтобы выбрать товар по номеру, сначала откройте {get_text(lang, 'hot_offers')}"
             if lang == "ru"
-            else "Mahsulotni tanlash uchun avval 🔥 Aksiyalar ni oching"
+            else f"Mahsulotni tanlash uchun avval {get_text(lang, 'hot_offers')} ni oching"
         )
         await message.answer(hint)
         return
