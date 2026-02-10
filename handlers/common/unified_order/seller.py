@@ -526,8 +526,12 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
             )
             items = cart_items
             total = sum(item.get("price", 0) * item.get("quantity", 1) for item in cart_items)
-        except Exception:  # pragma: no cover
-            pass
+        except Exception as e:  # pragma: no cover
+            logger.warning(
+                "Failed to save seller_message_id for order %s: %s",
+                order_id,
+                e,
+            )
 
     delivery_price = _get_store_field(store, "delivery_price", 0)
 
@@ -678,8 +682,8 @@ async def order_delivering_handler(callback: types.CallbackQuery, state: FSMCont
                     parse_mode="HTML",
                     reply_markup=kb.as_markup(),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to send courier phone prompt: %s", e)
 
     await callback.answer()
 

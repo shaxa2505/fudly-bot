@@ -370,12 +370,16 @@ function LocationPickerModal({
         const searchQuery = citySuggestion
           ? `${citySuggestion}, Uzbekistan`
           : normalized
-        const response = await api.searchLocations(searchQuery, {
-          lat: coords?.lat,
-          lon: coords?.lon,
+        const searchOptions = {
           limit: 8,
           countrycodes: 'uz',
-        })
+        }
+        const shouldBias = !(citySuggestion || localSuggestions.length)
+        if (shouldBias && coords?.lat != null && coords?.lon != null) {
+          searchOptions.lat = coords.lat
+          searchOptions.lon = coords.lon
+        }
+        const response = await api.searchLocations(searchQuery, searchOptions)
         let items = Array.isArray(response?.items)
           ? response.items
           : (Array.isArray(response) ? response : [])

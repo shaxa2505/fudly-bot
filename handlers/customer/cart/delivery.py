@@ -5,12 +5,20 @@ from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.geocoding import reverse_geocode_store
 from handlers.common.states import OrderDelivery
 from localization import get_text
 
 from .common import esc
 from . import common
 from app.core.order_math import calc_items_total, calc_total_price
+
+try:
+    from logging_config import logger
+except ImportError:
+    import logging
+
+    logger = logging.getLogger(__name__)
 
 
 class IsCartOrder(BaseFilter):
@@ -19,6 +27,72 @@ class IsCartOrder(BaseFilter):
     async def __call__(self, message: types.Message, state: FSMContext) -> bool:  # type: ignore[override]
         data = await state.get_data()
         return bool(data.get("is_cart_order"))
+
+
+def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
+    """Keyboard for requesting delivery geolocation."""
+    location_text = get_text(lang, "cart_delivery_location_button")
+    return types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text=location_text, request_location=True)],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+async def _send_cart_payment_selection(
+    message: types.Message,
+    state: FSMContext,
+    lang: str,
+    delivery_address: str,
+) -> None:
+    data = await state.get_data()
+    cart_items_stored = data.get("cart_items", [])
+    store_id = data.get("store_id")
+    delivery_price = data.get("delivery_price", 0)
+
+    if not cart_items_stored or not store_id:
+        await message.answer(get_text(lang, "cart_delivery_data_lost"))
+        await state.clear()
+        return
+
+    await state.update_data(address=delivery_address)
+    await state.set_state(OrderDelivery.payment_method_select)
+
+    currency = "so'm" if lang == "uz" else "сум"
+    total = calc_items_total(cart_items_stored)
+    total_with_delivery = calc_total_price(total, delivery_price)
+
+    lines: list[str] = [f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>"]
+    for item in cart_items_stored:
+        subtotal = item["price"] * item["quantity"]
+        lines.append(f"- {esc(item['title'])} x {item['quantity']} = {subtotal:,} {currency}")
+
+    lines.append("")
+    lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
+    lines.append(
+        f"<b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>"
+    )
+    lines.append("")
+    lines.append(f"{get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}")
+    lines.append("")
+    lines.append(get_text(lang, "cart_delivery_payment_prompt"))
+
+    text = "\n".join(lines)
+
+    kb = InlineKeyboardBuilder()
+    kb.button(
+        text=get_text(lang, "cart_delivery_payment_click"),
+        callback_data="cart_pay_click",
+    )
+    kb.button(
+        text=get_text(lang, "cart_delivery_back_button"),
+        callback_data="cart_back_to_address",
+    )
+    kb.adjust(1, 1)
+
+    await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
 
 def register(router: Router) -> None:
@@ -99,6 +173,8 @@ def register(router: Router) -> None:
             store_id=store_id,
             delivery_price=delivery_price,
             is_cart_order=True,
+            delivery_lat=None,
+            delivery_lon=None,
         )
 
         await state.set_state(OrderDelivery.address)
@@ -112,9 +188,43 @@ def register(router: Router) -> None:
         except Exception:
             await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
 
+        location_prompt = get_text(lang, "cart_delivery_location_prompt")
+        await callback.message.answer(
+            location_prompt,
+            reply_markup=location_request_keyboard(lang),
+        )
+
         await callback.answer()
 
-    @router.message(OrderDelivery.address, IsCartOrder())
+    @router.message(OrderDelivery.address, IsCartOrder(), F.location)
+    async def cart_process_delivery_location(message: types.Message, state: FSMContext) -> None:
+        if not common.db or not message.from_user or not message.location:
+            return
+
+        lang = common.db.get_user_language(message.from_user.id)
+        latitude = message.location.latitude
+        longitude = message.location.longitude
+
+        await state.update_data(delivery_lat=latitude, delivery_lon=longitude)
+
+        delivery_address = None
+        try:
+            geo = await reverse_geocode_store(latitude, longitude)
+            if geo:
+                delivery_address = geo.get("display_name")
+        except Exception as e:
+            logger.warning("Cart delivery reverse geocode failed: %s", e)
+
+        if delivery_address:
+            await _send_cart_payment_selection(message, state, lang, str(delivery_address))
+            return
+
+        await message.answer(
+            get_text(lang, "cart_delivery_location_received"),
+            reply_markup=location_request_keyboard(lang),
+        )
+
+    @router.message(OrderDelivery.address, IsCartOrder(), F.text)
     async def cart_process_delivery_address(message: types.Message, state: FSMContext) -> None:
         if not common.db or not message.from_user or not message.text:
             return
@@ -127,56 +237,19 @@ def register(router: Router) -> None:
 
         cart_items_stored = data.get("cart_items", [])
         store_id = data.get("store_id")
-        delivery_price = data.get("delivery_price", 0)
+        delivery_lat = data.get("delivery_lat")
+        delivery_lon = data.get("delivery_lon")
 
         if not cart_items_stored or not store_id:
             await message.answer(get_text(lang, "cart_delivery_data_lost"))
             await state.clear()
             return
 
-        if len(delivery_address) < 10:
+        if len(delivery_address) < 10 and not (delivery_lat and delivery_lon):
             await message.answer(get_text(lang, "cart_delivery_address_too_short"))
             return
 
-        await state.update_data(address=delivery_address)
-
-        await state.set_state(OrderDelivery.payment_method_select)
-
-        currency = "so'm" if lang == "uz" else "сум"
-        total = calc_items_total(cart_items_stored)
-        total_with_delivery = calc_total_price(total, delivery_price)
-
-        lines: list[str] = [f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>"]
-        for item in cart_items_stored:
-            subtotal = item['price'] * item['quantity']
-            lines.append(f"- {esc(item['title'])} x {item['quantity']} = {subtotal:,} {currency}")
-
-        lines.append("")
-        lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
-        lines.append(
-            f"<b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>"
-        )
-        lines.append("")
-        lines.append(
-            f"{get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}"
-        )
-        lines.append("")
-        lines.append(get_text(lang, 'cart_delivery_payment_prompt'))
-
-        text = "\n".join(lines)
-
-        kb = InlineKeyboardBuilder()
-        kb.button(
-            text=get_text(lang, "cart_delivery_payment_click"),
-            callback_data="cart_pay_click",
-        )
-        kb.button(
-            text=get_text(lang, "cart_delivery_back_button"),
-            callback_data="cart_back_to_address",
-        )
-        kb.adjust(1, 1)
-
-        await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        await _send_cart_payment_selection(message, state, lang, delivery_address)
 
     @router.callback_query(F.data == "cart_back_to_address")
     async def cart_back_to_address(callback: types.CallbackQuery, state: FSMContext) -> None:
@@ -195,6 +268,12 @@ def register(router: Router) -> None:
             await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
         except Exception:
             await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+        location_prompt = get_text(lang, "cart_delivery_location_prompt")
+        await callback.message.answer(
+            location_prompt,
+            reply_markup=location_request_keyboard(lang),
+        )
 
         await state.set_state(OrderDelivery.address)
         await callback.answer()

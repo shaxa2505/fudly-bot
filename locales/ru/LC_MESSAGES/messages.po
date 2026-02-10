@@ -155,3 +155,13 @@ msgstr[2] "{n} предложений"
 #: Payment notes
 msgid "delivery_fee_paid_to_courier"
 msgstr "????????? ???????? ???????????? ??????? ??? ?????????."
+
+#: Cart delivery location
+msgid "cart_delivery_location_prompt"
+msgstr "Отправьте геолокацию (кнопка ниже) или введите адрес доставки."
+
+msgid "cart_delivery_location_button"
+msgstr "Отправить геолокацию"
+
+msgid "cart_delivery_location_received"
+msgstr "Геолокация получена. Теперь введите адрес доставки."

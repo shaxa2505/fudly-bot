@@ -1,9 +1,4 @@
-# Локализация для бота Fudly
-
-LANGUAGES = {"ru": "Русский", "uz": "O'zbekcha"}
-
-TEXTS = {
-    "ru": {
+"ru": {
         # Приветствие
         "choose_language": "Выберите язык / Tilni tanlang.",
         "language_changed": "Язык обновлён.",
@@ -632,6 +627,9 @@ TEXTS = {
         "cart_delivery_unavailable": "Доставка для этого магазина временно недоступна.",
         "cart_confirm_in_progress": "Заказ уже оформляется. Подождите.",
         "cart_delivery_address_prompt": "Введите адрес доставки.",
+        "cart_delivery_location_prompt": "Отправьте геолокацию (кнопка ниже) или введите адрес доставки.",
+        "cart_delivery_location_button": "Отправить геолокацию",
+        "cart_delivery_location_received": "Геолокация получена. Теперь введите адрес доставки.",
         "cart_delivery_min_order": "Минимальная сумма доставки: {min} {currency}\nВаш заказ: {total} {currency}\nДобавьте ещё товаров.",
         "cart_delivery_data_lost": "Данные доставки потеряны.",
         "cart_delivery_address_too_short": "Адрес слишком короткий.",
@@ -649,12 +647,12 @@ TEXTS = {
         "delivery_qty_hint": "???????? ??????????",
         "delivery_address_hint": "??????? ????? ??? ????????",
         "delivery_payment_hint": "???????? ?????? ??????",
-        "delivery_processing_hint": "?????????...",
+        "delivery_processing_hint": "? ????????...",
         "delivery_next_button": "?? ??????????",
-        "delivery_new_address_button": "?? ????? ?????",
+        "delivery_new_address_button": "? ????? ?????",
         "delivery_payment_click_button": "?? Click",
         "delivery_address_input_title": "??????? ?????:",
-        "delivery_address_input_example": "??????: ????????, 5-??????, ??? 10",
+        "delivery_address_input_example": "????????: ????????, 5-??????, ??? 10",
         "delivery_unavailable": "???????? ??????????",
         "delivery_cancelled": "????????.",
         "delivery_address_too_short": "????? ??????? ????????.",
@@ -1008,6 +1006,9 @@ Menyu pastda.""",
         "cart_delivery_unavailable": "Bu do'konda yetkazib berish vaqtincha mavjud emas.",
         "cart_confirm_in_progress": "Buyurtma allaqachon rasmiylashtirilmoqda. Kuting.",
         "cart_delivery_address_prompt": "Yetkazib berish manzilini kiriting.",
+        "cart_delivery_location_prompt": "Yetkazib berish uchun geolokatsiyani yuboring (pastdagi tugma) yoki manzilni kiriting.",
+        "cart_delivery_location_button": "Joylashuvni yuborish",
+        "cart_delivery_location_received": "Geolokatsiya qabul qilindi. Endi manzilni kiriting.",
         "cart_delivery_min_order": "Minimal yetkazib berish summasi: {min} {currency}\nSizning buyurtmangiz: {total} {currency}\nYana mahsulot qo'shing.",
         "cart_delivery_data_lost": "Yetkazib berish ma'lumotlari yo'qoldi.",
         "cart_delivery_address_too_short": "Manzil juda qisqa.",
@@ -1027,7 +1028,7 @@ Menyu pastda.""",
         "delivery_payment_hint": "To'lov usulini tanlang",
         "delivery_processing_hint": "Jarayonda...",
         "delivery_next_button": "?? Davom etish",
-        "delivery_new_address_button": "?? Yangi manzil",
+        "delivery_new_address_button": "? Yangi manzil",
         "delivery_payment_click_button": "?? Click",
         "delivery_address_input_title": "Manzilni kiriting:",
         "delivery_address_input_example": "Masalan: Chilonzor, 5-mavze, 10-uy",

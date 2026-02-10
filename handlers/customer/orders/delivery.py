@@ -95,9 +95,35 @@ async def _send_delivery_card(
                 reply_markup=markup,
             )
             return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to send delivery card with photo: %s", e)
     await message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
+async def _edit_delivery_card(
+    callback: types.CallbackQuery,
+    text: str,
+    kb: Any,
+    offer_photo: str | None = None,
+) -> None:
+    """Edit an existing delivery card, falling back to a new message if needed."""
+    if not callback.message:
+        return
+    markup = _as_markup(kb)
+    try:
+        if callback.message.photo:
+            await callback.message.edit_caption(
+                caption=text, parse_mode="HTML", reply_markup=markup
+            )
+        else:
+            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+        return
+    except Exception as e:
+        logger.warning("Failed to edit delivery card: %s", e)
+    try:
+        await _send_delivery_card(callback.message, text, kb, offer_photo)
+    except Exception as e:
+        logger.warning("Failed to send delivery card fallback: %s", e)
 
 
 async def resume_delivery_after_phone(
@@ -454,15 +480,8 @@ async def dlv_change_qty(
     )
     kb = build_delivery_qty_keyboard(lang, offer_id, new_qty, max_qty)
 
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    offer_photo = data.get("offer_photo")
+    await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -512,15 +531,8 @@ async def dlv_to_address(
     )
     kb = build_delivery_address_keyboard(lang, offer_id, data.get("saved_address"))
 
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    offer_photo = data.get("offer_photo")
+    await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -555,15 +567,8 @@ async def dlv_back_to_qty(
         lang, offer_id, data.get("quantity", 1), data.get("max_qty", 1)
     )
 
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    offer_photo = data.get("offer_photo")
+    await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -607,15 +612,8 @@ async def dlv_use_saved_address(
     )
     kb = build_delivery_payment_keyboard(lang, offer_id)
 
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    offer_photo = data.get("offer_photo")
+    await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -675,15 +673,8 @@ async def dlv_new_address(
     else:
         kb.adjust(1)
 
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    offer_photo = data.get("offer_photo")
+    await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -791,15 +782,8 @@ async def dlv_back_to_address(
     )
     kb = build_delivery_address_keyboard(lang, offer_id, data.get("saved_address"))
 
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(
-                caption=text, parse_mode="HTML", reply_markup=kb.as_markup()
-            )
-        else:
-            await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    offer_photo = data.get("offer_photo")
+    await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
 
@@ -970,16 +954,16 @@ async def dlv_pay_click(
     # Remove inline keyboard to prevent duplicate taps and clear state
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to clear delivery payment keyboard for user %s: %s", user_id, e)
     await state.clear()
 
     # Notify user to pay via Click link
     notify_text = get_text(lang, "delivery_pay_click_prompt")
     try:
         await callback.message.answer(notify_text, reply_markup=kb.as_markup())
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to send delivery Click payment prompt to user %s: %s", user_id, e)
 
     await callback.answer()
 

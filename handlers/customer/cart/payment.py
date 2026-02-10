@@ -38,6 +38,8 @@ def register(router: Router) -> None:
         store_id = data.get("store_id")
         address = data.get("address", "")
         delivery_price = data.get("delivery_price", 0)
+        delivery_lat = data.get("delivery_lat")
+        delivery_lon = data.get("delivery_lon")
 
         if not cart_items_stored or not store_id or not address:
             await state.clear()
@@ -83,11 +85,22 @@ def register(router: Router) -> None:
             )
 
         try:
+            try:
+                delivery_lat = float(delivery_lat) if delivery_lat is not None else None
+            except (TypeError, ValueError):
+                delivery_lat = None
+            try:
+                delivery_lon = float(delivery_lon) if delivery_lon is not None else None
+            except (TypeError, ValueError):
+                delivery_lon = None
+
             result = await order_service.create_order(
                 user_id=user_id,
                 items=order_items,
                 order_type="delivery",
                 delivery_address=address,
+                delivery_lat=delivery_lat,
+                delivery_lon=delivery_lon,
                 payment_method="click",
                 notify_customer=False,
                 notify_sellers=False,
@@ -168,21 +181,39 @@ def register(router: Router) -> None:
 
         try:
             common.db.save_delivery_address(user_id, address)
-        except Exception:
-            pass
+        except Exception as e:
+            from logging_config import logger
+
+            logger.warning(
+                "Failed to save delivery address for user %s: %s",
+                user_id,
+                e,
+            )
 
         try:
             await callback.message.edit_reply_markup(reply_markup=None)
-        except Exception:
-            pass
+        except Exception as e:
+            from logging_config import logger
+
+            logger.warning(
+                "Failed to clear cart payment keyboard for user %s: %s",
+                user_id,
+                e,
+            )
 
         await state.clear()
 
         notify_text = get_text(lang, "cart_payment_click_prompt")
         try:
             await callback.message.answer(notify_text, reply_markup=kb.as_markup())
-        except Exception:
-            pass
+        except Exception as e:
+            from logging_config import logger
+
+            logger.warning(
+                "Failed to send cart Click payment prompt to user %s: %s",
+                user_id,
+                e,
+            )
 
         await callback.answer()
 
