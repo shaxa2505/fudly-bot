@@ -100,6 +100,7 @@ class EditOffer(StatesGroup):
     Flow: My Offers → select offer → edit field → enter value → done
     """
 
+    browse = State()  # Browsing offers list (allows quick text search)
     search_query = State()  # Search for offer
     offer_id = State()  # Selected offer ID
     field = State()  # Field to edit

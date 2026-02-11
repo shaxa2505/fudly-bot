@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 from datetime import date, datetime, timedelta
 
 from aiogram import F, Router, types
@@ -218,6 +219,67 @@ def _parse_expiry_input_text(text: str) -> str | None:
     raise ValueError("Invalid expiry format")
 
 
+def _search_offers(db: Any, user_id: int, query: str) -> list[Any]:
+    stores = db.get_user_accessible_stores(user_id)
+    all_offers = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        offers = db.get_offers_by_store(store_id, include_all=True)
+        all_offers.extend(offers)
+    results = []
+    for offer in all_offers:
+        title = get_offer_field(offer, "title", "").lower()
+        if query in title:
+            results.append(offer)
+    return results
+
+
+async def _send_offer_search_results(
+    message: types.Message, lang: str, query: str, results: list[Any]
+) -> None:
+    if not results:
+        await message.answer(
+            f"{'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
+            parse_mode="HTML",
+        )
+        return
+
+    text = f"{'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
+    text += f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(results)}\n\n"
+
+    nav_kb = InlineKeyboardBuilder()
+
+    for offer in results[:10]:
+        offer_id = get_offer_field(offer, "offer_id")
+        offer_title = get_offer_field(offer, "title", "Товар")[:25]
+        price = get_offer_field(offer, "discount_price", 0)
+        qty = get_offer_field(offer, "quantity", 0)
+        unit = get_offer_field(offer, "unit", "шт")
+        status = get_offer_field(offer, "status", "active")
+
+        status_label = "Активен" if status == "active" else "Неактивен"
+        if lang != "ru":
+            status_label = "Faol" if status == "active" else "Nofaol"
+        price_label = "Цена" if lang == "ru" else "Narx"
+        qty_label = "Остаток" if lang == "ru" else "Miqdor"
+        qty_display = format_quantity(qty, unit, lang)
+
+        text += f"<b>{offer_title}</b>\n"
+        text += f"   {status_label} | {price_label}: {price:,} | {qty_label}: {qty_display}\n"
+
+        nav_kb.button(
+            text=("Открыть " if lang == "ru" else "Ochish ") + offer_title[:15],
+            callback_data=f"edit_offer_{offer_id}",
+        )
+
+    nav_kb.button(
+        text="К фильтрам" if lang == "ru" else "Filtrlarga", callback_data="back_to_offers_menu"
+    )
+    nav_kb.adjust(2, 1)
+
+    await message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+
+
 @router.message(
     F.text.in_(
         {
@@ -269,6 +331,7 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
             ),
             parse_mode="HTML",
         )
+        await state.set_state(EditOffer.browse)
         return
 
     # Count active and inactive
@@ -316,6 +379,32 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
         parse_mode="HTML",
         reply_markup=filter_kb.as_markup(),
     )
+    await state.set_state(EditOffer.browse)
+
+
+@router.message(EditOffer.browse, F.text & ~F.text.startswith("/"))
+async def my_offers_quick_search(message: types.Message, state: FSMContext) -> None:
+    """Allow quick text search right after opening 'My items'."""
+    if not message.text:
+        return
+
+    if is_main_menu_button(message.text):
+        from handlers.seller.create_offer import _handle_main_menu_action
+
+        handled = await _handle_main_menu_action(message, state)
+        if handled:
+            return
+
+    db = get_db()
+    lang = db.get_user_language(message.from_user.id)
+    query = (message.text or "").strip().lower()
+
+    if len(query) < 2:
+        await message.answer("Минимум 2 символа" if lang == "ru" else "Kamida 2 ta belgi")
+        return
+
+    results = _search_offers(db, message.from_user.id, query)
+    await _send_offer_search_results(message, lang, query, results)
 
 
 @router.callback_query(F.data.startswith("filter_offers_"))
@@ -537,62 +626,8 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
 
     await state.clear()
 
-    stores = db.get_user_accessible_stores(message.from_user.id)
-    all_offers = []
-    for store in stores:
-        store_id = get_store_field(store, "store_id")
-        offers = db.get_offers_by_store(store_id, include_all=True)
-        all_offers.extend(offers)
-
-    # Search
-    results = []
-    for offer in all_offers:
-        title = get_offer_field(offer, "title", "").lower()
-        if query in title:
-            results.append(offer)
-
-    if not results:
-        await message.answer(
-            f"{'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
-            parse_mode="HTML",
-        )
-        return
-
-    # Show results
-    text = f"{'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
-    text += f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(results)}\n\n"
-
-    nav_kb = InlineKeyboardBuilder()
-
-    for offer in results[:10]:
-        offer_id = get_offer_field(offer, "offer_id")
-        offer_title = get_offer_field(offer, "title", "Товар")[:25]
-        price = get_offer_field(offer, "discount_price", 0)
-        qty = get_offer_field(offer, "quantity", 0)
-        unit = get_offer_field(offer, "unit", "шт")
-        status = get_offer_field(offer, "status", "active")
-
-        status_label = "Активен" if status == "active" else "Неактивен"
-        if lang != "ru":
-            status_label = "Faol" if status == "active" else "Nofaol"
-        price_label = "Цена" if lang == "ru" else "Narx"
-        qty_label = "Остаток" if lang == "ru" else "Miqdor"
-        qty_display = format_quantity(qty, unit, lang)
-
-        text += f"<b>{offer_title}</b>\n"
-        text += f"   {status_label} | {price_label}: {price:,} | {qty_label}: {qty_display}\n"
-
-        nav_kb.button(
-            text=("Открыть " if lang == "ru" else "Ochish ") + offer_title[:15],
-            callback_data=f"edit_offer_{offer_id}",
-        )
-
-    nav_kb.button(
-        text="К фильтрам" if lang == "ru" else "Filtrlarga", callback_data="back_to_offers_menu"
-    )
-    nav_kb.adjust(2, 1)
-
-    await message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+    results = _search_offers(db, message.from_user.id, query)
+    await _send_offer_search_results(message, lang, query, results)
 
 
 @router.callback_query(F.data.startswith("qty_add_"))
