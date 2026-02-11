@@ -6,6 +6,8 @@ from __future__ import annotations
 from typing import Any
 import re
 
+from app.core.utils import calc_discount_percent
+
 from psycopg.rows import dict_row
 
 try:
@@ -329,7 +331,7 @@ class OfferMixin:
                 raise ValueError("Prices must be greater than zero")
             if discount_price >= original_price:
                 raise ValueError("Discount price must be less than original price")
-            discount_percent = int((1 - discount_price / original_price) * 100)
+            discount_percent = calc_discount_percent(original_price, discount_price)
             if discount_percent < MIN_DISCOUNT_PERCENT:
                 raise ValueError(f"Minimum discount is {MIN_DISCOUNT_PERCENT}%")
 

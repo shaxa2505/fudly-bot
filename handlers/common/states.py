@@ -74,8 +74,8 @@ class CreateOffer(StatesGroup):
     """
     Offer creation flow (5 steps).
 
-    Flow: Add Offer → [store] → category → title → original price → discount price → quantity → expiry → photo → confirm
-    Legacy: description/unit_type/quick_input remain for backward compatibility.
+    Flow: Add Offer → [store] → category → title → original price → discount price → unit → quantity → expiry → photo → confirm
+    Legacy: description/quick_input remain for backward compatibility.
     """
 
     # Main flow states

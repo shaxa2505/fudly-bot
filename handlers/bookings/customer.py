@@ -17,6 +17,7 @@ from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
 from app.services.unified_order_service import (
+    NotificationTemplates,
     OrderItem,
     OrderStatus,
     get_unified_order_service,
@@ -1343,58 +1344,47 @@ async def notify_partner_new_pickup_order(
     from .utils import get_user_field
 
     customer_phone = get_user_field(customer, "phone") or "Не указан"
-    customer_username = get_user_field(customer, "username")
 
-    # Contact info
-    contact_info = f"@{customer_username}" if customer_username else customer_phone
     currency = "so'm" if partner_lang == "uz" else "сум"
+    items = [
+        {
+            "title": offer_title,
+            "quantity": int(quantity or 1),
+            "price": int(total or 0),
+        }
+    ]
+    created_at = None
+    try:
+        order_row = db.get_order(int(order_id))
+        from app.core.utils import get_order_field as _get_order_field
 
-    code_line = f"<code>{_esc(pickup_code)}</code>" if pickup_code else "—"
+        created_at = _get_order_field(order_row, "created_at")
+    except Exception:
+        created_at = None
 
-    if partner_lang == "uz":
-        text = (
-            f"🔔 <b>YANGI BUYURTMA!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"📦 <b>#{order_id}</b>\n"
-            f"🔑 Kod: {code_line}\n\n"
-            f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Miqdor: <b>{quantity}</b> dona\n"
-            f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👤 <b>Xaridor:</b>\n"
-            f"   Ism: {_esc(customer_name)}\n"
-            f"   📱 <code>{_esc(customer_phone)}</code>\n"
-            f"   💬 {_esc(contact_info)}\n\n"
-            f"🏪 <b>O'zi olib ketadi</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏳ <b>Buyurtmani tasdiqlang!</b>"
-        )
-        confirm_text = "✅ Qabul qilish"
-        reject_text = "❌ Rad etish"
-    else:
-        text = (
-            f"🔔 <b>НОВЫЙ ЗАКАЗ!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"📦 <b>#{order_id}</b>\n"
-            f"🔑 Код: {code_line}\n\n"
-            f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Количество: <b>{quantity}</b> шт\n"
-            f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👤 <b>Покупатель:</b>\n"
-            f"   Имя: {_esc(customer_name)}\n"
-            f"   📱 <code>{_esc(customer_phone)}</code>\n"
-            f"   💬 {_esc(contact_info)}\n\n"
-            f"🏪 <b>Самовывоз</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"⏳ <b>Подтвердите заказ!</b>"
-        )
-        confirm_text = "✅ Принять"
-        reject_text = "❌ Отклонить"
+    text = NotificationTemplates.seller_new_order(
+        lang=partner_lang,
+        order_ids=[str(order_id)],
+        pickup_codes=[pickup_code] if pickup_code else [],
+        items=items,
+        order_type="pickup",
+        delivery_address=None,
+        comment=None,
+        map_url=None,
+        payment_method="cash",
+        payment_status=None,
+        payment_proof_photo_id=None,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        total=int(total or 0),
+        delivery_price=0,
+        currency=currency,
+        created_at=created_at,
+    )
 
     kb = InlineKeyboardBuilder()
-    kb.button(text=confirm_text, callback_data=f"order_confirm_{order_id}")
-    kb.button(text=reject_text, callback_data=f"order_reject_{order_id}")
+    kb.button(text=get_text(partner_lang, "btn_order_accept"), callback_data=f"order_confirm_{order_id}")
+    kb.button(text=get_text(partner_lang, "btn_order_reject"), callback_data=f"order_reject_{order_id}")
     kb.adjust(2)
 
     try:
@@ -1447,52 +1437,45 @@ async def notify_partner_new_booking(
     from .utils import get_user_field
 
     customer_phone = get_user_field(customer, "phone") or "Не указан"
-    customer_username = get_user_field(customer, "username")
 
-    # Contact info
-    contact_info = f"@{customer_username}" if customer_username else customer_phone
     currency = "so'm" if partner_lang == "uz" else "сум"
+    items = [
+        {
+            "title": offer_title,
+            "quantity": int(quantity or 1),
+            "price": int(total or 0),
+        }
+    ]
+    created_at = None
+    try:
+        booking_row = db.get_booking(int(booking_id))
+        created_at = get_booking_field(booking_row, "created_at")
+    except Exception:
+        created_at = None
 
-    # Build beautiful notification card
-    if partner_lang == "uz":
-        text = (
-            f"🔔 <b>YANGI BRON!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Miqdor: <b>{quantity}</b> dona\n"
-            f"💰 Jami: <b>{total:,}</b> {currency}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👤 <b>Xaridor:</b>\n"
-            f"   Ism: {_esc(customer_name)}\n"
-            f"   📱 <code>{_esc(customer_phone)}</code>\n"
-            f"   💬 {_esc(contact_info)}\n\n"
-            f"🏪 <b>O'zi olib ketadi</b>\n"
-            f"━━━━━━━━━━━━━━━━━━"
-        )
-        confirm_text = "✅ Qabul qilish"
-        reject_text = "❌ Rad etish"
-    else:
-        text = (
-            f"🔔 <b>НОВАЯ БРОНЬ!</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Количество: <b>{quantity}</b> шт\n"
-            f"💰 Итого: <b>{total:,}</b> {currency}\n\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"👤 <b>Покупатель:</b>\n"
-            f"   Имя: {_esc(customer_name)}\n"
-            f"   📱 <code>{_esc(customer_phone)}</code>\n"
-            f"   💬 {_esc(contact_info)}\n\n"
-            f"🏪 <b>Самовывоз</b>\n"
-            f"━━━━━━━━━━━━━━━━━━"
-        )
-        confirm_text = "✅ Принять"
-        reject_text = "❌ Отклонить"
+    text = NotificationTemplates.seller_new_order(
+        lang=partner_lang,
+        order_ids=[str(booking_id)],
+        pickup_codes=[],
+        items=items,
+        order_type="pickup",
+        delivery_address=None,
+        comment=None,
+        map_url=None,
+        payment_method="cash",
+        payment_status=None,
+        payment_proof_photo_id=None,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        total=int(total or 0),
+        delivery_price=0,
+        currency=currency,
+        created_at=created_at,
+    )
 
     kb = InlineKeyboardBuilder()
-    # Use order_ prefix since pickup orders live in orders.
-    kb.button(text=confirm_text, callback_data=f"order_confirm_{booking_id}")
-    kb.button(text=reject_text, callback_data=f"order_reject_{booking_id}")
+    kb.button(text=get_text(partner_lang, "btn_order_accept"), callback_data=f"order_confirm_{booking_id}")
+    kb.button(text=get_text(partner_lang, "btn_order_reject"), callback_data=f"order_reject_{booking_id}")
     kb.adjust(2)
 
     try:

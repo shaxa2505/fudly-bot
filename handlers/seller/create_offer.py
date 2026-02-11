@@ -12,6 +12,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import calc_discount_percent, get_store_field
+from app.core.units import (
+    format_quantity,
+    normalize_unit,
+    parse_quantity_input,
+    quantity_step,
+    unit_label,
+)
 from app.keyboards import (
     expiry_keyboard,
     photo_keyboard,
@@ -30,7 +37,7 @@ bot: Any | None = None
 
 router = Router()
 
-TOTAL_STEPS = 5
+TOTAL_STEPS = 6
 MIN_DISCOUNT_PERCENT = 20
 MAX_DISCOUNT_PERCENT = 90
 MIN_TITLE_LEN = 3
@@ -240,38 +247,49 @@ ALLOWED_CATEGORIES = {
     "other",
 }
 
-UNIT_ALIASES = {
-    "шт": "шт",
-    "штука": "шт",
-    "штук": "шт",
-    "dona": "шт",
-    "pcs": "шт",
-    "piece": "шт",
-    "уп": "уп",
-    "упак": "уп",
-    "упаковка": "уп",
-    "qadoq": "уп",
-    "кг": "кг",
-    "kg": "кг",
-    "килограмм": "кг",
-    "г": "г",
-    "гр": "г",
-    "g": "г",
-    "gram": "г",
-    "л": "л",
-    "l": "л",
-    "литр": "л",
-    "ml": "мл",
-    "мл": "мл",
-    "milliliter": "мл",
-}
-
-DECIMAL_UNITS = {"кг", "л"}
+WEIGHT_ALLOWED_CATEGORIES = {"meat", "fruits", "dairy"}
+VOLUME_ALLOWED_CATEGORIES = {"drinks", "dairy"}
 
 
 def get_category_name(category: str, lang: str) -> str:
     """Get localized category name."""
     return CATEGORY_NAMES.get(lang, CATEGORY_NAMES["ru"]).get(category, category)
+
+
+def _allowed_units_for_category(category: str | None) -> set[str]:
+    allowed = {"piece"}
+    if category in WEIGHT_ALLOWED_CATEGORIES:
+        allowed.update({"kg", "g"})
+    if category in VOLUME_ALLOWED_CATEGORIES:
+        allowed.update({"l", "ml"})
+    return allowed
+
+
+def _build_unit_keyboard(lang: str, category: str | None) -> InlineKeyboardBuilder:
+    builder = InlineKeyboardBuilder()
+    allowed = _allowed_units_for_category(category)
+
+    if "piece" in allowed:
+        piece_label = f"📦 {get_text(lang, 'unit_piece_title')} ({get_text(lang, 'unit_piece')})"
+        builder.button(text=piece_label, callback_data="unit_type_piece")
+    if "kg" in allowed:
+        kg_label = f"⚖️ {get_text(lang, 'unit_kg_title')} ({get_text(lang, 'unit_kg')})"
+        builder.button(text=kg_label, callback_data="unit_type_kg")
+    if "g" in allowed:
+        g_label = f"⚖️ {get_text(lang, 'unit_g_title')} ({get_text(lang, 'unit_g')})"
+        builder.button(text=g_label, callback_data="unit_type_g")
+    if "l" in allowed:
+        l_label = f"🧃 {get_text(lang, 'unit_l_title')} ({get_text(lang, 'unit_l')})"
+        builder.button(text=l_label, callback_data="unit_type_l")
+    if "ml" in allowed:
+        ml_label = f"🧃 {get_text(lang, 'unit_ml_title')} ({get_text(lang, 'unit_ml')})"
+        builder.button(text=ml_label, callback_data="unit_type_ml")
+
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_discount")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+
+    builder.adjust(2)
+    return builder
 
 
 def _shorten(text: Any, limit: int = 24) -> str:
@@ -334,15 +352,19 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
             parts.append(f"💰 {price_value} {currency}")
 
     if current_step > 3:
+        unit = data.get("unit")
+        if unit:
+            parts.append(f"📦 {html_escape(unit_label(unit, lang))}")
+
+    if current_step > 4:
         quantity = data.get("quantity")
         if quantity is not None:
             try:
-                qty_value = float(quantity)
-                qty_str = str(int(qty_value))
-            except (TypeError, ValueError):
+                qty_str = format_quantity(quantity, data.get("unit", "piece"), lang)
+            except Exception:
                 qty_str = str(quantity)
-            unit = "шт" if lang == "ru" else "dona"
-            parts.append(f"📦 {html_escape(_shorten(f'{qty_str} {unit}', 18))}")
+            unit_text = unit_label(data.get("unit", "piece"), lang)
+            parts.append(f"📦 {html_escape(_shorten(f'{qty_str} {unit_text}', 18))}")
 
         expiry_value = data.get("expiry_date")
         if expiry_value:
@@ -415,8 +437,7 @@ def _validate_expiry_date(date_value: datetime.date) -> str:
 def _normalize_unit_input(value: str | None) -> str | None:
     if not value:
         return None
-    raw = value.strip().lower().replace(".", "").replace(" ", "")
-    return UNIT_ALIASES.get(raw)
+    return normalize_unit(value)
 
 
 def _normalize_category_input(value: str | None) -> str | None:
@@ -468,18 +489,11 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
     return discount_percent, discount_price
 
 
-def _parse_quantity_value(raw: str | None, unit: str) -> int:
+def _parse_quantity_value(raw: str | None, unit: str) -> float:
     if not raw or not raw.strip():
-        return 1
-    numbers = re.findall(r"\d+(?:[.,]\d+)?", raw)
-    if not numbers:
-        raise ValueError("Invalid quantity")
-    quantity = float(numbers[0].replace(",", "."))
-    if quantity <= 0:
-        raise ValueError("Invalid quantity")
-    if quantity != int(quantity):
-        raise ValueError("Quantity must be integer")
-    return int(quantity)
+        return 1.0
+    value = parse_quantity_input(raw, unit)
+    return float(value)
 
 
 def _quick_add_instructions(lang: str) -> str:
@@ -526,7 +540,7 @@ def _parse_quick_input(text: str) -> dict[str, Any]:
 
     discount_raw = parts[2] if len(parts) > 2 else ""
     unit_raw = parts[4] if len(parts) > 4 else ""
-    unit = _normalize_unit_input(unit_raw) if unit_raw else "шт"
+    unit = _normalize_unit_input(unit_raw) if unit_raw else "piece"
     if unit_raw and not unit:
         raise ValueError("Invalid unit")
 
@@ -914,7 +928,7 @@ async def create_offer_menu_fallback(message: types.Message, state: FSMContext) 
         text = _compose_step_message(
             data,
             lang,
-            4,
+            6,
             "Фото",
             "Rasm",
             "🖼️",
@@ -1281,27 +1295,28 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
 
 
 async def _go_to_unit_step(target: types.Message, state: FSMContext, lang: str) -> None:
-    """Move to quantity selection step (unit fixed)."""
-    await state.update_data(unit="шт")
+    """Move to unit selection step."""
     data = await state.get_data()
     text = _compose_step_message(
         data,
         lang,
         3,
-        "Остаток и срок годности",
-        "Miqdor va yaroqlilik",
-        "📦",
-        get_text(lang, "offer_step3_quantity_hint"),
+        "Единица измерения",
+        "O'lchov birligi",
+        "📏",
+        get_text(lang, "offer_step3_unit_hint"),
     )
+
+    unit_kb = _build_unit_keyboard(lang, data.get("category"))
 
     await _upsert_prompt(
         target,
         state,
         text,
-        reply_markup=quantity_keyboard(lang),
+        reply_markup=unit_kb.as_markup(),
         parse_mode="HTML",
     )
-    await state.set_state(CreateOffer.quantity)
+    await state.set_state(CreateOffer.unit_type)
 
 
 # ============ LEGACY: Unit Type ============
@@ -1309,7 +1324,7 @@ async def _go_to_unit_step(target: types.Message, state: FSMContext, lang: str) 
 
 @router.callback_query(CreateOffer.unit_type, F.data.startswith("unit_type_"))
 async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Legacy unit type selection - redirect to quantity."""
+    """Unit type selected - move to quantity."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
@@ -1319,11 +1334,52 @@ async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -
         await callback.answer()
         return
 
-    await _go_to_unit_step(callback.message, state, lang)
+    unit_type = callback.data.replace("unit_type_", "") if callback.data else "piece"
+    unit_type = normalize_unit(unit_type)
+    data = await state.get_data()
+    allowed = _allowed_units_for_category(data.get("category"))
+    if unit_type not in allowed:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    await state.update_data(unit=unit_type)
+    await _prompt_quantity_step(callback.message, state, lang)
     await callback.answer()
 
 
-# ============ STEP 3: Quantity ============
+# ============ STEP 4: Quantity ============
+
+
+async def _prompt_quantity_step(
+    target: types.Message, state: FSMContext, lang: str
+) -> None:
+    data = await state.get_data()
+    unit = data.get("unit", "piece")
+    if unit in {"kg", "g"}:
+        hint = get_text(lang, "offer_step4_quantity_hint_weight")
+    elif unit in {"l", "ml"}:
+        hint = get_text(lang, "offer_step4_quantity_hint_volume")
+    else:
+        hint = get_text(lang, "offer_step4_quantity_hint_piece")
+
+    text = _compose_step_message(
+        data,
+        lang,
+        4,
+        "Остаток и срок годности",
+        "Miqdor va yaroqlilik",
+        "📦",
+        hint,
+    )
+
+    await _upsert_prompt(
+        target,
+        state,
+        text,
+        reply_markup=quantity_keyboard(lang, unit=unit),
+        parse_mode="HTML",
+    )
+    await state.set_state(CreateOffer.quantity)
 
 
 @router.callback_query(CreateOffer.quantity, F.data.startswith("quantity_"))
@@ -1338,6 +1394,8 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         await callback.answer()
         return
     qty_data = callback.data.replace("quantity_", "")
+    data = await state.get_data()
+    unit = data.get("unit", "piece")
 
     if qty_data == "custom":
         # Ask for custom quantity
@@ -1357,14 +1415,23 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         return
 
     try:
-        quantity = int(qty_data)
-        if quantity < 1 or quantity > MAX_QUANTITY:
-            raise ValueError
-    except (TypeError, ValueError):
-        await callback.answer(
-            get_text(lang, "offer_error_quantity_range").format(max=MAX_QUANTITY),
-            show_alert=True,
-        )
+        quantity_val = parse_quantity_input(qty_data, unit)
+        quantity = float(quantity_val)
+        if quantity <= 0 or quantity > MAX_QUANTITY:
+            raise ValueError("range")
+    except (TypeError, ValueError) as exc:
+        reason = str(exc)
+        if reason == "integer":
+            msg = get_text(lang, "offer_error_quantity_integer")
+        elif reason == "step":
+            msg = get_text(lang, "offer_error_quantity_step")
+        elif unit in {"kg", "g"}:
+            msg = get_text(lang, "offer_error_quantity_weight_range").format(max=MAX_QUANTITY)
+        elif unit in {"l", "ml"}:
+            msg = get_text(lang, "offer_error_quantity_volume_range").format(max=MAX_QUANTITY)
+        else:
+            msg = get_text(lang, "offer_error_quantity_range").format(max=MAX_QUANTITY)
+        await callback.answer(msg, show_alert=True)
         return
 
     await _process_quantity(callback.message, state, lang, quantity)
@@ -1386,20 +1453,27 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
     if not await _ensure_wizard_alive(message, state, lang):
         return
 
+    data = await state.get_data()
+    unit = data.get("unit", "piece")
+
     try:
-        quantity_text = message.text.strip()
-        numbers = re.findall(r"\d+", quantity_text)
-        if not numbers:
-            raise ValueError
-        quantity = int(numbers[0])
-        if quantity < 1 or quantity > MAX_QUANTITY:
-            raise ValueError
-    except ValueError:
-        await _upsert_prompt(
-            message,
-            state,
-            get_text(lang, "offer_error_quantity_range").format(max=MAX_QUANTITY),
-        )
+        quantity_val = parse_quantity_input(message.text, unit)
+        quantity = float(quantity_val)
+        if quantity <= 0 or quantity > MAX_QUANTITY:
+            raise ValueError("range")
+    except ValueError as exc:
+        reason = str(exc)
+        if reason == "integer":
+            msg = get_text(lang, "offer_error_quantity_integer")
+        elif reason == "step":
+            msg = get_text(lang, "offer_error_quantity_step")
+        elif unit in {"kg", "g"}:
+            msg = get_text(lang, "offer_error_quantity_weight_range").format(max=MAX_QUANTITY)
+        elif unit in {"l", "ml"}:
+            msg = get_text(lang, "offer_error_quantity_volume_range").format(max=MAX_QUANTITY)
+        else:
+            msg = get_text(lang, "offer_error_quantity_range").format(max=MAX_QUANTITY)
+        await _upsert_prompt(message, state, msg)
         await safe_delete_message(message)
         return
 
@@ -1408,7 +1482,7 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
 
 
 async def _process_quantity(
-    target: types.Message, state: FSMContext, lang: str, quantity: int
+    target: types.Message, state: FSMContext, lang: str, quantity: float
 ) -> None:
     """Process quantity and move to expiry step."""
     await state.update_data(quantity=quantity)
@@ -1417,7 +1491,7 @@ async def _process_quantity(
     text = _compose_step_message(
         data,
         lang,
-        3,
+        5,
         "Остаток и срок годности",
         "Miqdor va yaroqlilik",
         "📦",
@@ -1434,7 +1508,7 @@ async def _process_quantity(
     await state.set_state(CreateOffer.expiry_date)
 
 
-# ============ STEP 3: Expiry Date ============
+# ============ STEP 4: Expiry Date ============
 
 
 @router.callback_query(CreateOffer.expiry_date, F.data.startswith("expiry_"))
@@ -1518,7 +1592,7 @@ async def _process_expiry(
     text = _compose_step_message(
         data,
         lang,
-        4,
+        6,
         "Фото",
         "Rasm",
         "🖼️",
@@ -1535,7 +1609,7 @@ async def _process_expiry(
     await state.set_state(CreateOffer.photo)
 
 
-# ============ STEP 4: Photo ============
+# ============ STEP 5: Photo ============
 
 
 @router.message(CreateOffer.photo, F.photo)
@@ -1602,7 +1676,11 @@ async def _show_confirmation(target: types.Message, state: FSMContext, lang: str
     discount_percent = int(data.get("discount_percent") or calc_discount_percent(original_price, discount_price))
 
     quantity = data.get("quantity", 0)
-    qty_display = f"{int(quantity)} {'шт' if lang == 'ru' else 'dona'}"
+    unit = data.get("unit", "piece")
+    try:
+        qty_display = f"{format_quantity(quantity, unit, lang)} {unit_label(unit, lang)}"
+    except Exception:
+        qty_display = f"{quantity} {unit_label(unit, lang)}"
 
     expiry_raw = data.get("expiry_date") or ""
 
@@ -1665,9 +1743,9 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         if not db:
             raise ValueError("Database not initialized")
 
-        unit = data.get("unit", "шт")
-        quantity = int(data["quantity"])
-        qty_display = f"{quantity} {unit}"
+        unit = data.get("unit", "piece")
+        quantity = float(data["quantity"])
+        qty_display = f"{format_quantity(quantity, unit, lang)} {unit_label(unit, lang)}"
 
         # Prepare times in ISO format (will be parsed by Pydantic)
         now = datetime.now()
@@ -1921,30 +1999,13 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
         return
     data = await state.get_data()
 
-    text = _compose_step_message(
-        data,
-        lang,
-        3,
-        "Остаток и срок годности",
-        "Miqdor va yaroqlilik",
-        "📦",
-        get_text(lang, "offer_step3_quantity_hint"),
-    )
-
-    await _edit_prompt_from_callback(
-        callback,
-        state,
-        text,
-        reply_markup=quantity_keyboard(lang),
-        parse_mode="HTML",
-    )
-    await state.set_state(CreateOffer.quantity)
+    await _prompt_quantity_step(callback.message, state, lang)
     await callback.answer()
 
 
 @router.callback_query(F.data == "create_back_unit")
 async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Legacy back action - return to discount step."""
+    """Go back to unit selection."""
     if not db or not callback.message:
         await callback.answer()
         return
@@ -1954,7 +2015,7 @@ async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None
         await callback.answer()
         return
 
-    await back_to_discount(callback, state)
+    await _go_to_unit_step(callback.message, state, lang)
 
 
 @router.callback_query(F.data == "create_back_expiry")
@@ -1973,7 +2034,7 @@ async def back_to_expiry(callback: types.CallbackQuery, state: FSMContext) -> No
     text = _compose_step_message(
         data,
         lang,
-        3,
+        5,
         "Остаток и срок годности",
         "Miqdor va yaroqlilik",
         "📦",

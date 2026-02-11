@@ -43,7 +43,7 @@ from app.core.geocoding import geocode_store_address
 from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
-from app.core.utils import UZB_TZ, get_uzb_time
+from app.core.utils import UZB_TZ, get_uzb_time, get_order_field
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
 from app.domain.order import OrderStatus, PaymentStatus
@@ -311,6 +311,149 @@ class NotificationTemplates:
         }.get(normalized, "📦")
 
     @staticmethod
+    def _format_created_time(value: Any | None) -> str | None:
+        if not value:
+            return None
+        base_time = None
+        if isinstance(value, datetime):
+            base_time = value
+        elif isinstance(value, str):
+            try:
+                base_time = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except Exception:
+                base_time = None
+        if base_time is None:
+            base_time = get_uzb_time()
+        elif base_time.tzinfo is None:
+            base_time = base_time.replace(tzinfo=UZB_TZ)
+        return base_time.astimezone(UZB_TZ).strftime("%H:%M")
+
+    @staticmethod
+    def _seller_status_label(status: str, lang: str, order_type: str) -> str:
+        normalized = OrderStatus.normalize(str(status))
+        if order_type == "delivery":
+            if normalized == OrderStatus.READY:
+                return get_text(lang, "seller_status_ready_delivery")
+            if normalized == OrderStatus.DELIVERING:
+                return get_text(lang, "seller_status_handed_over")
+        return status_label(normalized, lang, order_type)
+
+    @staticmethod
+    def _seller_status_hint(status: str, lang: str, order_type: str) -> str | None:
+        normalized = OrderStatus.normalize(str(status))
+        if order_type == "pickup":
+            if normalized == OrderStatus.PREPARING:
+                return get_text(lang, "seller_hint_pickup_preparing")
+            if normalized == OrderStatus.READY:
+                return get_text(lang, "seller_hint_pickup_ready")
+        if order_type == "delivery":
+            if normalized == OrderStatus.PREPARING:
+                return get_text(lang, "seller_hint_delivery_preparing")
+            if normalized == OrderStatus.READY:
+                return get_text(lang, "seller_hint_delivery_ready")
+        return None
+
+    @staticmethod
+    def _build_seller_card(
+        *,
+        lang: str,
+        order_id: int,
+        status: str,
+        order_type: str,
+        items: list[dict] | None,
+        customer_name: str | None,
+        customer_phone: str | None,
+        total: int | None,
+        delivery_price: int,
+        currency: str,
+        created_at: Any | None = None,
+    ) -> str:
+        normalized_type = "delivery" if order_type == "taxi" else (order_type or "delivery")
+        display_type = "pickup" if normalized_type == "pickup" else "delivery"
+
+        type_label = (
+            get_text(lang, "order_type_pickup")
+            if display_type == "pickup"
+            else get_text(lang, "order_type_delivery")
+        )
+        status_text = NotificationTemplates._seller_status_label(status, lang, display_type)
+        status_emoji = NotificationTemplates._status_emoji(status)
+        created_time = NotificationTemplates._format_created_time(created_at)
+
+        safe_name = html.escape(str(customer_name)) if customer_name else "—"
+        safe_phone = html.escape(str(customer_phone)) if customer_phone else "—"
+
+        items_total = int(total or 0)
+        if items_total <= 0 and items:
+            try:
+                items_total = sum(
+                    int(item.get("price") or 0) * int(item.get("quantity") or 1)
+                    for item in items
+                )
+            except Exception:
+                items_total = int(total or 0)
+
+        delivery_fee = int(delivery_price or 0) if display_type == "delivery" else 0
+        grand_total = items_total + (delivery_fee if display_type == "delivery" else 0)
+
+        label_order = get_text(lang, "label_order")
+        label_status = get_text(lang, "label_status")
+        label_created = get_text(lang, "label_created")
+        label_customer = get_text(lang, "label_customer")
+        label_phone = get_text(lang, "phone")
+        label_items = get_text(lang, "label_items")
+        label_amount = get_text(lang, "label_amount")
+        label_items_cost = get_text(lang, "label_items_cost")
+        label_delivery = get_text(lang, "label_delivery_fee")
+        label_total = get_text(lang, "label_total")
+
+        def _fmt_money(value: int) -> str:
+            return f"{int(value):,}".replace(",", " ")
+
+        lines: list[str] = [
+            f"📦 {label_order} #{order_id} — {type_label}",
+            f"{label_status}: {status_emoji} <b>{status_text}</b>",
+        ]
+        if created_time:
+            lines.append(f"⏱ {label_created}: {created_time}")
+
+        lines.extend(
+            [
+                "",
+                f"👤 {label_customer}: {safe_name}",
+                f"📞 {label_phone}: {safe_phone}",
+                "",
+                f"🛒 {label_items}:",
+            ]
+        )
+
+        if items:
+            for item in items:
+                title = html.escape(str(item.get("title") or ""))
+                qty = int(item.get("quantity") or 1)
+                lines.append(f"• {title} ×{qty}")
+        else:
+            lines.append("• —")
+
+        lines.extend(
+            [
+                "",
+                f"💰 {label_amount}:",
+                f"{label_items_cost}: {_fmt_money(items_total)} {currency}",
+            ]
+        )
+        if display_type == "delivery":
+            lines.append(f"{label_delivery}: {_fmt_money(delivery_fee)} {currency}")
+        lines.append(f"{label_total}: {_fmt_money(grand_total)} {currency}")
+
+        hint = NotificationTemplates._seller_status_hint(status, lang, display_type)
+        if hint:
+            lines.append("")
+            lines.append(hint)
+
+        return "\n".join(lines)
+
+    @staticmethod
     def _build_customer_card(
         *,
         lang: str,
@@ -450,38 +593,27 @@ class NotificationTemplates:
         map_url: str | None = None,
         payment_status: str | None = None,
         payment_proof_photo_id: str | None = None,
+        created_at: Any | None = None,
     ) -> str:
         "Build seller notification for new order."
-        normalized_type = "delivery" if order_type == "taxi" else order_type
-        builder = NotificationBuilder(normalized_type)  # type: ignore
-        pickup_code = ", ".join(pickup_codes) if pickup_codes else None
         order_ids_int = [int(x) for x in order_ids if x]
         order_id_value = (
             int(order_ids_int[0])
             if order_ids_int
             else int(order_ids[0]) if order_ids else 0
         )
-        return builder.build_created(
+        return NotificationTemplates._build_seller_card(
             lang=lang,
             order_id=order_id_value,
-            order_ids=order_ids_int or None,
-            is_cart=len(order_ids_int) > 1,
-            store_name="",
-            store_address=None,
-            delivery_address=delivery_address,
-            pickup_code=pickup_code,
+            status=OrderStatus.PENDING,
+            order_type=order_type,
             items=items,
-            delivery_price=delivery_price,
-            total=total,
-            currency=currency,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            payment_proof_photo_id=payment_proof_photo_id,
-            role="seller",
             customer_name=customer_name,
             customer_phone=customer_phone,
-            comment=comment,
-            map_url=map_url,
+            total=total,
+            delivery_price=delivery_price,
+            currency=currency,
+            created_at=created_at,
         )
 
 
@@ -623,25 +755,21 @@ class NotificationTemplates:
         payment_method: str | None = None,
         payment_status: str | None = None,
         payment_proof_photo_id: str | None = None,
+        created_at: Any | None = None,
     ) -> str:
         """Build seller notification with a clean status layout."""
-        normalized_type = "delivery" if order_type == "taxi" else order_type
-        builder = NotificationBuilder(normalized_type)  # type: ignore
-        return builder.build(
-            status=status,
+        return NotificationTemplates._build_seller_card(
             lang=lang,
             order_id=int(order_id) if isinstance(order_id, str) else order_id,
+            status=status,
+            order_type=order_type,
             items=items,
-            delivery_address=delivery_address,
-            delivery_price=delivery_price,
-            total=total,
-            currency=currency,
             customer_name=customer_name,
             customer_phone=customer_phone,
-            role="seller",
-            payment_method=payment_method,
-            payment_status=payment_status,
-            payment_proof_photo_id=payment_proof_photo_id,
+            total=total,
+            delivery_price=delivery_price,
+            currency=currency,
+            created_at=created_at,
         )
 
 
@@ -1943,18 +2071,21 @@ class UnifiedOrderService:
     def _build_seller_keyboard(
         seller_lang: str,
         first_order_id: int,
+        order_type: str | None,
         map_url: str | None,
     ) -> InlineKeyboardBuilder:
         kb = InlineKeyboardBuilder()
-        if seller_lang == "uz":
-            kb.button(text="✅ Qabul qilish", callback_data=f"order_confirm_{first_order_id}")
-            kb.button(text="❌ Rad etish", callback_data=f"order_reject_{first_order_id}")
-        else:
-            kb.button(text="✅ Принять", callback_data=f"order_confirm_{first_order_id}")
-            kb.button(text="❌ Отклонить", callback_data=f"order_reject_{first_order_id}")
-        if map_url:
-            map_text = "🗺 Xarita" if seller_lang == "uz" else "🗺 Карта"
-            kb.button(text=map_text, url=map_url)
+        is_delivery = order_type in ("delivery", "taxi")
+        kb.button(
+            text=get_text(seller_lang, "btn_order_accept"),
+            callback_data=f"order_confirm_{first_order_id}",
+        )
+        kb.button(
+            text=get_text(seller_lang, "btn_order_reject"),
+            callback_data=f"order_reject_{first_order_id}",
+        )
+        if map_url and is_delivery:
+            kb.button(text=get_text(seller_lang, "btn_map"), url=map_url)
             kb.adjust(2, 1)
         else:
             kb.adjust(2)
@@ -2001,12 +2132,19 @@ class UnifiedOrderService:
                 # Build notification
                 order_ids, order_id_ints = self._collect_order_ids(store_orders)
                 pickup_codes = self._collect_pickup_codes(store_orders)
-                map_url, static_map_url = await self._resolve_delivery_map(
+                map_url, _ = await self._resolve_delivery_map(
                     is_delivery=is_delivery,
                     delivery_address=delivery_address,
                     delivery_lat=delivery_lat,
                     delivery_lon=delivery_lon,
                 )
+                created_at = None
+                if order_id_ints and hasattr(self.db, "get_order"):
+                    try:
+                        order_row = self.db.get_order(int(order_id_ints[0]))
+                        created_at = get_order_field(order_row, "created_at")
+                    except Exception:
+                        created_at = None
 
                 seller_text = NotificationTemplates.seller_new_order(
                     lang=seller_lang,
@@ -2025,6 +2163,7 @@ class UnifiedOrderService:
                     total=store_total,
                     delivery_price=store_delivery,
                     currency=currency,
+                    created_at=created_at,
                 )
                 primary_offer_id = store_orders[0].get("offer_id") if store_orders else None
                 photo_ids = self._collect_photos_from_items(store_orders)
@@ -2072,6 +2211,7 @@ class UnifiedOrderService:
                 kb = self._build_seller_keyboard(
                     seller_lang=seller_lang,
                     first_order_id=first_order_id,
+                    order_type=normalized_order_type,
                     map_url=map_url,
                 )
 
@@ -2097,19 +2237,6 @@ class UnifiedOrderService:
                             parse_mode="HTML",
                             reply_markup=kb.as_markup(),
                         )
-                    if static_map_url and os.getenv("ENABLE_SELLER_MAP_PREVIEW", "0").strip().lower() in {
-                        "1",
-                        "true",
-                        "yes",
-                        "on",
-                    }:
-                        try:
-                            caption = "📍 Manzil xaritada" if seller_lang == "uz" else "📍 Адрес на карте"
-                            await self.bot.send_photo(owner_id, photo=static_map_url, caption=caption)
-                        except Exception as map_err:
-                            logger.debug(
-                                f"Map preview skipped for seller {owner_id}: {map_err}"
-                            )
                     logger.info(
                         f"Sent order notification to seller {owner_id} for orders {order_ids}"
                     )
@@ -3265,53 +3392,73 @@ class UnifiedOrderService:
         resolved_order_type: str | None,
         target_status: str,
         entity_id: int,
+        map_url: str | None = None,
     ) -> InlineKeyboardBuilder:
         kb = InlineKeyboardBuilder()
-        if resolved_order_type in ("delivery", "taxi"):
-            if target_status in (OrderStatus.PENDING, OrderStatus.PREPARING):
-                if seller_lang == "uz":
-                    kb.button(
-                        text="📦 Topshirishga tayyor",
-                        callback_data=f"order_ready_{entity_id}",
-                    )
-                else:
-                    kb.button(
-                        text="📦 Готов к передаче",
-                        callback_data=f"order_ready_{entity_id}",
-                    )
+        rows: list[int] = []
+        is_delivery = resolved_order_type in ("delivery", "taxi")
+
+        if is_delivery:
+            if target_status == OrderStatus.PENDING:
+                kb.button(
+                    text=get_text(seller_lang, "btn_order_accept"),
+                    callback_data=f"order_confirm_{entity_id}",
+                )
+                kb.button(
+                    text=get_text(seller_lang, "btn_order_reject"),
+                    callback_data=f"order_reject_{entity_id}",
+                )
+                rows.append(2)
+            elif target_status == OrderStatus.PREPARING:
+                kb.button(
+                    text=get_text(seller_lang, "btn_ready_for_delivery"),
+                    callback_data=f"order_ready_{entity_id}",
+                )
+                rows.append(1)
             elif target_status == OrderStatus.READY:
-                if seller_lang == "uz":
-                    kb.button(
-                        text="🚚 Kuryerga topshirdim",
-                        callback_data=f"order_delivering_{entity_id}",
-                    )
-                else:
-                    kb.button(
-                        text="🚚 Передал курьеру",
-                        callback_data=f"order_delivering_{entity_id}",
-                    )
-            elif target_status == OrderStatus.DELIVERING:
-                if seller_lang == "uz":
-                    kb.button(
-                        text="✅ Topshirildi",
-                        callback_data=f"order_complete_{entity_id}",
-                    )
-                else:
-                    kb.button(
-                        text="✅ Доставлено",
-                        callback_data=f"order_complete_{entity_id}",
-                    )
+                kb.button(
+                    text=get_text(seller_lang, "btn_enter_courier_phone"),
+                    callback_data=f"order_delivering_{entity_id}",
+                )
+                kb.button(
+                    text=get_text(seller_lang, "btn_skip"),
+                    callback_data=f"skip_courier_phone_{entity_id}",
+                )
+                rows.append(2)
         else:
-            if target_status == OrderStatus.PREPARING:
+            if target_status == OrderStatus.PENDING:
+                kb.button(
+                    text=get_text(seller_lang, "btn_order_accept"),
+                    callback_data=f"order_confirm_{entity_id}",
+                )
+                kb.button(
+                    text=get_text(seller_lang, "btn_order_reject"),
+                    callback_data=f"order_reject_{entity_id}",
+                )
+                rows.append(2)
+            elif target_status == OrderStatus.PREPARING:
                 kb.button(
                     text=get_text(seller_lang, "btn_ready_for_pickup"),
                     callback_data=f"order_ready_{entity_id}",
                 )
+                rows.append(1)
             elif target_status == OrderStatus.READY:
                 kb.button(
                     text=get_text(seller_lang, "btn_mark_issued"),
                     callback_data=f"order_complete_{entity_id}",
                 )
+                rows.append(1)
+
+        if map_url and is_delivery and target_status in (
+            OrderStatus.PENDING,
+            OrderStatus.PREPARING,
+            OrderStatus.READY,
+        ):
+            kb.button(text=get_text(seller_lang, "btn_map"), url=map_url)
+            rows.append(1)
+
+        if rows:
+            kb.adjust(*rows)
         return kb
 
     async def _resolve_seller_photo(
@@ -3838,6 +3985,25 @@ class UnifiedOrderService:
                             store,
                             resolved_order_type,
                         )
+                        created_at = get_order_field(entity, "created_at")
+                        map_url = None
+                        if resolved_order_type in ("delivery", "taxi") and target_status in (
+                            OrderStatus.PENDING,
+                            OrderStatus.PREPARING,
+                            OrderStatus.READY,
+                        ):
+                            if isinstance(entity, dict):
+                                delivery_lat = entity.get("delivery_lat")
+                                delivery_lon = entity.get("delivery_lon")
+                            else:
+                                delivery_lat = getattr(entity, "delivery_lat", None)
+                                delivery_lon = getattr(entity, "delivery_lon", None)
+                            map_url, _ = await self._resolve_delivery_map(
+                                is_delivery=True,
+                                delivery_address=delivery_address,
+                                delivery_lat=delivery_lat,
+                                delivery_lon=delivery_lon,
+                            )
 
                         seller_text = NotificationTemplates.seller_status_update(
                             lang=seller_lang,
@@ -3854,6 +4020,7 @@ class UnifiedOrderService:
                             payment_method=ctx.payment_method,
                             payment_status=normalized_payment_status,
                             payment_proof_photo_id=ctx.payment_proof_photo_id,
+                            created_at=created_at,
                         )
                         seller_photo = await self._resolve_seller_photo(items, offer_id)
 
@@ -3862,6 +4029,7 @@ class UnifiedOrderService:
                             resolved_order_type=resolved_order_type,
                             target_status=target_status,
                             entity_id=entity_id,
+                            map_url=map_url,
                         )
                         reply_markup = kb.as_markup() if kb.buttons else None
 

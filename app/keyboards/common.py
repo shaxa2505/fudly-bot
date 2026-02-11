@@ -5,6 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from localization import get_text
+from app.core.units import format_quantity, normalize_unit, unit_label
 
 
 def language_keyboard() -> InlineKeyboardMarkup:
@@ -167,33 +168,50 @@ def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
 
 
 def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMarkup:
-    """Quick quantity selection keyboard."""
+    """Quick quantity selection keyboard (unit-aware)."""
     builder = InlineKeyboardBuilder()
 
-    # Default to pieces; keep unit parameter for future flexibility
-    quantities = [5, 10, 20, 50, 100]
+    unit_type = normalize_unit(unit)
+    unit_text = unit_label(unit_type, lang)
+
+    if unit_type == "piece":
+        quantities = [5, 10, 20, 50, 100]
+    elif unit_type in {"kg", "l"}:
+        quantities = [0.5, 1, 2, 5]
+    elif unit_type == "g":
+        quantities = [200, 500, 1000]
+    else:
+        quantities = [250, 500, 1000]
+
     for q in quantities:
-        builder.button(text=str(q), callback_data=f"quantity_{q}")
+        label = f"{format_quantity(q, unit_type, lang)} {unit_text}"
+        builder.button(text=label, callback_data=f"quantity_{q}")
 
     builder.button(text="✍️ Другое" if lang == "ru" else "✍️ Boshqa", callback_data="quantity_custom")
-    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_discount")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_unit")
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
-    builder.adjust(3, 3, 2)
+    builder.adjust(2, 2, 2)
     return builder.as_markup()
 
 
 def unit_type_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
-    """Unit type selection keyboard (pieces, kg, etc.)."""
+    """Unit type selection keyboard."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="Штуки (шт)" if lang == "ru" else "Dona (dona)", callback_data="unit_type_шт")
-    builder.button(text="Упаковки (уп)" if lang == "ru" else "Qadoq (up)", callback_data="unit_type_уп")
-    builder.button(text="Килограммы (кг)" if lang == "ru" else "Kilogramm (kg)", callback_data="unit_type_кг")
-    builder.button(text="Граммы (г)" if lang == "ru" else "Gramm (g)", callback_data="unit_type_г")
-    builder.button(text="Литры (л)" if lang == "ru" else "Litr (l)", callback_data="unit_type_л")
-    builder.button(text="Миллилитры (мл)" if lang == "ru" else "Millilitr (ml)", callback_data="unit_type_мл")
+
+    piece_label = f"📦 {get_text(lang, 'unit_piece_title')} ({get_text(lang, 'unit_piece')})"
+    kg_label = f"⚖️ {get_text(lang, 'unit_kg_title')} ({get_text(lang, 'unit_kg')})"
+    g_label = f"⚖️ {get_text(lang, 'unit_g_title')} ({get_text(lang, 'unit_g')})"
+    l_label = f"🧃 {get_text(lang, 'unit_l_title')} ({get_text(lang, 'unit_l')})"
+    ml_label = f"🧃 {get_text(lang, 'unit_ml_title')} ({get_text(lang, 'unit_ml')})"
+
+    builder.button(text=piece_label, callback_data="unit_type_piece")
+    builder.button(text=kg_label, callback_data="unit_type_kg")
+    builder.button(text=g_label, callback_data="unit_type_g")
+    builder.button(text=l_label, callback_data="unit_type_l")
+    builder.button(text=ml_label, callback_data="unit_type_ml")
     builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_discount")
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
-    builder.adjust(2, 2, 2, 2)
+    builder.adjust(2, 2, 2, 1)
     return builder.as_markup()
 
 

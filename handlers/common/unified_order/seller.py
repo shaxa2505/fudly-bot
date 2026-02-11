@@ -23,7 +23,7 @@ from app.services.unified_order_service import (
     init_unified_order_service,
 )
 from handlers.common.states import CourierHandover
-from handlers.common.utils import can_manage_store, html_escape as _esc
+from handlers.common.utils import can_manage_store
 from localization import get_text
 
 from .common import _get_db, _get_entity_field, _get_store_field, logger
@@ -217,6 +217,10 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
     # Use UnifiedOrderService if available, otherwise fallback
     if order_service:
         success = await order_service.confirm_order(entity_id, entity_type)
+        if success:
+            confirmed_msg = get_text(lang, "order_confirmed")
+            await callback.answer(f"✅ {confirmed_msg}")
+            return
     else:
         try:
             if entity_type == "order":
@@ -297,16 +301,8 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
         payment_method=payment_method,
         payment_status=payment_status,
         payment_proof_photo_id=payment_proof_photo_id,
+        created_at=_get_entity_field(entity, "created_at"),
     )
-
-    # Add a short next-step hint so sellers clearly understand
-    # what to do after confirmation for each flow.
-    if order_type != "delivery":
-        # Pickup order created через orders: сразу ждём фактической выдачи.
-        seller_text += get_text(lang, "confirm_pickup_hint")
-    else:
-        # Delivery flow: сначала готовим, потом передаём курьеру.
-        seller_text += get_text(lang, "confirm_delivery_hint")
 
     kb = InlineKeyboardBuilder()
     if order_type != "delivery":
@@ -314,13 +310,13 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             text=get_text(lang, "btn_ready_for_pickup"),
             callback_data=f"order_ready_{entity_id}",
         )
+        kb.adjust(1)
     else:
-        # Настоящая доставка: сначала "готов к передаче", затем курьер и т.д.
         kb.button(
             text=get_text(lang, "btn_ready_for_delivery"),
             callback_data=f"order_ready_{entity_id}",
         )
-    kb.adjust(1)
+        kb.adjust(1)
 
     try:
         if callback.message:
@@ -404,6 +400,10 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
 
     if order_service:
         success = await order_service.reject_order(entity_id, entity_type)
+        if success:
+            rejected_msg = get_text(lang, "order_rejected")
+            await callback.answer(f"❌ {rejected_msg}")
+            return
     else:
         try:
             db_instance.update_order_status(entity_id, OrderStatus.REJECTED)
@@ -494,6 +494,10 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
 
     if order_service:
         success = await order_service.mark_ready(order_id, "order")
+        if success:
+            msg = get_text(lang, "order_ready_success") if is_delivery else get_text(lang, "status_ready")
+            await callback.answer(f"✅ {msg}")
+            return
     else:
         try:
             db_instance.update_order_status(order_id, OrderStatus.READY)
@@ -567,20 +571,26 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
         payment_method=payment_method,
         payment_status=payment_status,
         payment_proof_photo_id=payment_proof_photo_id,
+        created_at=_get_entity_field(order, "created_at"),
     )
 
     kb = InlineKeyboardBuilder()
     if is_delivery:
         kb.button(
-            text=get_text(lang, "btn_delivered_to_courier"),
+            text=get_text(lang, "btn_enter_courier_phone"),
             callback_data=f"order_delivering_{order_id}",
         )
+        kb.button(
+            text=get_text(lang, "btn_skip"),
+            callback_data=f"skip_courier_phone_{order_id}",
+        )
+        kb.adjust(2)
     else:
         kb.button(
             text=get_text(lang, "btn_mark_issued"),
             callback_data=f"order_complete_{order_id}",
         )
-    kb.adjust(1)
+        kb.adjust(1)
 
     try:
         if callback.message:
@@ -803,6 +813,17 @@ async def _process_delivery_handover(
 
     if order_service:
         success = await order_service.start_delivery(order_id, courier_phone=courier_phone)
+        if success:
+            msg = get_text(lang, "courier_handover_done")
+            if isinstance(event, types.CallbackQuery):
+                await event.answer(f"🚚 {msg}", show_alert=True)
+            else:
+                await event.answer(f"🚚 {msg}")
+                try:
+                    await event.delete()
+                except Exception:  # pragma: no cover
+                    pass
+            return
     else:
         try:
             db_instance.update_order_status(order_id, OrderStatus.DELIVERING)
@@ -874,11 +895,8 @@ async def _process_delivery_handover(
         payment_method=payment_method,
         payment_status=payment_status,
         payment_proof_photo_id=payment_proof_photo_id,
+        created_at=_get_entity_field(order, "created_at"),
     )
-
-    if courier_phone:
-        courier_label = get_text(lang, "label_courier")
-        seller_text += f"\n\n📞 {courier_label}: <code>{courier_phone}</code>"
 
     safe_caption = _safe_caption(seller_text)
     edited = False
@@ -983,6 +1001,10 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
 
     if order_service:
         success = await order_service.complete_order(order_id, entity_type)
+        if success:
+            msg = get_text(lang, "order_completed_seller")
+            await callback.answer(f"🎉 {msg}")
+            return
     else:
         try:
             if entity_type == "order":
@@ -1090,6 +1112,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
         payment_method=payment_method,
         payment_status=payment_status,
         payment_proof_photo_id=payment_proof_photo_id,
+        created_at=_get_entity_field(entity, "created_at"),
     )
 
     try:

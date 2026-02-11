@@ -302,48 +302,71 @@ function AppContent() {
         // Show UI immediately, load profile in background
         setLoading(false)
 
-        // Sync with backend in background (non-blocking)
-        api.getProfile().then(profile => {
-          if (profile) {
-            const fullUser = {
-              ...userData,
-              phone: profile.phone,
-              city: profile.city,
-              language: profile.language,
-              registered: profile.registered,
-            }
-            setUser(fullUser)
-            setStoredUser(fullUser)
-            if (profile.city) {
+        const syncProfile = async () => {
+          let profile = null
+          try {
+            profile = await api.getProfile()
+            if ((!profile?.phone || !profile?.registered) && tg.initData) {
               try {
-                const savedRaw = localStorage.getItem('fudly_location')
-                if (!savedRaw) {
-                  localStorage.setItem(
-                    'fudly_location',
-                    JSON.stringify({ city: profile.city, source: 'profile' })
-                  )
-                } else {
-                  const saved = JSON.parse(savedRaw)
-                  const hasCity = saved?.city && String(saved.city).trim()
-                  const hasCoords = saved?.coordinates?.lat != null && saved?.coordinates?.lon != null
-                  if (!hasCity && !hasCoords) {
-                    localStorage.setItem(
-                      'fudly_location',
-                      JSON.stringify({ ...saved, city: profile.city, source: saved?.source || 'profile' })
-                    )
-                  }
+                const validated = await api.validateAuth(tg.initData)
+                if (validated) {
+                  profile = validated
                 }
-              } catch {
+              } catch (error) {
+                console.warn('Auth validate fallback failed:', error)
+              }
+            }
+          } catch (error) {
+            if (tg.initData) {
+              try {
+                profile = await api.validateAuth(tg.initData)
+              } catch (fallbackError) {
+                console.warn('Profile sync failed:', fallbackError)
+              }
+            }
+          }
+
+          if (!profile) return
+
+          const fullUser = {
+            ...userData,
+            phone: profile.phone,
+            city: profile.city,
+            language: profile.language,
+            registered: profile.registered,
+          }
+          setUser(fullUser)
+          setStoredUser(fullUser)
+          if (profile.city) {
+            try {
+              const savedRaw = localStorage.getItem('fudly_location')
+              if (!savedRaw) {
                 localStorage.setItem(
                   'fudly_location',
                   JSON.stringify({ city: profile.city, source: 'profile' })
                 )
+              } else {
+                const saved = JSON.parse(savedRaw)
+                const hasCity = saved?.city && String(saved.city).trim()
+                const hasCoords = saved?.coordinates?.lat != null && saved?.coordinates?.lon != null
+                if (!hasCity && !hasCoords) {
+                  localStorage.setItem(
+                    'fudly_location',
+                    JSON.stringify({ ...saved, city: profile.city, source: saved?.source || 'profile' })
+                  )
+                }
               }
+            } catch {
+              localStorage.setItem(
+                'fudly_location',
+                JSON.stringify({ city: profile.city, source: 'profile' })
+              )
             }
           }
-        }).catch(() => {
-          // User not registered - that's ok
-        })
+        }
+
+        // Sync with backend in background (non-blocking)
+        syncProfile()
         return
       }
     }

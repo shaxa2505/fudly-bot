@@ -1435,14 +1435,33 @@ function CartPage({ user }) {
     try {
       const profile = await api.getProfile({ force: true })
       const profilePhone = (profile?.phone || '').toString().trim()
-      if (!profilePhone) {
-        return ''
+      if (profilePhone) {
+        const mergedUser = { ...(getCurrentUser() || {}), ...profile }
+        setStoredUser(mergedUser)
+        return profilePhone
       }
-      const mergedUser = { ...(getCurrentUser() || {}), ...profile }
-      setStoredUser(mergedUser)
-      return profilePhone
+      if (profile) {
+        const mergedUser = { ...(getCurrentUser() || {}), ...profile }
+        setStoredUser(mergedUser)
+      }
     } catch (error) {
       console.warn('Could not refresh profile phone:', error)
+    }
+
+    const initData = getTelegramInitData()
+    if (!initData) {
+      return ''
+    }
+    try {
+      const profile = await api.validateAuth(initData)
+      const profilePhone = (profile?.phone || '').toString().trim()
+      if (profile) {
+        const mergedUser = { ...(getCurrentUser() || {}), ...profile }
+        setStoredUser(mergedUser)
+      }
+      return profilePhone
+    } catch (error) {
+      console.warn('Could not validate Telegram auth for phone:', error)
       return ''
     }
   }, [])

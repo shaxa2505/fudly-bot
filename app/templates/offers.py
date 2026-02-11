@@ -6,6 +6,7 @@ from collections.abc import Iterable, Sequence
 from typing import Any
 
 from app.services.offer_service import OfferDetails, OfferListItem, StoreDetails, StoreSummary
+from app.core.units import format_quantity, normalize_unit, unit_label
 from localization import get_text
 
 
@@ -230,23 +231,32 @@ def format_product_card(
         current_price = getattr(offer, "price", 0) or 0
     original_price = getattr(offer, "original_price", 0) or 0
 
+    unit_type = normalize_unit(getattr(offer, "unit", "") or labels["unit"])
+    unit_text = unit_label(unit_type, lang)
+
     if original_price and original_price > current_price:
         discount_pct = round((1 - current_price / original_price) * 100)
         discount_pct = min(99, max(1, discount_pct))
         lines.append(
-            f"{labels['price']}: {_format_money(current_price)} {labels['currency']} (-{discount_pct}%)"
+            f"{labels['price']}: {_format_money(current_price)} {labels['currency']} / {unit_text} (-{discount_pct}%)"
         )
-        lines.append(f"{labels['was']}: {_format_money(original_price)} {labels['currency']}")
+        lines.append(
+            f"{labels['was']}: {_format_money(original_price)} {labels['currency']} / {unit_text}"
+        )
     else:
-        lines.append(f"{labels['price']}: {_format_money(current_price)} {labels['currency']}")
+        lines.append(f"{labels['price']}: {_format_money(current_price)} {labels['currency']} / {unit_text}")
 
     qty = getattr(offer, "quantity", None)
     if qty is not None:
         if qty <= 0:
             lines.append(labels["out_of_stock"])
         else:
-            unit = offer.unit or labels["unit"]
-            lines.append(f"{labels['in_stock']}: {qty} {unit}")
+            qty_text = format_quantity(qty, unit_type, lang)
+            if unit_type == "piece":
+                lines.append(f"{labels['in_stock']}: {qty_text} {unit_text}")
+            else:
+                upto = get_text(lang, "catalog_pickup_until_short")
+                lines.append(f"{labels['in_stock']}: {upto} {qty_text} {unit_text}")
 
     optional: list[tuple[int, str]] = []
 

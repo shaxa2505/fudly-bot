@@ -15,6 +15,7 @@ from app.keyboards import offers as offer_keyboards
 from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
+from app.core.units import format_quantity, normalize_unit, unit_label
 from handlers.common import BrowseOffers
 from handlers.common.utils import is_hot_offers_button, safe_delete_message, safe_edit_message
 from localization import get_product_categories, get_text, normalize_category
@@ -166,7 +167,8 @@ def _render_catalog_details(
     discount_pct = _discount_percent(offer)
 
     qty = offer.quantity or 0
-    unit = offer.unit or ("dona" if lang == "uz" else "шт")
+    unit_type = normalize_unit(getattr(offer, "unit", None))
+    unit_text = unit_label(unit_type, lang)
 
     pickup_until = _format_time(getattr(offer, "available_until", None))
     expiry_date = _format_date(getattr(offer, "expiry_date", None))
@@ -180,10 +182,16 @@ def _render_catalog_details(
 
     lines = [
         f"<b>{title}</b>",
-        f"{get_text(lang, 'catalog_price')}: {_format_money(original)} → {_format_money(current)} {currency}",
+        f"{get_text(lang, 'catalog_price')}: {_format_money(original)} → {_format_money(current)} {currency} / {unit_text}",
         f"{get_text(lang, 'catalog_discount')}: -{discount_pct}%",
         "",
-        f"{get_text(lang, 'catalog_in_stock')}: {qty} {unit}",
+        (
+            f"{get_text(lang, 'catalog_in_stock')}: "
+            f"{get_text(lang, 'catalog_pickup_until_short')} "
+            f"{format_quantity(qty, unit_type, lang)} {unit_text}"
+            if unit_type != "piece"
+            else f"{get_text(lang, 'catalog_in_stock')}: {format_quantity(qty, unit_type, lang)} {unit_text}"
+        ),
     ]
     if pickup_until:
         lines.append(f"{get_text(lang, 'catalog_pickup_until')}: {pickup_until}")
