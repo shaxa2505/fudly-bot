@@ -1863,7 +1863,6 @@ function CartPage({ user }) {
       return
     }
     setOrderType(null)
-    setOrderTypeTouched(false)
     setOrderItemsExpanded(false)
     setShowMapEditor(false)
     setMapSearchOpen(false)
