@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
+import { Bell, Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
@@ -19,16 +19,17 @@ import { resolveOfferImageUrl, PLACEHOLDER_IMAGE } from '../utils/imageUtils'
 import './HomePage.css'
 
 const CATEGORIES = [
-  { id: 'all', name: 'Barchasi', icon: Flame, color: '#E65100' },
-  { id: 'dairy', name: 'Sut', icon: Milk, color: '#2196F3' },
-  { id: 'bakery', name: 'Non', icon: Croissant, color: '#8D6E63' },
-  { id: 'meat', name: "Go'sht", icon: Beef, color: '#E53935' },
-  { id: 'fruits', name: 'Meva', icon: Apple, color: '#F44336' },
-  { id: 'vegetables', name: 'Sabzavot', icon: Salad, color: '#43A047' },
-  { id: 'drinks', name: 'Ichimlik', icon: Beverage, color: '#4CAF50' },
-  { id: 'sweets', name: 'Shirinlik', icon: Cookie, color: '#F59E0B' },
-  { id: 'frozen', name: 'Muzlatilgan', icon: Snowflake, color: '#3B82F6' },
-  { id: 'other', name: 'Boshqa', icon: Package, color: '#78909C' },
+  { id: 'all', name: 'Barchasi' },
+  { id: 'favorites', name: 'Sevimlilar', isVirtual: true },
+  { id: 'dairy', name: 'Sut' },
+  { id: 'bakery', name: 'Non' },
+  { id: 'meat', name: "Go'sht" },
+  { id: 'fruits', name: 'Meva' },
+  { id: 'vegetables', name: 'Sabzavot' },
+  { id: 'drinks', name: 'Ichimlik' },
+  { id: 'sweets', name: 'Shirinlik' },
+  { id: 'frozen', name: 'Muzlatilgan' },
+  { id: 'other', name: 'Boshqa' },
 ]
 
 const CATEGORY_ALIASES = {
@@ -267,9 +268,13 @@ function HomePage() {
     if (withHaptic) {
       window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
     }
+    if (categoryId === 'favorites') {
+      navigate('/favorites')
+      return
+    }
     setSelectedCategory(categoryId)
     setActiveCategory(categoryId)
-  }, [])
+  }, [navigate])
 
   useEffect(() => {
     activeCategoryRef.current = activeCategory
@@ -1297,9 +1302,6 @@ function HomePage() {
           aria-label="Kategoriyalar"
         >
           {CATEGORIES.map(cat => {
-            const Icon = cat.icon
-            const count = effectiveCategoryCounts?.[cat.id]
-            const showCount = Number.isFinite(count)
             return (
               <button
                 key={cat.id}
@@ -1311,15 +1313,7 @@ function HomePage() {
                 tabIndex={activeCategory === cat.id ? 0 : -1}
                 onClick={() => handleCategorySelect(cat.id)}
               >
-                <span className="category-tab-icon-wrap" aria-hidden="true">
-                  <Icon size={20} strokeWidth={2} className="category-tab-icon" />
-                </span>
                 <span className="category-tab-text">{cat.name}</span>
-                {showCount && (
-                  <span className="category-tab-count">
-                    {categoriesLoading ? '...' : count}
-                  </span>
-                )}
               </button>
             )
           })}
