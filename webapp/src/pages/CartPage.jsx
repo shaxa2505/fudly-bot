@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, Banknote } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, Banknote, X, Leaf } from 'lucide-react'
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -803,8 +803,15 @@ function CartPage({ user }) {
     }, 0)
   }, [safeCartItems])
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
-  const originalTotal = calcTotalPrice(subtotal, savingsTotal)
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
+  const summaryTotal = calcTotalPrice(subtotal, serviceFee)
+  const ecoSavedGrams = Math.max(0, Math.round(safeItemsCount * 120))
+  const ecoInsightText = safeItemsCount > 0
+    ? `${safeItemsCount} dona mahsulot isrof bo'lishining oldi olinmoqda.`
+    : `Bu buyurtma ovqat isrofini kamaytiradi.`
+  const ecoInsightMeta = ecoSavedGrams > 0
+    ? `Taxminan ${ecoSavedGrams}g CO2e tejandi`
+    : `Taxminiy CO2e tejami hisoblanmoqda`
     const deliveryOptions = useMemo(() => {
       const hoursRaw = storeWorkingHours || DEFAULT_WORKING_HOURS
       const range = extractRangeFromText(hoursRaw)
@@ -2266,6 +2273,7 @@ function CartPage({ user }) {
               const unitPrice = discountPrice ?? originalPrice ?? 0
               const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
               const subtitle = item.offer.description || item.offer.short_description || item.offer.store_address || ''
+              const itemSubtitle = subtitle || storeName || ''
               const availability = getOfferAvailability(item.offer)
               const isUnavailableNow = availability.timeRange && !availability.isAvailableNow
               return (
@@ -2286,19 +2294,49 @@ function CartPage({ user }) {
                     />
                   </div>
                   <div className="cart-item-body">
-                    <h3 className="cart-item-title">{item.offer.title}</h3>
-                    {subtitle && (
-                      <p className="cart-item-subtitle">{subtitle}</p>
+                    <div className="cart-item-head">
+                      <h3 className="cart-item-title">{item.offer.title}</h3>
+                      <button
+                        type="button"
+                        className="cart-item-remove"
+                        onClick={() => removeItem(item.offer.id)}
+                        aria-label={`${item.offer.title} ni savatdan o'chirish`}
+                      >
+                        <X size={16} strokeWidth={2} />
+                      </button>
+                    </div>
+                    {itemSubtitle && (
+                      <p className="cart-item-subtitle">{itemSubtitle}</p>
                     )}
-                    <div className="cart-item-prices">
-                      <span className="cart-item-price">
-                        {formatSum(unitPrice)} so'm
-                      </span>
-                      {showOriginalPrice && (
-                        <span className="cart-item-price-old">
-                          {formatSum(originalPrice)}
+                    <div className="cart-item-footer">
+                      <div className="cart-item-prices">
+                        <span className="cart-item-price">
+                          {formatSum(unitPrice)} so'm
                         </span>
-                      )}
+                        {showOriginalPrice && (
+                          <span className="cart-item-price-old">
+                            {formatSum(originalPrice)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="cart-item-qty">
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(item.offer.id, -1)}
+                          aria-label={`${item.offer.title} miqdorini kamaytirish`}
+                        >
+                          <Minus size={14} strokeWidth={2} />
+                        </button>
+                        <span className="cart-item-qty-value">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(item.offer.id, 1)}
+                          aria-label={`${item.offer.title} miqdorini oshirish`}
+                          disabled={item.quantity >= stockLimit || isUnavailableNow}
+                        >
+                          <Plus size={14} strokeWidth={2} />
+                        </button>
+                      </div>
                     </div>
                     {maxStock != null && item.quantity >= maxStock && (
                       <p className="cart-item-stock-warning">
@@ -2310,24 +2348,6 @@ function CartPage({ user }) {
                         Hozir yopiq - Buyurtma vaqti: {availability.timeRange}
                       </p>
                     )}
-                  </div>
-                  <div className="cart-item-qty">
-                    <button
-                      type="button"
-                      onClick={() => handleQuantityChange(item.offer.id, 1)}
-                      aria-label={`${item.offer.title} miqdorini oshirish`}
-                      disabled={item.quantity >= stockLimit || isUnavailableNow}
-                    >
-                      <Plus size={20} strokeWidth={2} />
-                    </button>
-                    <span className="cart-item-qty-value">{item.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleQuantityChange(item.offer.id, -1)}
-                      aria-label={`${item.offer.title} miqdorini kamaytirish`}
-                    >
-                      <Minus size={20} strokeWidth={2} />
-                    </button>
                   </div>
                 </div>
               )
@@ -2397,23 +2417,46 @@ function CartPage({ user }) {
             </div>
           </section>
         )}
-      </main>
 
-      {!isCheckoutRoute && (
-        <div className="cart-summary">
-          <div className="cart-summary-card">
-            <div className="cart-summary-rows">
-              <div className="cart-summary-row">
-                <span>Mahsulotlar ({itemsCount})</span>
-                <span>{formatSum(originalTotal)} so'm</span>
+        {!isCheckoutRoute && (
+          <section className="cart-eco">
+            <div className="cart-eco-icon" aria-hidden="true">
+              <Leaf size={16} strokeWidth={2.2} />
+            </div>
+            <div className="cart-eco-body">
+              <p className="cart-eco-text">{ecoInsightText}</p>
+              <p className="cart-eco-meta">{ecoInsightMeta}</p>
+            </div>
+          </section>
+        )}
+
+        {!isCheckoutRoute && (
+          <section className="cart-summary">
+            <div className="cart-summary-card">
+              <h3 className="cart-summary-title">Buyurtma ma'lumoti</h3>
+              <div className="cart-summary-rows">
+                <div className="cart-summary-row">
+                  <span>Mahsulotlar</span>
+                  <span>{formatSum(subtotal)} so'm</span>
+                </div>
+                <div className="cart-summary-row">
+                  <span>Xizmat haqi</span>
+                  <span>{formatSum(serviceFee)} so'm</span>
+                </div>
+                <div className="cart-summary-row savings">
+                  <span className="cart-summary-savings-label">
+                    <Leaf size={14} strokeWidth={2.2} />
+                    <span>Tejamkorlik</span>
+                  </span>
+                  <span>{savingsLabel}</span>
+                </div>
               </div>
-              <div className="cart-summary-row savings">
-                <span>Tejamkorlik</span>
-                <span>{savingsLabel}</span>
-              </div>
-              <div className="cart-summary-row total">
-                <span>Umumiy</span>
-                <span>{formatSum(subtotal)} so'm</span>
+              <div className="cart-summary-total">
+                <span>Jami</span>
+                <div className="cart-summary-total-values">
+                  <span>{formatSum(summaryTotal)} so'm</span>
+                  <span className="cart-summary-total-note">Soliqlar bilan</span>
+                </div>
               </div>
             </div>
             <button
@@ -2423,9 +2466,9 @@ function CartPage({ user }) {
             >
               To'lovga o'tish
             </button>
-          </div>
-        </div>
-      )}
+          </section>
+        )}
+      </main>
 
       {!isCheckoutRoute && (
         <BottomNav currentPage="cart" cartCount={itemsCount} />

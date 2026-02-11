@@ -1,0 +1,8 @@
+
+{
+  "name": "Premium Location Selection",
+  "description": "A high-end location selection interface for food delivery and anti-waste applications, featuring map integration, customizable address details, and a modern bottom navigation system.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

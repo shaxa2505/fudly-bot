@@ -277,6 +277,9 @@ const OfferCard = memo(function OfferCard({
         )}
       </div>
       <div className="offer-body">
+        {showStoreName && (
+          <span className="offer-store" title={storeName}>{storeName}</span>
+        )}
         <h3 className="offer-title" title={titleText}>{titleText}</h3>
         {showRating ? (
           <div className="offer-rating-row" aria-label={`Reyting ${ratingText}`}>
@@ -295,9 +298,6 @@ const OfferCard = memo(function OfferCard({
         )}
         <div className="offer-footer">
           <div className="offer-price-block">
-            {showStoreName && (
-              <span className="offer-store" title={storeName}>{storeName}</span>
-            )}
             {oldPriceLabel && (
               <span className="offer-old-price">{oldPriceLabel}</span>
             )}

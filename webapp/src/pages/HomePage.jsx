@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
+import { Bell, Flame, Milk, Cookie, Snowflake, Coffee as Beverage, Croissant, Beef, Apple, Salad, Package, Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
@@ -8,6 +8,7 @@ import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
+import FlashDeals from '../components/FlashDeals'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import ScrollTopButton from '../components/ScrollTopButton'
@@ -1010,6 +1011,7 @@ function HomePage() {
       {/* Header */}
       <header className="header">
         <div className="header-top">
+          <div className="header-spacer" aria-hidden="true" />
           <div className="header-title">
             <span className="header-location-label">Manzil</span>
             <button className={`header-location ${locationPulse ? 'location-pulse' : ''}`} onClick={openAddressModal}>
@@ -1019,6 +1021,10 @@ function HomePage() {
               </svg>
             </button>
           </div>
+          <button type="button" className="header-notification" aria-label="Bildirishnomalar">
+            <Bell size={18} strokeWidth={2} aria-hidden="true" />
+            <span className="header-notification-dot" aria-hidden="true" />
+          </button>
         </div>
       </header>
 
@@ -1340,6 +1346,12 @@ function HomePage() {
         </div>
       )}
 
+      <FlashDeals
+        city={cityForApi}
+        region={location.region || ''}
+        district={location.district || ''}
+      />
+
       {/* Section Title */}
       <div
         className="home-section-header"
@@ -1448,6 +1460,7 @@ function HomePage() {
 }
 
 export default HomePage
+
 
 
 
