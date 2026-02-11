@@ -651,6 +651,7 @@ def register_stores(
             offer.store_id,
             delivery_enabled,
             back_callback=f"back_to_store_offers_{store_id}",
+            unit=getattr(offer, "unit", None),
         )
 
         # Get message to respond to

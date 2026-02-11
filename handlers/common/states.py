@@ -72,7 +72,7 @@ class RegisterStore(StatesGroup):
 
 class CreateOffer(StatesGroup):
     """
-    Offer creation flow (5 steps).
+    Offer creation flow (6 steps).
 
     Flow: Add Offer → [store] → category → title → original price → discount price → unit → quantity → expiry → photo → confirm
     Legacy: description/quick_input remain for backward compatibility.
@@ -85,11 +85,11 @@ class CreateOffer(StatesGroup):
     description = State()  # Legacy: optional description
     original_price = State()  # Step 2: Enter original price
     discount_price = State()  # Step 2: Enter discount price
-    unit_type = State()  # Legacy: unit selection
-    quantity = State()  # Step 3: Enter quantity
-    expiry_date = State()  # Step 3: Select expiry date
-    photo = State()  # Step 4: Upload photo (required)
-    confirm = State()  # Step 5: Confirm & publish
+    unit_type = State()  # Step 3: Select unit
+    quantity = State()  # Step 4: Enter quantity
+    expiry_date = State()  # Step 5: Select expiry date
+    photo = State()  # Step 6: Upload photo (required)
+    confirm = State()  # Final: Confirm & publish
     quick_input = State()  # Legacy: quick add input
 
 
@@ -144,6 +144,17 @@ class BulkCreate(StatesGroup):
     available_until = State()
     categories = State()
     units = State()
+
+
+# =============================================================================
+# CART FLOWS
+# =============================================================================
+
+
+class CartAdd(StatesGroup):
+    """Cart add flow (custom quantity input for weight/volume)."""
+
+    quantity = State()
 
 
 # =============================================================================

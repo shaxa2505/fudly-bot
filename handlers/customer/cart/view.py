@@ -12,6 +12,7 @@ from .common import esc
 from . import common
 from .storage import cart_storage
 from app.core.order_math import calc_items_total
+from app.core.units import calc_total_price, format_quantity, normalize_unit, unit_label
 
 
 async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | None:
@@ -43,11 +44,13 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
     for i, item in enumerate(items, 1):
         cart_items.append({"price": item.price, "quantity": item.quantity})
         price_sums = int(item.price)
-        subtotal = price_sums * item.quantity
+        subtotal = calc_total_price(price_sums, item.quantity)
         lines.append(f"\n<b>{i}. {esc(item.title)}</b>")
-        unit = f" {esc(item.unit)}" if item.unit else ""
+        unit_type = normalize_unit(item.unit)
+        unit_text = unit_label(unit_type, lang)
+        qty_text = format_quantity(item.quantity, unit_type, lang)
         lines.append(
-            f"   {item.quantity}{unit} x {price_sums:,} = <b>{subtotal:,}</b> {currency}"
+            f"   {qty_text} {unit_text} x {price_sums:,} = <b>{subtotal:,}</b> {currency}"
         )
         lines.append(f"   {store_label}: {esc(item.store_name)}")
 
@@ -61,8 +64,9 @@ async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | 
 
     for i, item in enumerate(items, 1):
         title_short = item.title[:18] + "..." if len(item.title) > 18 else item.title
+        qty_label = format_quantity(item.quantity, normalize_unit(item.unit), lang)
         kb.button(text="-", callback_data=f"cart_qty_dec_{item.offer_id}")
-        kb.button(text=f"{i}. {title_short} ({item.quantity})", callback_data="cart_noop")
+        kb.button(text=f"{i}. {title_short} ({qty_label})", callback_data="cart_noop")
         kb.button(text="+", callback_data=f"cart_qty_inc_{item.offer_id}")
         kb.button(text=remove_label, callback_data=f"cart_remove_{item.offer_id}")
 
@@ -163,6 +167,11 @@ def register(router: Router) -> None:
             await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
             return
 
+        unit_type = normalize_unit(item.unit)
+        if unit_type != "piece":
+            await callback.answer(get_text(lang, "cart_weight_edit_disabled"), show_alert=True)
+            return
+
         if item.quantity >= item.max_quantity:
             await callback.answer(
                 get_text(lang, "cart_max_quantity_alert", max=item.max_quantity),
@@ -170,7 +179,7 @@ def register(router: Router) -> None:
             )
             return
 
-        cart_storage.update_quantity(user_id, offer_id, item.quantity + 1)
+        cart_storage.update_quantity(user_id, offer_id, int(item.quantity) + 1)
         await show_cart(callback, state, is_callback=True)
 
     @router.callback_query(F.data.startswith("cart_qty_dec_"))
@@ -195,10 +204,15 @@ def register(router: Router) -> None:
             await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
             return
 
+        unit_type = normalize_unit(item.unit)
+        if unit_type != "piece":
+            await callback.answer(get_text(lang, "cart_weight_edit_disabled"), show_alert=True)
+            return
+
         if item.quantity <= 1:
             cart_storage.remove_item(user_id, offer_id)
         else:
-            cart_storage.update_quantity(user_id, offer_id, item.quantity - 1)
+            cart_storage.update_quantity(user_id, offer_id, int(item.quantity) - 1)
 
         await show_cart(callback, state, is_callback=True)
 

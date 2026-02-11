@@ -703,7 +703,9 @@ def setup(
             # Use keyboard with cart buttons and back to search
             from app.keyboards.offers import offer_details_search_keyboard
 
-            kb = offer_details_search_keyboard(lang, offer_id, offer.store_id, delivery_enabled)
+            kb = offer_details_search_keyboard(
+                lang, offer_id, offer.store_id, delivery_enabled, unit=getattr(offer, "unit", None)
+            )
 
             # Delete search results and send offer card with photo
             try:
@@ -1111,7 +1113,11 @@ def setup(
                 from app.keyboards.offers import offer_details_search_keyboard
 
                 kb = offer_details_search_keyboard(
-                    lang, offer_id, details.store_id, delivery_enabled
+                    lang,
+                    offer_id,
+                    details.store_id,
+                    delivery_enabled,
+                    unit=getattr(details, "unit", None),
                 )
 
                 # Delete message and send offer card with photo

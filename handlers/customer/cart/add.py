@@ -5,6 +5,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from localization import get_text
+from app.core.units import (
+    calc_total_price,
+    format_quantity,
+    normalize_unit,
+    parse_quantity_input,
+    unit_label,
+)
+from handlers.common.states import CartAdd
 
 from . import common
 from .common import esc
@@ -16,21 +24,22 @@ def build_cart_add_card_text(
     lang: str,
     title: str,
     price: float,
-    quantity: int,
+    quantity: float,
     store_name: str,
-    max_qty: int,
+    max_qty: float,
     original_price: float = 0,
     description: str = "",
     expiry_date: str = "",
     store_address: str = "",
-    unit: str = "шт",
+    unit: str = "piece",
 ) -> str:
     currency = "so'm" if lang == "uz" else "сум"
     safe_title = esc(title)
     safe_description = esc(description)
     safe_store = esc(store_name)
     safe_address = esc(store_address)
-    safe_unit = esc(unit)
+    unit_type = normalize_unit(unit)
+    unit_text = unit_label(unit_type, lang)
 
     text_parts: list[str] = [f"<b>{safe_title}</b>"]
 
@@ -43,19 +52,24 @@ def build_cart_add_card_text(
         discount_pct = int(((original_price - price) / original_price) * 100)
         text_parts.append(
             f"{get_text(lang, 'cart_add_price_label')}: <s>{original_price:,.0f}</s> -> "
-            f"<b>{price:,.0f} {currency}</b> <code>(-{discount_pct}%)</code>"
+            f"<b>{price:,.0f} {currency}</b> / {unit_text} <code>(-{discount_pct}%)</code>"
         )
     else:
         text_parts.append(
-            f"{get_text(lang, 'cart_add_price_label')}: <b>{price:,.0f} {currency}</b>"
+            f"{get_text(lang, 'cart_add_price_label')}: <b>{price:,.0f} {currency}</b> / {unit_text}"
         )
 
     text_parts.append(
-        f"{get_text(lang, 'cart_add_quantity_label')}: <b>{quantity} {safe_unit}</b>"
+        f"{get_text(lang, 'cart_add_quantity_label')}: <b>{format_quantity(quantity, unit_type, lang)} {unit_text}</b>"
     )
 
     stock_label = get_text(lang, 'cart_add_stock_label')
-    text_parts.append(f"{stock_label}: {max_qty} {safe_unit}")
+    qty_text = format_quantity(max_qty, unit_type, lang)
+    if unit_type == "piece":
+        text_parts.append(f"{stock_label}: {qty_text} {unit_text}")
+    else:
+        upto = get_text(lang, "catalog_pickup_until_short")
+        text_parts.append(f"{stock_label}: {upto} {qty_text} {unit_text}")
 
     if expiry_date:
         expiry_label = get_text(lang, 'cart_add_expiry_label')
@@ -71,7 +85,7 @@ def build_cart_add_card_text(
 
     text_parts.append("")
 
-    total = price * quantity
+    total = calc_total_price(price, quantity)
     text_parts.append(
         f"<b>{get_text(lang, 'cart_add_total_label')}: {total:,.0f} {currency}</b>"
     )
@@ -79,6 +93,15 @@ def build_cart_add_card_text(
     return "\n".join(text_parts)
 
 def build_cart_add_card_keyboard(
+    lang: str, offer_id: int, quantity: float, max_qty: float, unit: str
+) -> InlineKeyboardBuilder:
+    unit_type = normalize_unit(unit)
+    if unit_type == "piece":
+        return _build_cart_add_piece_keyboard(lang, offer_id, int(quantity), int(max_qty))
+    return _build_cart_add_weight_keyboard(lang, offer_id, float(quantity), float(max_qty), unit_type)
+
+
+def _build_cart_add_piece_keyboard(
     lang: str, offer_id: int, quantity: int, max_qty: int
 ) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
@@ -111,6 +134,43 @@ def build_cart_add_card_keyboard(
     return kb
 
 
+def _build_cart_add_weight_keyboard(
+    lang: str, offer_id: int, quantity: float, max_qty: float, unit_type: str
+) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+
+    unit_text = unit_label(unit_type, lang)
+    if unit_type in {"kg", "l"}:
+        options = [0.5, 1, 1.5, 2]
+    elif unit_type == "g":
+        options = [200, 500, 1000]
+    else:
+        options = [250, 500, 1000]
+
+    for opt in options:
+        if opt > max_qty:
+            continue
+        label = f"{format_quantity(opt, unit_type, lang)} {unit_text}"
+        kb.button(text=label, callback_data=f"cart_qty_{offer_id}_{opt}")
+
+    kb.button(
+        text="✍️ Другое" if lang == "ru" else "✍️ Boshqa",
+        callback_data=f"cart_qty_custom_{offer_id}",
+    )
+    kb.adjust(2, 2, 1)
+
+    kb.button(
+        text=get_text(lang, 'cart_add_confirm_button'),
+        callback_data=f"cart_add_confirm_{offer_id}",
+    )
+    kb.button(
+        text=get_text(lang, 'cart_add_cancel_button'),
+        callback_data=f"cart_add_cancel_{offer_id}",
+    )
+    kb.adjust(2)
+    return kb
+
+
 def build_catalog_added_keyboard(lang: str) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     kb.button(text=get_text(lang, "catalog_checkout_cta"), callback_data="view_cart")
@@ -139,7 +199,7 @@ def register(router: Router) -> None:
                 return data.get(key, default)
             return default
 
-        max_qty = int(get_field(offer, "quantity", 0) or 0)
+        max_qty = float(get_field(offer, "quantity", 0) or 0)
         if max_qty <= 0:
             await callback.answer(get_text(lang, "cart_add_out_of_stock"), show_alert=True)
             return
@@ -147,7 +207,7 @@ def register(router: Router) -> None:
         price = float(get_field(offer, "discount_price", 0) or 0)
         original_price = float(get_field(offer, "original_price", 0) or 0)
         title = str(get_field(offer, "title", get_text(lang, "offer_not_found")))
-        unit = str(get_field(offer, "unit", "шт"))
+        unit = normalize_unit(get_field(offer, "unit", None))
         expiry_date = str(get_field(offer, "expiry_date", "") or "")
         store_id = get_field(offer, "store_id")
         offer_photo = get_field(offer, "photo", None)
@@ -239,7 +299,7 @@ def register(router: Router) -> None:
                 return data.get(key, default)
             return default
 
-        max_qty = int(get_field(offer, "quantity", 0) or 0)
+        max_qty = float(get_field(offer, "quantity", 0) or 0)
         if max_qty <= 0:
             await callback.answer(
                 get_text(lang, "cart_add_out_of_stock"),
@@ -251,7 +311,7 @@ def register(router: Router) -> None:
         original_price = float(get_field(offer, "original_price", 0) or 0)
         title = str(get_field(offer, "title", get_text(lang, "offer_not_found")))
         description = str(get_field(offer, "description", ""))
-        unit = str(get_field(offer, "unit", "шт"))
+        unit = normalize_unit(get_field(offer, "unit", None))
         expiry_date = str(get_field(offer, "expiry_date", "") or "")
         store_id = get_field(offer, "store_id")
         offer_photo = get_field(offer, "photo", None)
@@ -262,7 +322,14 @@ def register(router: Router) -> None:
         delivery_enabled = bool(get_field(store, "delivery_enabled", 0) == 1)
         delivery_price = float(get_field(store, "delivery_price", 0) or 0)
 
-        initial_qty = 1
+        if unit in {"kg", "l"}:
+            initial_qty = min(max_qty, 0.5)
+        elif unit == "g":
+            initial_qty = min(max_qty, 200)
+        elif unit == "ml":
+            initial_qty = min(max_qty, 250)
+        else:
+            initial_qty = 1
 
         await state.update_data(
             offer_id=offer_id,
@@ -280,6 +347,9 @@ def register(router: Router) -> None:
             delivery_price=delivery_price,
             selected_qty=initial_qty,
             offer_photo=offer_photo,
+            cart_message_id=callback.message.message_id if callback.message else None,
+            cart_chat_id=callback.message.chat.id if callback.message and callback.message.chat else None,
+            cart_message_has_photo=bool(getattr(callback.message, "photo", None)),
         )
 
         text = build_cart_add_card_text(
@@ -296,7 +366,7 @@ def register(router: Router) -> None:
             unit=unit,
         )
 
-        kb = build_cart_add_card_keyboard(lang, offer_id, initial_qty, max_qty)
+        kb = build_cart_add_card_keyboard(lang, offer_id, initial_qty, max_qty, unit)
 
         try:
             if callback.message.photo:
@@ -323,13 +393,20 @@ def register(router: Router) -> None:
         try:
             parts = callback.data.split("_")
             offer_id = int(parts[2])
-            new_qty = int(parts[3])
+            new_qty_raw = parts[3]
         except (ValueError, IndexError):
             await callback.answer(get_text(lang, "error"), show_alert=True)
             return
 
         data = await state.get_data()
-        max_qty = int(data.get("max_quantity", 1))
+        max_qty = float(data.get("max_quantity", 1))
+        unit = data.get("offer_unit", "piece")
+
+        try:
+            new_qty = float(parse_quantity_input(new_qty_raw, unit))
+        except ValueError:
+            await callback.answer(get_text(lang, "error"), show_alert=True)
+            return
 
         if new_qty < 1 or new_qty > max_qty:
             await callback.answer()
@@ -351,7 +428,9 @@ def register(router: Router) -> None:
             unit=str(data.get("offer_unit", "")),
         )
 
-        kb = build_cart_add_card_keyboard(lang, offer_id, new_qty, max_qty)
+        kb = build_cart_add_card_keyboard(
+            lang, offer_id, new_qty, max_qty, str(data.get("offer_unit", "piece"))
+        )
 
         try:
             if callback.message.photo:
@@ -367,6 +446,103 @@ def register(router: Router) -> None:
 
         await callback.answer()
 
+    @router.callback_query(F.data.startswith("cart_qty_custom_"))
+    async def cart_custom_quantity(callback: types.CallbackQuery, state: FSMContext) -> None:
+        if not common.db or not callback.message:
+            await callback.answer()
+            return
+
+        user_id = callback.from_user.id
+        lang = common.db.get_user_language(user_id)
+        data = await state.get_data()
+        unit = data.get("offer_unit", "piece")
+
+        if unit in {"kg", "g"}:
+            prompt = get_text(lang, "cart_weight_custom_prompt")
+        elif unit in {"l", "ml"}:
+            prompt = get_text(lang, "cart_volume_custom_prompt")
+        else:
+            prompt = get_text(lang, "offer_step3_quantity_custom")
+
+        await state.set_state(CartAdd.quantity)
+        await callback.message.answer(prompt)
+        await callback.answer()
+
+    @router.message(CartAdd.quantity, F.text)
+    async def cart_custom_quantity_entered(message: types.Message, state: FSMContext) -> None:
+        if not common.db or not message.from_user:
+            return
+
+        user_id = message.from_user.id
+        lang = common.db.get_user_language(user_id)
+        data = await state.get_data()
+        unit = data.get("offer_unit", "piece")
+        max_qty = float(data.get("max_quantity", 1))
+
+        try:
+            qty_val = parse_quantity_input(message.text, unit)
+            new_qty = float(qty_val)
+        except ValueError:
+            await message.answer(get_text(lang, "cart_weight_invalid"))
+            return
+
+        if new_qty <= 0 or new_qty > max_qty:
+            await message.answer(
+                get_text(lang, "offer_error_quantity_range").format(max=max_qty)
+            )
+            return
+
+        await state.update_data(selected_qty=new_qty)
+        await state.set_state(None)
+
+        text = build_cart_add_card_text(
+            lang,
+            str(data.get("offer_title", "")),
+            float(data.get("offer_price", 0) or 0),
+            new_qty,
+            str(data.get("store_name", "")),
+            max_qty,
+            original_price=float(data.get("original_price", 0) or 0),
+            description=str(data.get("offer_description", "")),
+            expiry_date=str(data.get("expiry_date", "")),
+            store_address=str(data.get("store_address", "")),
+            unit=str(data.get("offer_unit", "")),
+        )
+        kb = build_cart_add_card_keyboard(
+            lang, int(data.get("offer_id") or 0), new_qty, max_qty, str(unit)
+        )
+
+        chat_id = data.get("cart_chat_id")
+        message_id = data.get("cart_message_id")
+        has_photo = bool(data.get("cart_message_has_photo"))
+        if chat_id and message_id:
+            try:
+                if has_photo:
+                    await message.bot.edit_message_caption(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=kb.as_markup(),
+                    )
+                else:
+                    await message.bot.edit_message_text(
+                        text,
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        parse_mode="HTML",
+                        reply_markup=kb.as_markup(),
+                    )
+            except Exception:
+                await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+        else:
+            await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
     @router.callback_query(F.data.startswith("cart_add_confirm_"))
     async def cart_add_confirm(callback: types.CallbackQuery, state: FSMContext) -> None:
         if not common.db or not callback.message:
@@ -379,19 +555,19 @@ def register(router: Router) -> None:
         data = await state.get_data()
 
         offer_id = int(data.get("offer_id")) if data.get("offer_id") is not None else None
-        quantity = int(data.get("selected_qty", 1))
+        quantity = float(data.get("selected_qty", 1))
         store_id = data.get("store_id")
         offer_title = str(data.get("offer_title", ""))
         offer_price = float(data.get("offer_price", 0) or 0)
         original_price = float(data.get("original_price", 0) or 0)
-        max_qty = int(data.get("max_quantity", 1))
+        max_qty = float(data.get("max_quantity", 1))
         store_name = str(data.get("store_name", ""))
         store_address = str(data.get("store_address", ""))
         description = str(data.get("offer_description", ""))
         delivery_enabled = bool(data.get("delivery_enabled", False))
         delivery_price = float(data.get("delivery_price", 0) or 0)
         offer_photo = data.get("offer_photo")
-        offer_unit = str(data.get("offer_unit", "шт"))
+        offer_unit = str(data.get("offer_unit", "piece"))
         expiry_date = str(data.get("expiry_date", ""))
 
         # Enforce single-store cart at add time

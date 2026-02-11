@@ -580,7 +580,9 @@ def register_hot(
 
         store = offer_service.get_store(offer.store_id) if offer.store_id else None
         text = _render_catalog_details(lang, offer, store)
-        kb = offer_keyboards.catalog_details_keyboard(lang, offer_id)
+        kb = offer_keyboards.catalog_details_keyboard(
+            lang, offer_id, unit=getattr(offer, "unit", None)
+        )
 
         if offer.photo:
             if getattr(msg, "photo", None):
@@ -644,7 +646,9 @@ def register_hot(
 
         store = offer_service.get_store(offer.store_id) if offer.store_id else None
         text = _render_catalog_details(lang, offer, store)
-        kb = offer_keyboards.catalog_details_keyboard(lang, offer_id)
+        kb = offer_keyboards.catalog_details_keyboard(
+            lang, offer_id, unit=getattr(offer, "unit", None)
+        )
 
         if offer.photo:
             if getattr(msg, "photo", None):
@@ -708,7 +712,9 @@ def register_hot(
 
         store = offer_service.get_store(offer.store_id) if offer.store_id else None
         text = _render_catalog_details(lang, offer, store)
-        kb = offer_keyboards.catalog_details_keyboard(lang, offer_id)
+        kb = offer_keyboards.catalog_details_keyboard(
+            lang, offer_id, unit=getattr(offer, "unit", None)
+        )
 
         if offer.photo:
             if getattr(msg, "photo", None):
@@ -2040,10 +2046,15 @@ def register_hot(
                 store.delivery_enabled if store else False,
                 back_callback=back_cb,
                 back_text=back_text,
+                unit=getattr(offer, "unit", None),
             )
         else:
             keyboard = offer_keyboards.offer_details_keyboard(
-                lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+                lang,
+                offer.id,
+                offer.store_id,
+                store.delivery_enabled if store else False,
+                unit=getattr(offer, "unit", None),
             )
         if offer.photo:
             # Try editing caption if original is photo, otherwise send new photo
@@ -2082,7 +2093,11 @@ def register_hot(
 
         # Keyboard with back button
         keyboard = offer_keyboards.offer_details_with_back_keyboard(
-            lang, offer.id, offer.store_id, store.delivery_enabled if store else False
+            lang,
+            offer.id,
+            offer.store_id,
+            store.delivery_enabled if store else False,
+            unit=getattr(offer, "unit", None),
         )
 
         # If offer has photo, prefer editing caption or sending new photo without deleting
@@ -2121,7 +2136,7 @@ def register_hot(
     ) -> None:
         text = offer_templates.render_offer_card(lang, offer)
         keyboard = offer_keyboards.offer_quick_keyboard(
-            lang, offer.id, offer.store_id, offer.delivery_enabled
+            lang, offer.id, offer.store_id, offer.delivery_enabled, unit=getattr(offer, "unit", None)
         )
 
         # If offer has a photo, send it as a photo message with caption to be consistent

@@ -26,8 +26,8 @@ class CartItem:
     title: str
     price: int
     original_price: int
-    quantity: int
-    max_quantity: int
+    quantity: float
+    max_quantity: float
     store_name: str
     store_address: str
     photo: str | None
@@ -66,8 +66,8 @@ class CartItem:
             title=data["title"],
             price=data["price"],
             original_price=data.get("original_price", data["price"]),
-            quantity=data["quantity"],
-            max_quantity=data.get("max_quantity", 99),
+            quantity=float(data["quantity"]),
+            max_quantity=float(data.get("max_quantity", 99)),
             store_name=data["store_name"],
             store_address=data.get("store_address", ""),
             photo=data.get("photo"),
@@ -130,9 +130,9 @@ class CartStorage:
         store_id: int,
         title: str,
         price: int,
-        quantity: int = 1,
+        quantity: float = 1,
         original_price: int = 0,
-        max_quantity: int = 99,
+        max_quantity: float = 99,
         store_name: str = "",
         store_address: str = "",
         photo: str | None = None,
@@ -179,8 +179,8 @@ class CartStorage:
             title=title,
             price=price,
             original_price=original_price or price,
-            quantity=quantity,
-            max_quantity=max_quantity,
+            quantity=float(quantity),
+            max_quantity=float(max_quantity),
             store_name=store_name,
             store_address=store_address,
             photo=photo,
@@ -193,7 +193,7 @@ class CartStorage:
         logger.info(f"Added item {offer_id} to cart for user {user_id}")
         return item
 
-    def update_quantity(self, user_id: int, offer_id: int, quantity: int) -> bool:
+    def update_quantity(self, user_id: int, offer_id: int, quantity: float) -> bool:
         """Update item quantity. Returns True if found and updated."""
         self._touch(user_id)
         cart = self._carts.get(user_id, [])
@@ -201,7 +201,7 @@ class CartStorage:
             if item.offer_id == offer_id:
                 if quantity <= 0:
                     return self.remove_item(user_id, offer_id)
-                item.quantity = min(quantity, item.max_quantity)
+                item.quantity = min(float(quantity), item.max_quantity)
                 return True
         return False
 
