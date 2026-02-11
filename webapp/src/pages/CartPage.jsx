@@ -2302,7 +2302,7 @@ function CartPage({ user }) {
                         onClick={() => removeItem(item.offer.id)}
                         aria-label={`${item.offer.title} ni savatdan o'chirish`}
                       >
-                        <X size={16} strokeWidth={2} />
+                        <X size={16} strokeWidth={2} aria-hidden="true" />
                       </button>
                     </div>
                     {itemSubtitle && (
@@ -2421,7 +2421,7 @@ function CartPage({ user }) {
         {!isCheckoutRoute && (
           <section className="cart-eco">
             <div className="cart-eco-icon" aria-hidden="true">
-              <Leaf size={16} strokeWidth={2.2} />
+              <Leaf size={16} strokeWidth={2.2} aria-hidden="true" />
             </div>
             <div className="cart-eco-body">
               <p className="cart-eco-text">{ecoInsightText}</p>
@@ -2445,7 +2445,7 @@ function CartPage({ user }) {
                 </div>
                 <div className="cart-summary-row savings">
                   <span className="cart-summary-savings-label">
-                    <Leaf size={14} strokeWidth={2.2} />
+                    <Leaf size={14} strokeWidth={2.2} aria-hidden="true" />
                     <span>Tejamkorlik</span>
                   </span>
                   <span>{savingsLabel}</span>

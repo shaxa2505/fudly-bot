@@ -9,9 +9,11 @@
   gap: 8px;
   width: 100%;
   min-width: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: 18px;
+  padding: 10px;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -37,8 +39,8 @@
 .offer-image-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;
-  border-radius: var(--radius-xl);
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-light);
@@ -291,7 +293,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .offer-price-block {
@@ -338,7 +340,7 @@
   height: 32px;
   min-width: 32px;
   min-height: 32px;
-  border-radius: 12px;
+  border-radius: 999px;
   background: var(--color-primary-soft);
   color: var(--offer-primary);
   border: none;

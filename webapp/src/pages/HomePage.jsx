@@ -8,7 +8,6 @@ import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
 import HeroBanner from '../components/HeroBanner'
-import FlashDeals from '../components/FlashDeals'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import ScrollTopButton from '../components/ScrollTopButton'
@@ -1345,12 +1344,6 @@ function HomePage() {
           </button>
         </div>
       )}
-
-      <FlashDeals
-        city={cityForApi}
-        region={location.region || ''}
-        district={location.district || ''}
-      />
 
       {/* Section Title */}
       <div
