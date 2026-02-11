@@ -1,0 +1,73 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+  <title>EcoBite Marketplace</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script>
+    window.tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#3A5A40",
+            "sage": "#A3B18A",
+            "off-white": "#F9F9F9",
+            "charcoal": "#2D2D2D",
+            "pastel-green": "#F1F5F2",
+            "urgent-orange": "#E65100",
+            "discount-green": "#2E7D32",
+            "alert-red": "#D32F2F"
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          boxShadow: {
+            "soft": "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
+          }
+        },
+      },
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .ios-blur {
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    }
+    body {
+      -webkit-tap-highlight-color: transparent;
+      background-color: #F9F9F9;
+      color: #2D2D2D;
+      min-height: 100dvh;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="font-display">
+  <div id="root"></div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+
+{
+  "name": "EcoBite - Anti-Food Waste Marketplace",
+  "description": "A high-energy marketplace for surplus food deals, helping users save money and reduce food waste with AI-powered meal suggestions.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
