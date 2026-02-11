@@ -232,7 +232,7 @@ async def process_phone(message: types.Message, state: FSMContext, db: DatabaseP
 
 @router.message(Registration.phone, F.text)
 async def process_phone_text(message: types.Message, state: FSMContext, db: DatabaseProtocol):
-    """Process typed phone number - save and continue."""
+    """Reject typed phone number; require Telegram contact share."""
     if not db:
         await message.answer(get_text("ru", "system_error"))
         return
@@ -240,17 +240,12 @@ async def process_phone_text(message: types.Message, state: FSMContext, db: Data
         return
 
     lang = db.get_user_language(message.from_user.id)
-    phone = await _save_phone(
-        message,
-        db,
-        lang,
-        message.text,
-        get_text(lang, "error_invalid_number"),
+    await message.answer(
+        get_text(lang, "welcome_phone_step"),
+        parse_mode="HTML",
+        reply_markup=phone_request_keyboard(lang),
     )
-    if not phone:
-        return
-
-    await _after_phone_saved(message, state, db, lang)
+    return
 
 
 @router.callback_query(F.data.startswith("reg_city_"), StateFilter(Registration.city))

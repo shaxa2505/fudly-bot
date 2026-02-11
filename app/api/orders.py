@@ -495,7 +495,7 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
         store_id=store_id,
         store_name=store_dict.get("name", "Магазин"),
         store_address=store_dict.get("address"),
-        store_phone=store_dict.get("phone"),
+        store_phone=booking_dict.get("store_phone") or store_dict.get("phone"),
         pickup_time=str(booking_dict.get("pickup_time"))
         if booking_dict.get("pickup_time")
         else None,
@@ -665,7 +665,6 @@ async def get_user_orders(
                 "store_id": r.get("store_id"),
                 "store_name": r.get("store_name"),
                 "store_address": r.get("store_address"),
-                "store_phone": r.get("store_phone"),
             }
         )
 

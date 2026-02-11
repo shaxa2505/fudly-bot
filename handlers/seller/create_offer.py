@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -12,12 +13,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import calc_discount_percent, get_store_field
 from app.keyboards import (
-    discount_keyboard,
     expiry_keyboard,
     photo_keyboard,
     product_categories_keyboard,
     quantity_keyboard,
-    unit_type_keyboard,
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import CreateOffer
@@ -31,7 +30,14 @@ bot: Any | None = None
 
 router = Router()
 
+TOTAL_STEPS = 5
 MIN_DISCOUNT_PERCENT = 20
+MAX_DISCOUNT_PERCENT = 90
+MIN_TITLE_LEN = 3
+MAX_TITLE_LEN = 80
+MAX_QUANTITY = 500
+MAX_EXPIRY_DAYS = 30
+WIZARD_TTL_SECONDS = 600
 
 
 def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
@@ -168,6 +174,30 @@ async def _edit_prompt_from_callback(
         await _upsert_prompt(callback.message, state, text, reply_markup, parse_mode)
 
 
+async def _ensure_wizard_alive(
+    target: types.Message | types.CallbackQuery,
+    state: FSMContext,
+    lang: str,
+) -> bool:
+    """Ensure wizard session is not expired (10 minutes)."""
+    try:
+        data = await state.get_data()
+    except Exception:
+        return True
+
+    started_at = data.get("wizard_started_at")
+    if not started_at:
+        return True
+    if time.time() - float(started_at) <= WIZARD_TTL_SECONDS:
+        return True
+
+    await state.clear()
+    message = target.message if isinstance(target, types.CallbackQuery) else target
+    if message:
+        await _upsert_prompt(message, state, get_text(lang, "offer_creation_expired"))
+    return False
+
+
 # Category names for display
 CATEGORY_NAMES = {
     "ru": {
@@ -262,7 +292,11 @@ def _store_header(data: dict, lang: str) -> str:
 
 def _step_title(lang: str, step: int, ru_title: str, uz_title: str, emoji: str) -> str:
     label = ru_title if lang == "ru" else uz_title
-    step_label = f"Шаг {step}/9: {label}" if lang == "ru" else f"{step}/9-qadam: {label}"
+    step_label = (
+        f"Шаг {step}/{TOTAL_STEPS}: {label}"
+        if lang == "ru"
+        else f"{step}/{TOTAL_STEPS}-qadam: {label}"
+    )
     return f"{emoji} <b>{step_label}</b>"
 
 
@@ -283,12 +317,12 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
         if category:
             parts.append(f"🏷 {html_escape(_shorten(get_category_name(category, lang), 18))}")
 
-    if current_step > 2:
+    if current_step > 1:
         title = data.get("title")
         if title:
             parts.append(f"📝 {html_escape(_shorten(title, 22))}")
 
-    if current_step > 3:
+    if current_step > 2:
         original_price = data.get("original_price")
         if original_price is not None:
             discount_price = data.get("discount_price")
@@ -299,25 +333,19 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
             currency = "сум" if lang == "ru" else "sum"
             parts.append(f"💰 {price_value} {currency}")
 
-    if current_step > 6:
+    if current_step > 3:
         quantity = data.get("quantity")
-        unit = data.get("unit")
-        if quantity is not None and unit:
+        if quantity is not None:
             try:
                 qty_value = float(quantity)
-                if unit in DECIMAL_UNITS:
-                    qty_str = f"{qty_value:.2f}".rstrip("0").rstrip(".")
-                else:
-                    qty_str = str(int(qty_value))
+                qty_str = str(int(qty_value))
             except (TypeError, ValueError):
                 qty_str = str(quantity)
+            unit = "шт" if lang == "ru" else "dona"
             parts.append(f"📦 {html_escape(_shorten(f'{qty_str} {unit}', 18))}")
 
-    if current_step > 8:
-        if "expiry_date" in data:
-            expiry_value = data.get("expiry_date")
-            if not expiry_value:
-                expiry_value = "Без срока" if lang == "ru" else "Muddatsiz"
+        expiry_value = data.get("expiry_date")
+        if expiry_value:
             parts.append(f"⏳ {html_escape(_shorten(expiry_value, 16))}")
 
     if data.get("photo"):
@@ -332,29 +360,14 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
     return " • ".join(parts)
 
 
-NO_EXPIRY_TOKENS = {
-    "-",
-    "0",
-    "без",
-    "без срока",
-    "нет",
-    "нет срока",
-    "none",
-    "no",
-    "muddatsiz",
-    "muddati yo'q",
-    "muddati yoq",
-}
-
-
-def _parse_expiry_input(value: str) -> str | None:
-    """Parse expiry input into ISO date or None (no expiry)."""
+def _parse_expiry_input(value: str) -> str:
+    """Parse expiry input into ISO date (required)."""
     if not value:
-        return None
+        raise ValueError("Empty expiry")
 
     raw = value.strip().lower()
-    if not raw or raw in NO_EXPIRY_TOKENS:
-        return None
+    if not raw:
+        raise ValueError("Empty expiry")
 
     # Days offset (e.g. 3, +3, 3д, 3 кун)
     day_match = re.fullmatch(
@@ -363,7 +376,8 @@ def _parse_expiry_input(value: str) -> str | None:
     )
     if day_match:
         days = int(day_match.group(1))
-        return (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
+        date_obj = (datetime.now() + timedelta(days=days)).date()
+        return _validate_expiry_date(date_obj)
 
     normalized = raw.replace("/", ".").replace("-", ".")
     parts = normalized.split(".")
@@ -373,9 +387,7 @@ def _parse_expiry_input(value: str) -> str | None:
         if len(parts) == 2 and all(p.isdigit() for p in parts):
             day, month = map(int, parts)
             date_obj = datetime(today.year, month, day)
-            if date_obj.date() < today.date():
-                date_obj = date_obj.replace(year=today.year + 1)
-            return date_obj.strftime("%Y-%m-%d")
+            return _validate_expiry_date(date_obj.date())
         if len(parts) == 3 and all(p.isdigit() for p in parts):
             if len(parts[0]) == 4:
                 year, month, day = map(int, parts)
@@ -384,11 +396,21 @@ def _parse_expiry_input(value: str) -> str | None:
                 if year < 100:
                     year += 2000
             date_obj = datetime(year, month, day)
-            return date_obj.strftime("%Y-%m-%d")
+            return _validate_expiry_date(date_obj.date())
     except ValueError:
         pass
 
     raise ValueError("Invalid expiry format")
+
+
+def _validate_expiry_date(date_value: datetime.date) -> str:
+    today = datetime.now().date()
+    max_date = today + timedelta(days=MAX_EXPIRY_DAYS)
+    if date_value < today:
+        raise ValueError("Expiry in the past")
+    if date_value > max_date:
+        raise ValueError("Expiry too far")
+    return date_value.strftime("%Y-%m-%d")
 
 
 def _normalize_unit_input(value: str | None) -> str | None:
@@ -425,7 +447,7 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
     if "%" in raw:
         percent_value = _parse_price_value(raw)
         discount_percent = int(percent_value)
-        if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > 99:
+        if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > MAX_DISCOUNT_PERCENT:
             raise ValueError("Invalid discount percent")
         discount_price = original_price * (1 - discount_percent / 100)
         return discount_percent, discount_price
@@ -434,7 +456,7 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
     if discount_price >= original_price:
         if discount_price <= 99:
             discount_percent = int(discount_price)
-            if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > 99:
+            if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > MAX_DISCOUNT_PERCENT:
                 raise ValueError("Invalid discount percent")
             discount_price = original_price * (1 - discount_percent / 100)
             return discount_percent, discount_price
@@ -442,6 +464,8 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
     discount_percent = calc_discount_percent(original_price, discount_price)
     if discount_percent < MIN_DISCOUNT_PERCENT:
         raise ValueError("Discount too low")
+    if discount_percent > MAX_DISCOUNT_PERCENT:
+        raise ValueError("Discount too high")
     return discount_percent, discount_price
 
 
@@ -560,58 +584,21 @@ async def _prompt_quick_input(target: types.Message, state: FSMContext, lang: st
     (F.text == get_text("ru", "quick_add")) | (F.text == get_text("uz", "quick_add"))
 )
 async def quick_add_start(message: types.Message, state: FSMContext) -> None:
-    """Start quick add flow."""
-    await state.clear()
-
-    if not db:
-        await message.answer("System error")
-        return
-
-    lang = db.get_user_language(message.from_user.id)
-    stores = [
-        s
-        for s in db.get_user_accessible_stores(message.from_user.id)
-        if get_store_field(s, "status") in ("active", "approved")
-    ]
-
-    if not stores:
-        await message.answer(get_text(lang, "no_approved_stores"))
-        return
-
-    if len(stores) > 1:
-        builder = InlineKeyboardBuilder()
-        for store in stores:
-            store_id = get_store_field(store, "store_id")
-            store_name = get_store_field(store, "name", "Магазин")
-            if store_id is None:
-                continue
-            builder.button(text=store_name[:30], callback_data=f"quick_store_{store_id}")
-        builder.adjust(1)
-
-        await _upsert_prompt(
-            message,
-            state,
-            get_text(lang, "choose_store"),
-            reply_markup=builder.as_markup(),
-            parse_mode="HTML",
-        )
-        await state.set_state(CreateOffer.store)
-        return
-
-    store_id = get_store_field(stores[0], "store_id")
-    store_name = get_store_field(stores[0], "name", "Магазин")
-    await state.update_data(store_id=store_id, store_name=store_name)
-    await _prompt_quick_input(message, state, lang)
+    """Quick add disabled; redirect to full wizard."""
+    await add_offer_start(message, state)
 
 
 @router.callback_query(F.data.startswith("quick_store_"))
 async def quick_store_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Store selected for quick add."""
+    """Legacy quick add store selection - redirect to wizard."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     try:
         store_id = int(callback.data.replace("quick_store_", ""))
     except ValueError:
@@ -629,9 +616,28 @@ async def quick_store_selected(callback: types.CallbackQuery, state: FSMContext)
         return
 
     store_name = get_store_field(store, "name", "Магазин")
-    await state.update_data(store_id=store_id, store_name=store_name)
+    await state.update_data(store_id=store_id, store_name=store_name, wizard_started_at=time.time())
+
+    data = await state.get_data()
+    step_text = _compose_step_message(
+        data,
+        lang,
+        1,
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_category_hint"),
+    )
+
+    await _edit_prompt_from_callback(
+        callback,
+        state,
+        step_text,
+        reply_markup=product_categories_keyboard(lang),
+        parse_mode="HTML",
+    )
+    await state.set_state(CreateOffer.category)
     await callback.answer()
-    await _prompt_quick_input(callback.message, state, lang)
 
 
 @router.message(F.text.contains("Добавить") | F.text.contains("Qo'shish"))
@@ -645,6 +651,7 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
+    await state.update_data(wizard_started_at=time.time())
 
     # Get only APPROVED stores (owned + admin access)
     stores = [
@@ -688,10 +695,10 @@ async def add_offer_start(message: types.Message, state: FSMContext) -> None:
         data,
         lang,
         1,
-        "Категория",
-        "Kategoriya",
-        "🧺",
-        "Выберите категорию ниже." if lang == "ru" else "Kategoriyani tanlang.",
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_category_hint"),
     )
 
     await _upsert_prompt(
@@ -712,6 +719,9 @@ async def create_store_selected(callback: types.CallbackQuery, state: FSMContext
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     try:
         store_id = int(callback.data.replace("create_store_", ""))
     except ValueError:
@@ -732,14 +742,17 @@ async def create_store_selected(callback: types.CallbackQuery, state: FSMContext
     await state.update_data(store_id=store_id, store_name=store_name)
 
     data = await state.get_data()
+    if not data.get("wizard_started_at"):
+        await state.update_data(wizard_started_at=time.time())
+
     step_text = _compose_step_message(
         data,
         lang,
         1,
-        "Категория",
-        "Kategoriya",
-        "🧺",
-        "Выберите категорию ниже." if lang == "ru" else "Kategoriyani tanlang.",
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_category_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -781,10 +794,10 @@ async def back_to_store(callback: types.CallbackQuery, state: FSMContext) -> Non
             data,
             lang,
             1,
-            "Категория",
-            "Kategoriya",
-            "🧺",
-            "Выберите категорию ниже." if lang == "ru" else "Kategoriyani tanlang.",
+            "Товар",
+            "Mahsulot",
+            "🥗",
+            get_text(lang, "offer_step1_category_hint"),
         )
 
         await _edit_prompt_from_callback(
@@ -820,7 +833,13 @@ async def back_to_store(callback: types.CallbackQuery, state: FSMContext) -> Non
 
 
 @router.message(
-    StateFilter(CreateOffer.category, CreateOffer.store, CreateOffer.unit_type, CreateOffer.photo),
+    StateFilter(
+        CreateOffer.category,
+        CreateOffer.store,
+        CreateOffer.unit_type,
+        CreateOffer.photo,
+        CreateOffer.confirm,
+    ),
     F.text,
 )
 async def create_offer_menu_fallback(message: types.Message, state: FSMContext) -> None:
@@ -833,6 +852,8 @@ async def create_offer_menu_fallback(message: types.Message, state: FSMContext) 
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
     current_state = await state.get_state()
     data = await state.get_data()
 
@@ -870,10 +891,10 @@ async def create_offer_menu_fallback(message: types.Message, state: FSMContext) 
             data,
             lang,
             1,
-            "Категория",
-            "Kategoriya",
-            "🧺",
-            "Выберите категорию ниже." if lang == "ru" else "Kategoriyani tanlang.",
+            "Товар",
+            "Mahsulot",
+            "🥗",
+            get_text(lang, "offer_step1_category_hint"),
         )
         await _upsert_prompt(
             message,
@@ -894,11 +915,11 @@ async def create_offer_menu_fallback(message: types.Message, state: FSMContext) 
         text = _compose_step_message(
             data,
             lang,
-            9,
+            4,
             "Фото",
             "Rasm",
             "🖼️",
-            "Отправьте фото или пропустите." if lang == "ru" else "Rasm yuboring yoki o`tkazib yuboring.",
+            get_text(lang, "offer_step4_photo_hint"),
         )
         await _upsert_prompt(
             message,
@@ -910,10 +931,15 @@ async def create_offer_menu_fallback(message: types.Message, state: FSMContext) 
         await safe_delete_message(message)
         return
 
+    if current_state == CreateOffer.confirm.state:
+        await _show_confirmation(message, state, lang)
+        await safe_delete_message(message)
+        return
+
 
 @router.message(CreateOffer.quick_input, F.text)
 async def quick_input_entered(message: types.Message, state: FSMContext) -> None:
-    """Process quick add input from text."""
+    """Quick add disabled - redirect to wizard."""
     if not db:
         await message.answer("System error")
         return
@@ -921,45 +947,20 @@ async def quick_input_entered(message: types.Message, state: FSMContext) -> None
     if await _handle_main_menu_action(message, state):
         return
 
-    lang = db.get_user_language(message.from_user.id)
-
-    try:
-        offer_data = _parse_quick_input(message.text)
-    except Exception:
-        await _upsert_prompt(message, state, _quick_add_instructions(lang), parse_mode="HTML")
-        await safe_delete_message(message)
-        return
-
-    await state.update_data(**offer_data, photo=None)
-    await _finalize_offer(message, state, lang)
+    await add_offer_start(message, state)
     await safe_delete_message(message)
 
 
 @router.message(CreateOffer.quick_input, F.photo)
 async def quick_input_photo(message: types.Message, state: FSMContext) -> None:
-    """Process quick add input from photo caption."""
+    """Quick add disabled - redirect to wizard."""
     if not db:
         await message.answer("System error")
         return
-
-    lang = db.get_user_language(message.from_user.id)
-    caption = message.caption or ""
-
-    if not caption.strip():
-        await _upsert_prompt(message, state, _quick_add_instructions(lang), parse_mode="HTML")
-        await safe_delete_message(message)
+    if await _handle_main_menu_action(message, state):
         return
 
-    try:
-        offer_data = _parse_quick_input(caption)
-    except Exception:
-        await _upsert_prompt(message, state, _quick_add_instructions(lang), parse_mode="HTML")
-        await safe_delete_message(message)
-        return
-
-    photo_id = message.photo[-1].file_id
-    await state.update_data(**offer_data, photo=photo_id)
-    await _finalize_offer(message, state, lang)
+    await add_offer_start(message, state)
     await safe_delete_message(message)
 
 
@@ -971,6 +972,9 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     category = callback.data.replace("product_cat_", "")
 
     await state.update_data(category=category)
@@ -985,11 +989,11 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
     text = _compose_step_message(
         data,
         lang,
-        2,
-        "Название",
-        "Nomi",
-        "📝",
-        "Пример: Чай Ahmad Английский 100 г" if lang == "ru" else "Misol: Ahmad English Tea 100g",
+        1,
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_title_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -1003,12 +1007,12 @@ async def category_selected(callback: types.CallbackQuery, state: FSMContext) ->
     await callback.answer()
 
 
-# ============ STEP 2: Title ============
+# ============ STEP 1: Title ============
 
 
 @router.message(CreateOffer.title, F.text)
 async def title_entered(message: types.Message, state: FSMContext) -> None:
-    """Title entered - ask for description."""
+    """Title entered - ask for original price."""
     if not db:
         await message.answer("System error")
         return
@@ -1018,62 +1022,31 @@ async def title_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
     title = message.text.strip()
 
-    if len(title) < 2:
-        await _upsert_prompt(
-            message,
-            state,
-            "⚠️ Название слишком короткое" if lang == "ru" else "⚠️ Nom juda qisqa",
-        )
+    if len(title) < MIN_TITLE_LEN:
+        await _upsert_prompt(message, state, get_text(lang, "offer_error_title_short"))
         await safe_delete_message(message)
         return
 
-    if len(title) > 100:
-        await _upsert_prompt(
-            message,
-            state,
-            "⚠️ Название слишком длинное (макс 100 символов)"
-            if lang == "ru"
-            else "⚠️ Nom juda uzun (maks 100 belgi)",
-        )
+    if len(title) > MAX_TITLE_LEN:
+        await _upsert_prompt(message, state, get_text(lang, "offer_error_title_long"))
+        await safe_delete_message(message)
+        return
+
+    if not re.match(r"^[A-Za-zА-Яа-яЁё0-9]", title):
+        await _upsert_prompt(message, state, get_text(lang, "offer_error_title_start"))
         await safe_delete_message(message)
         return
 
     await state.update_data(title=title)
-    data = await state.get_data()
-
-    # Build back/skip/cancel keyboard
-    builder = InlineKeyboardBuilder()
-    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_title")
-    builder.button(text=get_text(lang, "btn_skip"), callback_data="create_skip_description")
-    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
-    builder.adjust(2, 1)
-
-    text = _compose_step_message(
-        data,
-        lang,
-        3,
-        "Описание",
-        "Tavsif",
-        "✍️",
-        "Можно пропустить. Пример: свежий, 450 г"
-        if lang == "ru"
-        else "Ixtiyoriy. Misol: yangi, 450g",
-    )
-
-    await _upsert_prompt(
-        message,
-        state,
-        text,
-        reply_markup=builder.as_markup(),
-        parse_mode="HTML",
-    )
-    await state.set_state(CreateOffer.description)
+    await _prompt_price(message, state, lang)
     await safe_delete_message(message)
 
 
-# ============ STEP 3: Description ============
+# ============ STEP 2: Price ============
 
 
 async def _prompt_price(target: types.Message, state: FSMContext, lang: str) -> None:
@@ -1081,20 +1054,18 @@ async def _prompt_price(target: types.Message, state: FSMContext, lang: str) -> 
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_description")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_title")
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(2)
 
     text = _compose_step_message(
         data,
         lang,
-        4,
+        2,
         "Цена",
         "Narx",
         "💰",
-        "Можно: 50000 или 50000 35000 (со скидкой)."
-        if lang == "ru"
-        else "Misol: 50000 yoki 50000 35000 (chegirmali).",
+        get_text(lang, "offer_step2_original_hint"),
     )
 
     await _upsert_prompt(
@@ -1109,7 +1080,7 @@ async def _prompt_price(target: types.Message, state: FSMContext, lang: str) -> 
 
 @router.message(CreateOffer.description, F.text)
 async def description_entered(message: types.Message, state: FSMContext) -> None:
-    """Description entered - ask for price."""
+    """Legacy description step - continue to price."""
     if not db:
         await message.answer("System error")
         return
@@ -1118,12 +1089,9 @@ async def description_entered(message: types.Message, state: FSMContext) -> None
         return
 
     lang = db.get_user_language(message.from_user.id)
-    description = message.text.strip()
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
 
-    if description.lower() in ("-", "нет", "без описания", "no"):
-        description = ""
-
-    await state.update_data(description=description)
     await _prompt_price(message, state, lang)
     await safe_delete_message(message)
 
@@ -1136,17 +1104,20 @@ async def skip_description(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    await state.update_data(description="")
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
+
     await _prompt_price(callback.message, state, lang)
     await callback.answer()
 
 
-# ============ STEP 4: Price ============
+# ============ STEP 2: Discounted Price ============
 
 
 @router.message(CreateOffer.original_price, F.text)
 async def price_entered(message: types.Message, state: FSMContext) -> None:
-    """Price entered - ask for discount."""
+    """Original price entered - ask for discounted price."""
     if not db:
         await message.answer("System error")
         return
@@ -1156,137 +1127,109 @@ async def price_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
 
     raw_text = message.text.strip()
-    numbers = re.findall(r"\d+(?:[.,]\d+)?", raw_text)
-    if not numbers:
-        await _upsert_prompt(
-            message,
-            state,
-            "⚠️ Введите число. Пример: 50000" if lang == "ru" else "⚠️ Raqam kiriting. Misol: 50000",
-        )
+    try:
+        original = _parse_price_value(raw_text)
+        if original <= 0:
+            raise ValueError
+    except ValueError:
+        await _upsert_prompt(message, state, get_text(lang, "offer_error_price_number"))
         await safe_delete_message(message)
         return
 
-    def _to_number(value: str) -> float:
-        return float(value.replace(",", "."))
+    await state.update_data(original_price=original)
+    data = await state.get_data()
 
-    try:
-        if len(numbers) >= 2:
-            original = _to_number(numbers[0])
-            discount_price = _to_number(numbers[1])
-            if original <= 0 or discount_price <= 0 or discount_price >= original:
-                raise ValueError
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_price")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+    builder.adjust(2)
 
-            discount_percent = calc_discount_percent(original, discount_price)
-            if discount_percent < MIN_DISCOUNT_PERCENT:
-                await state.update_data(original_price=original)
-                data = await state.get_data()
-                text = _compose_step_message(
-                    data,
-                    lang,
-                    5,
-                    "Скидка",
-                    "Chegirma",
-                    "🏷️",
-                    "Выберите % или отправьте цену со скидкой. Минимум 20%."
-                    if lang == "ru"
-                    else "Foizni tanlang yoki chegirmali narxni yuboring. Kamida 20%.",
-                )
-                text = f"{get_text(lang, 'error_min_discount')}\n\n{text}"
-                await _upsert_prompt(
-                    message,
-                    state,
-                    text,
-                    reply_markup=discount_keyboard(lang),
-                    parse_mode="HTML",
-                )
-                await state.set_state(CreateOffer.discount_price)
-                await safe_delete_message(message)
-                return
-            await state.update_data(
-                original_price=original,
-                discount_price=discount_price,
-                discount_percent=discount_percent,
-            )
-            await _go_to_unit_step(message, state, lang)
-            await safe_delete_message(message)
-            return
+    text = _compose_step_message(
+        data,
+        lang,
+        2,
+        "Цена",
+        "Narx",
+        "💰",
+        get_text(lang, "offer_step2_discount_hint"),
+    )
 
-        original = _to_number(numbers[0])
-        if original <= 0:
-            raise ValueError
-
-        await state.update_data(original_price=original)
-        data = await state.get_data()
-        text = _compose_step_message(
-            data,
-            lang,
-            5,
-            "Скидка",
-            "Chegirma",
-            "🏷️",
-            "Выберите % или отправьте цену со скидкой. Минимум 20%."
-            if lang == "ru"
-            else "Foizni tanlang yoki chegirmali narxni yuboring. Kamida 20%.",
-        )
-
-        await _upsert_prompt(
-            message,
-            state,
-            text,
-            reply_markup=discount_keyboard(lang),
-            parse_mode="HTML",
-        )
-        await state.set_state(CreateOffer.discount_price)
-        await safe_delete_message(message)
-    except ValueError:
-        await _upsert_prompt(
-            message,
-            state,
-            "⚠️ Неверный формат. Пример: 50000 или 50000 35000"
-            if lang == "ru"
-            else "⚠️ Noto`g`ri format. Misol: 50000 yoki 50000 35000",
-        )
-        await safe_delete_message(message)
+    await _upsert_prompt(
+        message,
+        state,
+        text,
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML",
+    )
+    await state.set_state(CreateOffer.discount_price)
+    await safe_delete_message(message)
 
 
 @router.callback_query(CreateOffer.discount_price, F.data.startswith("discount_"))
 async def discount_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Discount selected via button."""
+    """Discount selected via button (legacy support)."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     discount_data = callback.data.replace("discount_", "")
 
     if discount_data == "custom":
-        # Ask for custom discount
         builder = InlineKeyboardBuilder()
         builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_price")
+        builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+        builder.adjust(2)
 
+        data = await state.get_data()
         await _edit_prompt_from_callback(
             callback,
             state,
-            "<b>"
-            + ("🏷️ Скидка (%)" if lang == "ru" else "🏷️ Chegirma (%)")
-            + "</b>\n"
-            + ("Введите процент. Пример: 35" if lang == "ru" else "Foizni kiriting. Misol: 35"),
+            _compose_step_message(
+                data,
+                lang,
+                2,
+                "Цена",
+                "Narx",
+                "💰",
+                get_text(lang, "offer_step2_discount_hint"),
+            ),
             reply_markup=builder.as_markup(),
             parse_mode="HTML",
         )
         await callback.answer()
         return
 
-    discount_percent = int(discount_data)
-    await _process_discount(callback.message, state, lang, discount_percent)
+    data = await state.get_data()
+    original_price = data.get("original_price")
+    if not original_price:
+        await callback.answer(get_text(lang, "offer_error_price_number"), show_alert=True)
+        return
+
+    try:
+        discount_percent = int(discount_data)
+        if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > MAX_DISCOUNT_PERCENT:
+            raise ValueError
+        discount_price = original_price * (1 - discount_percent / 100)
+        await state.update_data(discount_percent=discount_percent, discount_price=discount_price)
+    except ValueError:
+        await callback.answer(get_text(lang, "offer_error_discount_range"), show_alert=True)
+        return
+
+    await _go_to_unit_step(callback.message, state, lang)
     await callback.answer()
 
 
 @router.message(CreateOffer.discount_price, F.text)
 async def discount_entered(message: types.Message, state: FSMContext) -> None:
-    """Custom discount or final price entered."""
+    """Discount price entered."""
     if not db:
         await message.answer("System error")
         return
@@ -1296,150 +1239,92 @@ async def discount_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
 
-    raw_text = message.text.strip()
-    numbers = re.findall(r"\d+(?:[.,]\d+)?", raw_text)
-    if not numbers:
-        await _upsert_prompt(
-            message,
-            state,
-            "⚠️ Введите процент или цену. Пример: 30% или 35000"
-            if lang == "ru"
-            else "⚠️ Foiz yoki narx yuboring. Misol: 30% yoki 35000",
-        )
+    data = await state.get_data()
+    original_price = data.get("original_price")
+    if not original_price:
+        await _upsert_prompt(message, state, get_text(lang, "offer_error_price_number"))
         await safe_delete_message(message)
         return
 
+    raw_text = message.text.strip()
+
     try:
-        data = await state.get_data()
-        original_price = float(data.get("original_price", 0))
-
         if "%" in raw_text:
-            discount_percent = int(float(numbers[0]))
-            if discount_percent < 0 or discount_percent > 99:
-                raise ValueError
-            await _process_discount(message, state, lang, discount_percent)
-            await safe_delete_message(message)
-            return
-
-        discount_price = float(numbers[0].replace(",", "."))
-        if original_price <= 0 or discount_price <= 0:
-            raise ValueError
-        if discount_price >= original_price:
-            # If looks like percent without %, treat as percent
-            if discount_price <= 99:
-                await _process_discount(message, state, lang, int(discount_price))
-                return
-            raise ValueError
-
-        discount_percent = calc_discount_percent(original_price, discount_price)
-        if discount_percent < MIN_DISCOUNT_PERCENT:
-            await _upsert_prompt(
-                message,
-                state,
-                get_text(lang, "error_min_discount"),
-                reply_markup=discount_keyboard(lang),
-                parse_mode="HTML",
-            )
-            await safe_delete_message(message)
-            return
-        await state.update_data(discount_percent=discount_percent, discount_price=discount_price)
-        await _go_to_unit_step(message, state, lang)
+            percent_value = _parse_price_value(raw_text)
+            discount_percent = int(percent_value)
+            if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > MAX_DISCOUNT_PERCENT:
+                raise ValueError("range")
+            discount_price = original_price * (1 - discount_percent / 100)
+        else:
+            discount_price = _parse_price_value(raw_text)
+            if discount_price >= original_price:
+                raise ValueError("logic")
+            discount_percent = calc_discount_percent(original_price, discount_price)
+            if discount_percent < MIN_DISCOUNT_PERCENT or discount_percent > MAX_DISCOUNT_PERCENT:
+                raise ValueError("range")
+    except ValueError as exc:
+        reason = str(exc)
+        if "logic" in reason:
+            await _upsert_prompt(message, state, get_text(lang, "offer_error_discount_logic"))
+        elif "range" in reason:
+            await _upsert_prompt(message, state, get_text(lang, "offer_error_discount_range"))
+        else:
+            await _upsert_prompt(message, state, get_text(lang, "offer_error_price_number"))
         await safe_delete_message(message)
-    except ValueError:
-        await _upsert_prompt(
-            message,
-            state,
-            "Неверный формат. Пример: 30% или 35000"
-            if lang == "ru"
-            else "Noto`g`ri format. Misol: 30% yoki 35000",
-        )
-        await safe_delete_message(message)
+        return
+
+    await state.update_data(discount_percent=discount_percent, discount_price=discount_price)
+    await _go_to_unit_step(message, state, lang)
+    await safe_delete_message(message)
 
 
 async def _go_to_unit_step(target: types.Message, state: FSMContext, lang: str) -> None:
-    """Move to unit selection step."""
+    """Move to quantity selection step (unit fixed)."""
+    await state.update_data(unit="шт")
     data = await state.get_data()
     text = _compose_step_message(
         data,
         lang,
-        6,
-        "Ед. измерения",
-        "O'lchov birligi",
-        "📏",
-        "Выберите единицу измерения." if lang == "ru" else "O'lchov birligini tanlang.",
+        3,
+        "Остаток и срок годности",
+        "Miqdor va yaroqlilik",
+        "📦",
+        get_text(lang, "offer_step3_quantity_hint"),
     )
 
     await _upsert_prompt(
         target,
         state,
         text,
-        reply_markup=unit_type_keyboard(lang),
+        reply_markup=quantity_keyboard(lang),
         parse_mode="HTML",
     )
-    await state.set_state(CreateOffer.unit_type)
+    await state.set_state(CreateOffer.quantity)
 
 
-async def _process_discount(
-    target: types.Message, state: FSMContext, lang: str, discount_percent: int
-) -> None:
-    """Process discount and move to unit type step."""
-    if discount_percent < MIN_DISCOUNT_PERCENT:
-        await _upsert_prompt(
-            target,
-            state,
-            get_text(lang, "error_min_discount"),
-            reply_markup=discount_keyboard(lang),
-            parse_mode="HTML",
-        )
-        await state.set_state(CreateOffer.discount_price)
-        return
-    data = await state.get_data()
-    original_price = data.get("original_price", 0)
-    discount_price = original_price * (1 - discount_percent / 100)
-
-    await state.update_data(discount_percent=discount_percent, discount_price=discount_price)
-    await _go_to_unit_step(target, state, lang)
-
-
-# ============ STEP 6: Unit Type ============
+# ============ LEGACY: Unit Type ============
 
 
 @router.callback_query(CreateOffer.unit_type, F.data.startswith("unit_type_"))
 async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Unit type selected via button."""
+    """Legacy unit type selection - redirect to quantity."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    unit = callback.data.replace("unit_type_", "")
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
 
-    await state.update_data(unit=unit)
-    data = await state.get_data()
-
-    text = _compose_step_message(
-        data,
-        lang,
-        7,
-        "Количество",
-        "Miqdor",
-        "🔢",
-        "Выберите или отправьте количество." if lang == "ru" else "Miqdorni tanlang yoki yuboring.",
-    )
-
-    await _edit_prompt_from_callback(
-        callback,
-        state,
-        text,
-        reply_markup=quantity_keyboard(lang, unit),
-        parse_mode="HTML",
-    )
-    await state.set_state(CreateOffer.quantity)
+    await _go_to_unit_step(callback.message, state, lang)
     await callback.answer()
 
 
-# ============ STEP 7: Quantity ============
+# ============ STEP 3: Quantity ============
 
 
 @router.callback_query(CreateOffer.quantity, F.data.startswith("quantity_"))
@@ -1450,29 +1335,22 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     qty_data = callback.data.replace("quantity_", "")
-    data = await state.get_data()
-    unit = data.get("unit", "шт")
 
     if qty_data == "custom":
         # Ask for custom quantity
         builder = InlineKeyboardBuilder()
-        builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_unit")
-
-        if unit in ("г", "мл"):
-            example = "Пример: 250"
-            example_uz = "Misol: 250"
-        else:
-            example = "Пример: 2"
-            example_uz = "Misol: 2"
+        builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_quantity")
+        builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+        builder.adjust(2)
 
         await _edit_prompt_from_callback(
             callback,
             state,
-            "<b>"
-            + ("🔢 Введите количество" if lang == "ru" else "🔢 Miqdorni kiriting")
-            + "</b>\n"
-            + (example if lang == "ru" else example_uz),
+            f"<b>{get_text(lang, 'offer_step3_quantity_custom')}</b>",
             reply_markup=builder.as_markup(),
             parse_mode="HTML",
         )
@@ -1480,12 +1358,14 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         return
 
     try:
-        quantity_value = float(qty_data)
-        if quantity_value <= 0 or quantity_value != int(quantity_value):
+        quantity = int(qty_data)
+        if quantity < 1 or quantity > MAX_QUANTITY:
             raise ValueError
-        quantity = int(quantity_value)
-    except ValueError:
-        await callback.answer(get_text(lang, "quantity_integer_only"), show_alert=True)
+    except (TypeError, ValueError):
+        await callback.answer(
+            get_text(lang, "offer_error_quantity_range").format(max=MAX_QUANTITY),
+            show_alert=True,
+        )
         return
 
     await _process_quantity(callback.message, state, lang, quantity)
@@ -1504,27 +1384,22 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    data = await state.get_data()
-    unit = data.get("unit", "шт")
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
 
     try:
-        quantity_text = message.text.strip().replace(",", ".")
-        quantity = float(quantity_text)
-        if quantity <= 0:
-            raise ValueError("Invalid quantity")
-        if quantity != int(quantity):
-            await _upsert_prompt(
-                message,
-                state,
-                get_text(lang, "quantity_integer_only"),
-            )
-            await safe_delete_message(message)
-            return
+        quantity_text = message.text.strip()
+        numbers = re.findall(r"\d+", quantity_text)
+        if not numbers:
+            raise ValueError
+        quantity = int(numbers[0])
+        if quantity < 1 or quantity > MAX_QUANTITY:
+            raise ValueError
     except ValueError:
         await _upsert_prompt(
             message,
             state,
-            "⚠️ Введите положительное число" if lang == "ru" else "⚠️ Musbat raqam kiriting",
+            get_text(lang, "offer_error_quantity_range").format(max=MAX_QUANTITY),
         )
         await safe_delete_message(message)
         return
@@ -1543,11 +1418,11 @@ async def _process_quantity(
     text = _compose_step_message(
         data,
         lang,
-        8,
-        "Срок годности",
-        "Yaroqlilik muddati",
-        "⏳",
-        "Выберите срок годности." if lang == "ru" else "Yaroqlilik muddatini tanlang.",
+        3,
+        "Остаток и срок годности",
+        "Miqdor va yaroqlilik",
+        "📦",
+        get_text(lang, "offer_step3_expiry_hint"),
     )
 
     await _upsert_prompt(
@@ -1560,7 +1435,7 @@ async def _process_quantity(
     await state.set_state(CreateOffer.expiry_date)
 
 
-# ============ STEP 8: Expiry Date ============
+# ============ STEP 3: Expiry Date ============
 
 
 @router.callback_query(CreateOffer.expiry_date, F.data.startswith("expiry_"))
@@ -1571,41 +1446,35 @@ async def expiry_selected(callback: types.CallbackQuery, state: FSMContext) -> N
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     expiry_data = callback.data.replace("expiry_", "")
 
     if expiry_data == "custom":
         # Ask for custom date
         builder = InlineKeyboardBuilder()
         builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_quantity")
+        builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+        builder.adjust(2)
 
         await _edit_prompt_from_callback(
             callback,
             state,
-            "<b>"
-            + (
-                "⏳ Дата (ДД.ММ или ДД.ММ.ГГГГ)"
-                if lang == "ru"
-                else "⏳ Sana (KK.OO yoki KK.OO.YYYY)"
-            )
-            + "</b>\n"
-            + (
-                "Введите дату. Пример: 25.12 или 25.12.2027"
-                if lang == "ru"
-                else "Sana kiriting. Misol: 25.12 yoki 25.12.2027"
-            ),
+            f"<b>{get_text(lang, 'offer_step3_expiry_custom')}</b>",
             reply_markup=builder.as_markup(),
             parse_mode="HTML",
         )
         await callback.answer()
         return
 
-    if expiry_data == "none":
-        await _process_expiry(callback.message, state, lang, None)
-        await callback.answer()
+    try:
+        days = int(expiry_data)
+        expiry_date = _validate_expiry_date((datetime.now() + timedelta(days=days)).date())
+    except (TypeError, ValueError):
+        await callback.answer(get_text(lang, "offer_error_expiry_range"), show_alert=True)
         return
 
-    days = int(expiry_data)
-    expiry_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
     await _process_expiry(callback.message, state, lang, expiry_date)
     await callback.answer()
 
@@ -1622,19 +1491,17 @@ async def expiry_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
 
     try:
         expiry_date = _parse_expiry_input(message.text)
-    except ValueError:
-        await _upsert_prompt(
-            message,
-            state,
-            (
-                "⚠️ Формат: ДД.ММ или ДД.ММ.ГГГГ (например 25.12 или 25.12.2027)"
-                if lang == "ru"
-                else "⚠️ Format: KK.OO yoki KK.OO.YYYY (masalan 25.12 yoki 25.12.2027)"
-            ),
-        )
+    except ValueError as exc:
+        msg = str(exc)
+        if "format" in msg.lower():
+            await _upsert_prompt(message, state, get_text(lang, "offer_error_expiry_format"))
+        else:
+            await _upsert_prompt(message, state, get_text(lang, "offer_error_expiry_range"))
         await safe_delete_message(message)
         return
 
@@ -1652,11 +1519,11 @@ async def _process_expiry(
     text = _compose_step_message(
         data,
         lang,
-        9,
+        4,
         "Фото",
         "Rasm",
         "🖼️",
-        "Отправьте фото или пропустите." if lang == "ru" else "Rasm yuboring yoki o`tkazib yuboring.",
+        get_text(lang, "offer_step4_photo_hint"),
     )
 
     await _upsert_prompt(
@@ -1669,36 +1536,124 @@ async def _process_expiry(
     await state.set_state(CreateOffer.photo)
 
 
-# ============ STEP 9: Photo ============
+# ============ STEP 4: Photo ============
 
 
 @router.message(CreateOffer.photo, F.photo)
 async def photo_received(message: types.Message, state: FSMContext) -> None:
-    """Photo received - finalize offer."""
+    """Photo received - show confirmation."""
     if not db:
         await message.answer("System error")
         return
 
     lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
     photo_id = message.photo[-1].file_id
     await state.update_data(photo=photo_id)
-    await _finalize_offer(message, state, lang)
+    await _show_confirmation(message, state, lang)
+    await safe_delete_message(message)
+
+
+@router.message(CreateOffer.photo)
+async def photo_required(message: types.Message, state: FSMContext) -> None:
+    """Handle non-photo input on photo step."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    if await _handle_main_menu_action(message, state):
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
+
+    await _upsert_prompt(
+        message,
+        state,
+        get_text(lang, "offer_error_photo_required"),
+        reply_markup=photo_keyboard(lang),
+        parse_mode="HTML",
+    )
     await safe_delete_message(message)
 
 
 @router.callback_query(F.data == "create_skip_photo")
 async def skip_photo(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Skip photo and finalize."""
+    """Photo is mandatory - show error."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
 
-    # Answer callback first to remove "loading" indicator
-    await callback.answer()
-
     lang = db.get_user_language(callback.from_user.id)
-    await state.update_data(photo=None)
-    await _finalize_offer(callback.message, state, lang)
+    await callback.answer(get_text(lang, "offer_error_photo_required"), show_alert=True)
+
+
+async def _show_confirmation(target: types.Message, state: FSMContext, lang: str) -> None:
+    """Show final confirmation before publishing."""
+    data = await state.get_data()
+
+    title = html_escape(data.get("title") or "")
+    category = get_category_name(data.get("category", "other"), lang)
+    category = html_escape(category)
+
+    original_price = int(data.get("original_price", 0))
+    discount_price = int(data.get("discount_price", 0))
+    discount_percent = int(data.get("discount_percent") or calc_discount_percent(original_price, discount_price))
+
+    quantity = data.get("quantity", 0)
+    qty_display = f"{int(quantity)} {'шт' if lang == 'ru' else 'dona'}"
+
+    expiry_raw = data.get("expiry_date") or ""
+
+    def _format_expiry(value: str) -> str:
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").strftime("%d.%m")
+        except Exception:
+            return value
+
+    expiry_display = _format_expiry(expiry_raw)
+    urgent_label = ""
+    try:
+        if expiry_raw:
+            exp_date = datetime.strptime(expiry_raw, "%Y-%m-%d").date()
+            if exp_date == datetime.now().date():
+                urgent_label = f" ({get_text(lang, 'offer_confirm_urgent')})"
+    except Exception:
+        urgent_label = ""
+
+    currency = get_text(lang, "currency")
+    expiry_prefix = "до" if lang == "ru" else "gacha"
+
+    lines = [
+        f"<b>{get_text(lang, 'offer_confirm_title')}</b>",
+        "",
+        f"🧀 {title}",
+        f"{get_text(lang, 'offer_confirm_category')}: {category}",
+        "",
+        f"{get_text(lang, 'offer_confirm_price_title')}:",
+        f"{get_text(lang, 'offer_confirm_was')}: {original_price:,} {currency}",
+        f"{get_text(lang, 'offer_confirm_now')}: {discount_price:,} {currency} (-{discount_percent}%)",
+        "",
+        f"{get_text(lang, 'offer_confirm_qty')}: {qty_display}",
+        f"{get_text(lang, 'offer_confirm_expiry')}: {expiry_prefix} {expiry_display}{urgent_label}",
+    ]
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "offer_publish_btn"), callback_data="create_publish")
+    builder.button(text=get_text(lang, "offer_edit_btn"), callback_data="create_edit")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+    builder.adjust(2, 1)
+
+    await _upsert_prompt(
+        target,
+        state,
+        "\n".join(lines),
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML",
+    )
+    await state.set_state(CreateOffer.confirm)
 
 
 async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -> None:
@@ -1712,20 +1667,8 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
             raise ValueError("Database not initialized")
 
         unit = data.get("unit", "шт")
-        quantity = data["quantity"]
-
-        def _format_qty(value: Any, unit_value: str) -> str:
-            try:
-                qty = float(value)
-                if unit_value in DECIMAL_UNITS:
-                    qty_str = f"{qty:.2f}".rstrip("0").rstrip(".")
-                else:
-                    qty_str = str(int(qty))
-            except (TypeError, ValueError):
-                qty_str = str(value)
-            return f"{qty_str} {unit_value}"
-
-        qty_display = _format_qty(quantity, unit)
+        quantity = int(data["quantity"])
+        qty_display = f"{quantity} {unit}"
 
         # Prepare times in ISO format (will be parsed by Pydantic)
         now = datetime.now()
@@ -1736,7 +1679,7 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         original_price_value = int(data["original_price"])
         discount_price_value = int(data["discount_price"])
 
-        offer_id = db.add_offer(
+        _offer_id = db.add_offer(
             store_id=data["store_id"],
             title=data["title"],
             description=data.get("description") or data["title"],
@@ -1751,37 +1694,12 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
             category=data.get("category", "other"),
         )
 
-        discount_percent = data.get("discount_percent", 0)
+        success_text = f"<b>{get_text(lang, 'offer_published_title')}</b>\n{get_text(lang, 'offer_published_hint')}"
 
-        expiry_display = data.get("expiry_date")
-        if not expiry_display:
-            expiry_display = "Без срока" if lang == "ru" else "Muddatsiz"
-
-        title_display = html_escape(data["title"])
-        expiry_safe = html_escape(expiry_display)
-        success_text = (
-            f"<b>\u2705 {'Товар создан' if lang == 'ru' else 'Mahsulot yaratildi'}</b>\n\n"
-            f"{title_display}\n"
-            f"💰 {'Цена' if lang == 'ru' else 'Narx'}: {int(data['original_price']):,} → {int(data['discount_price']):,} сум (-{discount_percent}%)\n"
-            f"📦 {'Количество' if lang == 'ru' else 'Miqdor'}: {qty_display}\n"
-            f"⏳ {'Срок годности' if lang == 'ru' else 'Yaroqlilik muddati'}: {expiry_safe}\n\n"
-        )
-
-        # Add quick action buttons
         builder = InlineKeyboardBuilder()
-        builder.button(
-            text="Еще товар" if lang == "ru" else "Yana mahsulot",
-            callback_data="create_another",
-        )
-        builder.button(
-            text="Копировать" if lang == "ru" else "Nusxalash",
-            callback_data=f"copy_offer_{offer_id}",
-        )
-        builder.button(
-            text="Мои товары" if lang == "ru" else "Mahsulotlarim",
-            callback_data="go_my_offers",
-        )
-        builder.adjust(2, 1)
+        builder.button(text=get_text(lang, 'offer_add_more_btn'), callback_data='create_another')
+        builder.button(text=get_text(lang, 'offer_to_items_btn'), callback_data='go_my_offers')
+        builder.adjust(2)
 
         await _upsert_prompt(
             target,
@@ -1793,13 +1711,7 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
 
     except Exception as e:
         logger.error(f"Error creating offer: {e}")
-        await _upsert_prompt(
-            target,
-            state,
-            "Ошибка при сохранении. Попробуйте снова."
-            if lang == "ru"
-            else "Saqlashda xatolik. Qayta urinib ko'ring.",
-        )
+        await _upsert_prompt(target, state, get_text(lang, "offer_create_failed"))
     finally:
         await state.clear()
 
@@ -1815,6 +1727,9 @@ async def back_to_title(callback: types.CallbackQuery, state: FSMContext) -> Non
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
@@ -1825,11 +1740,11 @@ async def back_to_title(callback: types.CallbackQuery, state: FSMContext) -> Non
     text = _compose_step_message(
         data,
         lang,
-        2,
-        "Название",
-        "Nomi",
-        "📝",
-        "Пример: Чай Ahmad Английский 100 г" if lang == "ru" else "Misol: Ahmad English Tea 100g",
+        1,
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_title_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -1845,30 +1760,30 @@ async def back_to_title(callback: types.CallbackQuery, state: FSMContext) -> Non
 
 @router.callback_query(F.data == "create_back_description")
 async def back_to_description(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Go back to description input."""
+    """Legacy back action - return to title input."""
     if not db or not callback.message:
         await callback.answer()
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
     builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_title")
-    builder.button(text=get_text(lang, "btn_skip"), callback_data="create_skip_description")
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
-    builder.adjust(2, 1)
+    builder.adjust(2)
 
     text = _compose_step_message(
         data,
         lang,
-        3,
-        "Описание",
-        "Tavsif",
-        "✍️",
-        "Можно пропустить. Пример: свежий, 450 г"
-        if lang == "ru"
-        else "Ixtiyoriy. Misol: yangi, 450g",
+        1,
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_title_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -1878,7 +1793,7 @@ async def back_to_description(callback: types.CallbackQuery, state: FSMContext) 
         reply_markup=builder.as_markup(),
         parse_mode="HTML",
     )
-    await state.set_state(CreateOffer.description)
+    await state.set_state(CreateOffer.title)
     await callback.answer()
 
 
@@ -1890,16 +1805,19 @@ async def back_to_category(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
 
     step_text = _compose_step_message(
         data,
         lang,
         1,
-        "Категория",
-        "Kategoriya",
-        "🧺",
-        "Выберите категорию ниже." if lang == "ru" else "Kategoriyani tanlang.",
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_category_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -1921,23 +1839,24 @@ async def back_to_price(callback: types.CallbackQuery, state: FSMContext) -> Non
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_description")
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_title")
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(2)
 
     text = _compose_step_message(
         data,
         lang,
-        4,
+        2,
         "Цена",
         "Narx",
         "💰",
-        "Можно: 50000 или 50000 35000 (со скидкой)."
-        if lang == "ru"
-        else "Misol: 50000 yoki 50000 35000 (chegirmali).",
+        get_text(lang, "offer_step2_original_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -1959,25 +1878,31 @@ async def back_to_discount(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_price")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+    builder.adjust(2)
 
     text = _compose_step_message(
         data,
         lang,
-        5,
-        "Скидка",
-        "Chegirma",
-        "🏷️",
-        "Выберите % или отправьте цену со скидкой. Минимум 20%."
-        if lang == "ru"
-        else "Foizni tanlang yoki chegirmali narxni yuboring. Kamida 20%.",
+        2,
+        "Цена",
+        "Narx",
+        "💰",
+        get_text(lang, "offer_step2_discount_hint"),
     )
 
     await _edit_prompt_from_callback(
         callback,
         state,
         text,
-        reply_markup=discount_keyboard(lang),
+        reply_markup=builder.as_markup(),
         parse_mode="HTML",
     )
     await state.set_state(CreateOffer.discount_price)
@@ -1992,23 +1917,26 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
 
     text = _compose_step_message(
         data,
         lang,
-        7,
-        "Количество",
-        "Miqdor",
-        "🔢",
-        "Выберите или отправьте количество." if lang == "ru" else "Miqdorni tanlang yoki yuboring.",
+        3,
+        "Остаток и срок годности",
+        "Miqdor va yaroqlilik",
+        "📦",
+        get_text(lang, "offer_step3_quantity_hint"),
     )
 
     await _edit_prompt_from_callback(
         callback,
         state,
         text,
-        reply_markup=quantity_keyboard(lang, unit),
+        reply_markup=quantity_keyboard(lang),
         parse_mode="HTML",
     )
     await state.set_state(CreateOffer.quantity)
@@ -2017,33 +1945,17 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
 
 @router.callback_query(F.data == "create_back_unit")
 async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Go back to unit type selection."""
+    """Legacy back action - return to discount step."""
     if not db or not callback.message:
         await callback.answer()
         return
 
     lang = db.get_user_language(callback.from_user.id)
-    data = await state.get_data()
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
 
-    text = _compose_step_message(
-        data,
-        lang,
-        6,
-        "Ед. измерения",
-        "O'lchov birligi",
-        "📏",
-        "Выберите единицу измерения." if lang == "ru" else "O'lchov birligini tanlang.",
-    )
-
-    await _edit_prompt_from_callback(
-        callback,
-        state,
-        text,
-        reply_markup=unit_type_keyboard(lang),
-        parse_mode="HTML",
-    )
-    await state.set_state(CreateOffer.unit_type)
-    await callback.answer()
+    await back_to_discount(callback, state)
 
 
 @router.callback_query(F.data == "create_back_expiry")
@@ -2054,16 +1966,19 @@ async def back_to_expiry(callback: types.CallbackQuery, state: FSMContext) -> No
         return
 
     lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
     data = await state.get_data()
 
     text = _compose_step_message(
         data,
         lang,
-        8,
-        "Срок годности",
-        "Yaroqlilik muddati",
-        "⏳",
-        "Выберите срок годности." if lang == "ru" else "Yaroqlilik muddatini tanlang.",
+        3,
+        "Остаток и срок годности",
+        "Miqdor va yaroqlilik",
+        "📦",
+        get_text(lang, "offer_step3_expiry_hint"),
     )
 
     await _edit_prompt_from_callback(
@@ -2097,6 +2012,56 @@ async def cancel_creation(callback: types.CallbackQuery, state: FSMContext) -> N
     await callback.answer()
 
 
+@router.callback_query(F.data == "create_publish")
+async def create_publish(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Publish offer after confirmation."""
+    if not db or not callback.message:
+        await callback.answer("System error", show_alert=True)
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
+
+    await _finalize_offer(callback.message, state, lang)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "create_edit")
+async def create_edit(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Return to step 1 for editing."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
+
+    data = await state.get_data()
+    step_text = _compose_step_message(
+        data,
+        lang,
+        1,
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_category_hint"),
+    )
+
+    await _edit_prompt_from_callback(
+        callback,
+        state,
+        step_text,
+        reply_markup=product_categories_keyboard(lang),
+        parse_mode="HTML",
+    )
+    await state.set_state(CreateOffer.category)
+    await callback.answer()
+
+
 @router.callback_query(F.data == "create_another")
 async def create_another(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Start creating another offer."""
@@ -2106,6 +2071,7 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
 
     # Simulate pressing "Добавить" button
     lang = db.get_user_language(callback.from_user.id)
+    await state.update_data(wizard_started_at=time.time())
 
     stores = [
         s
@@ -2142,16 +2108,17 @@ async def create_another(callback: types.CallbackQuery, state: FSMContext) -> No
     store_id = get_store_field(stores[0], "store_id")
     store_name = get_store_field(stores[0], "name", "Магазин")
     await state.update_data(store_id=store_id, store_name=store_name)
+    await state.update_data(wizard_started_at=time.time())
 
     data = await state.get_data()
     step_text = _compose_step_message(
         data,
         lang,
         1,
-        "Категория",
-        "Kategoriya",
-        "🧺",
-        "Выберите категорию ниже." if lang == "ru" else "Kategoriyani tanlang.",
+        "Товар",
+        "Mahsulot",
+        "🥗",
+        get_text(lang, "offer_step1_category_hint"),
     )
 
     await _edit_prompt_from_callback(

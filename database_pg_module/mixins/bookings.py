@@ -25,6 +25,23 @@ MAX_ACTIVE_BOOKINGS_PER_USER = int(os.environ.get("MAX_ACTIVE_BOOKINGS_PER_USER"
 class BookingMixin:
     """Mixin for booking-related database operations."""
 
+    def _snapshot_store_phone(self, cursor, booking_id: int | None, store_id: int | None) -> None:
+        """Snapshot store phone into booking row (best-effort)."""
+        if not booking_id or not store_id:
+            return
+        try:
+            cursor.execute("SELECT phone FROM stores WHERE store_id = %s", (store_id,))
+            row = cursor.fetchone()
+            phone = None
+            if row:
+                phone = row[0] if not hasattr(row, "get") else row.get("phone")
+            cursor.execute(
+                "UPDATE bookings SET store_phone = %s WHERE booking_id = %s",
+                (phone, booking_id),
+            )
+        except Exception as e:
+            logger.debug(f"Store phone snapshot skipped for booking {booking_id}: {e}")
+
     def create_booking_atomic(
         self,
         offer_id: int,
@@ -179,6 +196,7 @@ class BookingMixin:
                 ),
             )
             booking_id = cursor.fetchone()[0]
+            self._snapshot_store_phone(cursor, booking_id, store_id)
 
             conn.commit()
             logger.info(
@@ -611,7 +629,9 @@ class BookingMixin:
             """,
                 (user_id, offer_id, store_id, quantity, BOOKING_DURATION_HOURS),
             )
-            return cursor.fetchone()[0]
+            booking_id = cursor.fetchone()[0]
+            self._snapshot_store_phone(cursor, booking_id, store_id)
+            return booking_id
 
     def create_cart_booking_atomic(
         self,
@@ -745,6 +765,7 @@ class BookingMixin:
                 ),
             )
             booking_id = cursor.fetchone()[0]
+            self._snapshot_store_phone(cursor, booking_id, store_id)
 
             conn.commit()
             logger.info(

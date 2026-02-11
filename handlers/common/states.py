@@ -52,7 +52,7 @@ class RegisterStore(StatesGroup):
     """
     Store registration flow (8 steps).
 
-    Flow: Become Partner → city → category → name → address → description → photo → submit
+    Flow: Become Partner → city → category → name → address → location → description → phone → photo
     """
 
     city = State()  # Step 1: Select city
@@ -61,7 +61,7 @@ class RegisterStore(StatesGroup):
     address = State()  # Step 4: Enter address
     location = State()  # Step 5: Share store location (required)
     description = State()  # Step 6: Enter description
-    phone = State()  # Step 7: Enter phone (optional)
+    phone = State()  # Step 7: Enter phone (required)
     photo = State()  # Step 8: Upload photo
 
 
@@ -72,24 +72,25 @@ class RegisterStore(StatesGroup):
 
 class CreateOffer(StatesGroup):
     """
-    Offer creation flow (9 steps + quick add).
+    Offer creation flow (5 steps).
 
-    Flow: Add Offer → [store] → category → title → description → price → discount → unit → quantity → expiry → photo → done
-    Quick: Add Offer (quick) → [store] → quick_input → done
+    Flow: Add Offer → [store] → category → title → original price → discount price → quantity → expiry → photo → confirm
+    Legacy: description/unit_type/quick_input remain for backward compatibility.
     """
 
     # Main flow states
     store = State()  # Optional: Select store when multiple are available
     category = State()  # Step 1: Select category
     title = State()  # Step 2: Enter title
-    description = State()  # Step 3: Optional description
-    original_price = State()  # Step 4: Enter original price
-    discount_price = State()  # Step 5: Enter/select discount
-    unit_type = State()  # Step 6: Select unit type (шт/кг/л/...)
-    quantity = State()  # Step 7: Enter quantity
-    expiry_date = State()  # Step 8: Select expiry date
-    photo = State()  # Step 9: Upload photo (optional)
-    quick_input = State()  # Quick add input (one line or caption)
+    description = State()  # Legacy: optional description
+    original_price = State()  # Step 2: Enter original price
+    discount_price = State()  # Step 2: Enter discount price
+    unit_type = State()  # Legacy: unit selection
+    quantity = State()  # Step 3: Enter quantity
+    expiry_date = State()  # Step 3: Select expiry date
+    photo = State()  # Step 4: Upload photo (required)
+    confirm = State()  # Step 5: Confirm & publish
+    quick_input = State()  # Legacy: quick add input
 
 
 class EditOffer(StatesGroup):

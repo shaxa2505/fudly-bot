@@ -41,6 +41,8 @@ from PIL import Image
 
 from app.core.geocoding import geocode_store_address
 from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
+from app.core.sanitize import sanitize_phone
+from app.core.security import validator
 from app.core.utils import UZB_TZ, get_uzb_time
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
@@ -1435,6 +1437,21 @@ class UnifiedOrderService:
 
         store_id = next(iter(store_ids))
         store = self.db.get_store(store_id) if hasattr(self.db, "get_store") else None
+        store_phone_raw = None
+        if store:
+            if isinstance(store, dict):
+                store_phone_raw = store.get("phone")
+            else:
+                store_phone_raw = getattr(store, "phone", None)
+        store_phone = sanitize_phone(store_phone_raw)
+        if not store_phone or not validator.validate_phone(store_phone):
+            lang = "ru"
+            if hasattr(self.db, "get_user_language"):
+                try:
+                    lang = self.db.get_user_language(user_id) or "ru"
+                except Exception:
+                    lang = "ru"
+            return self._error_result(get_text(lang, "store_phone_required_for_orders"))
         if store and not _is_store_open_now(store):
             time_range = _get_store_time_range_label(store)
             detail = "Store is closed now"

@@ -114,6 +114,8 @@ TEXTS = {
         "store_working_hours_label": "\u0420\u0435\u0436\u0438\u043c \u0440\u0430\u0431\u043e\u0442\u044b: {hours}",
         "store_working_hours_prompt": "<b>\u0420\u0435\u0436\u0438\u043c \u0440\u0430\u0431\u043e\u0442\u044b \u043c\u0430\u0433\u0430\u0437\u0438\u043d\u0430</b>\n\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439: {hours}\n\u041e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 \u043d\u043e\u0432\u043e\u0435 \u0432\u0440\u0435\u043c\u044f \u0432 \u0444\u043e\u0440\u043c\u0430\u0442\u0435 08:00 - 23:00 (\u043d\u0430\u043f\u0440\u0438\u043c\u0435\u0440 10:00 - 22:00).",
         "store_working_hours_invalid": "\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u0444\u043e\u0440\u043c\u0430\u0442. \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 HH:MM - HH:MM",
+        "store_closed": "??????? ?????? ??????.",
+        "store_closed_order_time": "??????? ?????? ??????. ????? ??????: {time}",
         "store_working_hours_saved": "<b>\u0420\u0435\u0436\u0438\u043c \u0440\u0430\u0431\u043e\u0442\u044b \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d</b>\n\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439: {hours}",
         "store_delivery_price_button": "Сумма доставки",
         "store_min_order_button": "Мин. сумма заказа",
@@ -281,6 +283,41 @@ TEXTS = {
         "language_changed_named": "✅ Язык изменён: {lang_name}",
         "registration_required_phone": "Регистрация нужна для доступа.\nОтправьте номер.",
         "offer_creation_cancelled": "❌ Создание товара отменено",
+        "offer_step1_category_hint": "Выберите категорию товара",
+        "offer_step1_title_hint": "Введите название товара\nПример: Йогурт Activia 450 г",
+        "offer_step2_original_hint": "Введите ОБЫЧНУЮ цену товара",
+        "offer_step2_discount_hint": "Введите ЦЕНУ СО СКИДКОЙ\nСкидка посчитается автоматически",
+        "offer_step3_quantity_hint": "Выберите количество",
+        "offer_step3_quantity_custom": "Введите количество. Пример: 10",
+        "offer_step3_expiry_hint": "Выберите срок годности",
+        "offer_step3_expiry_custom": "Введите дату (ДД.ММ или ДД.ММ.ГГГГ)",
+        "offer_step4_photo_hint": "Отправьте фото товара",
+        "offer_confirm_title": "Проверьте товар перед публикацией:",
+        "offer_confirm_category": "Категория",
+        "offer_confirm_price_title": "Цена",
+        "offer_confirm_was": "Было",
+        "offer_confirm_now": "Стало",
+        "offer_confirm_qty": "Количество",
+        "offer_confirm_expiry": "Срок годности",
+        "offer_confirm_urgent": "Срочно",
+        "offer_publish_btn": "✅ Опубликовать",
+        "offer_edit_btn": "✏️ Изменить",
+        "offer_add_more_btn": "➕ Добавить ещё",
+        "offer_to_items_btn": "📦 К товарам",
+        "offer_published_title": "✅ Товар опубликован",
+        "offer_published_hint": "Он сразу появился в разделе «Еда со скидкой»",
+        "offer_create_failed": "Ошибка при сохранении. Попробуйте снова.",
+        "offer_error_title_short": "⚠️ Название слишком короткое (мин. 3 символа)",
+        "offer_error_title_long": "⚠️ Название слишком длинное (макс. 80 символов)",
+        "offer_error_title_start": "⚠️ Название должно начинаться с буквы или цифры",
+        "offer_error_price_number": "⚠️ Введите число. Пример: 50000",
+        "offer_error_discount_logic": "⚠️ Цена со скидкой должна быть меньше обычной",
+        "offer_error_discount_range": "⚠️ Скидка должна быть от 20% до 90%",
+        "offer_error_quantity_range": "⚠️ Количество должно быть от 1 до {max}",
+        "offer_error_expiry_format": "⚠️ Формат даты: ДД.ММ или ДД.ММ.ГГГГ",
+        "offer_error_expiry_range": "⚠️ Срок годности должен быть сегодня или в пределах 30 дней",
+        "offer_error_photo_required": "⚠️ Фото обязательно. Отправьте фото товара",
+        "offer_creation_expired": "⏳ Время истекло. Черновик удалён. Начните заново.",
         # Предложения
         "no_offers": "Пока нет предложений в вашем городе.",
         "no_offers_in_store": "В этом магазине пока нет предложений.",
@@ -433,20 +470,23 @@ TEXTS = {
 
 Продавайте товары со скидкой и находите новых клиентов.
 
-<b>Шаг 1/7: город</b>
+<b>Шаг 1/8: город</b>
 Выберите город вашего магазина:""",
-        "store_name": """<b>Шаг 3/7: название</b>
-Введите название магазина.
-Пример: Пекарня Хлеб и Соль""",
-        "store_category": """<b>Шаг 2/7: категория</b>
-Выберите тип магазина:""",
-        "store_address": """<b>Шаг 4/7: адрес</b>
-Введите адрес магазина.
-Пример: ул. Амира Темура, 12""",
-        "store_description": """<b>Шаг 6/7: описание</b>
-Коротко опишите ассортимент.
-Пример: Свежая выпечка ежедневно. Хлеб, булочки, торты""",
-        "store_phone": "Введите контактный телефон:",
+        "store_name": """<b>Шаг 3/8: название</b>
+Введите название магазина.""",
+        "store_category": """<b>Шаг 2/8: категория</b>
+Выберите тип магазина.""",
+        "store_address": """<b>Шаг 4/8: адрес</b>
+Введите адрес магазина.""",
+        "store_description": """<b>Шаг 6/8: описание</b>
+Коротко опишите ассортимент.""",
+        "store_phone": """<b>Шаг 7/8: телефон</b>
+Введите контактный телефон в формате +998901234567.""",
+        "store_phone_invalid": "❌ Неверный номер. Введите в формате +998901234567.",
+        "store_phone_required_for_orders": "Чтобы принимать заказы, магазин должен указать телефон.",
+        "contact_store_line": "📞 Связаться с магазином",
+        "contact_store_button": "📞 Позвонить в магазин",
+        "contact_store_late_notice": "Если вы не успеваете — свяжитесь с магазином",
         "store_registered": """<b>✅ Заявка отправлена</b>
 
 {name}
@@ -946,6 +986,8 @@ Bo'limni tanlang.""",
         "store_working_hours_label": "Ish vaqti: {hours}",
         "store_working_hours_prompt": "<b>Do'kon ish vaqti</b>\n\nHozirgi: {hours}\nYangi vaqtni 08:00 - 23:00 formatida yuboring (masalan 10:00 - 22:00).",
         "store_working_hours_invalid": "Noto'g'ri format. HH:MM - HH:MM ko'rinishida yuboring",
+        "store_closed": "Do'kon hozir yopiq.",
+        "store_closed_order_time": "Do'kon hozir yopiq. Ish vaqti: {time}",
         "store_working_hours_saved": "<b>Ish vaqti yangilandi</b>\n\nHozirgi: {hours}",
         "store_delivery_price_button": "Yetkazib berish narxi",
         "store_min_order_button": "Minimal buyurtma",
@@ -1114,6 +1156,41 @@ Menyu pastda.""",
         "language_changed_named": "✅ Til oʻzgartirildi: {lang_name}",
         "registration_required_phone": "Ro'yxatdan o'tish kerak.\nTelefon raqamingizni yuboring.",
         "offer_creation_cancelled": "❌ Mahsulot yaratish bekor qilindi",
+        "offer_step1_category_hint": "Mahsulot kategoriyasini tanlang",
+        "offer_step1_title_hint": "Mahsulot nomini kiriting\nMisol: Activia yogurt 450 g",
+        "offer_step2_original_hint": "Mahsulotning ODDIY narxini kiriting",
+        "offer_step2_discount_hint": "CHEGIRMALI narxni kiriting\nChegirma avtomatik hisoblanadi",
+        "offer_step3_quantity_hint": "Miqdorni tanlang",
+        "offer_step3_quantity_custom": "Miqdor kiriting. Misol: 10",
+        "offer_step3_expiry_hint": "Yaroqlilik muddatini tanlang",
+        "offer_step3_expiry_custom": "Sana kiriting (KK.OO yoki KK.OO.YYYY)",
+        "offer_step4_photo_hint": "Mahsulot fotosini yuboring",
+        "offer_confirm_title": "Nashr qilishdan oldin tekshiring:",
+        "offer_confirm_category": "Kategoriya",
+        "offer_confirm_price_title": "Narx",
+        "offer_confirm_was": "Oldin",
+        "offer_confirm_now": "Hozir",
+        "offer_confirm_qty": "Miqdor",
+        "offer_confirm_expiry": "Yaroqlilik muddati",
+        "offer_confirm_urgent": "Shoshilinch",
+        "offer_publish_btn": "? Nashr qilish",
+        "offer_edit_btn": "?? O'zgartirish",
+        "offer_add_more_btn": "? Yana qo'shish",
+        "offer_to_items_btn": "?? Mahsulotlarga",
+        "offer_published_title": "? Mahsulot e'lon qilindi",
+        "offer_published_hint": "U darhol ?Chegirmali taomlar? bo'limida paydo bo'ldi",
+        "offer_create_failed": "Saqlashda xatolik. Qayta urinib ko'ring.",
+        "offer_error_title_short": "?? Nom juda qisqa (kamida 3 belgi)",
+        "offer_error_title_long": "?? Nom juda uzun (maks. 80 belgi)",
+        "offer_error_title_start": "?? Nom harf yoki raqam bilan boshlanishi kerak",
+        "offer_error_price_number": "?? Raqam kiriting. Misol: 50000",
+        "offer_error_discount_logic": "?? Chegirmali narx asl narxdan kichik bo'lishi kerak",
+        "offer_error_discount_range": "?? Chegirma 20% dan 90% gacha bo'lishi kerak",
+        "offer_error_quantity_range": "?? Miqdor 1 dan {max} gacha bo'lishi kerak",
+        "offer_error_expiry_format": "?? Sana formati: KK.OO yoki KK.OO.YYYY",
+        "offer_error_expiry_range": "?? Yaroqlilik muddati bugundan 30 kungacha bo'lishi kerak",
+        "offer_error_photo_required": "?? Foto majburiy. Mahsulot fotosini yuboring",
+        "offer_creation_expired": "? Vaqt tugadi. Qoralama o'chirildi. Qayta boshlang.",
         # Savat
         "cart_title": "<b>Savat</b>",
         "cart_empty": "<b>Savat bo'sh</b>\nKatalog yoki qidiruvdan mahsulot qo'shing.",
@@ -1373,20 +1450,23 @@ Buyurtmani olishda shu kodni ko'rsating.""",
 
 Chegirmali mahsulotlar taklif qiling va yangi mijozlar toping.
 
-<b>1/7-qadam: shahar</b>
+<b>1/8-qadam: shahar</b>
 Do'koningiz joylashgan shaharni tanlang:""",
-        "store_name": """<b>3/7-qadam: nomi</b>
-Do'kon nomini kiriting.
-Misol: Non va Tuz nonvoyxonasi""",
-        "store_category": """<b>2/7-qadam: kategoriya</b>
-Do'kon turini tanlang:""",
-        "store_address": """<b>4/7-qadam: manzil</b>
-Do'kon manzilini kiriting.
-Misol: Amir Temur ko'chasi, 12""",
-        "store_description": """<b>6/7-qadam: tavsif</b>
-Assortimentni qisqacha yozing.
-Misol: Har kuni yangi pishirilgan non. Non, bulochka, tortlar""",
-        "store_phone": "Aloqa telefonini kiriting:",
+        "store_name": """<b>3/8-qadam: nomi</b>
+Do'kon nomini kiriting.""",
+        "store_category": """<b>2/8-qadam: kategoriya</b>
+Do'kon turini tanlang.""",
+        "store_address": """<b>4/8-qadam: manzil</b>
+Do'kon manzilini kiriting.""",
+        "store_description": """<b>6/8-qadam: tavsif</b>
+Assortimentni qisqacha yozing.""",
+        "store_phone": """<b>7/8-qadam: telefon</b>
+Aloqa telefonini xalqaro formatda kiriting: +998901234567.""",
+        "store_phone_invalid": "❌ Noto'g'ri telefon raqami. +998901234567 formatida kiriting.",
+        "store_phone_required_for_orders": "Buyurtmalarni qabul qilish uchun do'kon telefoni bo'lishi shart.",
+        "contact_store_line": "📞 Do'kon bilan bog'lanish",
+        "contact_store_button": "📞 Do'konga qo'ng'iroq",
+        "contact_store_late_notice": "Agar ulgurmasangiz — do'kon bilan bog'laning",
         "store_registered": """<b>✅ Ariza yuborildi</b>
 
 {name}

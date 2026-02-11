@@ -20,6 +20,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import WebAppInfo
 
 from app.core.utils import UZB_TZ, get_uzb_time
+from app.core.sanitize import sanitize_phone
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
 from app.domain.order import PaymentStatus
 from app.integrations.payment_service import get_payment_service
@@ -110,6 +111,57 @@ def _format_ready_until(updated_at: Any) -> str | None:
     return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
 
 
+def _ready_minutes_left(updated_at: Any) -> int | None:
+    try:
+        hours = int(os.environ.get("PICKUP_READY_EXPIRY_HOURS", "2"))
+    except Exception:
+        hours = 2
+    if hours <= 0:
+        return None
+
+    base_time = None
+    if isinstance(updated_at, datetime):
+        base_time = updated_at
+    elif isinstance(updated_at, str) and updated_at:
+        try:
+            base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        except Exception:
+            base_time = None
+
+    if base_time is None:
+        base_time = get_uzb_time()
+    elif base_time.tzinfo is None:
+        base_time = base_time.replace(tzinfo=UZB_TZ)
+
+    ready_until = base_time + timedelta(hours=hours)
+    now = get_uzb_time()
+    minutes_left = int((ready_until - now).total_seconds() // 60)
+    return minutes_left
+
+
+def _format_phone_display(raw_phone: str | None) -> str:
+    if not raw_phone:
+        return ""
+    sanitized = sanitize_phone(raw_phone)
+    digits = "".join(filter(str.isdigit, sanitized))
+    if digits.startswith("998") and len(digits) == 12:
+        return f"+998 {digits[3:5]} {digits[5:8]} {digits[8:10]} {digits[10:12]}"
+    if sanitized.startswith("+") and digits:
+        return f"+{digits}"
+    return sanitized or str(raw_phone)
+
+
+def _format_phone_link(raw_phone: str | None) -> str:
+    if not raw_phone:
+        return ""
+    phone = sanitize_phone(raw_phone)
+    return (
+        phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        if phone
+        else ""
+    )
+
+
 def _safe_caption(text: str, limit: int = 1000) -> str:
     if len(text) <= limit:
         return text
@@ -177,8 +229,14 @@ async def _maybe_transfer_customer_card(
     return True
 
 
-def _build_open_app_keyboard(lang: str, order_id: int) -> InlineKeyboardBuilder:
+def _build_open_app_keyboard(
+    lang: str, order_id: int, store_phone: str | None = None
+) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
+    if store_phone:
+        tel_link = _format_phone_link(store_phone)
+        if tel_link:
+            kb.button(text=get_text(lang, "contact_store_button"), url=f"tel:{tel_link}")
     webapp_url = os.getenv("WEBAPP_URL", "").strip()
     if webapp_url:
         kb.button(
@@ -477,11 +535,27 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
     """???????? ?????? ???????????? (??????????? fallback)."""
     user_id = callback.from_user.id
 
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
+    query = """
+                SELECT
+                    b.booking_id,
+                    b.status,
+                    b.booking_code,
+                    b.created_at,
+                    b.updated_at,
+                    COALESCE(b.quantity, 1) as quantity,
+                    s.name as store_name,
+                    s.address as store_address,
+                    COALESCE(b.store_phone, s.phone) as store_phone,
+                    off.title as offer_title,
+                    off.discount_price,
+                    off.original_price,
+                    off.unit
+                FROM bookings b
+                LEFT JOIN offers off ON b.offer_id = off.offer_id
+                LEFT JOIN stores s ON off.store_id = s.store_id
+                WHERE b.booking_id = %s AND b.user_id = %s
+            """
+    fallback_query = """
                 SELECT
                     b.booking_id,
                     b.status,
@@ -500,9 +574,17 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
                 LEFT JOIN offers off ON b.offer_id = off.offer_id
                 LEFT JOIN stores s ON off.store_id = s.store_id
                 WHERE b.booking_id = %s AND b.user_id = %s
-            """,
-                (booking_id, user_id),
-            )
+            """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, (booking_id, user_id))
+            except Exception as e:
+                if "store_phone" in str(e):
+                    cursor.execute(fallback_query, (booking_id, user_id))
+                else:
+                    raise
             booking = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get booking {booking_id}: {e}")
@@ -555,7 +637,20 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
     )
 
     lines = [card]
-    kb = _build_open_app_keyboard(lang, int(data["booking_id"]))
+    store_phone_raw = data.get("store_phone")
+    formatted_phone = _format_phone_display(store_phone_raw)
+    if formatted_phone:
+        lines.append("")
+        lines.append(get_text(lang, "contact_store_line"))
+        lines.append(formatted_phone)
+
+    if status == "ready":
+        minutes_left = _ready_minutes_left(data.get("updated_at"))
+        if minutes_left is not None and 0 < minutes_left <= 30:
+            lines.append("")
+            lines.append(get_text(lang, "contact_store_late_notice"))
+
+    kb = _build_open_app_keyboard(lang, int(data["booking_id"]), store_phone_raw)
 
     await _maybe_transfer_customer_card(
         user_id=user_id,
@@ -574,11 +669,39 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     """???????? ?????? ?????? (??????????? fallback)."""
     user_id = callback.from_user.id
 
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
+    query = """
+                SELECT
+                    o.order_id,
+                    o.store_id,
+                    o.order_type,
+                    o.order_status,
+                    o.payment_method,
+                    o.payment_status,
+                    o.pickup_code,
+                    o.delivery_address,
+                    o.total_price,
+                    o.created_at,
+                    o.updated_at,
+                    o.quantity,
+                    s.name as store_name,
+                    s.address as store_address,
+                    COALESCE(o.store_phone, s.phone) as store_phone,
+                    off.title as offer_title,
+                    off.discount_price,
+                    off.original_price,
+                    off.unit,
+                    o.is_cart_order,
+                    o.cart_items,
+                    o.delivery_price,
+                    o.item_title,
+                    o.item_price,
+                    o.item_original_price
+                FROM orders o
+                LEFT JOIN stores s ON o.store_id = s.store_id
+                LEFT JOIN offers off ON o.offer_id = off.offer_id
+                WHERE o.order_id = %s AND o.user_id = %s
+            """
+    fallback_query = """
                 SELECT
                     o.order_id,
                     o.store_id,
@@ -609,9 +732,17 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
                 LEFT JOIN stores s ON o.store_id = s.store_id
                 LEFT JOIN offers off ON o.offer_id = off.offer_id
                 WHERE o.order_id = %s AND o.user_id = %s
-            """,
-                (order_id, user_id),
-            )
+            """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(query, (order_id, user_id))
+            except Exception as e:
+                if "store_phone" in str(e):
+                    cursor.execute(fallback_query, (order_id, user_id))
+                else:
+                    raise
             order = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get order {order_id}: {e}")
@@ -703,7 +834,20 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
     )
 
     lines = [card]
-    kb = _build_open_app_keyboard(lang, int(data["order_id"]))
+    store_phone_raw = data.get("store_phone")
+    formatted_phone = _format_phone_display(store_phone_raw)
+    if formatted_phone:
+        lines.append("")
+        lines.append(get_text(lang, "contact_store_line"))
+        lines.append(formatted_phone)
+
+    if not is_delivery and status == "ready":
+        minutes_left = _ready_minutes_left(data.get("updated_at"))
+        if minutes_left is not None and 0 < minutes_left <= 30:
+            lines.append("")
+            lines.append(get_text(lang, "contact_store_late_notice"))
+
+    kb = _build_open_app_keyboard(lang, int(data["order_id"]), store_phone_raw)
 
     await _maybe_transfer_customer_card(
         user_id=user_id,

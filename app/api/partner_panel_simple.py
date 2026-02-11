@@ -28,6 +28,8 @@ from fastapi import (
 )
 
 from app.core.async_db import AsyncDBProxy
+from app.core.sanitize import sanitize_phone
+from app.core.security import validator
 from app.core.utils import calc_discount_percent, normalize_city
 from database_pg_module.mixins.offers import canonicalize_geo_slug
 from app.api.websocket_manager import get_connection_manager
@@ -1745,6 +1747,10 @@ async def update_store(
     delivery_price_value = max(0, int(delivery_price))
     min_order_value = max(0, int(min_order_amount))
 
+    phone_value = sanitize_phone(settings.get("phone", store.get("phone")))
+    if not phone_value or not validator.validate_phone(phone_value):
+        raise HTTPException(status_code=400, detail="Invalid store phone")
+
     working_hours_value = store.get("working_hours")
     if "working_hours" in settings:
         normalized_hours = _normalize_working_hours(settings.get("working_hours"))
@@ -1845,7 +1851,7 @@ async def update_store(
             district_slug,
             region_id_value,
             district_id_value,
-            settings.get("phone", store.get("phone")),
+            phone_value,
             settings.get("description", store.get("description")),
             working_hours_value,
             int(delivery_enabled),

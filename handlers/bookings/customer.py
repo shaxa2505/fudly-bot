@@ -13,6 +13,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.core.order_math import calc_total_price
+from app.core.sanitize import sanitize_phone
+from app.core.security import validator
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
 from app.services.unified_order_service import (
     OrderItem,
@@ -1184,9 +1186,15 @@ async def create_booking(
     store = db.get_store(store_id_int) if store_id_int else None
     store_name = get_store_field(store, "name", "Store")
     store_address = get_store_field(store, "address", "")
+    store_phone = sanitize_phone(get_store_field(store, "phone", None))
+    if not store_phone or not validator.validate_phone(store_phone):
+        await message.answer(get_text(lang, "store_phone_required_for_orders"))
+        await state.clear()
+        return
 
     order_service = get_unified_order_service()
     if order_service:
+        result = None
         try:
             order_item = OrderItem(
                 offer_id=int(offer_id),
@@ -1223,6 +1231,24 @@ async def create_booking(
                 )
         except Exception as e:
             logger.error(f"Unified pickup order creation failed: {e}")
+            result = None
+
+        if result and not result.success:
+            err = (result.error_message or "").strip()
+            if "Store is closed now" in err:
+                time_range = None
+                if "Order time:" in err:
+                    time_range = err.split("Order time:", 1)[1].strip()
+                if time_range:
+                    await message.answer(
+                        get_text(lang, "store_closed_order_time", time=time_range)
+                    )
+                else:
+                    await message.answer(get_text(lang, "store_closed"))
+            else:
+                await message.answer(err or get_text(lang, "system_error"))
+            await state.clear()
+            return
 
     if not created_orders:
         try:

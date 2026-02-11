@@ -135,24 +135,22 @@ async def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -
 
 
 async def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
-    """Return canonical phone: use DB if present, otherwise allow first-time set."""
+    """Return canonical phone: must exist in DB (bot-verified)."""
     user_model = await db.get_user_model(user_id) if hasattr(db, "get_user_model") else None
     stored_phone = _normalize_phone((get_val(user_model, "phone") if user_model else None))
     candidate = _normalize_phone(raw_phone)
 
-    if stored_phone:
-        if candidate and candidate != stored_phone:
-            raise HTTPException(
-                status_code=400,
-                detail="Phone does not match registered number. Update it in the bot.",
-            )
-        return stored_phone
-
-    if candidate:
-        await _update_phone_if_valid(db, user_id, candidate)
-        return candidate
-
-    raise HTTPException(status_code=400, detail="Phone is required")
+    if not stored_phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Phone is required. Register in the bot and share your contact.",
+        )
+    if candidate and candidate != stored_phone:
+        raise HTTPException(
+            status_code=400,
+            detail="Phone does not match registered number. Update it in the bot.",
+        )
+    return stored_phone
 
 
 def _status_for_creation_error(detail: str) -> int:
@@ -691,7 +689,6 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                 "store_id": r.get("store_id"),
                 "store_name": r.get("store_name"),
                 "store_address": r.get("store_address"),
-                "store_phone": r.get("store_phone"),
                 "items": items,
             }
         )

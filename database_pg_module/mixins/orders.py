@@ -50,6 +50,23 @@ class OrderMixin:
         # card / card_transfer / unknown
         return "awaiting_proof"
 
+    def _snapshot_store_phone(self, cursor, order_id: int | None, store_id: int | None) -> None:
+        """Snapshot store phone into order row (best-effort)."""
+        if not order_id or not store_id:
+            return
+        try:
+            cursor.execute("SELECT phone FROM stores WHERE store_id = %s", (store_id,))
+            row = cursor.fetchone()
+            phone = None
+            if row:
+                phone = row[0] if not hasattr(row, "get") else row.get("phone")
+            cursor.execute(
+                "UPDATE orders SET store_phone = %s WHERE order_id = %s",
+                (phone, order_id),
+            )
+        except Exception as e:
+            logger.debug(f"Store phone snapshot skipped for order {order_id}: {e}")
+
     def create_order(
         self,
         user_id: int,
@@ -341,6 +358,7 @@ class OrderMixin:
                             cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
                             raise
                     if order_id:
+                        self._snapshot_store_phone(cursor, order_id, store_id)
                         # Update offer quantity based on previously locked value
                         new_qty = available_qty - quantity
                         cursor.execute(
@@ -844,6 +862,8 @@ class OrderMixin:
                         raise
                 if not order_id:
                     raise RuntimeError("order_insert_failed")
+
+                self._snapshot_store_phone(cursor, order_id, store_id)
 
                 logger.info(
                     f"🛒✅ Cart order created: id={order_id}, code={pickup_code}, items={len(cart_items)}, total={total_price}"

@@ -76,23 +76,18 @@ def _update_phone_if_valid(db: Any, user_id: int, raw_phone: str | None) -> None
 
 
 def _resolve_required_phone(db: Any, user_id: int, raw_phone: str | None) -> str:
-    """Return canonical phone: use DB if present, otherwise allow first-time set."""
+    """Return canonical phone: must exist in DB (bot-verified)."""
     user_model = (
         db.get_user_model(user_id) if hasattr(db, "get_user_model") else db.get_user(user_id)
     )
     stored_phone = _normalize_phone(get_val(user_model, "phone") if user_model else None)
     candidate = _normalize_phone(raw_phone)
 
-    if stored_phone:
-        if candidate and candidate != stored_phone:
-            raise ValueError("Phone does not match registered number. Update it in the bot.")
-        return stored_phone
-
-    if candidate:
-        _update_phone_if_valid(db, user_id, candidate)
-        return candidate
-
-    raise ValueError("Phone is required")
+    if not stored_phone:
+        raise ValueError("Phone is required. Register in the bot and share your contact.")
+    if candidate and candidate != stored_phone:
+        raise ValueError("Phone does not match registered number. Update it in the bot.")
+    return stored_phone
 
 
 def _validate_store_open(store: Any) -> str | None:

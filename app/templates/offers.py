@@ -110,10 +110,6 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
         address_label = "Адрес" if lang == "ru" else "Manzil"
         lines.append(f"{address_label}: {_escape(store.address)}")
 
-    if store.phone:
-        phone_label = "Телефон" if lang == "ru" else "Telefon"
-        lines.append(f"{phone_label}: {_escape(store.phone)}")
-
     if store.description:
         description_label = "Описание" if lang == "ru" else "Tavsif"
         lines.append(f"{description_label}: {_escape(_trim_title(store.description, limit=120))}")

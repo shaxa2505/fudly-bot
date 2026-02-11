@@ -406,6 +406,7 @@ class SchemaMixin:
                     user_id BIGINT,
                     offer_id INTEGER,
                     store_id INTEGER,
+                    store_phone TEXT,
                     delivery_address TEXT,
                     comment TEXT,
                     delivery_city TEXT,
@@ -505,6 +506,15 @@ class SchemaMixin:
                 except Exception as e:
                     logger.warning(f"Migration for orders order_type: {e}")
 
+            # Migration: Add store_phone snapshot to orders
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_phone TEXT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for orders store_phone: {e}")
+
             # Migration: Add cancel_reason/cancel_comment for partner cancellations
             if run_runtime_migrations:
                 try:
@@ -537,6 +547,7 @@ class SchemaMixin:
                     user_id BIGINT,
                     offer_id INTEGER,
                     store_id INTEGER,
+                    store_phone TEXT,
                     quantity INTEGER DEFAULT 1,
                     booking_code TEXT,
                     pickup_time TEXT,
@@ -576,6 +587,15 @@ class SchemaMixin:
                     )
                 except Exception as e:
                     logger.warning(f"Migration for bookings seller_message_id: {e}")
+
+            # Migration: Add store_phone snapshot to bookings
+            if run_runtime_migrations:
+                try:
+                    cursor.execute(
+                        "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS store_phone TEXT"
+                    )
+                except Exception as e:
+                    logger.warning(f"Migration for bookings store_phone: {e}")
 
             # Migration: Add rating_reminder_sent and updated_at for rating reminders
             if run_runtime_migrations:

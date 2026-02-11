@@ -19,6 +19,8 @@ from app.keyboards import (
     main_menu_customer,
     main_menu_seller,
 )
+from app.core.sanitize import sanitize_phone
+from app.core.security import validator
 from app.core.geocoding import geocode_store_address, reverse_geocode_store
 from database_protocol import DatabaseProtocol
 from handlers.common.states import RegisterStore
@@ -450,10 +452,10 @@ async def register_store_address(message: types.Message, state: FSMContext) -> N
     )
     await state.update_data(address=message.text)
     location_text = (
-        "<b>Шаг 5/7: геолокация</b>\n"
+        "<b>Шаг 5/8: геолокация</b>\n"
         "Отправьте геолокацию магазина кнопкой ниже. Это обязательно."
         if lang == "ru"
-        else "<b>5/7-qadam: joylashuv</b>\n"
+        else "<b>5/8-qadam: joylashuv</b>\n"
         "Do'kon geolokatsiyasini pastdagi tugma orqali yuboring. Bu majburiy."
     )
     await message.answer(
@@ -519,9 +521,21 @@ async def register_store_location_invalid(message: types.Message, state: FSMCont
     await message.answer(text, reply_markup=location_request_keyboard(lang))
 
 
+def _store_photo_prompt(lang: str) -> str:
+    return (
+        "<b>Шаг 8/8: фото</b>\n"
+        "Отправьте фото магазина или витрины.\n"
+        "Фото обязательно."
+        if lang == "ru"
+        else "<b>8/8-qadam: foto</b>\n"
+        "Do'kon yoki vitrina fotosuratini yuboring.\n"
+        "Foto majburiy."
+    )
+
+
 @router.message(RegisterStore.description)
 async def register_store_description(message: types.Message, state: FSMContext) -> None:
-    """Store description entered - ask for photo."""
+    """Store description entered - ask for phone."""
     if not db or not bot:
         await message.answer("System error")
         return
@@ -530,19 +544,59 @@ async def register_store_description(message: types.Message, state: FSMContext) 
     lang = db.get_user_language(message.from_user.id)
     await state.update_data(description=message.text)
 
-    # Ask for store photo (required)
-    photo_prompt = (
-        "<b>Шаг 7/7: фото</b>\n"
-        "Отправьте фото магазина или витрины.\n"
-        "Фото обязательно."
-        if lang == "ru"
-        else "<b>7/7-qadam: foto</b>\n"
-        "Do'kon yoki vitrina fotosuratini yuboring.\n"
-        "Foto majburiy."
+    await message.answer(
+        get_text(lang, "store_phone"),
+        parse_mode="HTML",
+        reply_markup=cancel_keyboard(lang),
     )
+    await state.set_state(RegisterStore.phone)
 
-    await message.answer(photo_prompt, parse_mode="HTML", reply_markup=cancel_keyboard(lang))
+
+async def _process_store_phone(
+    message: types.Message, state: FSMContext, raw_phone: str | None
+) -> None:
+    if not db:
+        await message.answer("System error")
+        return
+    assert message.from_user is not None
+    lang = db.get_user_language(message.from_user.id)
+
+    phone = sanitize_phone(raw_phone)
+    if not phone or not validator.validate_phone(phone):
+        await message.answer(
+            get_text(lang, "store_phone_invalid"),
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang),
+        )
+        return
+
+    await state.update_data(phone=phone)
+    data = await state.get_data()
+    if data.get("photo"):
+        await create_store_from_data(message, state)
+        return
+
+    await message.answer(
+        _store_photo_prompt(lang),
+        parse_mode="HTML",
+        reply_markup=cancel_keyboard(lang),
+    )
     await state.set_state(RegisterStore.photo)
+
+
+@router.message(RegisterStore.phone, F.contact)
+async def register_store_phone_contact(message: types.Message, state: FSMContext) -> None:
+    """Store phone captured from contact."""
+    await _process_store_phone(message, state, message.contact.phone_number if message.contact else None)
+
+
+@router.message(RegisterStore.phone)
+async def register_store_phone(message: types.Message, state: FSMContext) -> None:
+    """Store phone entered - proceed to photo."""
+    if _is_cancel_text(message.text):
+        await register_store_cancel(message, state)
+        return
+    await _process_store_phone(message, state, message.text)
 
 
 @router.message(RegisterStore.photo, F.photo)
@@ -631,9 +685,19 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
     lang = db.get_user_language(message.from_user.id)
     data = await state.get_data()
 
-    # Use phone from user profile
+    # Use phone from registration (fallback to user profile)
     user = db.get_user_model(message.from_user.id)
     owner_phone = user.phone if user else None
+    store_phone = data.get("phone") or owner_phone
+    store_phone = sanitize_phone(store_phone)
+    if not store_phone or not validator.validate_phone(store_phone):
+        await message.answer(
+            get_text(lang, "store_phone_invalid"),
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard(lang),
+        )
+        await state.set_state(RegisterStore.phone)
+        return
 
     manual_lat = data.get("latitude")
     manual_lon = data.get("longitude")
@@ -661,7 +725,7 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
         address=data["address"],
         description=data["description"],
         category=data["category"],
-        phone=owner_phone,
+        phone=store_phone,
         business_type=data.get("business_type", "supermarket"),
         photo=data.get("photo"),  # Add photo parameter
     )
@@ -696,7 +760,7 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
             address=data["address"],
             category=data["category"],
             description=data["description"],
-            phone=owner_phone or "-",
+            phone=f"{get_text(lang, 'phone')}: {store_phone}",
         ),
         parse_mode="HTML",
         reply_markup=main_menu_seller(lang, user_id=message.from_user.id),
@@ -732,7 +796,7 @@ async def create_store_from_data(message: types.Message, state: FSMContext) -> N
                 f"Адрес: {data['address']}\n"
                 f"Категория: {data['category']}\n"
                 f"Описание: {data['description']}\n"
-                f"Телефон: {owner_phone or '—'}\n\n"
+                f"Телефон: {store_phone or '—'}\n\n"
                 f"Откройте админ-панель для модерации."
             )
 
