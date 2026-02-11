@@ -315,7 +315,7 @@ TEXTS = {
         "offer_error_discount_range": "⚠️ Скидка должна быть от 20% до 90%",
         "offer_error_quantity_range": "⚠️ Количество должно быть от 1 до {max}",
         "offer_error_expiry_format": "⚠️ Формат даты: ДД.ММ или ДД.ММ.ГГГГ",
-        "offer_error_expiry_range": "⚠️ Срок годности должен быть сегодня или в пределах 30 дней",
+        "offer_error_expiry_range": "⚠️ Срок годности должен быть сегодня или в будущем",
         "offer_error_photo_required": "⚠️ Фото обязательно. Отправьте фото товара",
         "offer_creation_expired": "⏳ Время истекло. Черновик удалён. Начните заново.",
         # Предложения
@@ -1188,7 +1188,7 @@ Menyu pastda.""",
         "offer_error_discount_range": "?? Chegirma 20% dan 90% gacha bo'lishi kerak",
         "offer_error_quantity_range": "?? Miqdor 1 dan {max} gacha bo'lishi kerak",
         "offer_error_expiry_format": "?? Sana formati: KK.OO yoki KK.OO.YYYY",
-        "offer_error_expiry_range": "?? Yaroqlilik muddati bugundan 30 kungacha bo'lishi kerak",
+        "offer_error_expiry_range": "?? Yaroqlilik muddati bugun yoki kelajakda bo'lishi kerak",
         "offer_error_photo_required": "?? Foto majburiy. Mahsulot fotosini yuboring",
         "offer_creation_expired": "? Vaqt tugadi. Qoralama o'chirildi. Qayta boshlang.",
         # Savat

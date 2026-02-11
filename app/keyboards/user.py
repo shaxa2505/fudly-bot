@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, ReplyKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from localization import get_text
@@ -40,8 +40,28 @@ def main_menu_customer(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMa
 
 
 def registration_complete_keyboard(lang: str = "ru", cart_count: int = 0) -> ReplyKeyboardMarkup:
-    """Main menu for registration completion (no WebApp button)."""
-    return main_menu_customer(lang, cart_count=cart_count)
+    """Main menu for registration completion with a WebApp shortcut."""
+    builder = ReplyKeyboardBuilder()
+
+    # Row 1: Open WebApp
+    builder.button(text=get_text(lang, "open_store_button"), web_app=WebAppInfo(url=WEBAPP_URL))
+
+    # Row 2: Main action - discounted food catalog
+    builder.button(text=get_text(lang, "hot_offers"))
+
+    # Row 3: Cart + Orders
+    cart_text = f"🛒 {get_text(lang, 'my_cart')}"
+    if cart_count > 0:
+        cart_text = f"{cart_text} ({cart_count})"
+    builder.button(text=cart_text)
+    builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
+
+    # Row 4: Profile + Support
+    builder.button(text=f"👤 {get_text(lang, 'profile')}")
+    builder.button(text=f"🆘 {get_text(lang, 'support')}")
+
+    builder.adjust(1, 1, 2, 2)
+    return builder.as_markup(resize_keyboard=True)
 
 
 def webapp_inline_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:

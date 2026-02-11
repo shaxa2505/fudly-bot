@@ -9,7 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from app.core.location_data import get_districts_for_city_index, get_districts_for_region, get_region_key_for_city_index
 from app.core.sanitize import sanitize_phone
 from app.core.security import logger, rate_limiter, secure_user_input, validator
-from app.core.utils import get_user_field, normalize_city
+from app.core.utils import normalize_city
 from app.keyboards import (
     city_inline_keyboard,
     main_menu_customer,
@@ -23,23 +23,6 @@ from localization import get_cities, get_text
 
 router = Router(name="registration")
 REGISTRATION_COMPLETE_STICKER_ID = None
-
-
-def _is_city_selected(user_data: object | None) -> bool:
-    """Return True if city was explicitly selected (not just default)."""
-    if not user_data:
-        return False
-    city_raw = get_user_field(user_data, "city")
-    if not city_raw:
-        return False
-    city_norm = normalize_city(city_raw)
-    region = get_user_field(user_data, "region")
-    district = get_user_field(user_data, "district")
-    region_id = get_user_field(user_data, "region_id")
-    district_id = get_user_field(user_data, "district_id")
-    if city_norm == "Ташкент" and not (region or district or region_id or district_id):
-        return False
-    return True
 
 
 def _build_district_keyboard(
@@ -132,22 +115,9 @@ async def _after_phone_saved(
         )
         return
 
-    user_data = None
-    if hasattr(db, "get_user"):
-        user_data = db.get_user(message.from_user.id)
-
-    if _is_city_selected(user_data):
-        await state.clear()
-        await message.answer(
-            get_text(lang, "phone_saved"),
-        )
-        await _send_completion_menu(message, lang)
-        return
-
     await state.set_state(Registration.city)
-    await message.answer(get_text(lang, "phone_saved"), reply_markup=ReplyKeyboardRemove())
     await message.answer(
-        get_text(lang, "choose_city"),
+        get_text(lang, "welcome_city_step"),
         parse_mode="HTML",
         reply_markup=city_inline_keyboard(lang, allow_cancel=False),
     )
@@ -339,10 +309,6 @@ async def registration_city_callback(
     await callback.message.answer(
         complete_text,
         parse_mode="HTML",
-        reply_markup=webapp_inline_keyboard(lang),
-    )
-    await callback.message.answer(
-        get_text(lang, "main_menu"),
         reply_markup=registration_complete_keyboard(lang),
     )
     await callback.answer()
@@ -422,10 +388,6 @@ async def registration_district_callback(
     await callback.message.answer(
         complete_text,
         parse_mode="HTML",
-        reply_markup=webapp_inline_keyboard(lang),
-    )
-    await callback.message.answer(
-        get_text(lang, "main_menu"),
         reply_markup=registration_complete_keyboard(lang),
     )
     await callback.answer()

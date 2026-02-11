@@ -36,7 +36,7 @@ MAX_DISCOUNT_PERCENT = 90
 MIN_TITLE_LEN = 3
 MAX_TITLE_LEN = 80
 MAX_QUANTITY = 500
-MAX_EXPIRY_DAYS = 30
+MAX_EXPIRY_DAYS = 30  # Legacy limit (no longer enforced)
 WIZARD_TTL_SECONDS = 600
 
 
@@ -383,12 +383,12 @@ def _parse_expiry_input(value: str) -> str:
     parts = normalized.split(".")
     today = datetime.now()
 
+    date_obj: datetime | None = None
     try:
         if len(parts) == 2 and all(p.isdigit() for p in parts):
             day, month = map(int, parts)
             date_obj = datetime(today.year, month, day)
-            return _validate_expiry_date(date_obj.date())
-        if len(parts) == 3 and all(p.isdigit() for p in parts):
+        elif len(parts) == 3 and all(p.isdigit() for p in parts):
             if len(parts[0]) == 4:
                 year, month, day = map(int, parts)
             else:
@@ -396,20 +396,19 @@ def _parse_expiry_input(value: str) -> str:
                 if year < 100:
                     year += 2000
             date_obj = datetime(year, month, day)
-            return _validate_expiry_date(date_obj.date())
     except ValueError:
-        pass
+        date_obj = None
 
-    raise ValueError("Invalid expiry format")
+    if date_obj is None:
+        raise ValueError("Invalid expiry format")
+
+    return _validate_expiry_date(date_obj.date())
 
 
 def _validate_expiry_date(date_value: datetime.date) -> str:
     today = datetime.now().date()
-    max_date = today + timedelta(days=MAX_EXPIRY_DAYS)
     if date_value < today:
         raise ValueError("Expiry in the past")
-    if date_value > max_date:
-        raise ValueError("Expiry too far")
     return date_value.strftime("%Y-%m-%d")
 
 

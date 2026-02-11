@@ -864,16 +864,6 @@ async def cmd_start(message: types.Message, state: FSMContext, db: DatabaseProto
         main_menu_customer=main_menu_customer,
     )
 
-    await message.answer(
-        get_text(
-            lang,
-            "welcome_back",
-            name=message.from_user.first_name,
-            city=normalize_city(user_city) if user_city else get_cities(lang)[0],
-        ),
-        parse_mode="HTML",
-        reply_markup=webapp_inline_keyboard(lang),
-    )
     await message.answer(get_text(lang, "main_menu"), reply_markup=menu)
 
 
