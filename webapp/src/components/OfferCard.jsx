@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { useFavorites } from '../context/FavoritesContext'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
-import { getOfferAvailability } from '../utils/availability'
+import { getOfferAvailability, getTashkentNowMinutes } from '../utils/availability'
 import './OfferCard.css'
 
 const LOADED_IMAGE_CACHE = new Set()
@@ -170,10 +170,10 @@ const OfferCard = memo(function OfferCard({
   const offerId = offer?.id ?? offer?.offer_id ?? offer?.offerId
   const isFav = offerId ? isFavorite(offerId) : false
   const priceLabel = priceValue > 0
-    ? `${Math.round(priceValue).toLocaleString('ru-RU')} so'm`
+    ? Math.round(priceValue).toLocaleString('ru-RU')
     : ''
   const oldPriceLabel = hasOldPrice
-    ? Math.round(originalPrice).toLocaleString('ru-RU')
+    ? `${Math.round(originalPrice / 1000)}k`
     : ''
 
   const handleFavoriteClick = useCallback((e) => {
@@ -182,43 +182,33 @@ const OfferCard = memo(function OfferCard({
     toggleFavorite(offer)
   }, [offer, offerId, toggleFavorite])
 
-  const formatDistanceMeters = (value) => {
-    const raw = Number(value)
-    if (!Number.isFinite(raw) || raw <= 0) return ''
-    if (raw < 950) return `${Math.round(raw)} m`
-    return `${(raw / 1000).toFixed(1)} km`
+  const parseTimeToMinutes = (label) => {
+    if (!label) return null
+    const match = String(label).match(/(\d{1,2}):(\d{2})/)
+    if (!match) return null
+    const hours = Number(match[1])
+    const minutes = Number(match[2])
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
+    return hours * 60 + minutes
   }
 
-  const formatDistanceKm = (value) => {
-    const raw = Number(value)
-    if (!Number.isFinite(raw) || raw <= 0) return ''
-    return `${raw.toFixed(1)} km`
+  const buildTimeLeftLabel = () => {
+    const endMinutes = parseTimeToMinutes(availability.endLabel)
+    if (!endMinutes) return ''
+    const nowMinutes = getTashkentNowMinutes()
+    let diff = endMinutes - nowMinutes
+    if (diff < 0) diff += 24 * 60
+    if (diff <= 0 || diff > 180) return ''
+    const hoursLeft = Math.max(1, Math.ceil(diff / 60))
+    return `${hoursLeft}h left`
   }
 
-  const distanceKm = offer?.distance_km ?? offer?.distanceKm
-  const distanceMeters = offer?.distance_m ?? offer?.distanceM ?? offer?.distance_meters
-  const distanceRaw = offer?.distance
-  let distanceLabel = ''
-
-  if (distanceKm != null) {
-    distanceLabel = formatDistanceKm(distanceKm)
-  } else if (distanceMeters != null) {
-    distanceLabel = formatDistanceMeters(distanceMeters)
-  } else if (typeof distanceRaw === 'string') {
-    distanceLabel = distanceRaw.trim()
-  } else if (Number.isFinite(Number(distanceRaw))) {
-    const numeric = Number(distanceRaw)
-    distanceLabel = numeric < 20 ? formatDistanceKm(numeric) : formatDistanceMeters(numeric)
-  }
-
-  if (!distanceLabel && locationShort) {
-    distanceLabel = locationShort
-  }
+  const timeLeftLabel = buildTimeLeftLabel()
 
   const metaTag = (() => {
-    if (isLowStock) return { text: 'Kam qoldi', variant: 'alert' }
+    if (isLowStock) return { text: `Only ${stockLimit} left`, variant: 'alert' }
+    if (timeLeftLabel) return { text: timeLeftLabel, variant: 'time' }
     if (isUnavailableNow) return { text: 'Hozir yopiq', variant: 'closed' }
-    if (timeRange) return { text: timeRange, variant: 'primary', icon: true }
     return null
   })()
 
@@ -262,27 +252,27 @@ const OfferCard = memo(function OfferCard({
           }}
         />
         {showDiscountTag && (
-          <div className="offer-discount-badge">-{discountPercent}%</div>
-        )}
-        <div className="offer-image-overlay">
-          <div className="offer-image-meta">
-            {metaTag ? (
-              <span className={`offer-meta-tag offer-meta-tag--${metaTag.variant}`}>
-                {metaTag.icon && (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-                    <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                )}
-                {metaTag.text}
-              </span>
-            ) : (
-              <span />
-            )}
-            {distanceLabel && (
-              <span className="offer-meta-distance">{distanceLabel}</span>
-            )}
+          <div className={`offer-discount-badge ${discountPercent > 50 ? 'offer-discount-badge--high' : ''}`}>
+            -{discountPercent}%
           </div>
+        )}
+        <div className={`offer-image-overlay ${metaTag ? '' : 'only-action'}`}>
+          {metaTag && (
+            <span className={`offer-meta-tag offer-meta-tag--${metaTag.variant}`}>
+              {metaTag.text}
+            </span>
+          )}
+          <button
+            type="button"
+            className={`offer-add-btn offer-add-btn--image ${isAdding ? 'pulse' : ''}`}
+            onClick={handleAddClick}
+            disabled={isOutOfStock || isMaxReached || isUnavailableNow}
+            aria-label="Savatga qo'shish"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
         <button
           type="button"
@@ -323,19 +313,6 @@ const OfferCard = memo(function OfferCard({
             {oldPriceLabel && (
               <span className="offer-old-price">{oldPriceLabel}</span>
             )}
-          </div>
-          <div className="offer-action">
-            <button
-              type="button"
-              className={`offer-add-btn ${isAdding ? 'pulse' : ''}`}
-              onClick={handleAddClick}
-              disabled={isOutOfStock || isMaxReached || isUnavailableNow}
-              aria-label="Savatga qo'shish"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
           </div>
         </div>
       </div>
