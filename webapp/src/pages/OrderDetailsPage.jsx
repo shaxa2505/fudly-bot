@@ -457,15 +457,15 @@ export default function OrderDetailsPage() {
   if (error || !order) {
     return (
       <div className="order-details-page">
-        <div className="details-header">
-          <div className="topbar-card details-header-inner">
-            <div className="details-header-main">
-              <div className="details-title-row">
-                <h1 className="details-title">Buyurtma #{orderId}</h1>
-              </div>
+        <header className="app-header">
+          <div className="app-header-inner">
+            <div className="app-header-spacer" aria-hidden="true" />
+            <div className="app-header-title">
+              <h1 className="app-header-title-text">Buyurtma #{orderId}</h1>
             </div>
+            <div className="app-header-spacer" aria-hidden="true" />
           </div>
-        </div>
+        </header>
         <div className="details-error">
           <div className="details-error-icon">!</div>
           <p>{error || 'Xatolik yuz berdi'}</p>

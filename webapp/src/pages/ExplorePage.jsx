@@ -80,9 +80,13 @@ function ExplorePage({ onNavigate }) {
   return (
     <div className="explore-page">
       {/* Header */}
-      <header className="explore-header">
-        <div className="topbar-card explore-header-inner">
-          <h1 className="explore-title">Mahsulotlarni Topish</h1>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">Mahsulotlarni Topish</h1>
+          </div>
+          <div className="app-header-spacer" aria-hidden="true" />
         </div>
       </header>
 

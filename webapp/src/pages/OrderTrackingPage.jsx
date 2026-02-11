@@ -183,11 +183,15 @@ function OrderTrackingPage({ user }) {
           pullDistance={pullDistance}
           progress={progress}
         />
-        <div className="tracking-header">
-          <div className="topbar-card tracking-header-inner">
-            <h1>{t('Заказ', 'Buyurtma')}</h1>
+        <header className="app-header">
+          <div className="app-header-inner">
+            <div className="app-header-spacer" aria-hidden="true" />
+            <div className="app-header-title">
+              <h1 className="app-header-title-text">{t('Заказ', 'Buyurtma')}</h1>
+            </div>
+            <div className="app-header-spacer" aria-hidden="true" />
           </div>
-        </div>
+        </header>
         <div className="tracking-error">
           <p className="tracking-error-icon">!</p>
           <p className="tracking-error-message">{error || t('Заказ не найден', 'Buyurtma topilmadi')}</p>
@@ -212,11 +216,15 @@ function OrderTrackingPage({ user }) {
         pullDistance={pullDistance}
         progress={progress}
       />
-      <div className="tracking-header">
-        <div className="topbar-card tracking-header-inner">
-          <h1>{t('Заказ', 'Buyurtma')} #{orderCode}</h1>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">{t('Заказ', 'Buyurtma')} #{orderCode}</h1>
+          </div>
+          <div className="app-header-spacer" aria-hidden="true" />
         </div>
-      </div>
+      </header>
 
       {/* Order Status Card */}
       <div className="order-status-card">
@@ -358,5 +366,7 @@ function OrderTrackingPage({ user }) {
 }
 
 export default OrderTrackingPage;
+
+
 
 

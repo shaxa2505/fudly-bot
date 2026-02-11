@@ -18,9 +18,13 @@ function FavoritesPage() {
   if (isEmpty) {
     return (
       <div className="favorites-page">
-        <header className="favorites-header">
-          <div className="topbar-card favorites-header-inner">
-            <h1>Sevimlilar</h1>
+        <header className="app-header">
+          <div className="app-header-inner">
+            <div className="app-header-spacer" aria-hidden="true" />
+            <div className="app-header-title">
+              <h1 className="app-header-title-text">Sevimlilar</h1>
+            </div>
+            <div className="app-header-spacer" aria-hidden="true" />
           </div>
         </header>
 
@@ -50,9 +54,13 @@ function FavoritesPage() {
 
   return (
     <div className="favorites-page">
-      <header className="favorites-header">
-        <div className="topbar-card favorites-header-inner">
-          <h1>Sevimlilar ({favoritesCount})</h1>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">Sevimlilar ({favoritesCount})</h1>
+          </div>
+          <div className="app-header-spacer" aria-hidden="true" />
         </div>
       </header>
 

@@ -202,6 +202,140 @@
   outline-offset: 2px;
 }
 
+/* ===== UNIFIED HEADER ===== */
+
+:root {
+  --app-header-height: 34px;
+  --app-header-gap: 6px;
+  --app-header-inset: max(
+    6px,
+    var(--safe-area-top-raw, 0px),
+    calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--app-header-height)) / 2)
+  );
+  --app-header-total-height: calc(var(--app-header-height) + var(--app-header-inset) + var(--app-header-gap));
+}
+
+.app-header {
+  position: sticky;
+  top: var(--app-surface-top);
+  z-index: var(--z-sticky);
+  background: rgba(249, 249, 249, 0.94);
+  padding: var(--app-header-inset) var(--page-padding-x) var(--app-header-gap);
+  border-radius: var(--app-surface-radius) var(--app-surface-radius) 0 0;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: transform 0.22s ease, padding 0.22s ease;
+  will-change: transform, opacity;
+}
+
+.app-header-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--app-header-height);
+  min-height: var(--app-header-height);
+}
+
+.app-header-spacer {
+  width: 36px;
+  height: 36px;
+}
+
+.app-header-title {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 160px);
+  text-align: center;
+}
+
+.app-header-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(58, 90, 64, 0.6);
+  line-height: 1;
+}
+
+.app-header-title-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-header-button:active {
+  transform: scale(0.98);
+}
+
+.app-header-button-text {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.app-header-button-caret {
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  transform: translateY(1px);
+}
+
+.app-header-action {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-light);
+  background: var(--color-bg-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-xs);
+  position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-header-action:active {
+  transform: scale(0.96);
+}
+
 /* ===== CHIPS / PILLS ===== */
 
 .chip {

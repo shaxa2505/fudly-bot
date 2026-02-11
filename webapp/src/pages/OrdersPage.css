@@ -10,13 +10,7 @@
 }
 
 .orders-topbar {
-  position: sticky;
-  top: var(--app-surface-top);
-  z-index: var(--z-sticky);
-  padding: var(--app-top-inset) var(--page-padding-x) 0;
-  background: rgba(248, 245, 241, 0.94);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--color-border-light);
+  padding-bottom: var(--app-header-gap);
 }
 
 .orders-topbar-inner {

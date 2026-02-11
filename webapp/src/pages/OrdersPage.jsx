@@ -380,22 +380,22 @@ function OrdersPage() {
         progress={progress}
       />
 
-      <header className="orders-topbar">
-        <div className="orders-topbar-inner">
+      <header className="orders-topbar app-header">
+        <div className="app-header-inner">
           <button
             type="button"
-            className="orders-topbar-btn"
+            className="app-header-action"
             onClick={() => navigate(-1)}
             aria-label="Orqaga"
           >
             <ChevronLeft size={18} strokeWidth={2.2} />
           </button>
-          <div className="orders-topbar-center">
-            <h1 className="orders-topbar-title">Buyurtmalar</h1>
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">Buyurtmalar</h1>
           </div>
           <button
             type="button"
-            className="orders-topbar-btn ghost"
+            className="app-header-action"
             onClick={() => toast.info('Buyurtmalar bo\'limi yangilanmoqda')}
             aria-label="Ma'lumot"
           >

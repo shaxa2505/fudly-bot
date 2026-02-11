@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
-import { useFavorites } from '../context/FavoritesContext'
-import { getUnitLabel } from '../utils/helpers'
 import { calcItemsTotal } from '../utils/orderMath'
 import { getOfferAvailability } from '../utils/availability'
 import api from '../api/client'
@@ -13,7 +11,6 @@ import './ProductDetailPage.css'
 function ProductDetailPage() {
   const location = useLocation()
   const { addToCart } = useCart()
-  const { isFavorite, toggleFavorite } = useFavorites()
 
   const initialOffer = location.state?.offer || null
   const [offer, setOffer] = useState(initialOffer)
@@ -97,8 +94,6 @@ function ProductDetailPage() {
   // Get image URL - support multiple field names and convert file_id
   const imageUrl = resolveOfferImageUrl(offer) || ''
   const hasImage = Boolean(imageUrl) && !imgError
-  const unitLabel = offer?.unit ? getUnitLabel(offer.unit) : ''
-  const displayUnitLabel = unitLabel || 'dona'
   const originalPrice = Number(offer?.original_price ?? 0)
   const discountPrice = Number(offer?.discount_price ?? offer?.price ?? 0)
   const unitPrice = discountPrice || originalPrice || 0
@@ -107,21 +102,73 @@ function ProductDetailPage() {
     ? Math.round((1 - unitPrice / originalPrice) * 100)
     : 0
   const discountPercent = Number(offer?.discount_percent ?? 0) || fallbackDiscountPercent
-  const savingsPerUnit = hasDiscount ? Math.max(0, originalPrice - unitPrice) : 0
   const totalPrice = Math.max(0, calcItemsTotal([{ price: unitPrice, quantity }]))
-  const totalSavings = calcItemsTotal([{ price: savingsPerUnit, quantity }])
   const storeName = offer?.store_name || store?.name || ''
   const storeAddress = offer?.store_address || store?.address || ''
-  const deliveryEnabled = offer?.delivery_enabled ?? store?.delivery_enabled ?? false
-  const deliveryPrice = Number(offer?.delivery_price ?? store?.delivery_price ?? 0)
-  const minOrderAmount = Number(offer?.min_order_amount ?? store?.min_order_amount ?? 0)
-  const lowStock = hasStock && stockValue <= 3
-  const midStock = hasStock && stockValue > 3 && stockValue <= 10
-  const stockMeterValue = !hasStock ? 0 : lowStock ? 24 : midStock ? 56 : 92
   const availability = getOfferAvailability(offer)
   const isUnavailableNow = Boolean(availability.timeRange && !availability.isAvailableNow)
   const showDiscountBadge = discountPercent > 0
   const formatPrice = (value) => Math.round(value || 0).toLocaleString('ru-RU')
+  const descriptionText = offer?.description &&
+    offer.description.toLowerCase() !== offer.title?.toLowerCase()
+    ? offer.description
+    : ''
+
+  const formatDistanceMeters = (value) => {
+    const raw = Number(value)
+    if (!Number.isFinite(raw) || raw <= 0) return ''
+    if (raw < 950) return `${Math.round(raw)} m`
+    return `${(raw / 1000).toFixed(1)} km`
+  }
+
+  const formatDistanceKm = (value) => {
+    const raw = Number(value)
+    if (!Number.isFinite(raw) || raw <= 0) return ''
+    return `${raw.toFixed(1)} km`
+  }
+
+  const distanceKm = offer?.distance_km ?? offer?.distanceKm ?? store?.distance
+  const distanceMeters = offer?.distance_m ?? offer?.distanceM ?? offer?.distance_meters
+  const distanceRaw = offer?.distance
+  let distanceLabel = ''
+
+  if (distanceKm != null) {
+    distanceLabel = formatDistanceKm(distanceKm)
+  } else if (distanceMeters != null) {
+    distanceLabel = formatDistanceMeters(distanceMeters)
+  } else if (typeof distanceRaw === 'string') {
+    distanceLabel = distanceRaw.trim()
+  } else if (Number.isFinite(Number(distanceRaw))) {
+    const numeric = Number(distanceRaw)
+    distanceLabel = numeric < 20 ? formatDistanceKm(numeric) : formatDistanceMeters(numeric)
+  }
+
+  const storeInitial = storeName ? storeName.trim().charAt(0).toUpperCase() : '?'
+
+  const buildExpiryDisplay = () => {
+    if (!offer?.expiry_date) return ''
+    const expiryDate = new Date(offer.expiry_date)
+    if (Number.isNaN(expiryDate.getTime())) return ''
+    const now = new Date()
+    const timeLabel = expiryDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    const todayLabel = now.toDateString()
+    const tomorrow = new Date(now)
+    tomorrow.setDate(now.getDate() + 1)
+    if (expiryDate.toDateString() === todayLabel) return `Today, ${timeLabel}`
+    if (expiryDate.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${timeLabel}`
+    return `${expiryDate.toLocaleDateString('ru-RU')} ${timeLabel}`
+  }
+
+  const pickupLabel = availability.timeRange || '—'
+  const expiryLabel = buildExpiryDisplay() || '—'
+  const remainingLabel = hasStock ? `${stockValue} items left` : 'Out of stock'
+  const co2ValueRaw =
+    offer?.co2_saved ??
+    offer?.co2_saved_kg ??
+    offer?.saved_co2 ??
+    offer?.saved_co2_kg
+  const co2Value = Number(co2ValueRaw)
+  const co2Label = Number.isFinite(co2Value) && co2Value > 0 ? `${co2Value} kg` : '—'
 
   const handleQuantityChange = (delta) => {
     if (!hasStock) {
@@ -161,36 +208,6 @@ function ProductDetailPage() {
     setTimeout(() => setAddedToCart(false), 3000)
   }
 
-  const handleFavorite = (e) => {
-    e.stopPropagation()
-    toggleFavorite(offer)
-    window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
-  }
-
-  const handleShare = () => {
-    if (!offer) return
-    const sharePrice = formatPrice(unitPrice)
-    const shareStore = storeName || ''
-    const text = `${offer.title}\nNarx: ${sharePrice} so'm\nDo'kon: ${shareStore}`
-    if (navigator.share) {
-      navigator.share({ title: offer.title, text }).catch(() => {})
-    }
-  }
-
-  // Expiry calculation
-  const getExpiryInfo = () => {
-    if (!offer?.expiry_date) return null
-    try {
-      const days = Math.ceil((new Date(offer.expiry_date) - new Date()) / 86400000)
-      if (days < 0) return { text: "Muddati o'tgan", urgent: true }
-      if (days === 0) return { text: "Bugun tugaydi!", urgent: true }
-      if (days === 1) return { text: "Ertaga tugaydi", urgent: true }
-      if (days <= 3) return { text: `${days} kun qoldi`, urgent: true }
-      if (days <= 7) return { text: `${days} kun qoldi`, urgent: false }
-      return null
-    } catch { return null }
-  }
-
   if (!offer && !isLoadingOffer) {
     return (
       <div className="pdp">
@@ -214,14 +231,6 @@ function ProductDetailPage() {
     )
   }
 
-  const expiryInfo = getExpiryInfo()
-  const expiryDateLabel = offer?.expiry_date
-    ? new Date(offer.expiry_date).toLocaleDateString('ru-RU')
-    : ''
-  const expiryMeta = expiryDateLabel
-    ? `${expiryDateLabel}${expiryInfo?.text ? ` / ${expiryInfo.text}` : ''}`
-    : (expiryInfo?.text || '')
-  const isFav = isFavorite(offer.id || offer.offer_id)
 
   return (
     <div className="pdp">
@@ -247,146 +256,106 @@ function ProductDetailPage() {
               </svg>
             </div>
           )}
-          {(showDiscountBadge || expiryInfo) && (
-            <div className="pdp-hero-badges">
-              {showDiscountBadge && (
-                <span className="pdp-badge pdp-badge-discount">-{discountPercent}%</span>
-              )}
-              {expiryInfo && (
-                <span className={`pdp-badge pdp-badge-expiry ${expiryInfo.urgent ? 'is-urgent' : ''}`}>
-                  {expiryInfo.text}
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </section>
 
-      {/* Content */}
-      <section className="pdp-body">
-        <div className="pdp-title-block">
-          <div className="pdp-title-row">
-            <div className="pdp-title-main">
-              <h1 className="pdp-title">{offer.title}</h1>
-              {storeName && (
-                <div className="pdp-store">
-                  <div className="pdp-store-line">
-                    <span className="pdp-store-label">DO'KON</span>
-                    <span className="pdp-store-name">{storeName}</span>
-                  </div>
-                  {storeAddress && <div className="pdp-store-address">{storeAddress}</div>}
-                </div>
-              )}
-            </div>
-            <div className="pdp-title-actions">
-              <button
-                className={`pdp-icon-btn ${isFav ? 'active' : ''}`}
-                onClick={handleFavorite}
-                aria-label="Sevimli"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill={isFav ? "#FF4757" : "none"}>
-                  <path
-                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                    stroke={isFav ? "#FF4757" : "currentColor"}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <button className="pdp-icon-btn" onClick={handleShare} aria-label="Ulashish">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div className="pdp-info-grid">
-            <div className="pdp-info-item">
-              <span className="pdp-info-label">Yaroqlilik</span>
-              <span className={`pdp-info-value ${expiryInfo?.urgent ? 'is-urgent' : ''}`}>
-                {expiryMeta || '?'}
-              </span>
-            </div>
-            <div className="pdp-info-item">
-              <span className="pdp-info-label">Mavjud miqdor</span>
-              <span className={`pdp-info-value ${lowStock ? 'is-urgent' : ''}`}>
-                {hasStock ? `${stockValue} ${displayUnitLabel}` : 'Tugagan'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="pdp-price-card">
-          <div className="pdp-price-main">
-            <span className="pdp-current-price">{formatPrice(unitPrice)} so'm</span>
-            {showDiscountBadge && (
-              <span className="pdp-price-badge">-{discountPercent}%</span>
-            )}
-          </div>
-          <div className="pdp-price-sub">
+      <section className="pdp-sheet">
+        <div className="pdp-sheet-inner">
+          <h1 className="pdp-title">{offer.title}</h1>
+          <div className="pdp-price-row">
+            <span className="pdp-price-current">{formatPrice(unitPrice)} UZS</span>
             {hasDiscount && (
-              <span className="pdp-old-price">{formatPrice(originalPrice)} so'm</span>
+              <span className="pdp-price-old">{formatPrice(originalPrice)} UZS</span>
             )}
-            {hasDiscount && savingsPerUnit > 0 && (
-              <span className="pdp-savings">Tejaysiz {formatPrice(savingsPerUnit)} so'm</span>
-            )}
-          </div>
-          <div className="pdp-price-sub">
-            {hasDiscount && totalSavings > 0 && quantity > 1 && (
-              <span className="pdp-total-savings">Jami tejaysiz {formatPrice(totalSavings)} so'm</span>
+            {showDiscountBadge && (
+              <span className="pdp-discount-pill">-{discountPercent}%</span>
             )}
           </div>
-          {availability.timeRange && (
-            <div className={`pdp-availability ${isUnavailableNow ? 'is-closed' : ''}`}>
-              <span>{isUnavailableNow ? 'Hozir yopiq' : 'Buyurtma vaqti'}</span>
-              <strong>{availability.timeRange}</strong>
+
+          {descriptionText && (
+            <p className="pdp-description-text">{descriptionText}</p>
+          )}
+
+          <div className="pdp-info-grid new-grid">
+            <div className="pdp-info-card">
+              <div className="pdp-info-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                  <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                Pickup Time
+              </div>
+              <div className="pdp-info-value">{pickupLabel}</div>
+            </div>
+            <div className="pdp-info-card">
+              <div className="pdp-info-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 2h12v4l-4 4v4l-4 4v4H6v-4l4-4v-4L6 6V2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Expires In
+              </div>
+              <div className="pdp-info-value">{expiryLabel}</div>
+            </div>
+            <div className="pdp-info-card">
+              <div className="pdp-info-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4 7h16v10H4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                  <path d="M4 7l4-3h8l4 3" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                </svg>
+                Remaining
+              </div>
+              <div className="pdp-info-value">{remainingLabel}</div>
+            </div>
+            <div className="pdp-info-card">
+              <div className="pdp-info-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M7 21c5.5 0 10-4.5 10-10V3S9 3 4 8c-2.6 2.6-2 6.5 1.5 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                </svg>
+                Saved CO2
+              </div>
+              <div className="pdp-info-value">{co2Label}</div>
+            </div>
+          </div>
+
+          {(storeName || storeAddress) && (
+            <div className="pdp-store-card">
+              <div className="pdp-store-row">
+                <div className="pdp-store-avatar">{storeInitial}</div>
+                <div className="pdp-store-info">
+                  <div className="pdp-store-name">{storeName || 'Store'}</div>
+                  <div className="pdp-store-meta">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 21s-6-5-6-10a6 6 0 1112 0c0 5-6 10-6 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="12" cy="11" r="2" fill="currentColor"/>
+                    </svg>
+                    <span>{storeAddress || '—'}</span>
+                    {distanceLabel && (
+                      <span className="pdp-store-distance">• {distanceLabel}</span>
+                    )}
+                  </div>
+                </div>
+                <span className="pdp-store-chevron">›</span>
+              </div>
+              <div className="pdp-map-preview">
+                <button type="button" className="pdp-map-button">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 19l7-16-7 4-7-4 7 16z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                  </svg>
+                  View on Map
+                </button>
+              </div>
             </div>
           )}
-          <div className="pdp-stock-meter">
-            <span
-              className={`pdp-stock-meter-fill ${lowStock ? 'is-low' : midStock ? 'is-mid' : ''}`}
-              style={{ width: `${stockMeterValue}%` }}
-            />
+
+          <div className="pdp-note">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
+              <path d="M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M11 12h2v4h-2z" fill="currentColor"/>
+            </svg>
+            <span>This is a surprise bag item. The contents may vary slightly depending on availability.</span>
           </div>
         </div>
-
-        <div className="pdp-card pdp-delivery-card">
-          <div className="pdp-card-header">
-            <h3 className="pdp-card-title">Yetkazib berish</h3>
-          </div>
-          {!deliveryEnabled && (
-            <div className="pdp-card-row">
-              <span>Yetkazib berish</span>
-              <span>Faqat olib ketish</span>
-            </div>
-          )}
-          {deliveryEnabled && deliveryPrice > 0 && (
-            <div className="pdp-card-row">
-              <span>Narxi</span>
-              <span>{formatPrice(deliveryPrice)} so'm</span>
-            </div>
-          )}
-          {minOrderAmount > 0 && (
-            <div className="pdp-card-row">
-              <span>Minimal buyurtma</span>
-              <span>{formatPrice(minOrderAmount)} so'm</span>
-            </div>
-          )}
-        </div>
-
-        {offer.description && offer.description.toLowerCase() !== offer.title?.toLowerCase() && (
-          <div className="pdp-description">
-            <h3>Tavsif</h3>
-            <p>{offer.description}</p>
-          </div>
-        )}
       </section>
 
       {/* Fixed Bottom Button */}
@@ -408,14 +377,13 @@ function ProductDetailPage() {
           >
             <span className="pdp-add-text">
               {!hasStock
-                ? "Tugagan"
-                : (isUnavailableNow ? "Hozir yopiq" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish"))
+                ? "Out of stock"
+                : (isUnavailableNow ? "Closed" : (addedToCart ? "Added!" : "Add to Cart"))
               }
             </span>
             {hasStock && (
               <span className="pdp-add-total">
-                <span className="pdp-add-amount">{formatPrice(totalPrice)}</span>
-                <span className="pdp-add-currency">so'm</span>
+                • {formatPrice(totalPrice)} UZS
               </span>
             )}
           </button>

@@ -175,7 +175,7 @@
 
 .sp-subheader {
   position: sticky;
-  top: calc(var(--app-surface-top) + var(--sp-topbar-total-height));
+  top: calc(var(--app-surface-top) + var(--app-header-total-height));
   z-index: 19;
   background: rgba(248, 250, 249, 0.8);
   padding: 0 var(--page-padding-x, 16px) 16px;

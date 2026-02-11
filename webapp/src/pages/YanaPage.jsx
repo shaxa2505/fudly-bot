@@ -416,20 +416,21 @@ function YanaPage({ user }) {
         progress={progress}
       />
 
-      <header className="profile-topbar">
-        <div className="profile-topbar-inner">
-          <div className="profile-topbar-center">
-            <h1 className="profile-title">Profil</h1>
-            <button
-              type="button"
-              className="profile-topbar-action"
-              onClick={handleEditProfile}
-              aria-label="Tahrirlash"
-              title="Tahrirlash"
-            >
-              <Pencil size={16} strokeWidth={2.2} />
-            </button>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">Profil</h1>
           </div>
+          <button
+            type="button"
+            className="app-header-action"
+            onClick={handleEditProfile}
+            aria-label="Tahrirlash"
+            title="Tahrirlash"
+          >
+            <Pencil size={16} strokeWidth={2.2} />
+          </button>
         </div>
       </header>
 

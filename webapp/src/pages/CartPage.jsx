@@ -2155,10 +2155,13 @@ function CartPage({ user }) {
   if (isSafeEmpty) {
     return (
       <div className="cart-page cart-page--empty">
-        <header className="cart-header">
-          <div className="cart-header-inner">
-            <div className="cart-header-spacer" aria-hidden="true" />
-            <h1 className="cart-header-title">Savat</h1>
+        <header className="app-header">
+          <div className="app-header-inner">
+            <div className="app-header-spacer" aria-hidden="true" />
+            <div className="app-header-title">
+              <h1 className="app-header-title-text">Savat</h1>
+            </div>
+            <div className="app-header-spacer" aria-hidden="true" />
           </div>
         </header>
 
@@ -2194,10 +2197,13 @@ function CartPage({ user }) {
 
   return (
     <div className="cart-page">
-      <header className="cart-header">
-        <div className="cart-header-inner">
-          <div className="cart-header-spacer" aria-hidden="true" />
-          <h1 className="cart-header-title">Savat</h1>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">Savat</h1>
+          </div>
+          <div className="app-header-spacer" aria-hidden="true" />
         </div>
       </header>
 

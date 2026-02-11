@@ -455,17 +455,19 @@ function StoresPage() {
 
   return (
     <div className="sp">
-      <header className="sp-header">
-        <div className="sp-header-top">
-          <div className="sp-header-title">
-            <span className="sp-location-label">Yetkazish manzili</span>
-            <button className="sp-location-btn" type="button" onClick={requestLocation}>
-              <span className="sp-location-city-name">{cityLatin || 'Tanlanmagan'}</span>
-              <svg className="sp-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <span className="app-header-label">Yetkazish manzili</span>
+            <button className="app-header-button" type="button" onClick={requestLocation}>
+              <span className="app-header-button-text">{cityLatin || 'Tanlanmagan'}</span>
+              <svg className="app-header-button-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
+          <div className="app-header-spacer" aria-hidden="true" />
         </div>
       </header>
 

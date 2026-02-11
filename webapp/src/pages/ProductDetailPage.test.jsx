@@ -8,6 +8,7 @@ const apiMocks = vi.hoisted(() => ({
   addRecentlyViewed: vi.fn(),
   getOffer: vi.fn(),
   getStore: vi.fn(),
+  getTelegramInitData: vi.fn(),
 }))
 
 vi.mock('../api/client', () => ({
@@ -17,6 +18,7 @@ vi.mock('../api/client', () => ({
     getOffer: apiMocks.getOffer,
     getStore: apiMocks.getStore,
   },
+  getTelegramInitData: apiMocks.getTelegramInitData,
 }))
 
 describe('ProductDetailPage', () => {
@@ -56,9 +58,9 @@ describe('ProductDetailPage', () => {
 
     expect(screen.getByText('Test Offer')).toBeInTheDocument()
     expect(screen.getByText('Demo Store')).toBeInTheDocument()
-    expect(screen.getByText('Mavjud miqdor')).toBeInTheDocument()
-    expect(screen.getByText(/5 dona/)).toBeInTheDocument()
-    expect(screen.getAllByText(/so'm/).length).toBeGreaterThan(0)
+    expect(screen.getByText('Remaining')).toBeInTheDocument()
+    expect(screen.getByText(/5 items left/)).toBeInTheDocument()
+    expect(screen.getAllByText(/UZS/).length).toBeGreaterThan(0)
 
     await waitFor(() => {
       expect(apiMocks.addRecentlyViewed).toHaveBeenCalledWith(7)

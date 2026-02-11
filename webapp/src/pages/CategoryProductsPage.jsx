@@ -298,20 +298,24 @@ function CategoryProductsPage() {
   return (
     <div className="category-products-page">
       {/* Header */}
-      <header className="category-header">
-        <div className="topbar-card category-header-inner">
-          <h1 className="category-title">{categoryName || 'Mahsulotlar'}</h1>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="app-header-spacer" aria-hidden="true" />
+          <div className="app-header-title">
+            <h1 className="app-header-title-text">{categoryName || 'Mahsulotlar'}</h1>
+          </div>
           <button
-            className="category-header-filter-btn"
+            className="app-header-action category-header-filter-btn"
             onClick={() => setShowAdvancedFilters(prev => !prev)}
+            aria-label="Filtrlar"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <line x1="4" y1="6" x2="20" y2="6" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="4" y1="12" x2="20" y2="12" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="4" y1="18" x2="20" y2="18" stroke="#181725" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="8" cy="6" r="2" fill="#181725"/>
-              <circle cx="16" cy="12" r="2" fill="#181725"/>
-              <circle cx="12" cy="18" r="2" fill="#181725"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <line x1="4" y1="6" x2="20" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="4" y1="18" x2="20" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="8" cy="6" r="2" fill="currentColor"/>
+              <circle cx="16" cy="12" r="2" fill="currentColor"/>
+              <circle cx="12" cy="18" r="2" fill="currentColor"/>
             </svg>
             {hasActiveFilters && <span className="category-filter-indicator" aria-hidden />}
           </button>
