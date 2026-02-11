@@ -10,7 +10,7 @@
 
 .skeleton-image {
   width: 100%;
-  aspect-ratio: 6 / 5;
+  aspect-ratio: 1 / 1;
   border-radius: 16px;
   background: var(--color-bg-skeleton, #E2E8F0);
   border: 1px solid rgba(45, 45, 45, 0.08);

@@ -38,7 +38,7 @@
 .offer-image-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 6 / 5;
+  aspect-ratio: 1 / 1;
   border-radius: 16px;
   overflow: hidden;
   background: var(--color-bg-secondary);
