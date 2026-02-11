@@ -19,7 +19,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import WebAppInfo
 
-from app.core.utils import UZB_TZ, get_uzb_time
+from app.core.utils import UZB_TZ, get_uzb_time, to_uzb_datetime
 from app.core.sanitize import sanitize_phone
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
 from app.core.units import calc_total_price
@@ -94,22 +94,9 @@ def _format_ready_until(updated_at: Any) -> str | None:
     if hours <= 0:
         return None
 
-    base_time = None
-    if isinstance(updated_at, datetime):
-        base_time = updated_at
-    elif isinstance(updated_at, str) and updated_at:
-        try:
-            base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-        except Exception:
-            base_time = None
-
-    if base_time is None:
-        base_time = get_uzb_time()
-    elif base_time.tzinfo is None:
-        base_time = base_time.replace(tzinfo=UZB_TZ)
-
+    base_time = to_uzb_datetime(updated_at) or get_uzb_time()
     ready_until = base_time + timedelta(hours=hours)
-    return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
+    return ready_until.strftime("%H:%M")
 
 
 def _ready_minutes_left(updated_at: Any) -> int | None:
@@ -120,19 +107,7 @@ def _ready_minutes_left(updated_at: Any) -> int | None:
     if hours <= 0:
         return None
 
-    base_time = None
-    if isinstance(updated_at, datetime):
-        base_time = updated_at
-    elif isinstance(updated_at, str) and updated_at:
-        try:
-            base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-        except Exception:
-            base_time = None
-
-    if base_time is None:
-        base_time = get_uzb_time()
-    elif base_time.tzinfo is None:
-        base_time = base_time.replace(tzinfo=UZB_TZ)
+    base_time = to_uzb_datetime(updated_at) or get_uzb_time()
 
     ready_until = base_time + timedelta(hours=hours)
     now = get_uzb_time()

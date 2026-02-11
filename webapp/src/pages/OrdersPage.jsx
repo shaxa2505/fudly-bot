@@ -31,6 +31,7 @@ const CANCELABLE_STATUSES = new Set(['pending'])
 
 const TAB_ACTIVE = 'active'
 const TAB_HISTORY = 'history'
+const PAGE_SIZE = 30
 
 function OrdersPage() {
   const navigate = useNavigate()
@@ -38,6 +39,9 @@ function OrdersPage() {
   const { toast } = useToast()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pageOffset, setPageOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [cancelingOrderId, setCancelingOrderId] = useState(null)
   const [activeTab, setActiveTab] = useState(TAB_ACTIVE)
 
@@ -51,33 +55,112 @@ function OrdersPage() {
     }
   }
 
-  const loadOrders = async (force = false) => {
-    if (!force) setLoading(true)
+  const getOrderKey = (order) => (
+    order?.id || order?.booking_id || order?.order_id || null
+  )
+
+  const appendOrders = (prev, next) => {
+    if (!Array.isArray(next) || next.length === 0) return prev
+    const seen = new Set(prev.map(getOrderKey).filter(Boolean))
+    const appended = next.filter((item) => {
+      const key = getOrderKey(item)
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    return [...prev, ...appended]
+  }
+
+  const mergeFirstPage = (prev, next) => {
+    if (!Array.isArray(next) || next.length === 0) return prev
+    const nextKeys = new Set(next.map(getOrderKey).filter(Boolean))
+    const rest = prev.filter((item) => {
+      const key = getOrderKey(item)
+      return key && !nextKeys.has(key)
+    })
+    return [...next, ...rest]
+  }
+
+  const loadOrders = async ({ reset = false, force = false } = {}) => {
+    if (reset) {
+      setLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
     try {
-      const response = await api.getOrders({ force })
-      const allOrders = [
+      const offset = reset ? 0 : pageOffset
+      const response = await api.getOrders({
+        force,
+        limit: PAGE_SIZE,
+        offset,
+        include_meta: true,
+      })
+      const pageOrders = [
         ...(response.orders || []),
         ...(response.bookings || []),
       ].map(normalizeOrder)
+      const ordersPageCount = Array.isArray(response.orders) ? response.orders.length : 0
+      const nextOffset = Number.isFinite(response?.next_offset)
+        ? response.next_offset
+        : offset + ordersPageCount
+      const hasMoreResult = typeof response?.has_more === 'boolean'
+        ? response.has_more
+        : ordersPageCount === PAGE_SIZE
 
-      setOrders(allOrders)
+      setOrders((prev) => (reset ? pageOrders : appendOrders(prev, pageOrders)))
+      setHasMore(hasMoreResult)
+      setPageOffset(reset ? (nextOffset || 0) : (nextOffset ?? pageOffset))
     } catch (error) {
       console.error('Error loading orders:', error)
-      setOrders([])
-      toast.error("Buyurtmalarni yuklab bo'lmadi")
+      if (reset) {
+        setOrders([])
+        toast.error("Buyurtmalarni yuklab bo'lmadi")
+      }
     } finally {
-      if (!force) setLoading(false)
+      if (reset) {
+        setLoading(false)
+      } else {
+        setLoadingMore(false)
+      }
+    }
+  }
+
+  const refreshOrders = async () => {
+    try {
+      const response = await api.getOrders({
+        force: true,
+        limit: PAGE_SIZE,
+        offset: 0,
+        include_meta: true,
+      })
+      const pageOrders = [
+        ...(response.orders || []),
+        ...(response.bookings || []),
+      ].map(normalizeOrder)
+      const ordersPageCount = Array.isArray(response.orders) ? response.orders.length : 0
+      const nextOffset = Number.isFinite(response?.next_offset)
+        ? response.next_offset
+        : ordersPageCount
+      const hasMoreResult = typeof response?.has_more === 'boolean'
+        ? response.has_more
+        : ordersPageCount === PAGE_SIZE
+
+      setOrders((prev) => mergeFirstPage(prev, pageOrders))
+      setHasMore(hasMoreResult)
+      setPageOffset((prev) => Math.max(prev, nextOffset ?? 0))
+    } catch (error) {
+      console.warn('Orders refresh failed:', error)
     }
   }
 
   useEffect(() => {
-    loadOrders()
+    loadOrders({ reset: true })
   }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (orders.some(o => ACTIVE_STATUSES.has(o.status))) {
-        loadOrders(true)
+        refreshOrders()
       }
     }, 10000)
 
@@ -279,7 +362,12 @@ function OrdersPage() {
   ), [orders])
 
   const handleRefresh = async () => {
-    await loadOrders(true)
+    await loadOrders({ reset: true, force: true })
+  }
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return
+    await loadOrders({ reset: false, force: true })
   }
 
   const { containerRef, isRefreshing, pullDistance, progress } = usePullToRefresh(handleRefresh)
@@ -657,6 +745,19 @@ function OrdersPage() {
               </div>
             )}
           </section>
+        )}
+
+        {!loading && hasMore && (
+          <div className="orders-load-more">
+            <button
+              type="button"
+              className="orders-load-more-btn"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Yuklanmoqda...' : 'Yana yuklash'}
+            </button>
+          </div>
         )}
       </main>
 

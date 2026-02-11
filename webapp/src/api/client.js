@@ -332,8 +332,13 @@ const api = {
   async getOrders(options = {}) {
     const normalizedOptions =
       typeof options === 'boolean' ? { force: options } : (options || {})
+    const { force = false, limit, offset, include_meta: includeMeta } = normalizedOptions
+    const params = {}
+    if (Number.isFinite(limit)) params.limit = limit
+    if (Number.isFinite(offset)) params.offset = offset
+    if (includeMeta) params.include_meta = true
     // Unified endpoint for both legacy bookings and orders (aiohttp Mini App API)
-    const data = await cachedGet('/orders', {}, 10000, normalizedOptions)
+    const data = await cachedGet('/orders', params, 10000, { force })
     if (Array.isArray(data)) {
       return { orders: data, bookings: [] }
     }

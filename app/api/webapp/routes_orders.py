@@ -7,7 +7,7 @@ from typing import Any
 
 from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -480,16 +480,23 @@ async def create_order(
 
 
 @router.get("/orders")
-async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user)):
+async def get_orders(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+):
     """Get user's orders and bookings for WebApp."""
     user_id = _require_user_id(user)
+    page_limit = max(1, min(int(limit), 200))
+    page_offset = max(0, int(offset))
 
     orders: list[dict[str, Any]] = []
     raw_orders: list[Any] = []
 
     try:
         if hasattr(db, "sync") and hasattr(db.sync, "get_connection"):
-            def _fetch_orders_sync(sync_db, uid: int) -> list[Any]:
+            def _fetch_orders_sync(sync_db, uid: int, limit: int, offset: int) -> list[Any]:
                 with sync_db.get_connection() as conn:
                     cursor = conn.cursor()
                     orders_query = """
@@ -525,7 +532,8 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         LEFT JOIN offers off ON o.offer_id = off.offer_id
                         WHERE o.user_id = %s
                         ORDER BY o.created_at DESC
-                        LIMIT 100
+                        LIMIT %s
+                        OFFSET %s
                     """
                     fallback_query = """
                         SELECT
@@ -560,17 +568,18 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         LEFT JOIN offers off ON o.offer_id = off.offer_id
                         WHERE o.user_id = %s
                         ORDER BY o.created_at DESC
-                        LIMIT 100
+                        LIMIT %s
+                        OFFSET %s
                     """
                     try:
-                        cursor.execute(orders_query, (int(uid),))
+                        cursor.execute(orders_query, (int(uid), limit, offset))
                     except Exception as e:
                         message = str(e)
                         if "delivery_price" in message or "order_type" in message or "updated_at" in message:
                             logger.warning(
                                 "Orders query fallback (missing columns): %s", message
                             )
-                            cursor.execute(fallback_query, (int(uid),))
+                            cursor.execute(fallback_query, (int(uid), limit, offset))
                         else:
                             raise
                     rows = cursor.fetchall() or []
@@ -579,9 +588,9 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         rows = [dict(zip(columns, row)) for row in rows]
                     return rows
 
-            raw_orders = await db.run(_fetch_orders_sync, db.sync, int(user_id))
+            raw_orders = await db.run(_fetch_orders_sync, db.sync, int(user_id), page_limit, page_offset)
             logger.info(
-                f"📦 Fetched {len(raw_orders)} raw orders from database for user {user_id}"
+                f"📦 Fetched {len(raw_orders)} raw orders for user {user_id} (limit={page_limit}, offset={page_offset})"
             )
     except Exception as e:
         logger.warning(f"Webapp get_orders failed to fetch orders: {e}")
@@ -701,8 +710,13 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             }
         )
 
+    orders_count = len(raw_orders)
+    has_more = orders_count == page_limit
+    next_offset = page_offset + orders_count if has_more else None
+    include_bookings = page_offset == 0
+
     bookings = []
-    if hasattr(db, "get_user_bookings"):
+    if include_bookings and hasattr(db, "get_user_bookings"):
         try:
             raw_bookings = await db.get_user_bookings(int(user_id)) or []
             for b in raw_bookings:
@@ -750,7 +764,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
             raw_bookings = []
 
-    if not bookings and await _bookings_archive_exists(db) and hasattr(db, "sync"):
+    if include_bookings and not bookings and await _bookings_archive_exists(db) and hasattr(db, "sync"):
         try:
             def _fetch_archived_bookings(sync_db, uid: int) -> list[Any]:
                 with sync_db.get_connection() as conn:
@@ -833,7 +847,14 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
     logger.info(
         f"📊 get_orders result for user {user_id}: {len(orders)} orders, {len(bookings)} bookings"
     )
-    return {"bookings": bookings, "orders": orders}
+    return {
+        "bookings": bookings,
+        "orders": orders,
+        "limit": page_limit,
+        "offset": page_offset,
+        "has_more": has_more,
+        "next_offset": next_offset,
+    }
 
 
 @router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)

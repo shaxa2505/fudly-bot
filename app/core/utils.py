@@ -113,6 +113,28 @@ def get_uzb_time() -> datetime:
     return datetime.now(UZB_TZ)
 
 
+def to_uzb_datetime(value: Any) -> datetime | None:
+    """Normalize a datetime/string to UZB timezone, assuming naive values are UTC."""
+    if not value:
+        return None
+    base_time: datetime | None = None
+    if isinstance(value, datetime):
+        base_time = value
+    elif isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            base_time = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except Exception:
+            base_time = None
+    if base_time is None:
+        return None
+    if base_time.tzinfo is None:
+        base_time = base_time.replace(tzinfo=timezone.utc)
+    return base_time.astimezone(UZB_TZ)
+
+
 def get_user_field(user: Any, field_name: str, default: Any = None) -> Any:
     """Safely extract field from user (dict or tuple)."""
     if not user:

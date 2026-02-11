@@ -8,7 +8,7 @@ from datetime import date, datetime
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import calc_discount_percent
+from app.core.utils import calc_discount_percent, to_uzb_datetime
 from localization import get_text
 
 if TYPE_CHECKING:
@@ -607,7 +607,11 @@ async def send_order_card(
         text += f"{'Телефон' if lang == 'ru' else 'Telefon'}: <code>{phone}</code>\n"
         text += f"{'Код' if lang == 'ru' else 'Kod'}: <code>{booking_code}</code>\n"
         if created_at:
-            text += f"{'Дата' if lang == 'ru' else 'Sana'}: {created_at}\n"
+            created_dt = to_uzb_datetime(created_at)
+            created_label = (
+                created_dt.strftime("%Y-%m-%d %H:%M") if created_dt else str(created_at)
+            )
+            text += f"{'Дата' if lang == 'ru' else 'Sana'}: {created_label}\n"
         text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n"
 
         builder = InlineKeyboardBuilder()

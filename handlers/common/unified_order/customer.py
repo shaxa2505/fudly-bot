@@ -14,7 +14,7 @@ from aiogram import F, Router, types
 from aiogram.types import WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import UZB_TZ, get_uzb_time
+from app.core.utils import UZB_TZ, get_uzb_time, to_uzb_datetime
 from app.services.unified_order_service import (
     NotificationTemplates,
     OrderStatus,
@@ -47,22 +47,9 @@ def _format_ready_until(updated_at: Any | None) -> str | None:
     if hours <= 0:
         return None
 
-    base_time = None
-    if isinstance(updated_at, datetime):
-        base_time = updated_at
-    elif isinstance(updated_at, str) and updated_at:
-        try:
-            base_time = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
-        except Exception:
-            base_time = None
-
-    if base_time is None:
-        base_time = get_uzb_time()
-    elif base_time.tzinfo is None:
-        base_time = base_time.replace(tzinfo=UZB_TZ)
-
+    base_time = to_uzb_datetime(updated_at) or get_uzb_time()
     ready_until = base_time + timedelta(hours=hours)
-    return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
+    return ready_until.strftime("%H:%M")
 
 
 def _build_open_order_keyboard(lang: str, order_id: int) -> InlineKeyboardBuilder:

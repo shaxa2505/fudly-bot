@@ -14,7 +14,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.domain.order_labels import status_label
-from app.core.utils import UZB_TZ, get_uzb_time, get_order_field
+from app.core.utils import UZB_TZ, get_uzb_time, get_order_field, to_uzb_datetime
 from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
@@ -67,27 +67,14 @@ def _shorten(text: Any, limit: int = 28) -> str:
 
 
 def _parse_dt(value: Any) -> datetime | None:
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        base = value
-    elif isinstance(value, str):
-        try:
-            base = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except Exception:
-            return None
-    else:
-        return None
-    if base.tzinfo is None:
-        base = base.replace(tzinfo=UZB_TZ)
-    return base
+    return to_uzb_datetime(value)
 
 
 def _format_time(value: Any) -> str | None:
     base = _parse_dt(value)
     if not base:
         return None
-    return base.astimezone(UZB_TZ).strftime("%H:%M")
+    return base.strftime("%H:%M")
 
 
 def _minutes_since(value: Any) -> int | None:

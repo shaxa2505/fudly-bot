@@ -43,7 +43,7 @@ from app.core.geocoding import geocode_store_address
 from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
-from app.core.utils import UZB_TZ, get_uzb_time, get_order_field
+from app.core.utils import UZB_TZ, get_uzb_time, get_order_field, to_uzb_datetime
 from app.core.units import calc_total_price
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
@@ -325,19 +325,8 @@ class NotificationTemplates:
     def _format_created_time(value: Any | None) -> str | None:
         if not value:
             return None
-        base_time = None
-        if isinstance(value, datetime):
-            base_time = value
-        elif isinstance(value, str):
-            try:
-                base_time = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            except Exception:
-                base_time = None
-        if base_time is None:
-            base_time = get_uzb_time()
-        elif base_time.tzinfo is None:
-            base_time = base_time.replace(tzinfo=UZB_TZ)
-        return base_time.astimezone(UZB_TZ).strftime("%H:%M")
+        base_time = to_uzb_datetime(value) or get_uzb_time()
+        return base_time.strftime("%H:%M")
 
     @staticmethod
     def _seller_status_label(status: str, lang: str, order_type: str) -> str:
@@ -921,11 +910,11 @@ class UnifiedOrderService:
 
         if base_time is None:
             base_time = get_uzb_time()
-        elif base_time.tzinfo is None:
-            base_time = base_time.replace(tzinfo=UZB_TZ)
+        else:
+            base_time = to_uzb_datetime(base_time) or get_uzb_time()
 
         ready_until = base_time + timedelta(hours=hours)
-        return ready_until.astimezone(UZB_TZ).strftime("%H:%M")
+        return ready_until.strftime("%H:%M")
 
     def _build_customer_notification(
         self,
