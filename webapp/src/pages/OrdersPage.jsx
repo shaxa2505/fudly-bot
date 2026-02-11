@@ -7,9 +7,8 @@ import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
-import { getUserLanguage } from '../utils/auth'
 import { resolveImageUrl } from '../utils/imageUtils'
-import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
+import { calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import { deriveDisplayStatus as deriveStatus, displayStatusText, normalizeOrderStatus, resolveOrderType } from '../utils/orderStatus'
 import './YanaPage.css'
 import './OrdersPage.css'
@@ -37,8 +36,6 @@ function OrdersPage() {
   const navigate = useNavigate()
   const { cartCount } = useCart()
   const { toast } = useToast()
-  const lang = getUserLanguage()
-
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [cancelingOrderId, setCancelingOrderId] = useState(null)
@@ -87,6 +84,14 @@ function OrdersPage() {
     return () => clearInterval(interval)
   }, [orders])
 
+  const toNumeric = (value) => {
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/[^\d.-]/g, '')
+      return Number(cleaned || 0)
+    }
+    return Number(value || 0)
+  }
+
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
       pending: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
@@ -102,7 +107,7 @@ function OrdersPage() {
       payment_rejected: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
     }
     const palette = statusMap[status] || { color: 'var(--color-text-secondary)', bg: 'var(--color-bg-tertiary)' }
-    return { ...palette, text: displayStatusText(status, lang, orderType) }
+    return { ...palette, text: displayStatusText(status, 'uz', orderType) }
   }
 
   const getOrderQuantity = (order) => {
@@ -120,18 +125,32 @@ function OrdersPage() {
     const createdAt = order.created_at || order.createdAt
     const orderStatus = normalizeOrderStatus(order.order_status || order.status)
     const quantity = getOrderQuantity(order)
-    const rawTotal = Number(order.total_with_delivery ?? order.total_price ?? order.total_amount ?? order.total ?? 0)
-    const itemsTotal = calcItemsTotal(items, {
-      getPrice: (item) => Number(item?.price ?? item?.discount_price ?? 0),
-      getQuantity: (item) => Number(item?.quantity ?? 0),
-    })
+    const explicitItemsTotal = toNumeric(order.items_total ?? order.itemsTotal ?? 0)
+    const itemsTotal = Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
+      ? explicitItemsTotal
+      : items.reduce((sum, item) => {
+          const price = toNumeric(item?.price ?? item?.discount_price ?? 0)
+          const qty = toNumeric(item?.quantity ?? 0)
+          if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum
+          return sum + Math.round(price * qty)
+        }, 0)
     const isDelivery = order?.order_type === 'delivery' || order?.delivery_address
-    const deliveryFee = calcDeliveryFee(rawTotal, itemsTotal, {
+    const rawTotal = (() => {
+      const candidates = isDelivery
+        ? [order.total_with_delivery, order.total_price, order.total_amount, order.total, order.items_total]
+        : [order.total_price, order.total_amount, order.total, order.items_total, order.total_with_delivery]
+      for (const value of candidates) {
+        const numeric = toNumeric(value)
+        if (Number.isFinite(numeric) && numeric > 0) return numeric
+      }
+      return 0
+    })()
+    const deliveryFee = calcDeliveryFee(rawTotal || null, itemsTotal, {
       deliveryFee: order?.delivery_fee,
       isDelivery,
     })
     const baseTotal = itemsTotal || (rawTotal ? Math.max(0, rawTotal - deliveryFee) : 0)
-    const totalPrice = calcTotalPrice(itemsTotal, deliveryFee, { totalPrice: rawTotal || null })
+    const totalPrice = rawTotal > 0 ? rawTotal : calcTotalPrice(itemsTotal, deliveryFee)
     const unitPrice = quantity
       ? Math.round((baseTotal || 0) / quantity)
       : (items[0]?.price ?? items[0]?.discount_price ?? 0)
@@ -171,22 +190,46 @@ function OrdersPage() {
 
   const formatOrderDate = (dateStr) => {
     if (!dateStr) return ''
-    try {
-      const date = new Date(dateStr)
-      if (Number.isNaN(date.getTime())) return String(dateStr)
-      return date.toLocaleDateString('uz-UZ', {
-        day: 'numeric',
-        month: 'short',
-      })
-    } catch {
-      return String(dateStr)
+    const raw = String(dateStr)
+    const date = new Date(raw)
+    if (!Number.isNaN(date.getTime())) {
+      const months = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek']
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${day} ${months[date.getMonth()]}`
     }
+
+    const monthMap = {
+      'янв': 'yan',
+      'фев': 'fev',
+      'мар': 'mar',
+      'апр': 'apr',
+      'май': 'may',
+      'июн': 'iyn',
+      'июл': 'iyl',
+      'авг': 'avg',
+      'сен': 'sen',
+      'сент': 'sen',
+      'окт': 'okt',
+      'ноя': 'noy',
+      'дек': 'dek',
+    }
+    const match = raw.toLowerCase().match(/(\d{1,2})\s*[-.\s]*\s*([а-яё]+)/i)
+    if (match) {
+      const day = match[1].padStart(2, '0')
+      const key = match[2].slice(0, 4)
+      const mapped = monthMap[key]
+      if (mapped) {
+        return `${day} ${mapped}`
+      }
+    }
+    return raw
   }
 
   const formatSum = (value) => {
-    const numeric = Number(value || 0)
+    const numeric = toNumeric(value)
     if (!Number.isFinite(numeric)) return '0'
-    return Math.round(numeric).toLocaleString('uz-UZ')
+    const rounded = Math.round(numeric + Number.EPSILON)
+    return rounded.toLocaleString('uz-UZ')
   }
 
   const getProgressSteps = (orderType) => {

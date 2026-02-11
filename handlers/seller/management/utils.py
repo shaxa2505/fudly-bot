@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
+from datetime import date, datetime
 
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.utils import calc_discount_percent
+from localization import get_text
 
 if TYPE_CHECKING:
     from database_protocol import DatabaseProtocol
@@ -33,11 +35,28 @@ CATEGORY_LABELS = {
 
 UNIT_DISPLAY_UZ = {
     "шт": "dona",
-    "уп": "up",
+    "уп": "dona",
     "кг": "kg",
     "г": "g",
     "л": "l",
     "мл": "ml",
+}
+
+UNIT_NORMALIZATION = {
+    "piece": "шт",
+    "pcs": "шт",
+    "pc": "шт",
+    "unit": "шт",
+    "units": "шт",
+    "шт.": "шт",
+    "уп": "шт",
+    "уп.": "шт",
+    "up": "шт",
+    "kg": "кг",
+    "g": "г",
+    "gr": "г",
+    "l": "л",
+    "ml": "мл",
 }
 
 # Module-level dependencies (set by setup_dependencies)
@@ -228,9 +247,30 @@ def get_category_label(category: str | None, lang: str) -> str:
     return labels["ru"] if lang == "ru" else labels["uz"]
 
 
+def get_category_labels(category: str | None) -> tuple[str, str]:
+    """Return both RU and UZ labels for category."""
+    if not category:
+        category = "other"
+    labels = CATEGORY_LABELS.get(category, CATEGORY_LABELS["other"])
+    return labels["ru"], labels["uz"]
+
+
+def normalize_unit_value(unit: str | None) -> str:
+    """Normalize unit to supported display values."""
+    if not unit:
+        return "шт"
+    raw = str(unit).strip().lower()
+    normalized = UNIT_NORMALIZATION.get(raw)
+    if normalized:
+        return normalized
+    if raw in {"шт", "кг", "г", "л", "мл"}:
+        return raw
+    return "шт"
+
+
 def display_unit(unit: str | None, lang: str) -> str:
     """Return unit display label."""
-    unit_value = unit or "шт"
+    unit_value = normalize_unit_value(unit)
     if lang == "uz":
         return UNIT_DISPLAY_UZ.get(unit_value, unit_value)
     return unit_value
@@ -250,6 +290,73 @@ def format_quantity(value: Any, unit: str | None, lang: str) -> str:
     return f"{qty_str} {unit_value}"
 
 
+def parse_expiry_date(value: Any) -> date | None:
+    """Parse expiry date into date."""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        raw = value.strip()
+        if "T" in raw:
+            raw = raw.split("T", 1)[0]
+        for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d.%m.%Y"):
+            try:
+                return datetime.strptime(raw, fmt).date()
+            except ValueError:
+                continue
+    return None
+
+
+def get_offer_quantity_value(offer: Any) -> float:
+    """Safely extract offer quantity as float."""
+    raw = get_offer_field(offer, "quantity", 0) or 0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def get_offer_expiry_days(offer: Any) -> int | None:
+    """Return days until expiry (can be negative)."""
+    expiry = parse_expiry_date(get_offer_field(offer, "expiry_date"))
+    if not expiry:
+        return None
+    return (expiry - date.today()).days
+
+
+def get_offer_discount_percent(offer: Any) -> int:
+    """Calculate offer discount percent."""
+    original_price = get_offer_field(offer, "original_price", 0) or 0
+    discount_price = get_offer_field(offer, "discount_price", 0) or 0
+    try:
+        original_price = float(original_price)
+        discount_price = float(discount_price)
+    except (TypeError, ValueError):
+        return 0
+    if original_price <= 0 or discount_price < 0 or original_price <= discount_price:
+        return 0
+    return int(calc_discount_percent(original_price, discount_price))
+
+
+def get_offer_effective_status(offer: Any) -> str:
+    """Derive effective status based on quantity and expiry."""
+    status = str(get_offer_field(offer, "status", "active") or "").lower()
+    qty = get_offer_quantity_value(offer)
+    days_left = get_offer_expiry_days(offer)
+    expired = days_left is not None and days_left < 0
+    if status == "active" and qty > 0 and not expired:
+        return "active"
+    return "inactive"
+
+
+def offer_has_photo(offer: Any) -> bool:
+    """Check if offer has photo."""
+    return bool(get_offer_field(offer, "photo") or get_offer_field(offer, "photo_id"))
+
+
 def normalize_expiry_value(expiry_date: Any) -> str | None:
     """Normalize expiry date to ISO string."""
     if not expiry_date:
@@ -266,101 +373,111 @@ def normalize_expiry_value(expiry_date: Any) -> str | None:
     return str(expiry_date)
 
 
-async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None:
-    """Send single offer card with management buttons."""
-    database = get_db()
+def _format_money(value: Any) -> str:
+    try:
+        return f"{int(float(value)):,}".replace(",", " ")
+    except (TypeError, ValueError):
+        return str(value)
 
-    # Safe field extraction
+
+def _pluralize_days_ru(days: int) -> str:
+    if days % 10 == 1 and days % 100 != 11:
+        return "день"
+    if 2 <= days % 10 <= 4 and not (12 <= days % 100 <= 14):
+        return "дня"
+    return "дней"
+
+
+def _format_days(days: int, lang: str) -> str:
+    if lang == "ru":
+        return f"{days} {_pluralize_days_ru(days)}"
+    return f"{days} kun"
+
+
+def _format_expiry_display(offer: Any, lang: str) -> str:
+    days_left = get_offer_expiry_days(offer)
+    if days_left is None:
+        return get_text(lang, "seller_expiry_no")
+    if days_left < 0:
+        return get_text(lang, "seller_expiry_expired")
+    return _format_days(days_left, lang)
+
+
+def build_offer_card(offer: Any, lang: str) -> tuple[str, Any]:
+    """Build offer card text and keyboard."""
     offer_id = get_offer_field(offer, "offer_id")
-    title = get_offer_field(offer, "title", "Без названия")
-    original_price = int(get_offer_field(offer, "original_price", 0))
-    discount_price = int(get_offer_field(offer, "discount_price", 0))
-    quantity = get_offer_field(offer, "quantity", 0)
-    status = get_offer_field(offer, "status", "active")
-    photo = get_offer_field(offer, "photo")
+    title = get_offer_field(offer, "title", "Товар")
+    original_price = get_offer_field(offer, "original_price", 0) or 0
+    discount_price = get_offer_field(offer, "discount_price", 0) or 0
     unit = get_offer_field(offer, "unit", "шт") or "шт"
     category = get_offer_field(offer, "category", "other")
+    quantity = get_offer_quantity_value(offer)
     available_from = get_offer_field(offer, "available_from")
     available_until = get_offer_field(offer, "available_until")
-    expiry_date = get_offer_field(offer, "expiry_date")
 
-    discount_percent = calc_discount_percent(original_price, discount_price)
+    status = get_offer_effective_status(offer)
+    status_label = (
+        get_text(lang, "seller_status_active")
+        if status == "active"
+        else get_text(lang, "seller_status_inactive")
+    )
 
-    # Build card
-    status_label = "Активен" if status == "active" else "Неактивен"
-    if lang != "ru":
-        status_label = "Faol" if status == "active" else "Nofaol"
+    discount_percent = get_offer_discount_percent(offer)
+    unit_display = display_unit(unit, lang)
+    currency = "сум" if lang == "ru" else "so'm"
+    show_unit = unit_display not in ("шт", "dona")
+    price_line = (
+        f"{_format_money(original_price)} → {_format_money(discount_price)} (–{discount_percent}%)"
+    )
+    if show_unit:
+        price_line += f" {currency} / {unit_display}"
+    else:
+        price_line += f" {currency}"
 
-    text = f"<b>{title}</b>\n"
-    text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n\n"
-    text += f"{'Цена' if lang == 'ru' else 'Narx'}: <s>{original_price:,}</s> -> <b>{discount_price:,}</b> сум\n"
-    text += f"{'Скидка' if lang == 'ru' else 'Chegirma'}: -{discount_percent}%\n"
-    text += f"{'Категория' if lang == 'ru' else 'Kategoriya'}: {get_category_label(category, lang)}\n"
-    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{format_quantity(quantity, unit, lang)}</b>\n"
+    text_parts = [
+        f"<b>{title}</b>",
+        f"{get_text(lang, 'label_status')}: {status_label}",
+        "",
+        f"{get_text(lang, 'label_price')}:",
+        price_line,
+        f"{get_text(lang, 'seller_label_category')}: {get_category_label(category, lang)}",
+        f"{get_text(lang, 'seller_label_stock')}: {format_quantity(quantity, unit, lang)}",
+        f"{get_text(lang, 'seller_label_expiry')}: {_format_expiry_display(offer, lang)}",
+    ]
 
     if available_from and available_until:
-        text += f"{'Время' if lang == 'ru' else 'Vaqt'}: {available_from} - {available_until}\n"
+        text_parts.append(
+            f"{get_text(lang, 'seller_label_time')}: {available_from}–{available_until}"
+        )
 
-    expiry_value = normalize_expiry_value(expiry_date)
-    if expiry_value:
-        expiry_info = database.get_time_remaining(expiry_value)
-        expiry_display = expiry_info or expiry_value
-    else:
-        expiry_display = "Без срока" if lang == "ru" else "Muddatsiz"
-    text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_display}\n"
+    text = "\n".join(text_parts)
 
-    # Management buttons
     builder = InlineKeyboardBuilder()
-
     if status == "active":
-        builder.button(text="+1", callback_data=f"qty_add_{offer_id}")
-        builder.button(text="-1", callback_data=f"qty_sub_{offer_id}")
-        builder.button(text="+5", callback_data=f"qty_add_5_{offer_id}")
-        builder.button(text="-5", callback_data=f"qty_sub_5_{offer_id}")
+        builder.button(text=get_text(lang, "seller_btn_add_stock"), callback_data=f"qty_add_{offer_id}")
+        builder.button(text=get_text(lang, "seller_btn_sub_stock"), callback_data=f"qty_sub_{offer_id}")
+        builder.button(text=get_text(lang, "seller_btn_edit"), callback_data=f"edit_offer_{offer_id}")
         builder.button(
-            text="Изменить" if lang == "ru" else "Tahrirlash",
-            callback_data=f"edit_offer_{offer_id}",
+            text=get_text(lang, "seller_btn_deactivate"), callback_data=f"deactivate_offer_{offer_id}"
         )
-        builder.button(
-            text="Продлить" if lang == "ru" else "Uzaytirish",
-            callback_data=f"extend_offer_{offer_id}",
-        )
-        builder.button(
-            text="Снять" if lang == "ru" else "O'chirish",
-            callback_data=f"deactivate_offer_{offer_id}",
-        )
-        builder.button(
-            text="Назад" if lang == "ru" else "Orqaga",
-            callback_data="back_to_offers_menu",
-        )
-        builder.adjust(4, 2, 1, 1)
+        builder.button(text=get_text(lang, "seller_items_back_btn"), callback_data="back_to_offers_menu")
+        builder.adjust(2, 2, 1)
     else:
         builder.button(
-            text="Активировать" if lang == "ru" else "Faollashtirish",
-            callback_data=f"activate_offer_{offer_id}",
+            text=get_text(lang, "seller_btn_activate"), callback_data=f"activate_offer_{offer_id}"
         )
-        builder.button(
-            text="Удалить" if lang == "ru" else "O'chirish",
-            callback_data=f"delete_offer_{offer_id}",
-        )
-        builder.button(
-            text="Назад" if lang == "ru" else "Orqaga",
-            callback_data="back_to_offers_menu",
-        )
-        builder.adjust(2, 1)
+        builder.button(text=get_text(lang, "seller_btn_edit"), callback_data=f"edit_offer_{offer_id}")
+        builder.button(text=get_text(lang, "seller_btn_delete"), callback_data=f"delete_offer_{offer_id}")
+        builder.button(text=get_text(lang, "seller_items_back_btn"), callback_data="back_to_offers_menu")
+        builder.adjust(2, 1, 1)
 
-    if photo:
-        try:
-            await message.answer_photo(
-                photo=photo,
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=builder.as_markup(),
-            )
-        except Exception:
-            await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
-    else:
-        await message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
+    return text, builder.as_markup()
+
+
+async def send_offer_card(message: types.Message, offer: Any, lang: str) -> None:
+    """Send single offer card with management buttons."""
+    text, markup = build_offer_card(offer, lang)
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
 
 
 async def send_order_card(
@@ -663,106 +780,15 @@ async def update_offer_message(callback: types.CallbackQuery, offer_id: int, lan
     if not offer:
         return
 
-    # Safe field extraction
-    title = get_offer_field(offer, "title", "Товар")
-    original_price = int(get_offer_field(offer, "original_price", 0))
-    discount_price = int(get_offer_field(offer, "discount_price", 0))
-    quantity = get_offer_field(offer, "quantity", 0)
-    status = get_offer_field(offer, "status", "active")
-    unit = get_offer_field(offer, "unit", "шт") or "шт"
-    category = get_offer_field(offer, "category", "other")
-    available_from = get_offer_field(offer, "available_from", "")
-    available_until = get_offer_field(offer, "available_until", "")
-    expiry_date = get_offer_field(offer, "expiry_date")
-
-    discount_percent = calc_discount_percent(original_price, discount_price)
-
-    status_label = "Активен" if status == "active" else "Неактивен"
-    if lang != "ru":
-        status_label = "Faol" if status == "active" else "Nofaol"
-
-    text = f"<b>{title}</b>\n"
-    text += f"{'Статус' if lang == 'ru' else 'Holat'}: {status_label}\n\n"
-    text += f"{'Цена' if lang == 'ru' else 'Narx'}: <s>{original_price:,}</s> -> <b>{discount_price:,}</b> сум\n"
-    text += f"{'Скидка' if lang == 'ru' else 'Chegirma'}: -{discount_percent}%\n"
-    text += f"{'Категория' if lang == 'ru' else 'Kategoriya'}: {get_category_label(category, lang)}\n"
-    text += f"{'Остаток' if lang == 'ru' else 'Miqdor'}: <b>{format_quantity(quantity, unit, lang)}</b>\n"
-
-    if available_from and available_until:
-        text += f"{'Время' if lang == 'ru' else 'Vaqt'}: {available_from} - {available_until}\n"
-
-    expiry_value = normalize_expiry_value(expiry_date)
-    if expiry_value:
-        expiry_info = database.get_time_remaining(expiry_value)
-        expiry_display = expiry_info or expiry_value
-    else:
-        expiry_display = "Без срока" if lang == "ru" else "Muddatsiz"
-    text += f"{'Срок' if lang == 'ru' else 'Muddat'}: {expiry_display}\n"
-
-    builder = InlineKeyboardBuilder()
-
-    if status == "active":
-        builder.button(text="+1", callback_data=f"qty_add_{offer_id}")
-        builder.button(text="-1", callback_data=f"qty_sub_{offer_id}")
-        builder.button(text="+5", callback_data=f"qty_add_5_{offer_id}")
-        builder.button(text="-5", callback_data=f"qty_sub_5_{offer_id}")
-        builder.button(
-            text="Изменить" if lang == "ru" else "Tahrirlash",
-            callback_data=f"edit_offer_{offer_id}",
-        )
-        builder.button(
-            text="Продлить" if lang == "ru" else "Uzaytirish",
-            callback_data=f"extend_offer_{offer_id}",
-        )
-        builder.button(
-            text="Снять" if lang == "ru" else "O'chirish",
-            callback_data=f"deactivate_offer_{offer_id}",
-        )
-        builder.button(
-            text="Назад" if lang == "ru" else "Orqaga",
-            callback_data="back_to_offers_menu",
-        )
-        builder.adjust(4, 2, 1, 1)
-    else:
-        builder.button(
-            text="Активировать" if lang == "ru" else "Faollashtirish",
-            callback_data=f"activate_offer_{offer_id}",
-        )
-        builder.button(
-            text="Удалить" if lang == "ru" else "O'chirish",
-            callback_data=f"delete_offer_{offer_id}",
-        )
-        builder.button(
-            text="Назад" if lang == "ru" else "Orqaga",
-            callback_data="back_to_offers_menu",
-        )
-        builder.adjust(2, 1)
-
-    # Get offer photo
-    photo = get_offer_field(database.get_offer(offer_id), "photo")
-
+    text, markup = build_offer_card(offer, lang)
     try:
-        if photo:
-            # Offer has photo - send as photo message
-            await callback.message.answer_photo(
-                photo=photo,
-                caption=text,
-                parse_mode="HTML",
-                reply_markup=builder.as_markup(),
-            )
-        else:
-            # No photo - send as text
-            await callback.message.answer(text, parse_mode="HTML", reply_markup=builder.as_markup())
-        # Try to delete the list message
-        try:
-            await callback.message.delete()
-        except Exception:
-            pass
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
     except Exception:
-        # Fallback: try to edit current message
         try:
-            await callback.message.edit_text(
-                text, parse_mode="HTML", reply_markup=builder.as_markup()
-            )
+            await callback.message.answer(text, parse_mode="HTML", reply_markup=markup)
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
         except Exception:
             pass

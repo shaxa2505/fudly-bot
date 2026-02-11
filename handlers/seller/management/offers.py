@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.keyboards import main_menu_seller
 from app.core.utils import calc_discount_percent
@@ -17,10 +18,17 @@ from localization import get_text
 from logging_config import logger
 
 from .utils import (
+    build_offer_card,
     format_quantity,
     get_db,
     get_offer_field,
     get_store_field,
+    get_category_labels,
+    get_offer_discount_percent,
+    get_offer_effective_status,
+    get_offer_expiry_days,
+    get_offer_quantity_value,
+    offer_has_photo,
     send_offer_card,
     update_offer_message,
 )
@@ -28,6 +36,12 @@ from .utils import (
 router = Router()
 
 MIN_DISCOUNT_PERCENT = 20
+
+ITEMS_PER_PAGE = 5
+MAX_PAGES = 50
+MAX_ITEMS = ITEMS_PER_PAGE * MAX_PAGES
+ATTENTION_STOCK_THRESHOLD = 5
+ATTENTION_EXPIRY_DAYS = 2
 
 DECIMAL_UNITS = {"кг", "л"}
 NO_EXPIRY_TOKENS = {
@@ -115,28 +129,173 @@ def _parse_expiry_date(value: object) -> date | None:
     return None
 
 
-def _is_low_stock(offer: object, threshold: int = 5) -> bool:
-    status = get_offer_field(offer, "status", "active")
-    if status != "active":
-        return False
-    qty = get_offer_field(offer, "quantity", 0)
+def _is_low_stock(offer: object, threshold: int = ATTENTION_STOCK_THRESHOLD) -> bool:
+    qty_value = get_offer_quantity_value(offer)
+    return qty_value <= threshold
+
+
+def _is_expiring_soon(offer: object, days: int = ATTENTION_EXPIRY_DAYS) -> bool:
+    days_left = get_offer_expiry_days(offer)
+    return days_left is not None and 0 <= days_left <= days
+
+
+def _is_expired(offer: object) -> bool:
+    days_left = get_offer_expiry_days(offer)
+    return days_left is not None and days_left < 0
+
+
+def _needs_attention(offer: object) -> bool:
+    low_stock = _is_low_stock(offer)
+    days_left = get_offer_expiry_days(offer)
+    expiring = days_left is not None and 0 <= days_left <= ATTENTION_EXPIRY_DAYS
+    expired = days_left is not None and days_left < 0
+    no_photo = not offer_has_photo(offer)
+    min_discount = MIN_DISCOUNT_PERCENT if MIN_DISCOUNT_PERCENT > 0 else None
+    discount_percent = get_offer_discount_percent(offer)
+    low_discount = min_discount is not None and discount_percent < min_discount
+    return low_stock or expiring or expired or no_photo or low_discount
+
+
+def _format_money(value: Any) -> str:
     try:
-        qty_value = float(qty)
+        return f"{int(float(value)):,}".replace(",", " ")
     except (TypeError, ValueError):
-        qty_value = 0
-    return qty_value < threshold
+        return str(value)
 
 
-def _is_expiring_soon(offer: object, days: int = 2) -> bool:
-    status = get_offer_field(offer, "status", "active")
-    if status != "active":
-        return False
-    expiry = _parse_expiry_date(get_offer_field(offer, "expiry_date"))
-    if not expiry:
-        return False
-    today = datetime.now().date()
-    delta_days = (expiry - today).days
-    return 0 <= delta_days <= days
+def _pluralize_days_ru(days: int) -> str:
+    if days % 10 == 1 and days % 100 != 11:
+        return "день"
+    if 2 <= days % 10 <= 4 and not (12 <= days % 100 <= 14):
+        return "дня"
+    return "дней"
+
+
+def _format_days(days: int, lang: str) -> str:
+    if lang == "ru":
+        return f"{days} {_pluralize_days_ru(days)}"
+    return f"{days} kun"
+
+
+def _format_expiry_line(offer: object, lang: str) -> str:
+    label = get_text(lang, "seller_label_expiry")
+    days_left = get_offer_expiry_days(offer)
+    if days_left is None:
+        return f"{label}: {get_text(lang, 'seller_expiry_no')}"
+    if days_left < 0:
+        return f"⚠️ {label}: {get_text(lang, 'seller_expiry_expired')}"
+    days_text = _format_days(days_left, lang)
+    if days_left <= ATTENTION_EXPIRY_DAYS:
+        return f"⚠️ {label}: {days_text}"
+    return f"{label}: {days_text}"
+
+
+def _build_offer_list_item(offer: object, lang: str) -> str:
+    title = get_offer_field(offer, "title", "Товар")
+    original_price = get_offer_field(offer, "original_price", 0) or 0
+    discount_price = get_offer_field(offer, "discount_price", 0) or 0
+    discount_percent = get_offer_discount_percent(offer)
+
+    qty = get_offer_quantity_value(offer)
+    unit = get_offer_field(offer, "unit", "шт") or "шт"
+    qty_display = format_quantity(qty, unit, lang)
+    stock_label = get_text(lang, "seller_label_stock")
+    if qty <= ATTENTION_STOCK_THRESHOLD:
+        stock_line = f"⚠️ {stock_label}: {qty_display}"
+    else:
+        stock_line = f"{stock_label}: {qty_display}"
+
+    price_line = (
+        f"–{discount_percent}% | {_format_money(original_price)} → {_format_money(discount_price)}"
+    )
+    expiry_line = _format_expiry_line(offer, lang)
+
+    return "\n".join([f"<b>{title}</b>", price_line, stock_line, expiry_line])
+
+
+def _offer_sort_key(offer: object) -> tuple[int, date, float]:
+    status = get_offer_effective_status(offer)
+    status_rank = 0 if status == "active" else 1
+    expiry_date = _parse_expiry_date(get_offer_field(offer, "expiry_date")) or date.max
+    created_at = get_offer_field(offer, "created_at")
+    created_ts = 0.0
+    if isinstance(created_at, datetime):
+        created_ts = created_at.timestamp()
+    elif isinstance(created_at, date):
+        created_ts = datetime.combine(created_at, datetime.min.time()).timestamp()
+    elif isinstance(created_at, str):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                created_ts = datetime.strptime(created_at, fmt).timestamp()
+                break
+            except ValueError:
+                continue
+    return (status_rank, expiry_date, -created_ts)
+
+
+def _collect_user_offers(db: Any, user_id: int) -> list[Any]:
+    stores = db.get_user_accessible_stores(user_id)
+    all_offers: list[Any] = []
+    for store in stores:
+        store_id = get_store_field(store, "store_id")
+        offers = db.get_offers_by_store(store_id, include_all=True)
+        all_offers.extend(offers)
+    return all_offers
+
+
+def _build_offers_main_screen(lang: str, all_offers: list[Any]) -> tuple[str, InlineKeyboardMarkup]:
+    active_count = sum(1 for o in all_offers if get_offer_effective_status(o) == "active")
+    inactive_count = len(all_offers) - active_count
+    attention_count = sum(1 for o in all_offers if _needs_attention(o))
+    total_count = len(all_offers)
+
+    text = (
+        f"<b>{get_text(lang, 'seller_items_title')}</b>\n\n"
+        f"{get_text(lang, 'seller_items_active_label')}: <b>{active_count}</b>\n"
+        f"{get_text(lang, 'seller_items_attention_label')}: <b>{attention_count}</b>\n"
+        f"{get_text(lang, 'seller_items_inactive_label')}: <b>{inactive_count}</b>\n"
+        f"{get_text(lang, 'seller_items_total_label')}: <b>{total_count}</b>\n"
+    )
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text=get_text(lang, "seller_items_active_btn"), callback_data="filter_offers_active_0"
+            ),
+            InlineKeyboardButton(
+                text=get_text(lang, "seller_items_attention_btn"),
+                callback_data="filter_offers_attention_0",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text=get_text(lang, "seller_items_inactive_btn"),
+                callback_data="filter_offers_inactive_0",
+            ),
+            InlineKeyboardButton(
+                text=get_text(lang, "seller_items_search_btn"), callback_data="search_my_offers"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text=get_text(lang, "seller_items_add_btn"), callback_data="add_offer"
+            )
+        ],
+    ]
+    return text, InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+class _MessageProxy:
+    """Lightweight proxy to reuse message handlers from callback context."""
+
+    def __init__(self, callback: types.CallbackQuery) -> None:
+        self.from_user = callback.from_user
+        self._callback = callback
+
+    async def answer(self, *args: Any, **kwargs: Any) -> Any:
+        if self._callback.message:
+            return await self._callback.message.answer(*args, **kwargs)
+        return await self._callback.bot.send_message(chat_id=self.from_user.id, *args, **kwargs)
 
 
 def _category_keyboard(offer_id: int, lang: str) -> InlineKeyboardBuilder:
@@ -220,16 +379,15 @@ def _parse_expiry_input_text(text: str) -> str | None:
 
 
 def _search_offers(db: Any, user_id: int, query: str) -> list[Any]:
-    stores = db.get_user_accessible_stores(user_id)
-    all_offers = []
-    for store in stores:
-        store_id = get_store_field(store, "store_id")
-        offers = db.get_offers_by_store(store_id, include_all=True)
-        all_offers.extend(offers)
+    all_offers = _collect_user_offers(db, user_id)
     results = []
     for offer in all_offers:
-        title = get_offer_field(offer, "title", "").lower()
-        if query in title:
+        title = str(get_offer_field(offer, "title", "") or "").lower()
+        description = str(get_offer_field(offer, "description", "") or "").lower()
+        category = str(get_offer_field(offer, "category", "") or "").lower()
+        cat_ru, cat_uz = get_category_labels(get_offer_field(offer, "category", None))
+        haystack = " ".join([title, description, category, cat_ru.lower(), cat_uz.lower()])
+        if query in haystack:
             results.append(offer)
     return results
 
@@ -238,46 +396,31 @@ async def _send_offer_search_results(
     message: types.Message, lang: str, query: str, results: list[Any]
 ) -> None:
     if not results:
-        await message.answer(
-            f"{'Ничего не найдено по запросу' if lang == 'ru' else 'Topilmadi'}: <b>{query}</b>",
-            parse_mode="HTML",
-        )
+        await message.answer(get_text(lang, "no_results"), parse_mode="HTML")
         return
 
-    text = f"{'Результаты поиска' if lang == 'ru' else 'Qidiruv natijalari'}: <b>{query}</b>\n"
-    text += f"{'Найдено' if lang == 'ru' else 'Topildi'}: {len(results)}\n\n"
-
-    nav_kb = InlineKeyboardBuilder()
-
-    for offer in results[:10]:
-        offer_id = get_offer_field(offer, "offer_id")
-        offer_title = get_offer_field(offer, "title", "Товар")[:25]
-        price = get_offer_field(offer, "discount_price", 0)
-        qty = get_offer_field(offer, "quantity", 0)
-        unit = get_offer_field(offer, "unit", "шт")
-        status = get_offer_field(offer, "status", "active")
-
-        status_label = "Активен" if status == "active" else "Неактивен"
-        if lang != "ru":
-            status_label = "Faol" if status == "active" else "Nofaol"
-        price_label = "Цена" if lang == "ru" else "Narx"
-        qty_label = "Остаток" if lang == "ru" else "Miqdor"
-        qty_display = format_quantity(qty, unit, lang)
-
-        text += f"<b>{offer_title}</b>\n"
-        text += f"   {status_label} | {price_label}: {price:,} | {qty_label}: {qty_display}\n"
-
-        nav_kb.button(
-            text=("Открыть " if lang == "ru" else "Ochish ") + offer_title[:15],
-            callback_data=f"edit_offer_{offer_id}",
-        )
-
-    nav_kb.button(
-        text="К фильтрам" if lang == "ru" else "Filtrlarga", callback_data="back_to_offers_menu"
+    results = results[:ITEMS_PER_PAGE]
+    text = (
+        f"<b>{get_text(lang, 'seller_items_search_results')}</b>\n"
+        f"{get_text(lang, 'seller_items_found').format(count=len(results))}\n\n"
     )
-    nav_kb.adjust(2, 1)
+    for offer in results:
+        text += _build_offer_list_item(offer, lang) + "\n\n"
 
-    await message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+    keyboard: list[list[InlineKeyboardButton]] = []
+    for i in range(0, len(results), 2):
+        row = []
+        for offer in results[i : i + 2]:
+            offer_id = get_offer_field(offer, "offer_id")
+            title = str(get_offer_field(offer, "title", "Товар") or "")[:20]
+            row.append(InlineKeyboardButton(text=title, callback_data=f"view_offer_{offer_id}"))
+        keyboard.append(row)
+
+    keyboard.append(
+        [InlineKeyboardButton(text=get_text(lang, "seller_items_back_btn"), callback_data="back_to_offers_menu")]
+    )
+
+    await message.answer(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
 
 @router.message(
@@ -302,83 +445,17 @@ async def my_offers(message: types.Message, state: FSMContext) -> None:
     db = get_db()
     lang = db.get_user_language(message.from_user.id)
     stores = db.get_user_accessible_stores(message.from_user.id)
-
     logger.info(f"my_offers: user {message.from_user.id}, stores count: {len(stores)}")
 
     if not stores:
         await message.answer(get_text(lang, "no_stores"))
         return
 
-    all_offers = []
-    for store in stores:
-        store_id = get_store_field(store, "store_id")
-        store_name = get_store_field(store, "name", "Магазин")
-        offers = db.get_offers_by_store(store_id, include_all=True)
-        logger.info(f"Store {store_id} ({store_name}), offers count: {len(offers)}")
-        all_offers.extend(offers)
-
+    all_offers = _collect_user_offers(db, message.from_user.id)
     logger.info(f"Total offers: {len(all_offers)}")
 
-    if not all_offers:
-        await message.answer(
-            "<b>" + ("Ваши товары" if lang == "ru" else "Mahsulotlaringiz") + "</b>\n\n"
-            + get_text(lang, "no_offers_yet")
-            + "\n\n"
-            + (
-                "Нажмите «Добавить», чтобы создать первый товар."
-                if lang == "ru"
-                else "Birinchi mahsulotni yaratish uchun «Qo'shish» tugmasini bosing."
-            ),
-            parse_mode="HTML",
-        )
-        await state.set_state(EditOffer.browse)
-        return
-
-    # Count active and inactive
-    active_count = sum(1 for o in all_offers if get_offer_field(o, "status") == "active")
-    inactive_count = len(all_offers) - active_count
-    low_stock_count = sum(1 for o in all_offers if _is_low_stock(o))
-    expiring_count = sum(1 for o in all_offers if _is_expiring_soon(o))
-
-    # Filter menu
-    filter_kb = InlineKeyboardBuilder()
-    filter_kb.button(text=f"Активные ({active_count})", callback_data="filter_offers_active_0")
-    filter_kb.button(
-        text=(
-            f"Мало (≤5) ({low_stock_count})"
-            if lang == "ru"
-            else f"Kam (≤5) ({low_stock_count})"
-        ),
-        callback_data="filter_offers_low_0",
-    )
-    filter_kb.button(
-        text=(
-            f"Срок ≤2д ({expiring_count})"
-            if lang == "ru"
-            else f"Muddat ≤2k ({expiring_count})"
-        ),
-        callback_data="filter_offers_expiring_0",
-    )
-    filter_kb.button(
-        text=f"Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
-    )
-    filter_kb.button(text=f"Все ({len(all_offers)})", callback_data="filter_offers_all_0")
-    filter_kb.button(
-        text="Поиск" if lang == "ru" else "Qidirish", callback_data="search_my_offers"
-    )
-    filter_kb.adjust(2, 2, 2)
-
-    await message.answer(
-        f"<b>{'Ваши товары' if lang == 'ru' else 'Mahsulotlaringiz'}</b>\n\n"
-        f"Активных: <b>{active_count}</b>\n"
-        f"{'Мало (≤5)' if lang == 'ru' else 'Kam (≤5)'}: <b>{low_stock_count}</b>\n"
-        f"{'Срок ≤2д' if lang == 'ru' else 'Muddat ≤2k'}: <b>{expiring_count}</b>\n"
-        f"Неактивных: <b>{inactive_count}</b>\n"
-        f"Всего: <b>{len(all_offers)}</b>\n\n"
-        f"{'Выберите фильтр:' if lang == 'ru' else 'Filtrni tanlang:'}",
-        parse_mode="HTML",
-        reply_markup=filter_kb.as_markup(),
-    )
+    text, markup = _build_offers_main_screen(lang, all_offers)
+    await message.answer(text, parse_mode="HTML", reply_markup=markup)
     await state.set_state(EditOffer.browse)
 
 
@@ -423,108 +500,84 @@ async def filter_offers(callback: types.CallbackQuery) -> None:
     filter_type = parts[2] if len(parts) > 2 else "all"  # active, inactive, all
     page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
 
-    ITEMS_PER_PAGE = 5
-
-    all_offers = []
-    for store in stores:
-        store_id = get_store_field(store, "store_id")
-        offers = db.get_offers_by_store(store_id, include_all=True)
-        all_offers.extend(offers)
+    all_offers = _collect_user_offers(db, callback.from_user.id)
 
     # Apply filter
     if filter_type == "active":
-        filtered = [o for o in all_offers if get_offer_field(o, "status") == "active"]
-        title = "Активные" if lang == "ru" else "Faol"
+        filtered = [o for o in all_offers if get_offer_effective_status(o) == "active"]
+        title = get_text(lang, "seller_items_active_label")
     elif filter_type == "inactive":
-        filtered = [o for o in all_offers if get_offer_field(o, "status") != "active"]
-        title = "Неактивные" if lang == "ru" else "Nofaol"
+        filtered = [o for o in all_offers if get_offer_effective_status(o) != "active"]
+        title = get_text(lang, "seller_items_inactive_label")
+    elif filter_type == "attention":
+        filtered = [o for o in all_offers if _needs_attention(o)]
+        title = get_text(lang, "seller_items_attention_label")
     elif filter_type == "low":
         filtered = [o for o in all_offers if _is_low_stock(o)]
-        title = "Мало (≤5)" if lang == "ru" else "Kam (≤5)"
+        title = get_text(lang, "seller_items_attention_label")
     elif filter_type == "expiring":
         filtered = [o for o in all_offers if _is_expiring_soon(o)]
-        title = "Срок ≤2д" if lang == "ru" else "Muddat ≤2k"
+        title = get_text(lang, "seller_items_attention_label")
+    elif filter_type == "all":
+        filtered = all_offers
+        title = get_text(lang, "seller_items_title")
     else:
         filtered = all_offers
-        title = "Все" if lang == "ru" else "Hammasi"
+        title = get_text(lang, "seller_items_title")
 
     if not filtered:
-        await callback.answer(
-            f"{'Нет товаров в этой категории' if lang == 'ru' else 'Bu kategoriyada mahsulot yo`q'}",
-            show_alert=True,
-        )
+        await callback.answer(get_text(lang, "seller_items_not_found"), show_alert=True)
         return
 
+    filtered = sorted(filtered, key=_offer_sort_key)
+    if len(filtered) > MAX_ITEMS:
+        filtered = filtered[:MAX_ITEMS]
+
     # Pagination
-    total_pages = (len(filtered) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+    total_pages = max(1, (len(filtered) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
     page = min(page, total_pages - 1)
     start_idx = page * ITEMS_PER_PAGE
     end_idx = start_idx + ITEMS_PER_PAGE
     page_offers = filtered[start_idx:end_idx]
 
-    # Build compact list
-    text = f"<b>{title}</b> ({len(filtered)})\n"
-    text += f"{'Страница' if lang == 'ru' else 'Sahifa'} {page + 1}/{total_pages}\n\n"
+    text = f"<b>{title}</b>\n"
+    text += f"{get_text(lang, 'seller_items_page_label')} {page + 1} / {total_pages}\n\n"
 
-    for i, offer in enumerate(page_offers, start=start_idx + 1):
-        offer_id = get_offer_field(offer, "offer_id")
-        offer_title = get_offer_field(offer, "title", "Товар")[:25]
-        price = get_offer_field(offer, "discount_price", 0)
-        qty = get_offer_field(offer, "quantity", 0)
-        unit = get_offer_field(offer, "unit", "шт")
-        status = get_offer_field(offer, "status", "active")
-
-        status_label = "Активен" if lang == "ru" else "Faol"
-        if status != "active":
-            status_label = "Неактивен" if lang == "ru" else "Nofaol"
-        price_label = "Цена" if lang == "ru" else "Narx"
-        qty_label = "Остаток" if lang == "ru" else "Miqdor"
-        qty_display = format_quantity(qty, unit, lang)
-
-        text += f"{i}. <b>{offer_title}</b>\n"
-        if filter_type == "all":
-            text += f"   {status_label} | {price_label}: {price:,} | {qty_label}: {qty_display}\n"
-        else:
-            text += f"   {price_label}: {price:,} | {qty_label}: {qty_display}\n"
-
-    # Navigation buttons
-    nav_kb = InlineKeyboardBuilder()
-
-    # Add item buttons for quick access
     for offer in page_offers:
-        offer_id = get_offer_field(offer, "offer_id")
-        offer_title = get_offer_field(offer, "title", "Товар")[:18]
-        nav_kb.button(text=offer_title, callback_data=f"view_offer_{offer_id}")
+        text += _build_offer_list_item(offer, lang) + "\n\n"
 
-    nav_kb.adjust(2)  # 2 buttons per row for items
+    keyboard: list[list[InlineKeyboardButton]] = []
+    for i in range(0, len(page_offers), 2):
+        row = []
+        for offer in page_offers[i : i + 2]:
+            offer_id = get_offer_field(offer, "offer_id")
+            title_btn = str(get_offer_field(offer, "title", "Товар") or "")[:20]
+            row.append(InlineKeyboardButton(text=title_btn, callback_data=f"view_offer_{offer_id}"))
+        keyboard.append(row)
 
-    # Pagination row
-    pagination_buttons = []
-    if page > 0:
-        prev_text = "Предыдущая" if lang == "ru" else "Oldingi"
-        pagination_buttons.append((prev_text, f"filter_offers_{filter_type}_{page - 1}"))
-    pagination_buttons.append((f"{page + 1}/{total_pages}", "noop"))
-    if page < total_pages - 1:
-        next_text = "Следующая" if lang == "ru" else "Keyingi"
-        pagination_buttons.append((next_text, f"filter_offers_{filter_type}_{page + 1}"))
-
-    for btn_text, btn_data in pagination_buttons:
-        nav_kb.button(text=btn_text, callback_data=btn_data)
-
-    # Back button
-    nav_kb.button(
-        text="К фильтрам" if lang == "ru" else "Filtrlarga", callback_data="back_to_offers_menu"
+    prev_cb = f"filter_offers_{filter_type}_{page - 1}" if page > 0 else "noop"
+    next_cb = f"filter_offers_{filter_type}_{page + 1}" if page < total_pages - 1 else "noop"
+    keyboard.append(
+        [
+            InlineKeyboardButton(text="◀️", callback_data=prev_cb),
+            InlineKeyboardButton(text=f"{page + 1} / {total_pages}", callback_data="noop"),
+            InlineKeyboardButton(text="▶️", callback_data=next_cb),
+        ]
     )
-
-    # Adjust: items (2 per row), then pagination (3), then back (1)
-    nav_kb.adjust(2, 2, len(pagination_buttons), 1)
+    keyboard.append(
+        [InlineKeyboardButton(text=get_text(lang, "seller_items_back_btn"), callback_data="back_to_offers_menu")]
+    )
 
     await callback.answer()
 
     try:
-        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+        await callback.message.edit_text(
+            text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+        )
     except Exception:
-        await callback.message.answer(text, parse_mode="HTML", reply_markup=nav_kb.as_markup())
+        await callback.message.answer(
+            text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+        )
 
 
 @router.callback_query(F.data == "back_to_offers_menu")
@@ -532,56 +585,23 @@ async def back_to_offers_menu(callback: types.CallbackQuery) -> None:
     """Return to main offers menu."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
-    stores = db.get_user_accessible_stores(callback.from_user.id)
-
-    all_offers = []
-    for store in stores:
-        store_id = get_store_field(store, "store_id")
-        offers = db.get_offers_by_store(store_id, include_all=True)
-        all_offers.extend(offers)
-
-    active_count = sum(1 for o in all_offers if get_offer_field(o, "status") == "active")
-    inactive_count = len(all_offers) - active_count
-    low_stock_count = sum(1 for o in all_offers if _is_low_stock(o))
-    expiring_count = sum(1 for o in all_offers if _is_expiring_soon(o))
-
-    filter_kb = InlineKeyboardBuilder()
-    filter_kb.button(text=f"Активные ({active_count})", callback_data="filter_offers_active_0")
-    filter_kb.button(
-        text=(
-            f"Мало (≤5) ({low_stock_count})"
-            if lang == "ru"
-            else f"Kam (≤5) ({low_stock_count})"
-        ),
-        callback_data="filter_offers_low_0",
-    )
-    filter_kb.button(
-        text=(
-            f"Срок ≤2д ({expiring_count})"
-            if lang == "ru"
-            else f"Muddat ≤2k ({expiring_count})"
-        ),
-        callback_data="filter_offers_expiring_0",
-    )
-    filter_kb.button(
-        text=f"Неактивные ({inactive_count})", callback_data="filter_offers_inactive_0"
-    )
-    filter_kb.button(text=f"Все ({len(all_offers)})", callback_data="filter_offers_all_0")
-    filter_kb.button(text="Поиск" if lang == "ru" else "Qidirish", callback_data="search_my_offers")
-    filter_kb.adjust(2, 2, 2)
+    all_offers = _collect_user_offers(db, callback.from_user.id)
+    text, markup = _build_offers_main_screen(lang, all_offers)
 
     await callback.answer()
-    await callback.message.edit_text(
-        f"<b>{'Ваши товары' if lang == 'ru' else 'Mahsulotlaringiz'}</b>\n\n"
-        f"{'Активных' if lang == 'ru' else 'Faol'}: <b>{active_count}</b>\n"
-        f"{'Мало (≤5)' if lang == 'ru' else 'Kam (≤5)'}: <b>{low_stock_count}</b>\n"
-        f"{'Срок ≤2д' if lang == 'ru' else 'Muddat ≤2k'}: <b>{expiring_count}</b>\n"
-        f"{'Неактивных' if lang == 'ru' else 'Nofaol'}: <b>{inactive_count}</b>\n"
-        f"{'Всего' if lang == 'ru' else 'Jami'}: <b>{len(all_offers)}</b>\n\n"
-        f"{'Выберите фильтр:' if lang == 'ru' else 'Filtrni tanlang:'}",
-        parse_mode="HTML",
-        reply_markup=filter_kb.as_markup(),
-    )
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=markup)
+    except Exception:
+        await callback.message.answer(text, parse_mode="HTML", reply_markup=markup)
+
+
+@router.callback_query(F.data == "add_offer")
+async def add_offer_from_items(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Start add offer flow from items section."""
+    from handlers.seller.create_offer import add_offer_start
+
+    await add_offer_start(_MessageProxy(callback), state)
+    await callback.answer()
 
 
 @router.callback_query(F.data == "noop")
@@ -599,7 +619,7 @@ async def search_my_offers_start(callback: types.CallbackQuery, state: FSMContex
     await state.set_state(EditOffer.search_query)
     await callback.answer()
     await callback.message.answer(
-        f"{'Введите название товара для поиска:' if lang == 'ru' else 'Qidiruv uchun mahsulot nomini kiriting:'}",
+        get_text(lang, "seller_items_search_prompt"),
         parse_mode="HTML",
     )
 
@@ -631,8 +651,8 @@ async def search_my_offers_process(message: types.Message, state: FSMContext) ->
 
 
 @router.callback_query(F.data.startswith("qty_add_"))
-async def quantity_add(callback: types.CallbackQuery) -> None:
-    """Increase offer quantity by 1."""
+async def quantity_add(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Increase offer quantity."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
@@ -642,6 +662,8 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
     offer_id, delta = parsed
+    parts = callback.data.split("_")
+    has_explicit_delta = len(parts) >= 4 and parts[-2].isdigit()
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -652,6 +674,18 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
     user_stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
+        return
+
+    if not has_explicit_delta:
+        await state.update_data(
+            offer_id=offer_id,
+            edit_field="quantity_add",
+            card_message_id=getattr(callback.message, "message_id", None),
+            card_chat_id=getattr(callback.message, "chat", None).id if callback.message else None,
+        )
+        await state.set_state(EditOffer.value)
+        await callback.message.answer(get_text(lang, "seller_prompt_add_stock"), parse_mode="HTML")
+        await callback.answer()
         return
 
     try:
@@ -673,8 +707,8 @@ async def quantity_add(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("qty_sub_"))
-async def quantity_subtract(callback: types.CallbackQuery) -> None:
-    """Decrease offer quantity by 1."""
+async def quantity_subtract(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Decrease offer quantity."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
@@ -684,6 +718,8 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
     offer_id, delta = parsed
+    parts = callback.data.split("_")
+    has_explicit_delta = len(parts) >= 4 and parts[-2].isdigit()
 
     offer = db.get_offer(offer_id)
     if not offer:
@@ -696,6 +732,18 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
+    if not has_explicit_delta:
+        await state.update_data(
+            offer_id=offer_id,
+            edit_field="quantity_sub",
+            card_message_id=getattr(callback.message, "message_id", None),
+            card_chat_id=getattr(callback.message, "chat", None).id if callback.message else None,
+        )
+        await state.set_state(EditOffer.value)
+        await callback.message.answer(get_text(lang, "seller_prompt_sub_stock"), parse_mode="HTML")
+        await callback.answer()
+        return
+
     try:
         new_quantity = db.increment_offer_quantity_atomic(offer_id, delta)
     except Exception as e:
@@ -706,12 +754,7 @@ async def quantity_subtract(callback: types.CallbackQuery) -> None:
     await update_offer_message(callback, offer_id, lang)
 
     if new_quantity == 0:
-        await callback.answer(
-            "Количество стало 0 - товар снят с продажи"
-            if lang == "ru"
-            else "Miqdor 0 bo'ldi - mahsulot savdodan olindi",
-            show_alert=True,
-        )
+        await callback.answer(get_text(lang, "seller_stock_zero"), show_alert=True)
     else:
         await callback.answer(
             (
@@ -945,7 +988,7 @@ async def delete_offer(callback: types.CallbackQuery) -> None:
 
 
 @router.callback_query(F.data.startswith("edit_offer_"))
-async def edit_offer(callback: types.CallbackQuery) -> None:
+async def edit_offer(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Show offer edit menu."""
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
@@ -968,22 +1011,19 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
+    await state.update_data(
+        card_message_id=getattr(callback.message, "message_id", None),
+        card_chat_id=getattr(callback.message, "chat", None).id if callback.message else None,
+    )
+
     kb = InlineKeyboardBuilder()
     kb.button(
         text="Изменить цену" if lang == "ru" else "Narxni o'zgartirish",
         callback_data=f"edit_price_{offer_id}",
     )
     kb.button(
-        text="Изменить количество" if lang == "ru" else "Sonini o'zgartirish",
+        text="Изменить остаток" if lang == "ru" else "Miqdorni o'zgartirish",
         callback_data=f"edit_quantity_{offer_id}",
-    )
-    kb.button(
-        text="Изменить категорию" if lang == "ru" else "Kategoriyani o'zgartirish",
-        callback_data=f"edit_category_{offer_id}",
-    )
-    kb.button(
-        text="Изменить единицу" if lang == "ru" else "Birligini o'zgartirish",
-        callback_data=f"edit_unit_{offer_id}",
     )
     kb.button(
         text="Изменить срок" if lang == "ru" else "Muddatni o'zgartirish",
@@ -1002,8 +1042,8 @@ async def edit_offer(callback: types.CallbackQuery) -> None:
         callback_data=f"edit_photo_{offer_id}",
     )
     kb.button(
-        text="Копировать" if lang == "ru" else "Nusxalash",
-        callback_data=f"copy_offer_{offer_id}",
+        text="Изменить категорию" if lang == "ru" else "Kategoriyani o'zgartirish",
+        callback_data=f"edit_category_{offer_id}",
     )
     kb.button(text=get_text(lang, "back"), callback_data="back_to_offers_menu")
     kb.adjust(1)
@@ -1304,7 +1344,7 @@ async def edit_quantity_start(callback: types.CallbackQuery, state: FSMContext) 
     await state.set_state(EditOffer.value)
 
     text = (
-        f"{get_text(lang, 'quantity')}\n"
+        f"{get_text(lang, 'seller_label_stock')}\n"
         f"{'Текущая' if lang == 'ru' else 'Joriy'}: {current_qty}"
     )
     await callback.message.answer(text, parse_mode="HTML")
@@ -1355,6 +1395,8 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
     data = await state.get_data()
     offer_id = data.get("offer_id")
     edit_field = data.get("edit_field")
+    card_message_id = data.get("card_message_id")
+    card_chat_id = data.get("card_chat_id")
     if not offer_id or not edit_field:
         await state.clear()
         await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
@@ -1456,6 +1498,19 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
             )
             return
         db.update_offer_expiry(offer_id, expiry_value)
+    elif edit_field in ("quantity_add", "quantity_sub"):
+        numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text or "")
+        if len(numbers) != 1:
+            await message.answer(get_text(lang, "error_qty_gt_zero"))
+            return
+        amount = float(numbers[0].replace(",", "."))
+        if amount <= 0:
+            await message.answer(get_text(lang, "error_qty_gt_zero"))
+            return
+        delta = int(amount)
+        if edit_field == "quantity_sub":
+            delta = -delta
+        db.increment_offer_quantity_atomic(offer_id, delta)
     else:
         await state.clear()
         await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
@@ -1465,7 +1520,20 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
 
     updated_offer = db.get_offer(offer_id)
     if updated_offer:
-        await send_offer_card(message, updated_offer, lang)
+        if card_message_id and card_chat_id:
+            text, markup = build_offer_card(updated_offer, lang)
+            try:
+                await message.bot.edit_message_text(
+                    text,
+                    chat_id=card_chat_id,
+                    message_id=card_message_id,
+                    parse_mode="HTML",
+                    reply_markup=markup,
+                )
+            except Exception:
+                await send_offer_card(message, updated_offer, lang)
+        else:
+            await send_offer_card(message, updated_offer, lang)
     else:
         await message.answer(get_text(lang, "error_general"), reply_markup=main_menu_seller(lang))
 

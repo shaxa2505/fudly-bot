@@ -1,6 +1,28 @@
 export const normalizeOrderStatus = (status) => {
   if (!status) return 'pending'
   const normalized = String(status).trim().toLowerCase()
+  const ruMap = {
+    'ожидает подтверждения': 'pending',
+    'ожидание подтверждения': 'pending',
+    'ожидает оплаты': 'awaiting_payment',
+    'подтвержден': 'preparing',
+    'подтверждён': 'preparing',
+    'принят': 'preparing',
+    'готов': 'ready',
+    'готово': 'ready',
+    'готов к выдаче': 'ready',
+    'в пути': 'delivering',
+    'доставляется': 'delivering',
+    'доставлен': 'completed',
+    'получен': 'completed',
+    'выдан': 'completed',
+    'отменен': 'cancelled',
+    'отменён': 'cancelled',
+    'отмена': 'cancelled',
+    'отклонен': 'rejected',
+    'отклонён': 'rejected',
+  }
+  if (ruMap[normalized]) return ruMap[normalized]
   if (normalized === 'confirmed') return 'preparing'
   if (normalized === 'active') return 'pending'
   return normalized

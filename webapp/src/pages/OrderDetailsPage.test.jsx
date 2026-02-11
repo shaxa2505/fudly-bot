@@ -6,6 +6,8 @@ import { renderWithProviders } from '../test/renderWithProviders'
 
 const apiMocks = vi.hoisted(() => ({
   getOrderStatus: vi.fn(),
+  getOrderTimeline: vi.fn(),
+  getOrderQR: vi.fn(),
   getPhotoUrl: vi.fn(),
   getPaymentProviders: vi.fn(),
   createPaymentLink: vi.fn(),
@@ -14,16 +16,22 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('../api/client', () => ({
   default: {
     getOrderStatus: apiMocks.getOrderStatus,
+    getOrderTimeline: apiMocks.getOrderTimeline,
+    getOrderQR: apiMocks.getOrderQR,
     getPhotoUrl: apiMocks.getPhotoUrl,
     getPaymentProviders: apiMocks.getPaymentProviders,
     createPaymentLink: apiMocks.createPaymentLink,
   },
+  API_BASE_URL: '',
+  getTelegramInitData: () => '',
 }))
 
 describe('OrderDetailsPage', () => {
   beforeEach(() => {
     localStorage.clear()
     apiMocks.getOrderStatus.mockReset()
+    apiMocks.getOrderTimeline.mockReset()
+    apiMocks.getOrderQR.mockReset()
     apiMocks.getPhotoUrl.mockReset()
     apiMocks.getPaymentProviders.mockReset()
     apiMocks.createPaymentLink.mockReset()
@@ -60,6 +68,7 @@ describe('OrderDetailsPage', () => {
       delivery_cost: null,
       qr_code: null,
     })
+    apiMocks.getOrderTimeline.mockResolvedValueOnce({ timeline: [] })
 
     renderWithProviders(
       <Routes>

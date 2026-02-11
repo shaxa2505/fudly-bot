@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, MoreHorizontal, Phone, QrCode } from 'lucide-react'
 import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
-import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
+import { calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import {
   deriveDisplayStatus,
   displayStatusText,
@@ -265,7 +265,19 @@ export default function OrderDetailsPage() {
     }
   }, [orderId, userId, loadOrderDetails, loadOrderTimeline])
 
-  const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('uz-UZ')
+  const toNumeric = (value) => {
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/[^\d.-]/g, '')
+      return Number(cleaned || 0)
+    }
+    return Number(value || 0)
+  }
+
+  const formatMoney = (value) => {
+    const numeric = toNumeric(value)
+    if (!Number.isFinite(numeric)) return '0'
+    return Math.round(numeric + Number.EPSILON).toLocaleString('uz-UZ')
+  }
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
@@ -471,34 +483,42 @@ export default function OrderDetailsPage() {
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
   const showPaymentChip = paymentStatusLabel && paymentStatusLabel !== "To'lov talab qilinmaydi"
 
-  const rawTotalValue = order?.total_price
-  const rawTotal = rawTotalValue == null ? null : Number(rawTotalValue || 0)
-  const explicitItemsTotal = order?.items_total
-  const explicitTotalWithDelivery = order?.total_with_delivery
+  const explicitItemsTotal = toNumeric(order?.items_total ?? order?.itemsTotal ?? 0)
   const hasItemBreakdown = Array.isArray(order.items) && order.items.length > 0
   const rawItemsSubtotal = hasItemBreakdown
-    ? calcItemsTotal(order.items, {
-      getPrice: (item) => Number(item?.price || 0),
-      getQuantity: (item) => Number(item?.quantity || 0),
-    })
+    ? order.items.reduce((sum, item) => {
+        const price = toNumeric(item?.price ?? item?.discount_price ?? 0)
+        const qty = toNumeric(item?.quantity ?? 0)
+        if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum
+        return sum + Math.round(price * qty)
+      }, 0)
     : 0
-  const itemsSubtotal = hasItemBreakdown
-    ? rawItemsSubtotal
-    : Number(explicitItemsTotal ?? (rawTotal ?? 0))
+  const itemsSubtotal = Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
+    ? explicitItemsTotal
+    : rawItemsSubtotal
+  const rawTotal = (() => {
+    const candidates = isDelivery
+      ? [order?.total_with_delivery, order?.total_price, order?.total_amount, order?.total, order?.items_total]
+      : [order?.total_price, order?.total_amount, order?.total, order?.items_total, order?.total_with_delivery]
+    for (const value of candidates) {
+      const numeric = toNumeric(value)
+      if (Number.isFinite(numeric) && numeric > 0) return numeric
+    }
+    return 0
+  })()
   const deliveryFee = isDelivery
-    ? calcDeliveryFee(rawTotal, itemsSubtotal, {
+    ? calcDeliveryFee(rawTotal || null, itemsSubtotal, {
       deliveryFee: order?.delivery_fee,
       isDelivery,
     })
     : 0
-  const totalWithDelivery = Number(
-    explicitTotalWithDelivery ?? calcTotalPrice(itemsSubtotal, deliveryFee)
-  )
-  const totalDue = Number.isFinite(Number(explicitTotalWithDelivery))
-    ? Number(explicitTotalWithDelivery)
-    : (Number.isFinite(rawTotal) ? rawTotal : totalWithDelivery)
+  const totalDue = rawTotal > 0
+    ? rawTotal
+    : calcTotalPrice(itemsSubtotal, deliveryFee)
   const payableTotal = Number(
-    explicitItemsTotal ?? (hasItemBreakdown ? rawItemsSubtotal : (rawTotal ?? 0))
+    Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
+      ? explicitItemsTotal
+      : (hasItemBreakdown ? rawItemsSubtotal : (rawTotal || 0))
   )
   const totalUnits = hasItemBreakdown
     ? calcQuantity(order.items, item => Number(item?.quantity || 0))
