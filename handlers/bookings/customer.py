@@ -21,6 +21,8 @@ from app.services.unified_order_service import (
     OrderItem,
     OrderStatus,
     get_unified_order_service,
+    get_store_time_range_label,
+    is_store_open_now,
 )
 from handlers.bookings.utils import format_price
 from handlers.common.states import BookOffer, OrderDelivery, Registration
@@ -1252,6 +1254,14 @@ async def create_booking(
             return
 
     if not created_orders:
+        if store and not is_store_open_now(store):
+            time_range = get_store_time_range_label(store)
+            if time_range:
+                await message.answer(get_text(lang, "store_closed_order_time", time=time_range))
+            else:
+                await message.answer(get_text(lang, "store_closed"))
+            await state.clear()
+            return
         try:
             result = db.create_cart_order(
                 user_id=user_id,

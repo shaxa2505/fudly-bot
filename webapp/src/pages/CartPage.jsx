@@ -773,7 +773,8 @@ function CartPage({ user }) {
   // Calculate totals using context values
   const subtotal = cartTotal
   const serviceFee = 0
-  const total = calcTotalPrice(subtotal, serviceFee)
+  const deliveryTotal = orderType === 'delivery' ? (Number.isFinite(deliveryFee) ? deliveryFee : 0) : 0
+  const total = calcTotalPrice(subtotal, serviceFee + deliveryTotal)
   const checkoutTotal = total
   const itemsCount = safeItemsCount
   const unavailableCartItems = useMemo(() => {
@@ -2028,6 +2029,7 @@ function CartPage({ user }) {
 
       // Get order ID from response
       const orderId = result.order_id || result.bookings?.[0]?.booking_id
+      const orderTotal = Number(result?.total ?? total)
 
       clearCart()
       setShowCheckout(false)
@@ -2038,7 +2040,7 @@ function CartPage({ user }) {
         orderId: orderId,
         bookingCode: result.bookings?.[0]?.booking_code,
         orderType: orderType,
-        total: total
+        total: orderTotal
       })
 
       // Haptic feedback
@@ -2047,7 +2049,7 @@ function CartPage({ user }) {
       window.Telegram?.WebApp?.sendData?.(JSON.stringify({
         action: 'order_placed',
         order_id: orderId,
-        total: total,
+        total: orderTotal,
         order_type: orderType,
       }))
 
@@ -2112,17 +2114,18 @@ function CartPage({ user }) {
       orderId = result.order_id || result.bookings?.[0]?.booking_id
       const storeId = safeCartItems[0]?.offer?.store_id || null
       const returnUrl = `${window.location.origin}/order/${orderId}`
+      const orderTotal = Number(result?.total ?? total)
       const pendingPayload = savePendingPayment({
         orderId,
         storeId,
-        total,
+        total: orderTotal,
         provider: 'click',
         cart: buildCartSnapshot(),
       })
       setPendingPayment(pendingPayload)
 
       // Create payment link
-      const paymentData = await api.createPaymentLink(orderId, 'click', returnUrl, storeId, total)
+      const paymentData = await api.createPaymentLink(orderId, 'click', returnUrl, storeId, orderTotal)
 
       if (paymentData.payment_url) {
         clearCart()

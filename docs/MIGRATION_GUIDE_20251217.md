@@ -1,4 +1,4 @@
-# Unified Offers Schema Migration Guide
+﻿# Unified Offers Schema Migration Guide
 
 ## Overview
 
@@ -7,15 +7,15 @@ This guide explains how to apply the unified offers schema migration that fixes 
 ## What Changed
 
 ### Database Schema
-- `available_from`, `available_until`: `VARCHAR(50)` в†’ `TIME`
-- `expiry_date`: `VARCHAR(50)` в†’ `DATE`
-- `original_price`, `discount_price`: `FLOAT` в†’ `INTEGER` (stored in kopeks, not rubles)
+- `available_from`, `available_until`: `VARCHAR(50)` РІвЂ вЂ™ `TIME`
+- `expiry_date`: `VARCHAR(50)` РІвЂ вЂ™ `DATE`
+- `original_price`, `discount_price`: `FLOAT` РІвЂ вЂ™ `INTEGER` (stored in kopeks, not rubles)
 - Added CHECK constraints for data validation
 
 ### Application Code
 - **Database Layer**: Removed `photo`/`photo_id` hack, unified to `photo_id`
 - **Bot Handlers**: Convert prices to kopeks, use ISO time format
-- **API Endpoints**: Use Pydantic models, convert rublesв†”kopeks
+- **API Endpoints**: Use Pydantic models, convert rublesРІвЂ вЂќkopeks
 - **Pydantic Models**: Added flexible parsers for multiple date/time formats
 
 ## Migration Steps
@@ -49,9 +49,9 @@ Review [migrations_alembic/versions/20251217_003_unified_offers_schema.py](migra
 
 1. **Add temporary columns** with correct types
 2. **Migrate data** with type conversions:
-   - Times: "08:00" в†’ TIME, ISO timestamps в†’ TIME
-   - Dates: "YYYY-MM-DD" в†’ DATE, "DD.MM.YYYY" в†’ DATE
-   - Prices: rubles (FLOAT) в†’ kopeks (INTEGER) by multiplying by 100
+   - Times: "08:00" РІвЂ вЂ™ TIME, ISO timestamps РІвЂ вЂ™ TIME
+   - Dates: "YYYY-MM-DD" РІвЂ вЂ™ DATE, "DD.MM.YYYY" РІвЂ вЂ™ DATE
+   - Prices: rubles (FLOAT) РІвЂ вЂ™ kopeks (INTEGER) by multiplying by 100
 3. **Drop old columns**
 4. **Rename temporary columns** to original names
 5. **Add CHECK constraints** for validation
@@ -87,9 +87,9 @@ psql $DATABASE_URL -c "\d offers"
 
 ### Step 6: Test Application
 
-1. **Test Bot**: Create offer via bot в†’ check prices in kopeks
-2. **Test Panel**: Create offer via Partner Panel в†’ check prices converted
-3. **Test Compatibility**: Create in bot в†’ edit in panel (should work now!)
+1. **Test Bot**: Create offer via bot РІвЂ вЂ™ check prices in kopeks
+2. **Test Panel**: Create offer via Partner Panel РІвЂ вЂ™ check prices converted
+3. **Test Compatibility**: Create in bot РІвЂ вЂ™ edit in panel (should work now!)
 
 ## Rollback Instructions
 

@@ -308,6 +308,7 @@ async def create_order(
             await _validate_min_order(db, store_id, order.items, offers_by_id)
 
         created_items: list[dict[str, Any]] = []
+        order_items: list[OrderItem] = []
 
         order_service = get_unified_order_service()
         if not order_service:
@@ -317,7 +318,6 @@ async def create_order(
 
         # If unified service is available, use it as a single entry point
         if order_service and hasattr(db, "create_cart_order"):
-            order_items: list[OrderItem] = []
             for item in order.items:
                 offer = offers_by_id.get(item.offer_id)
                 if not offer:
@@ -428,6 +428,13 @@ async def create_order(
 
         order_id = created_items[0]["id"] if created_items else 0
         total_amount = sum(b["total"] for b in created_items)
+        if is_delivery:
+            delivery_fee = 0
+            try:
+                delivery_fee = int(order_items[0].delivery_price) if order_items else 0
+            except Exception:
+                delivery_fee = 0
+            total_amount = int(total_amount) + delivery_fee
         total_items = sum(b["quantity"] for b in created_items)
         logger.info(
             "ORDER_CREATED: id=%s, user=%s, type=%s, total=%s, items=%s, source=webapp_api",

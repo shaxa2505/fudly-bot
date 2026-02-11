@@ -171,6 +171,16 @@ def _is_store_open_now(store: Any) -> bool:
     return _is_time_in_window(start, end, current)
 
 
+def is_store_open_now(store: Any) -> bool:
+    """Public wrapper for store working-hours check."""
+    return _is_store_open_now(store)
+
+
+def get_store_time_range_label(store: Any) -> str | None:
+    """Public wrapper for store working-hours label."""
+    return _get_store_time_range_label(store)
+
+
 def set_order_status_direct(db: Any, order_id: int, status: str) -> bool:
     """Update order status directly via DB adapter (legacy fallback)."""
     if not db or not hasattr(db, "update_order_status"):
