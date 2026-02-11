@@ -36,7 +36,7 @@
 
 .empty-state-cta {
   padding: var(--spacing-xl, 14px) var(--spacing-3xl, 32px);
-  background: var(--color-primary-gradient);
+  background: var(--color-primary);
   border: none;
   border-radius: var(--radius-2xl, 16px);
   font-size: var(--font-md, 15px);
@@ -77,7 +77,7 @@
   justify-content: center;
   gap: var(--spacing-sm, 8px);
   padding: var(--spacing-lg, 16px) var(--spacing-2xl, 24px);
-  background: var(--color-primary-gradient);
+  background: var(--color-primary);
   color: var(--color-text-inverse, white);
   border: none;
   border-radius: var(--radius-2xl, 16px);
@@ -109,7 +109,7 @@
   justify-content: center;
   gap: var(--spacing-sm, 8px);
   padding: var(--spacing-lg, 16px) var(--spacing-2xl, 24px);
-  background: var(--color-bg-tertiary, #F7F8F7);
+  background: var(--color-bg-secondary, #F1F5F2);
   color: var(--color-text-primary, #181725);
   border: none;
   border-radius: var(--radius-2xl, 16px);
@@ -136,7 +136,7 @@
   justify-content: center;
   gap: var(--spacing-sm, 8px);
   padding: var(--spacing-lg, 16px) var(--spacing-2xl, 24px);
-  background: var(--color-accent, #FF6B35);
+  background: var(--color-accent, #E65100);
   color: var(--color-text-inverse, white);
   border: none;
   border-radius: var(--radius-2xl, 16px);
@@ -164,8 +164,8 @@
   justify-content: center;
   gap: var(--spacing-sm, 8px);
   padding: var(--spacing-lg, 16px) var(--spacing-2xl, 24px);
-  background: var(--color-error-light, #FFEBEE);
-  color: var(--color-error, #FF5252);
+  background: var(--color-error-light, #FDEAEA);
+  color: var(--color-error, #D32F2F);
   border: none;
   border-radius: var(--radius-2xl, 16px);
   font-size: var(--font-lg, 16px);
@@ -186,7 +186,7 @@
   align-items: center;
   justify-content: center;
   border: none;
-  background: var(--color-bg-primary, white);
+  background: var(--color-bg-card, white);
   border-radius: var(--radius-full, 50%);
   cursor: pointer;
   transition: all var(--transition-normal, 0.2s ease);
@@ -209,7 +209,7 @@
   align-items: center;
   gap: var(--spacing-xs, 6px);
   padding: var(--spacing-sm, 10px) var(--spacing-lg, 16px);
-  border: 1.5px solid var(--color-border, #E5E5E5);
+  border: 1.5px solid var(--color-border, #E0E5DD);
   border-radius: var(--radius-pill, 25px);
   background: var(--color-bg-primary, white);
   font-size: var(--font-sm, 13px);
@@ -226,9 +226,9 @@
 }
 
 .chip.active {
-  background: var(--color-primary, #53B175);
+  background: var(--color-primary, #3A5A40);
   color: var(--color-text-inverse, white);
-  border-color: var(--color-primary, #53B175);
+  border-color: var(--color-primary, #3A5A40);
 }
 
 .chip:focus-visible {
@@ -252,7 +252,7 @@
 
 .input:focus {
   outline: none;
-  border-color: var(--color-primary, #53B175);
+  border-color: var(--color-primary, #3A5A40);
   background: var(--color-bg-primary, white);
   box-shadow: 0 0 0 3px rgba(83, 177, 117, 0.1);
 }
@@ -318,17 +318,17 @@
 
 .badge-primary {
   background: var(--color-primary-light, #E8F5E9);
-  color: var(--color-primary, #53B175);
+  color: var(--color-primary, #3A5A40);
 }
 
 .badge-accent {
-  background: var(--color-accent, #FF6B35);
+  background: var(--color-accent, #E65100);
   color: var(--color-text-inverse, white);
 }
 
 .badge-warning {
   background: var(--color-warning-light, #FFF3E0);
-  color: #E65100;
+  color: var(--color-accent, #E65100);
 }
 
 .badge-error {
@@ -490,7 +490,7 @@
 .section-action {
   font-size: var(--font-base, 14px);
   font-weight: var(--font-medium, 500);
-  color: var(--color-primary, #53B175);
+  color: var(--color-primary, #3A5A40);
   background: none;
   border: none;
   cursor: pointer;

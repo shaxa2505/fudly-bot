@@ -5,7 +5,7 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#53B175",
+  "theme_color": "#3A5A40",
   "orientation": "portrait",
   "lang": "uz",
   "categories": ["food", "shopping", "lifestyle"],

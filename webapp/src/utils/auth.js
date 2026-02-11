@@ -104,8 +104,8 @@ export const initializeTelegramAuth = async () => {
   tg.enableClosingConfirmation()
   
   // Set theme colors
-  tg.setHeaderColor('#FF6B35')
-  tg.setBackgroundColor('#FAFAFA')
+  tg.setHeaderColor('#F9F9F9')
+  tg.setBackgroundColor('#F9F9F9')
 
   // Get initData for authentication
   const initData = tg.initData

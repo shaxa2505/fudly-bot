@@ -71,7 +71,7 @@
   background: var(--color-bg-primary);
   border-radius: 20px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(15, 118, 110, 0.08);
+  border: 1px solid rgba(58, 90, 64, 0.08);
 }
 
 .favorite-image {

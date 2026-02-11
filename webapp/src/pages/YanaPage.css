@@ -1,10 +1,13 @@
-﻿/**
+/**
  * Yana/Profile Page Styles
  */
 
 .yana-page {
   min-height: 100vh;
-  background: #F6F8F6;
+  background: var(--color-bg-primary);
+  background-image:
+    radial-gradient(120% 120% at 15% -10%, rgba(58, 90, 64, 0.07) 0%, rgba(58, 90, 64, 0) 60%),
+    radial-gradient(120% 120% at 110% -20%, rgba(230, 81, 0, 0.06) 0%, rgba(230, 81, 0, 0) 60%);
   padding-bottom: calc(var(--bottom-nav-height) + var(--spacing-4xl));
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
@@ -18,9 +21,9 @@
   top: var(--app-surface-top);
   z-index: var(--z-sticky);
   padding: var(--app-top-inset) var(--page-padding-x) var(--app-topbar-gap);
-  background: rgba(246, 248, 246, 0.94);
+  background: rgba(249, 249, 249, 0.86);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(16, 24, 40, 0.05);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .profile-topbar-inner {
@@ -68,8 +71,8 @@
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  border: 1px solid rgba(15, 118, 110, 0.18);
-  background: rgba(15, 118, 110, 0.1);
+  border: 1px solid rgba(58, 90, 64, 0.18);
+  background: var(--color-primary-soft);
   color: var(--color-primary);
   display: inline-flex;
   align-items: center;
@@ -80,11 +83,11 @@
 
 .profile-topbar-action:active {
   transform: scale(0.96);
-  background: rgba(15, 118, 110, 0.18);
+  background: var(--color-primary-soft-strong);
 }
 
 .profile-topbar-action:focus-visible {
-  outline: 3px solid rgba(15, 118, 110, 0.25);
+  outline: 3px solid var(--color-primary-soft-strong);
   outline-offset: 2px;
 }
 
@@ -189,7 +192,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(15, 118, 110, 0.12);
+  background: var(--color-primary-soft);
   color: var(--color-primary);
   display: inline-flex;
   align-items: center;
@@ -241,7 +244,7 @@
 .profile-section-badge {
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(15, 118, 110, 0.12);
+  background: var(--color-primary-soft);
   color: var(--color-primary);
   font-size: 11px;
   font-weight: 700;
@@ -472,7 +475,7 @@
 
 .active-order-arrow:active {
   transform: scale(0.95);
-  background: rgba(15, 118, 110, 0.12);
+  background: var(--color-primary-soft);
 }
 
 .active-order-cancel {
@@ -699,7 +702,7 @@
 .clear-notifications-btn {
   padding: 4px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(15, 118, 110, 0.2);
+  border: 1px solid rgba(58, 90, 64, 0.2);
   background: var(--color-bg-primary);
   font-size: 11px;
   font-weight: 600;
@@ -827,8 +830,8 @@
 }
 
 .settings-icon.tone-orange {
-  background: rgba(249, 115, 22, 0.15);
-  color: #EA580C;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
 .settings-icon.tone-purple {
@@ -837,8 +840,8 @@
 }
 
 .settings-icon.tone-green {
-  background: rgba(16, 185, 129, 0.12);
-  color: #10B981;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 .settings-text {
@@ -860,9 +863,9 @@
 .toggle {
   width: 46px;
   height: 28px;
-  border: 1px solid rgba(15, 118, 110, 0.14);
+  border: 1px solid rgba(58, 90, 64, 0.14);
   border-radius: 999px;
-  background: rgba(15, 118, 110, 0.12);
+  background: var(--color-primary-soft);
   padding: 2px;
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -874,8 +877,8 @@
 }
 
 .toggle.on {
-  background: var(--color-primary-gradient);
-  border-color: rgba(15, 118, 110, 0.35);
+  background: var(--color-primary);
+  border-color: rgba(58, 90, 64, 0.35);
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.25);
 }
 
@@ -897,7 +900,7 @@
 }
 
 .toggle:focus-visible {
-  outline: 3px solid rgba(15, 118, 110, 0.35);
+  outline: 3px solid rgba(58, 90, 64, 0.35);
   outline-offset: 2px;
 }
 

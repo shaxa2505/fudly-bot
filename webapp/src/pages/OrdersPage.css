@@ -327,7 +327,7 @@
 
 .order-card-progress-dot.active {
   background: var(--orders-accent);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  box-shadow: 0 0 0 3px rgba(58, 90, 64, 0.12);
 }
 
 .order-card-progress-labels {

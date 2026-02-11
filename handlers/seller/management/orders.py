@@ -7,14 +7,14 @@ from __future__ import annotations
 
 from typing import Any
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.domain.order_labels import status_label
-from app.core.utils import UZB_TZ, get_uzb_time, get_order_field, to_uzb_datetime
+from app.core.utils import UZB_TZ, get_order_field, to_uzb_datetime
 from app.services.unified_order_service import (
     OrderStatus,
     PaymentStatus,
@@ -30,8 +30,7 @@ from .utils import get_db, get_store_field
 
 router = Router()
 
-HISTORY_PAGE_SIZE = 30
-WAITING_THRESHOLD_MINUTES = 5
+PAGE_SIZE = 5
 
 
 def _get_field(entity: Any, field: str, default: Any = None) -> Any:
@@ -77,26 +76,10 @@ def _format_time(value: Any) -> str | None:
     return base.strftime("%H:%M")
 
 
-def _minutes_since(value: Any) -> int | None:
-    base = _parse_dt(value)
-    if not base:
-        return None
-    now = get_uzb_time()
-    minutes = int((now - base.astimezone(UZB_TZ)).total_seconds() // 60)
-    return max(0, minutes)
-
-
-def _pluralize_minutes_ru(minutes: int) -> str:
-    if minutes % 10 == 1 and minutes % 100 != 11:
-        return "минуту"
-    if 2 <= minutes % 10 <= 4 and not (12 <= minutes % 100 <= 14):
-        return "минуты"
-    return "минут"
-
-
 def _status_dot(status: str) -> str:
     return {
         OrderStatus.PENDING: "🟡",
+        OrderStatus.CONFIRMED: "🟢",
         OrderStatus.PREPARING: "🟢",
         OrderStatus.READY: "🟣",
         OrderStatus.DELIVERING: "🟣",
@@ -200,7 +183,7 @@ def _count_statuses(entries: list[dict[str, Any]]) -> dict[str, int]:
         status = entry["status"]
         if status == OrderStatus.PENDING:
             counts["pending"] += 1
-        elif status == OrderStatus.PREPARING:
+        elif status in (OrderStatus.CONFIRMED, OrderStatus.PREPARING):
             counts["in_work"] += 1
         elif status in (OrderStatus.READY, OrderStatus.DELIVERING):
             counts["ready"] += 1
@@ -212,10 +195,11 @@ def _count_statuses(entries: list[dict[str, Any]]) -> dict[str, int]:
 def _filter_entries(entries: list[dict[str, Any]], filter_type: str) -> list[dict[str, Any]]:
     status_map = {
         "pending": {OrderStatus.PENDING},
-        "in_work": {OrderStatus.PREPARING},
+        "in_work": {OrderStatus.CONFIRMED, OrderStatus.PREPARING},
         "ready": {OrderStatus.READY, OrderStatus.DELIVERING},
         "history": {OrderStatus.COMPLETED, OrderStatus.REJECTED, OrderStatus.CANCELLED},
         "active": {
+            OrderStatus.CONFIRMED,
             OrderStatus.PREPARING,
             OrderStatus.READY,
             OrderStatus.DELIVERING,
@@ -247,6 +231,16 @@ def _filter_header_key(filter_type: str) -> str:
         "completed": "partner_orders_filter_history",
     }
     return mapping.get(filter_type, "partner_orders_filter_new")
+
+
+def _status_to_filter(status: str) -> str:
+    if status == OrderStatus.PENDING:
+        return "pending"
+    if status in (OrderStatus.CONFIRMED, OrderStatus.PREPARING):
+        return "in_work"
+    if status in (OrderStatus.READY, OrderStatus.DELIVERING):
+        return "ready"
+    return "history"
 
 
 def _partner_status_label(status_raw: Any, lang: str, order_type: str) -> str:
@@ -300,30 +294,25 @@ def _format_order_card(entry: dict[str, Any], lang: str) -> list[str]:
         created_time = _format_time(entry.get("created_at")) or get_text(lang, "value_unknown")
         lines.append(f"{get_text(lang, 'label_created')}: {created_time}")
 
-    wait_minutes = None
-    if status == OrderStatus.PENDING:
-        wait_minutes = _minutes_since(entry.get("created_at"))
-    if wait_minutes is not None and wait_minutes > WAITING_THRESHOLD_MINUTES:
-        unit = _pluralize_minutes_ru(wait_minutes) if lang == "ru" else "daqiqa"
-        lines.append(
-            get_text(lang, "partner_orders_waiting", minutes=wait_minutes, unit=unit)
-        )
-
     return lines
 
 
+def _build_main_text(counts: dict[str, int], lang: str) -> str:
+    lines: list[str] = [
+        f"<b>{get_text(lang, 'partner_orders_header')}</b>",
+        "",
+        get_text(lang, "partner_orders_summary_pending", count=counts.get("pending", 0)),
+        get_text(lang, "partner_orders_summary_in_work", count=counts.get("in_work", 0)),
+        get_text(lang, "partner_orders_summary_ready", count=counts.get("ready", 0)),
+        get_text(lang, "partner_orders_summary_history", count=counts.get("history", 0)),
+    ]
+    return "\n".join(lines)
+
+
 def _build_list_text(
-    entries: list[dict[str, Any]], counts: dict[str, int], lang: str, filter_type: str
+    entries: list[dict[str, Any]], lang: str, filter_type: str
 ) -> str:
     lines: list[str] = []
-
-    lines.append(f"<b>{get_text(lang, 'partner_orders_header')}</b>")
-    lines.append("")
-    lines.append(get_text(lang, "partner_orders_summary_pending", count=counts.get("pending", 0)))
-    lines.append(get_text(lang, "partner_orders_summary_in_work", count=counts.get("in_work", 0)))
-    lines.append(get_text(lang, "partner_orders_summary_ready", count=counts.get("ready", 0)))
-    lines.append(get_text(lang, "partner_orders_summary_history", count=counts.get("history", 0)))
-    lines.append("")
 
     header_key = _filter_header_key(filter_type)
     lines.append(f"<b>{get_text(lang, header_key)}</b>")
@@ -341,36 +330,8 @@ def _build_list_text(
     return "\n".join(lines)
 
 
-def _build_keyboard(
-    entries: list[dict[str, Any]],
-    lang: str,
-    filter_type: str,
-    offset: int = 0,
-    total_count: int = 0,
-) -> InlineKeyboardBuilder:
+def _build_main_keyboard(lang: str) -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
-
-    for entry in entries:
-        order = entry["order"]
-        order_type = entry["order_type"]
-        status = entry["status"]
-        order_id = get_order_field(order, "order_id") or (
-            order[0] if isinstance(order, (list, tuple)) and len(order) > 0 else 0
-        )
-        icon = "🚚" if order_type == "delivery" else _status_dot(status)
-        kb.button(text=f"{icon} #{order_id}", callback_data=f"seller_view_o_{order_id}")
-
-    if entries:
-        kb.adjust(2)
-
-    if filter_type in ("history", "completed") and total_count > offset + HISTORY_PAGE_SIZE:
-        kb.row(
-            types.InlineKeyboardButton(
-                text=get_text(lang, "partner_orders_btn_show_more"),
-                callback_data=f"seller_history_more_{offset + HISTORY_PAGE_SIZE}",
-            )
-        )
-
     filter_buttons = [
         ("seller_filter_pending", get_text(lang, "partner_orders_btn_new")),
         ("seller_filter_in_work", get_text(lang, "partner_orders_btn_in_work")),
@@ -379,22 +340,84 @@ def _build_keyboard(
     ]
 
     row: list[types.InlineKeyboardButton] = []
-    for cb, text in filter_buttons:
-        row.append(types.InlineKeyboardButton(text=text, callback_data=cb))
+    for cb, text_label in filter_buttons:
+        row.append(types.InlineKeyboardButton(text=text_label, callback_data=cb))
         if len(row) == 2:
             kb.row(*row, width=2)
             row = []
     if row:
         kb.row(*row, width=2)
 
-    refresh_cb = f"seller_orders_refresh:{filter_type}:{offset}"
     kb.row(
         types.InlineKeyboardButton(
-            text=get_text(lang, "partner_orders_btn_refresh"), callback_data=refresh_cb
+            text=get_text(lang, "partner_orders_btn_refresh"),
+            callback_data="seller_orders_refresh:main",
         )
     )
 
     return kb
+
+
+def _build_list_keyboard(
+    entries: list[dict[str, Any]],
+    lang: str,
+    filter_type: str,
+    page: int,
+    total_pages: int,
+) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+
+    order_buttons: list[types.InlineKeyboardButton] = []
+    for entry in entries:
+        order = entry["order"]
+        order_id = get_order_field(order, "order_id") or (
+            order[0] if isinstance(order, (list, tuple)) and len(order) > 0 else 0
+        )
+        order_buttons.append(
+            types.InlineKeyboardButton(
+                text=f"#{order_id}",
+                callback_data=f"seller_view_o_{order_id}:{filter_type}:{page}",
+            )
+        )
+
+    if order_buttons:
+        kb.row(*order_buttons, width=min(len(order_buttons), PAGE_SIZE))
+
+    prev_page = page - 1 if page > 1 else 1
+    next_page = page + 1 if page < total_pages else total_pages
+
+    kb.row(
+        types.InlineKeyboardButton(
+            text="??",
+            callback_data=f"seller_orders_page:{filter_type}:{prev_page}",
+        ),
+        types.InlineKeyboardButton(
+            text=get_text(lang, "partner_orders_page", page=page, total=total_pages),
+            callback_data="seller_orders_page_info",
+        ),
+        types.InlineKeyboardButton(
+            text="??",
+            callback_data=f"seller_orders_page:{filter_type}:{next_page}",
+        ),
+        width=3,
+    )
+
+    kb.row(
+        types.InlineKeyboardButton(
+            text=get_text(lang, "partner_orders_btn_refresh"),
+            callback_data=f"seller_orders_refresh:{filter_type}:{page}",
+        )
+    )
+
+    kb.row(
+        types.InlineKeyboardButton(
+            text=get_text(lang, "partner_order_btn_back"),
+            callback_data="seller_orders_main",
+        )
+    )
+
+    return kb
+
 
 def _get_all_orders(db, user_id: int) -> tuple[list, list]:
     """
@@ -441,26 +464,39 @@ def _get_all_orders(db, user_id: int) -> tuple[list, list]:
     return pickup_orders, delivery_orders
 
 
-def _build_orders_view(
-    user_id: int, lang: str, filter_type: str, offset: int = 0
-) -> tuple[str, InlineKeyboardBuilder]:
+def _build_main_view(user_id: int, lang: str) -> tuple[str, InlineKeyboardBuilder]:
     db = get_db()
     pickup_orders, delivery_orders = _get_all_orders(db, user_id)
     entries = _build_entries(pickup_orders, delivery_orders)
     counts = _count_statuses(entries)
+
+    text = _build_main_text(counts, lang)
+    kb = _build_main_keyboard(lang)
+    return text, kb
+
+
+def _build_list_view(
+    user_id: int, lang: str, filter_type: str, page: int | str | None = 1
+) -> tuple[str, InlineKeyboardBuilder]:
+    db = get_db()
+    pickup_orders, delivery_orders = _get_all_orders(db, user_id)
+    entries = _build_entries(pickup_orders, delivery_orders)
     filtered_entries = _filter_entries(entries, filter_type)
     sorted_entries = _sort_entries(filtered_entries, filter_type)
 
-    if filter_type in ("history", "completed"):
-        safe_offset = max(0, int(offset or 0))
-        page_entries = sorted_entries[safe_offset : safe_offset + HISTORY_PAGE_SIZE]
-        offset = safe_offset
-    else:
-        offset = 0
-        page_entries = sorted_entries
+    total_count = len(sorted_entries)
+    total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+    try:
+        current_page = int(page) if page is not None else 1
+    except (TypeError, ValueError):
+        current_page = 1
+    current_page = max(1, min(current_page, total_pages))
 
-    text = _build_list_text(page_entries, counts, lang, filter_type)
-    kb = _build_keyboard(page_entries, lang, filter_type, offset, len(sorted_entries))
+    start_index = (current_page - 1) * PAGE_SIZE
+    page_entries = sorted_entries[start_index : start_index + PAGE_SIZE]
+
+    text = _build_list_text(page_entries, lang, filter_type)
+    kb = _build_list_keyboard(page_entries, lang, filter_type, current_page, total_pages)
     return text, kb
 
 
@@ -509,9 +545,24 @@ async def seller_orders_main(message: types.Message, state: FSMContext) -> Any:
         return
 
     lang = db.get_user_language(message.from_user.id)
-    text, kb = _build_orders_view(message.from_user.id, lang, "pending")
+    text, kb = _build_main_view(message.from_user.id, lang)
 
     await message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+
+
+@router.callback_query(F.data == "seller_orders_main")
+async def seller_orders_main_callback(callback: types.CallbackQuery) -> None:
+    """Return to main orders summary screen."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+
+    text, kb = _build_main_view(callback.from_user.id, lang)
+
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        pass
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("seller_orders_refresh"))
@@ -520,26 +571,69 @@ async def seller_orders_refresh(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    filter_type = "pending"
-    offset = 0
     data = callback.data or ""
-    if ":" in data:
-        parts = data.split(":")
-        if len(parts) >= 2 and parts[1]:
-            filter_type = parts[1]
-        if len(parts) >= 3:
-            try:
-                offset = int(parts[2])
-            except ValueError:
-                offset = 0
+    parts = data.split(":")
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, filter_type, offset)
+    view = "main"
+    filter_type = "pending"
+    page = 1
+
+    if len(parts) >= 2 and parts[1]:
+        if parts[1] == "main":
+            view = "main"
+        else:
+            view = "list"
+            filter_type = parts[1]
+            if len(parts) >= 3:
+                try:
+                    page = int(parts[2])
+                except ValueError:
+                    page = 1
+
+    if view == "main":
+        text, kb = _build_main_view(callback.from_user.id, lang)
+    else:
+        text, kb = _build_list_view(callback.from_user.id, lang, filter_type, page)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
     except Exception:
         pass
 
+    await callback.answer()
+
+
+# =============================================================================
+# PAGINATION
+# =============================================================================
+
+
+@router.callback_query(F.data.startswith("seller_orders_page:"))
+async def seller_orders_page(callback: types.CallbackQuery) -> None:
+    """Switch orders list page."""
+    db = get_db()
+    lang = db.get_user_language(callback.from_user.id)
+
+    data = callback.data or ""
+    parts = data.split(":")
+    filter_type = parts[1] if len(parts) > 1 and parts[1] else "pending"
+    try:
+        page = int(parts[2]) if len(parts) > 2 else 1
+    except ValueError:
+        page = 1
+
+    text, kb = _build_list_view(callback.from_user.id, lang, filter_type, page)
+
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        pass
+    await callback.answer()
+
+
+@router.callback_query(F.data == "seller_orders_page_info")
+async def seller_orders_page_info(callback: types.CallbackQuery) -> None:
+    """No-op for page indicator button."""
     await callback.answer()
 
 
@@ -554,7 +648,7 @@ async def seller_filter_pending(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "pending")
+    text, kb = _build_list_view(callback.from_user.id, lang, "pending", 1)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -569,7 +663,7 @@ async def seller_filter_in_work(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "in_work")
+    text, kb = _build_list_view(callback.from_user.id, lang, "in_work", 1)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -584,7 +678,7 @@ async def seller_filter_ready(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "ready")
+    text, kb = _build_list_view(callback.from_user.id, lang, "ready", 1)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -599,7 +693,7 @@ async def seller_filter_history(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "history", 0)
+    text, kb = _build_list_view(callback.from_user.id, lang, "history", 1)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -618,8 +712,9 @@ async def seller_history_more(callback: types.CallbackQuery) -> None:
         offset = int(callback.data.split("_")[-1])
     except Exception:
         offset = 0
+    page = max(1, offset // PAGE_SIZE + 1)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "history", offset)
+    text, kb = _build_list_view(callback.from_user.id, lang, "history", page)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -634,7 +729,7 @@ async def seller_filter_active(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "active")
+    text, kb = _build_list_view(callback.from_user.id, lang, "in_work", 1)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -649,7 +744,7 @@ async def seller_filter_completed(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    text, kb = _build_orders_view(callback.from_user.id, lang, "completed")
+    text, kb = _build_list_view(callback.from_user.id, lang, "history", 1)
 
     try:
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
@@ -682,8 +777,17 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
+    data = callback.data or ""
+    parts = data.split(":")
+    base = parts[0]
+    filter_type = parts[1] if len(parts) > 1 and parts[1] else None
     try:
-        order_id = int(callback.data.split("_")[-1])
+        page = int(parts[2]) if len(parts) > 2 else 1
+    except ValueError:
+        page = 1
+
+    try:
+        order_id = int(base.split("_")[-1])
     except ValueError:
         await callback.answer(
             "Noto'g'ri so'rov" if lang == "uz" else "Неверный запрос", show_alert=True
@@ -713,6 +817,8 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
         or OrderStatus.PENDING
     )
     status = OrderStatus.normalize(str(status_raw).strip().lower())
+    if not filter_type:
+        filter_type = _status_to_filter(status)
     delivery_address = get_order_field(order, "delivery_address") or ""
     pickup_code = get_order_field(order, "pickup_code") or ""
 
@@ -745,13 +851,25 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
     customer_name_safe = html_escape(customer_name)
     address_safe = html_escape(delivery_address) if delivery_address else get_text(lang, "value_unknown")
 
+    items = _extract_cart_items(order)
+    items_lines: list[str] = []
+    if items:
+        for item in items:
+            item_title = html_escape(item.get("title") or title)
+            item_qty = _format_quantity_short(item.get("quantity", 1))
+            items_lines.append(f"• {item_title} ×{item_qty}")
+    else:
+        items_lines.append(f"• {title_safe} ×{qty_text}")
+
     lines = [
         f"<b>📦 {get_text(lang, 'label_order')} #{order_id}</b>",
-        type_label,
+        f"{get_text(lang, 'label_order_type')}: {type_label}",
         f"{get_text(lang, 'label_status')}: <b>{status_text}</b>",
         "",
-        f"🛒 {title_safe} ×{qty_text}",
-        f"💰 {format_price(total_price, lang)}",
+        f"🛒 {get_text(lang, 'label_items')}:",
+        *items_lines,
+        "",
+        f"💰 {get_text(lang, 'label_amount')}: {format_price(total_price, lang)}",
         "",
         f"👤 {get_text(lang, 'label_customer')}: {customer_name_safe}",
         f"📞 <code>{html_escape(customer_phone)}</code>",
@@ -817,11 +935,11 @@ async def seller_view_order(callback: types.CallbackQuery) -> None:
 
     kb.button(
         text=get_text(lang, "partner_order_btn_contact"),
-        callback_data=f"contact_customer_o_{order_id}",
+        callback_data=f"contact_customer_o_{order_id}:{filter_type}:{page}",
     )
     kb.button(
         text=get_text(lang, "partner_order_btn_back"),
-        callback_data="seller_orders_refresh:pending:0",
+        callback_data=f"seller_orders_page:{filter_type}:{page}",
     )
     kb.adjust(2, 1, 1)
 
@@ -844,9 +962,29 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
     db = get_db()
     lang = db.get_user_language(callback.from_user.id)
 
-    parts = callback.data.split("_")
-    entity_type = parts[2]  # 'b' or 'o'
-    entity_id = int(parts[3])
+    data = callback.data or ""
+    parts = data.split(":")
+    base = parts[0]
+    filter_type = parts[1] if len(parts) > 1 and parts[1] else None
+    try:
+        page = int(parts[2]) if len(parts) > 2 else 1
+    except ValueError:
+        page = 1
+
+    base_parts = base.split("_")
+    if len(base_parts) < 4:
+        await callback.answer(
+            "Noto'g'ri so'rov" if lang == "uz" else "Неверный запрос", show_alert=True
+        )
+        return
+    entity_type = base_parts[2]  # 'b' or 'o'
+    try:
+        entity_id = int(base_parts[3])
+    except ValueError:
+        await callback.answer(
+            "Noto'g'ri so'rov" if lang == "uz" else "Неверный запрос", show_alert=True
+        )
+        return
 
     if entity_type == "b":
         entity = db.get_booking(entity_id)
@@ -876,8 +1014,8 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
         )
         return
 
-    phone = customer.phone or "—"
-    name = customer.first_name or "Клиент"
+    phone = customer.phone or get_text(lang, "value_unknown")
+    name = customer.first_name or ("Mijoz" if lang == "uz" else "Клиент")
 
     text = f"<b>{'Mijoz kontakti' if lang == 'uz' else 'Контакт клиента'}</b>\n\n"
     text += f"{name}\n"
@@ -889,10 +1027,14 @@ async def contact_customer(callback: types.CallbackQuery) -> None:
     elif user_id:
         kb.button(text="Telegram", url=f"tg://user?id={user_id}")
 
-    kb.button(text=get_text(lang, "partner_order_btn_back"), callback_data="seller_orders_refresh:pending:0")
+    back_cb = f"seller_orders_page:{filter_type}:{page}" if filter_type else "seller_orders_main"
+    kb.button(text=get_text(lang, "partner_order_btn_back"), callback_data=back_cb)
     kb.adjust(1)
 
-    await callback.message.answer(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    try:
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=kb.as_markup())
+    except Exception:
+        pass
     await callback.answer()
 
 

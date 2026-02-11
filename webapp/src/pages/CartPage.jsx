@@ -2167,7 +2167,7 @@ function CartPage({ user }) {
           {pendingPaymentCard}
           <div className="empty-card">
             <div className="empty-icon">
-              <ShoppingCart size={72} strokeWidth={1.5} color="#0F766E" aria-hidden="true" />
+              <ShoppingCart size={72} strokeWidth={1.5} color="#3A5A40" aria-hidden="true" />
             </div>
             <h2>Savatingiz bo'sh</h2>
             <p className="empty-description">

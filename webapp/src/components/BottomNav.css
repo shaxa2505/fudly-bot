@@ -9,8 +9,8 @@
   left: 0;
   right: 0;
   display: block;
-  background: rgba(255, 255, 255, 0.8);
-  border-top: 1px solid #F1F5F9;
+  background: rgba(255, 255, 255, 0.86);
+  border-top: 1px solid var(--color-border-light);
   border-radius: 0;
   z-index: var(--z-fixed);
   padding: 10px 24px max(16px, var(--safe-area-bottom));
@@ -44,6 +44,7 @@
   transition: all var(--transition-normal);
   border-radius: 12px;
   -webkit-tap-highlight-color: transparent;
+  color: var(--color-text-muted);
 }
 
 .nav-item:active {
@@ -57,6 +58,7 @@
 
 .nav-item.active {
   background: transparent;
+  color: var(--color-primary);
 }
 
 .nav-item.active::before {
@@ -86,11 +88,7 @@
 }
 
 .nav-item.active .nav-icon {
-  background: rgba(6, 95, 70, 0.1);
-}
-
-.nav-item.active .nav-icon svg {
-  color: #065F46;
+  background: var(--color-primary-soft);
 }
 
 /* navIconPop animation moved to animations.css */
@@ -102,7 +100,7 @@
   position: absolute;
   top: -4px;
   right: 0;
-  background: #10B981;
+  background: var(--color-accent);
   color: var(--color-text-inverse);
   font-size: 8px;
   font-weight: 700;
@@ -113,7 +111,7 @@
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  border: 2px solid #FFFFFF;
+  border: 2px solid var(--color-bg-card);
 }
 
 /* badgePulse animation moved to animations.css */
@@ -124,13 +122,12 @@
 .nav-label {
   font-size: 10px;
   font-weight: 700;
-  color: #94A3B8;
   transition: all var(--transition-normal);
   white-space: nowrap;
 }
 
 .nav-item.active .nav-label {
-  color: #065F46;
+  color: var(--color-primary);
 }
 
 /* Fix for very small screens */

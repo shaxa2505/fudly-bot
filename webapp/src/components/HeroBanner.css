@@ -8,10 +8,10 @@
 
 .hero-banner {
   position: relative;
-  border-radius: 24px;
+  border-radius: var(--radius-2xl);
   height: 208px;
   overflow: hidden;
-  background: #111827;
+  background: var(--color-primary);
   color: #FFFFFF;
   cursor: pointer;
   box-shadow: none;
@@ -34,7 +34,7 @@
 .hero-banner__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.2) 55%, rgba(0, 0, 0, 0) 100%);
+  background: linear-gradient(0deg, rgba(46, 70, 50, 0.85) 0%, rgba(46, 70, 50, 0.35) 55%, rgba(46, 70, 50, 0) 100%);
 }
 
 .hero-banner:active {
@@ -59,7 +59,7 @@
 .banner-badge {
   display: inline-block;
   padding: 4px 12px;
-  background: var(--home-accent);
+  background: var(--color-primary);
   color: #FFFFFF;
   font-size: 10px;
   font-weight: 700;
@@ -70,7 +70,7 @@
 }
 
 .banner-title {
-  font-family: "Playfair Display", var(--font-display);
+  font-family: var(--font-display);
   font-size: 30px;
   font-weight: 700;
   line-height: 1.2;
@@ -83,7 +83,7 @@
   margin: 6px 0 0;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .banner-indicators {

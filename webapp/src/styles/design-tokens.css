@@ -8,62 +8,65 @@
 :root {
   /* ===== COLORS ===== */
 
-  /* Primary Palette - Deep Teal (main brand color) */
-  --color-primary: #0F766E;
-  --color-primary-dark: #0B5E57;
-  --color-primary-light: #DDF4F1;
-  --color-primary-gradient: linear-gradient(135deg, #0F766E 0%, #0A5C54 100%);
+  /* Primary Palette - Forest Green (main brand color) */
+  --color-primary: #3A5A40;
+  --color-primary-dark: #2F4D36;
+  --color-primary-light: #E6EDE0;
+  --color-primary-gradient: linear-gradient(135deg, #3A5A40 0%, #2F4D36 100%);
+  --color-primary-soft: rgba(58, 90, 64, 0.12);
+  --color-primary-soft-strong: rgba(58, 90, 64, 0.2);
 
-  /* Accent Palette - Citrus (CTAs, highlights) */
-  --color-accent: #F97316;
-  --color-accent-dark: #EA580C;
-  --color-accent-light: #FFF1E6;
-  --color-accent-bg: #FFE6D2;
-  --color-accent-bg-light: #FFF5EC;
-  --color-accent-gradient: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+  /* Accent Palette - Warm Orange (CTAs, highlights) */
+  --color-accent: #E65100;
+  --color-accent-dark: #C24600;
+  --color-accent-light: #FFE7D6;
+  --color-accent-bg: #FFF0E3;
+  --color-accent-bg-light: #FFF6EE;
+  --color-accent-gradient: linear-gradient(135deg, #E65100 0%, #C24600 100%);
+  --color-accent-soft: rgba(230, 81, 0, 0.14);
 
   /* Semantic Colors */
-  --color-success: #4CAF50;
-  --color-success-light: #E8F5E9;
-  --color-warning: #FFC107;
-  --color-warning-light: #FFF3E0;
-  --color-error: #FF5252;
-  --color-error-dark: #D32F2F;
-  --color-error-light: #FFEBEE;
-  --color-info: #007AFF;
-  --color-link: #007AFF;
+  --color-success: #2E7D32;
+  --color-success-light: #E7F4EA;
+  --color-warning: #F59E0B;
+  --color-warning-light: #FFF4D6;
+  --color-error: #D32F2F;
+  --color-error-dark: #B71C1C;
+  --color-error-light: #FDEAEA;
+  --color-info: #2F6FED;
+  --color-link: #2F6FED;
 
   /* Text Colors */
-  --color-text-primary: #101828;
-  --color-text-secondary: #475467;
-  --color-text-tertiary: #667085;
-  --color-text-muted: #98A2B3;
+  --color-text-primary: #2D2D2D;
+  --color-text-secondary: #525252;
+  --color-text-tertiary: #6B6B6B;
+  --color-text-muted: #8C8C8C;
   --color-text-inverse: #FFFFFF;
 
   /* Background Colors */
-  --color-bg-primary: #FFFFFF;
-  --color-bg-secondary: #F8F5F1;
-  --color-bg-tertiary: #EFE9E2;
+  --color-bg-primary: #F9F9F9;
+  --color-bg-secondary: #F1F5F2;
+  --color-bg-tertiary: #E7ECE6;
   --color-bg-card: #FFFFFF;
-  --color-bg-input: #FBF9F6;
-  --color-bg-overlay: rgba(0, 0, 0, 0.5);
-  --color-bg-skeleton: #E7E0D8;
-  --color-primary-bg: #E7F5F3; /* Light primary background for accents */
+  --color-bg-input: #FFFFFF;
+  --color-bg-overlay: rgba(20, 20, 20, 0.45);
+  --color-bg-skeleton: #E3E7E0;
+  --color-primary-bg: #E9F0E3; /* Light primary background for accents */
 
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #0F766E 0%, #0A5C54 100%);
-  --gradient-accent: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+  --gradient-primary: linear-gradient(135deg, #3A5A40 0%, #2F4D36 100%);
+  --gradient-accent: linear-gradient(135deg, #E65100 0%, #C24600 100%);
 
   /* Border Colors */
-  --color-border: #E4DED6;
-  --color-border-light: #F0EBE4;
+  --color-border: #E0E5DD;
+  --color-border-light: #EEF2EB;
   --color-border-focus: var(--color-primary);
 
   /* ===== TYPOGRAPHY ===== */
 
   /* Font Family */
-  --font-family: 'Plus Jakarta Sans', 'Sora', 'Manrope', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Plus Jakarta Sans', 'Sora', 'Times New Roman', serif;
+  --font-family: 'Manrope', 'Plus Jakarta Sans', 'Sora', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Manrope', 'Fraunces', 'Times New Roman', serif;
   --font-body: var(--font-family);
 
   /* Font Sizes (1.25 ratio type scale) */
@@ -118,28 +121,28 @@
 
   /* ===== BORDER RADIUS ===== */
 
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-  --radius-2xl: 16px;
-  --radius-3xl: 20px;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
   --radius-pill: 25px;
   --radius-full: 50%;
 
   /* ===== SHADOWS ===== */
 
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 4px 12px rgba(16, 24, 40, 0.08);
-  --shadow-md: 0 6px 16px rgba(16, 24, 40, 0.08);
-  --shadow-lg: 0 10px 24px rgba(16, 24, 40, 0.12);
-  --shadow-xl: 0 16px 32px rgba(16, 24, 40, 0.14);
-  --shadow-primary: 0 10px 24px rgba(15, 118, 110, 0.28);
-  --shadow-accent: 0 12px 26px rgba(249, 115, 22, 0.32);
-  --shadow-card: 0 14px 32px rgba(16, 24, 40, 0.1);
-  --shadow-header: 0 18px 34px rgba(16, 24, 40, 0.08);
-  --shadow-button: 0 12px 26px rgba(249, 115, 22, 0.3);
+  --shadow-xs: 0 1px 2px rgba(45, 45, 45, 0.05);
+  --shadow-sm: 0 6px 18px rgba(58, 90, 64, 0.08);
+  --shadow-md: 0 10px 24px rgba(58, 90, 64, 0.12);
+  --shadow-lg: 0 14px 32px rgba(45, 45, 45, 0.12);
+  --shadow-xl: 0 20px 40px rgba(45, 45, 45, 0.16);
+  --shadow-primary: 0 10px 24px rgba(58, 90, 64, 0.28);
+  --shadow-accent: 0 10px 24px rgba(230, 81, 0, 0.28);
+  --shadow-card: 0 12px 24px rgba(45, 45, 45, 0.08);
+  --shadow-header: 0 14px 28px rgba(45, 45, 45, 0.08);
+  --shadow-button: 0 12px 24px rgba(58, 90, 64, 0.25);
 
   /* ===== TRANSITIONS ===== */
 

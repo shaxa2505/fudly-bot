@@ -1,4 +1,4 @@
-﻿.order-details-page {
+.order-details-page {
   min-height: 100vh;
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
@@ -165,7 +165,7 @@
 }
 
 .order-alert.info .order-alert-icon {
-  background: rgba(15, 118, 110, 0.15);
+  background: rgba(58, 90, 64, 0.15);
 }
 
 .order-alert-content {
@@ -470,7 +470,7 @@
   height: 12px;
   border-radius: 50%;
   background: var(--details-accent);
-  box-shadow: 0 0 0 10px rgba(15, 118, 110, 0.12);
+  box-shadow: 0 0 0 10px rgba(58, 90, 64, 0.12);
   position: absolute;
 }
 

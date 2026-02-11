@@ -19,7 +19,7 @@ import { resolveOfferImageUrl, PLACEHOLDER_IMAGE } from '../utils/imageUtils'
 import './HomePage.css'
 
 const CATEGORIES = [
-  { id: 'all', name: 'Barchasi', icon: Flame, color: '#FF6B35' },
+  { id: 'all', name: 'Barchasi', icon: Flame, color: '#E65100' },
   { id: 'dairy', name: 'Sut', icon: Milk, color: '#2196F3' },
   { id: 'bakery', name: 'Non', icon: Croissant, color: '#8D6E63' },
   { id: 'meat', name: "Go'sht", icon: Beef, color: '#E53935' },

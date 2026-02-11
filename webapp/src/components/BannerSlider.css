@@ -28,15 +28,15 @@
 }
 
 .banner-slide.gradient-green {
-  background: linear-gradient(135deg, var(--color-primary) 0%, #7BC77E 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, #A3B18A 100%);
 }
 
 .banner-slide.gradient-orange {
-  background: linear-gradient(135deg, var(--color-accent) 0%, #FF9F1C 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, #FF8A3D 100%);
 }
 
 .banner-slide.gradient-purple {
-  background: linear-gradient(135deg, #F59E0B 0%, #F97316 100%);
+  background: linear-gradient(135deg, #A3B18A 0%, #3A5A40 100%);
 }
 
 .banner-content {

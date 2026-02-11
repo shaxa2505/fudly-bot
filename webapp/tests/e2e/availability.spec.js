@@ -182,7 +182,7 @@ test.beforeEach(async ({ page }) => {
         themeParams: {
           bg_color: '#ffffff',
           text_color: '#000000',
-          button_color: '#53B175',
+          button_color: '#3A5A40',
         },
         ready: noop,
         expand: noop,

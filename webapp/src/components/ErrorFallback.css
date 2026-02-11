@@ -90,14 +90,14 @@
 }
 
 .error-fallback-btn.primary {
-  background: linear-gradient(135deg, #53B175 0%, #3d8f5a 100%);
+  background: linear-gradient(135deg, #3A5A40 0%, #2F4D36 100%);
   color: white;
-  box-shadow: 0 4px 12px rgba(83, 177, 117, 0.3);
+  box-shadow: 0 4px 12px rgba(58, 90, 64, 0.3);
 }
 
 .error-fallback-btn.primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(83, 177, 117, 0.4);
+  box-shadow: 0 6px 16px rgba(58, 90, 64, 0.4);
 }
 
 .error-fallback-btn.primary:active {
@@ -130,7 +130,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #53B175;
+  color: #3A5A40;
   text-decoration: none;
   font-weight: 500;
   font-size: 15px;
@@ -138,7 +138,7 @@
 }
 
 .error-fallback-link:hover {
-  color: #3d8f5a;
+  color: #2F4D36;
 }
 
 /* Inline Error Styles */

@@ -198,7 +198,7 @@ async function offlineFallback() {
         h1 { font-size: 24px; color: #181725; margin-bottom: 12px; }
         p { color: #7C7C7C; margin-bottom: 24px; line-height: 1.5; }
         button {
-          background: #53B175;
+          background: #3A5A40;
           color: white;
           border: none;
           padding: 16px 32px;

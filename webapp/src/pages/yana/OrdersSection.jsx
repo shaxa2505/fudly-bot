@@ -15,7 +15,7 @@ const getStatusInfo = (status, orderType) => {
     preparing: { emoji: '👨‍🍳', color: '#34C759', bg: '#E8F8ED' },
     ready: { emoji: '📦', color: '#007AFF', bg: '#E5F2FF' },
     delivering: { emoji: '🚚', color: '#007AFF', bg: '#E5F2FF' },
-    completed: { emoji: '🎉', color: '#53B175', bg: '#E8F5E9' },
+    completed: { emoji: '🎉', color: '#3A5A40', bg: '#E7F4EA' },
     cancelled: { emoji: '❌', color: '#FF3B30', bg: '#FFEBEE' },
     rejected: { emoji: '❌', color: '#FF3B30', bg: '#FFEBEE' },
 
@@ -81,7 +81,7 @@ function OrdersSection({ orders, loading, orderFilter, onFilterChange }) {
       ) : orders.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">
-            <Package size={80} strokeWidth={1.5} color="#53B175" aria-hidden="true" />
+            <Package size={80} strokeWidth={1.5} color="#3A5A40" aria-hidden="true" />
           </div>
           <h3>Buyurtmalar yo'q</h3>
           <p className="empty-description">

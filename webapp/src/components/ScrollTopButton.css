@@ -11,7 +11,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-primary, 0 12px 24px rgba(15, 118, 110, 0.28));
+  box-shadow: var(--shadow-primary, 0 12px 24px rgba(58, 90, 64, 0.28));
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
@@ -30,13 +30,13 @@
 }
 
 .scroll-top-btn:focus-visible {
-  outline: 3px solid rgba(15, 118, 110, 0.28);
+  outline: 3px solid rgba(58, 90, 64, 0.28);
   outline-offset: 2px;
 }
 
 @media (hover: hover) {
   .scroll-top-btn:hover {
-    box-shadow: var(--shadow-accent, 0 12px 26px rgba(249, 115, 22, 0.24));
+    box-shadow: var(--shadow-accent, 0 12px 26px rgba(230, 81, 0, 0.24));
   }
 }
 

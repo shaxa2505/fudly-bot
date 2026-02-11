@@ -11,7 +11,7 @@ const CATEGORIES = [
     nameEn: "Frash Fruits\n& Vegetable",
     icon: Apple,
     color: 'linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%)',
-    borderColor: '#53B175'
+    borderColor: '#3A5A40'
   },
   {
     id: 'cooking-oil',

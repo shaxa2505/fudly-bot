@@ -56,13 +56,13 @@
 
 /* Primary - Green gradient */
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
   box-shadow: var(--shadow-primary);
 }
 
 .btn-primary:hover:not(.btn-disabled) {
-  box-shadow: 0 8px 28px rgba(83, 177, 117, 0.45);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-1px);
 }
 
@@ -75,7 +75,7 @@
 .btn-secondary {
   background: var(--color-bg-primary);
   color: var(--color-primary);
-  border: 2px solid var(--color-primary);
+  border: 1.5px solid var(--color-primary);
 }
 
 .btn-secondary:hover:not(.btn-disabled) {
@@ -102,9 +102,9 @@
 
 /* Danger - Red gradient */
 .btn-danger {
-  background: linear-gradient(135deg, var(--color-error) 0%, var(--color-error-dark) 100%);
+  background: var(--color-error);
   color: var(--color-text-inverse);
-  box-shadow: 0 4px 16px rgba(255, 82, 82, 0.3);
+  box-shadow: 0 8px 20px rgba(211, 47, 47, 0.28);
 }
 
 .btn-danger:hover:not(.btn-disabled) {
@@ -114,13 +114,13 @@
 
 /* Accent - Orange gradient */
 .btn-accent {
-  background: var(--color-accent-gradient);
+  background: var(--color-accent);
   color: var(--color-text-inverse);
   box-shadow: var(--shadow-accent);
 }
 
 .btn-accent:hover:not(.btn-disabled) {
-  box-shadow: 0 8px 28px rgba(255, 107, 53, 0.5);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-1px);
 }
 

@@ -2,26 +2,29 @@
  * Stores Page - Premium list design
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap');
 
 .sp {
-  --sp-primary: #065F46;
-  --sp-primary-dark: #054432;
-  --sp-bg: #FFFFFF;
-  --sp-subtle: #F3F4F6;
-  --sp-text: #0F172A;
-  --sp-text-muted: #94A3B8;
-  --sp-border: #E5E7EB;
+  --sp-primary: #3A5A40;
+  --sp-primary-dark: #2F4D36;
+  --sp-bg: #F9F9F9;
+  --sp-subtle: #F1F5F2;
+  --sp-text: #2D2D2D;
+  --sp-text-muted: #8C8C8C;
+  --sp-border: #E0E5DD;
   --color-primary: var(--sp-primary);
   --color-primary-dark: var(--sp-primary-dark);
   --color-bg-primary: var(--sp-bg);
   --color-text-primary: var(--sp-text);
-  --color-text-secondary: #64748B;
-  --color-text-tertiary: #94A3B8;
-  --color-text-muted: #94A3B8;
+  --color-text-secondary: #525252;
+  --color-text-tertiary: #6B6B6B;
+  --color-text-muted: #8C8C8C;
   --color-border-light: var(--sp-border);
-  font-family: "Plus Jakarta Sans", var(--font-family);
+  font-family: var(--font-family);
   background: var(--sp-bg);
+  background-image:
+    radial-gradient(120% 120% at 10% -10%, rgba(58, 90, 64, 0.08) 0%, rgba(58, 90, 64, 0) 60%),
+    radial-gradient(120% 120% at 110% -10%, rgba(230, 81, 0, 0.06) 0%, rgba(230, 81, 0, 0) 60%);
   color: var(--sp-text);
   min-height: 100vh;
   padding-bottom: calc(var(--bottom-nav-height) + 24px);
@@ -43,7 +46,7 @@
   position: sticky;
   top: var(--app-surface-top);
   z-index: var(--z-sticky);
-  background: rgba(248, 250, 249, 0.8);
+  background: rgba(249, 249, 249, 0.86);
   padding: var(--sp-top-inset) var(--page-padding-x, 16px) var(--sp-topbar-gap);
   border-radius: var(--app-surface-radius) var(--app-surface-radius) 0 0;
   border-bottom: none;

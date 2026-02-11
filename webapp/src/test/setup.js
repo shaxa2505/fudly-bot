@@ -17,9 +17,9 @@ window.Telegram = {
       },
     },
     themeParams: {
-      bg_color: '#ffffff',
-      text_color: '#000000',
-      button_color: '#53B175',
+      bg_color: '#F9F9F9',
+      text_color: '#2D2D2D',
+      button_color: '#3A5A40',
     },
     HapticFeedback: {
       impactOccurred: () => {},

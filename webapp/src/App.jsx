@@ -276,9 +276,9 @@ function AppContent() {
       }
 
       // Set theme colors immediately
-      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#ffffff')
-      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#000000')
-      document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#53B175')
+      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#F9F9F9')
+      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#2D2D2D')
+      document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#3A5A40')
 
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user

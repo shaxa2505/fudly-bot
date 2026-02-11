@@ -23,6 +23,8 @@ const SORT_LABELS = {
   price_desc: 'Qimmatroq',
 }
 
+const PAGE_SIZE = 30
+
 const categoryPageCache = new Map()
 
 const buildLocationCacheKey = (locationValue) => {
@@ -65,6 +67,9 @@ function CategoryProductsPage() {
 
   const [offers, setOffers] = useState([])
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
@@ -94,6 +99,8 @@ function CategoryProductsPage() {
     setMinDiscount(cached.minDiscount ?? null)
     setPriceRange(cached.priceRange || 'all')
     setSortBy(cached.sortBy || 'default')
+    setHasMore(typeof cached.hasMore === 'boolean' ? cached.hasMore : true)
+    setOffset(Number.isFinite(cached.offset) ? cached.offset : 0)
     setLoading(false)
     pendingScrollRef.current = Number.isFinite(cached.scrollTop) ? cached.scrollTop : 0
   }, [cacheKey])
@@ -116,15 +123,20 @@ function CategoryProductsPage() {
   }, [offers.length])
 
   const loadOffers = async (options = {}) => {
-    const { searchOverride } = options
+    const { searchOverride, reset = false } = options
     const searchValue = typeof searchOverride === 'string' ? searchOverride : debouncedSearch
     const trimmedSearch = searchValue?.trim() || ''
 
-    setLoading(true)
+    if (reset) {
+      setLoading(true)
+    } else {
+      setLoadingMore(true)
+    }
     try {
       const cityRaw = savedLocation?.city ? savedLocation.city.split(',')[0].trim() : ''
       const cityForApi = transliterateCity(cityRaw)
-      const params = { limit: 50 }
+      const currentOffset = reset ? 0 : offset
+      const params = { limit: PAGE_SIZE, offset: currentOffset, include_meta: true }
       if (categoryId) {
         params.category = categoryId
       }
@@ -168,12 +180,25 @@ function CategoryProductsPage() {
       const items = Array.isArray(data?.items)
         ? data.items
         : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
-      setOffers(items)
+      const hasMoreResult = typeof data?.has_more === 'boolean'
+        ? data.has_more
+        : items.length === PAGE_SIZE
+      const nextOffset = Number.isFinite(data?.next_offset)
+        ? data.next_offset
+        : currentOffset + items.length
+
+      setOffers(prev => (reset ? items : [...prev, ...items]))
+      setHasMore(hasMoreResult)
+      setOffset(nextOffset ?? currentOffset)
     } catch (error) {
       console.error('Error loading offers:', error)
       alert('Xatolik yuz berdi')
     } finally {
-      setLoading(false)
+      if (reset) {
+        setLoading(false)
+      } else {
+        setLoadingMore(false)
+      }
     }
   }
 
@@ -186,8 +211,10 @@ function CategoryProductsPage() {
       priceRange,
       sortBy,
       isLoading: loading,
+      hasMore,
+      offset,
     }
-  }, [offers, searchQuery, debouncedSearch, minDiscount, priceRange, sortBy, loading])
+  }, [offers, searchQuery, debouncedSearch, minDiscount, priceRange, sortBy, loading, hasMore, offset])
 
   useEffect(() => {
     return () => {
@@ -213,7 +240,7 @@ function CategoryProductsPage() {
 
   useEffect(() => {
     if (restoringRef.current) return
-    loadOffers()
+    loadOffers({ reset: true })
   }, [categoryId, debouncedSearch, minDiscount, priceRange, sortBy])
 
   const handleSearch = () => {
@@ -231,6 +258,11 @@ function CategoryProductsPage() {
     setMinDiscount(null)
     setPriceRange('all')
     setSortBy('default')
+  }
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return
+    await loadOffers({ reset: false })
   }
 
   const renderFilterChips = () => {
@@ -460,6 +492,19 @@ function CategoryProductsPage() {
           ))
         )}
       </div>
+
+      {!loading && hasMore && (
+        <div className="category-load-more">
+          <button
+            type="button"
+            className="category-load-more-btn"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? 'Yuklanmoqda...' : 'Yana yuklash'}
+          </button>
+        </div>
+      )}
 
       <ScrollTopButton />
     </div>

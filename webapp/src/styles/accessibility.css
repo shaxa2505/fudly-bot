@@ -13,7 +13,7 @@
 }
 
 *:focus-visible {
-  outline: 3px solid var(--color-primary, #53B175);
+  outline: 3px solid var(--color-primary, #3A5A40);
   outline-offset: 2px;
 }
 
@@ -25,7 +25,7 @@ select:focus-visible,
 textarea:focus-visible,
 [role="button"]:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid var(--color-primary, #53B175);
+  outline: 3px solid var(--color-primary, #3A5A40);
   outline-offset: 2px;
 }
 
@@ -34,7 +34,7 @@ textarea:focus-visible,
 .offer-card:focus-visible,
 .store-card:focus-visible,
 .order-card:focus-visible {
-  outline: 3px solid var(--color-primary, #53B175);
+  outline: 3px solid var(--color-primary, #3A5A40);
   outline-offset: 2px;
   box-shadow: var(--shadow-lg);
 }
@@ -65,7 +65,7 @@ button.inline-btn {
   top: -100px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--color-primary, #53B175);
+  background: var(--color-primary, #3A5A40);
   color: var(--color-text-inverse, white);
   padding: var(--spacing-sm, 8px) var(--spacing-lg, 16px);
   border-radius: var(--radius-sm, 8px);
