@@ -783,6 +783,9 @@ function LocationPickerModal({
   return (
     <div className="location-picker-overlay" onClick={onClose}>
       <div className={`location-picker ${mode === 'search' ? 'search-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
+        <div className="location-picker-handle" aria-hidden="true">
+          <span />
+        </div>
         {mode === 'search' ? (
           <div className="location-picker-search-view">
             <div className="location-picker-search-header">
@@ -798,6 +801,11 @@ function LocationPickerModal({
                   </svg>
                 </span>
               </button>
+              <div className="location-picker-search-title">
+                <p>Manzilni tanlang</p>
+                <span>Shahar, mahalla yoki ko'cha</span>
+              </div>
+              <span className="location-picker-search-spacer" aria-hidden="true" />
             </div>
 
             <div className="location-picker-search-field">
@@ -890,26 +898,19 @@ function LocationPickerModal({
           </div>
         ) : (
           <>
-            <div className="location-picker-header">
-              <div className="location-picker-title">
-                <p>Manzilni tanlang</p>
-                <span>Xaritada manzilni belgilang</span>
-              </div>
-              <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
-
             <div className="location-picker-map">
-                <div className="location-picker-map-canvas">
+              <div className="location-picker-map-canvas">
                 {!mapLoaded && (
                   <div className="location-picker-map-loading">
                     Xarita yuklanmoqda...
                   </div>
                 )}
                 <div ref={mapRef} className="location-picker-map-view" />
+                <button className="location-picker-close" onClick={onClose} aria-label="Yopish">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  </svg>
+                </button>
                 {showGeoSuggestion && (
                   <button
                     type="button"
@@ -931,6 +932,10 @@ function LocationPickerModal({
             </div>
 
             <div className="location-picker-sheet">
+              <div className="location-picker-sheet-header">
+                <p>Manzilni tanlang</p>
+                <span>Xaritada manzilni belgilang</span>
+              </div>
               {showGeoSuggestion && (
                 <div className="location-picker-geo">
                   <span>Joriy joylashuvni aniqlash</span>
@@ -950,8 +955,17 @@ function LocationPickerModal({
                 onClick={openSearch}
                 aria-label="Manzilni qo'lda kiritish"
               >
-                <span className={`location-picker-address-value ${mapResolving ? 'is-loading' : ''}`}>
-                  {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Manzil topilmadi')}
+                <span className="location-picker-address-leading" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+                    <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="location-picker-address-body">
+                  <span className="location-picker-address-label">Manzil</span>
+                  <span className={`location-picker-address-value ${mapResolving ? 'is-loading' : ''}`}>
+                    {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Manzil topilmadi')}
+                  </span>
                 </span>
                 <span className="location-picker-address-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
