@@ -6,7 +6,7 @@
   --offer-primary: var(--color-primary);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   min-width: 0;
   background: transparent;
@@ -37,8 +37,8 @@
 .offer-image-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius-2xl);
+  aspect-ratio: 4 / 5;
+  border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-light);
@@ -98,10 +98,10 @@
 .offer-tags {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 4px;
   z-index: 3;
 }
@@ -114,8 +114,10 @@
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   color: var(--color-text-primary);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -162,7 +164,7 @@
 .offer-favorite {
   position: absolute;
   top: 8px;
-  right: 8px;
+  left: 8px;
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -240,7 +242,7 @@
 
 .offer-title {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--color-text-primary);
   line-height: 1.2;
   letter-spacing: 0;
@@ -301,12 +303,14 @@
 
 .offer-store {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text-tertiary);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .offer-old-price {
@@ -334,7 +338,7 @@
   height: 32px;
   min-width: 32px;
   min-height: 32px;
-  border-radius: 999px;
+  border-radius: 12px;
   background: var(--color-primary-soft);
   color: var(--offer-primary);
   border: none;

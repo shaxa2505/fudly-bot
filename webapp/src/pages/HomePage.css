@@ -109,9 +109,9 @@
   text-align: center;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--home-text-muted);
+  color: rgba(58, 90, 64, 0.6);
   line-height: 1;
   margin-top: 0;
 }
@@ -156,8 +156,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   color: var(--home-text);
 }
 
@@ -244,7 +244,10 @@
 
 .header-search .search-input::placeholder {
   color: var(--home-text-muted);
-  font-weight: 500;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 10px;
 }
 
 .header-search .search-input:valid,
@@ -830,21 +833,23 @@
 }
 
 .categories-header h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--home-text);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
   margin: 0;
 }
 
 .category-tabs {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 10px;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
-  padding: 0 var(--page-padding-x) 6px;
+  padding: 0 var(--page-padding-x) 10px;
   scroll-padding-inline: var(--page-padding-x);
 }
 
@@ -855,21 +860,25 @@
 .category-tab {
   position: relative;
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--color-text-tertiary);
-  font-size: 12px;
-  font-weight: 600;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 800;
   line-height: 1.2;
   cursor: pointer;
-  transition: color var(--transition-fast), transform var(--transition-fast);
+  transition: color var(--transition-fast), transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
 }
 
 .category-tab:focus-visible {
@@ -883,16 +892,7 @@
 }
 
 .category-tab-icon-wrap {
-  width: 64px;
-  height: 64px;
-  border-radius: 24px;
-  background: var(--color-bg-card);
-  border: 1px solid var(--home-border);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  box-shadow: var(--shadow-sm);
+  display: none;
 }
 
 .category-tab-icon {
@@ -900,7 +900,7 @@
 }
 
 .category-tab-text {
-  color: var(--color-text-tertiary);
+  color: inherit;
 }
 
 .category-tab-count {
@@ -908,15 +908,19 @@
 }
 
 .category-tab.is-active .category-tab-icon-wrap {
-  background: var(--home-primary);
-  color: #FFFFFF;
-  border-color: transparent;
-  box-shadow: var(--shadow-primary);
+  display: none;
 }
 
 .category-tab.is-active .category-tab-text {
-  color: var(--home-primary);
-  font-weight: 700;
+  color: #FFFFFF;
+  font-weight: 800;
+}
+
+.category-tab.is-active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-primary);
 }
 
 .location-warning {
@@ -1221,8 +1225,8 @@
 }
 
 .home-section-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--home-text);
   margin: 0;
 }
@@ -1235,20 +1239,24 @@
   padding: 2px 8px;
   font-size: 10px;
   color: var(--home-primary);
-  font-weight: 900;
+  font-weight: 800;
   background: var(--color-primary-soft);
   border: none;
   border-radius: 999px;
   line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .home-section-link {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
   color: var(--home-primary);
   background: transparent;
   border: none;
   padding: 4px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }
 
 .home-section-link:active {
