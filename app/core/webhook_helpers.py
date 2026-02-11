@@ -58,14 +58,14 @@ def _parse_offer_expiry_date(value: Any) -> date | None:
     return None
 
 
-def _get_offer_quantity(offer: Any) -> int | None:
+def _get_offer_quantity(offer: Any) -> float | None:
     raw_qty = get_offer_value(offer, "stock_quantity")
     if raw_qty is None:
         raw_qty = get_offer_value(offer, "quantity")
     if raw_qty is None:
         return None
     try:
-        return int(raw_qty)
+        return float(raw_qty)
     except (TypeError, ValueError):
         return None
 
@@ -161,7 +161,7 @@ def offer_to_dict(offer: Any, photo_url: str | None = None) -> dict:
         "original_price": convert(get_offer_value(offer, "original_price", 0)),
         "discount_price": convert(get_offer_value(offer, "discount_price", 0)),
         "discount_percent": float(get_offer_value(offer, "discount_percent", 0) or 0),
-        "quantity": int(get_offer_value(offer, "quantity", 0) or 0),
+        "quantity": float(get_offer_value(offer, "quantity", 0) or 0),
         "category": get_offer_value(offer, "category", "other") or "other",
         "store_id": int(get_offer_value(offer, "store_id", 0) or 0),
         "store_name": get_offer_value(offer, "store_name", "") or "",

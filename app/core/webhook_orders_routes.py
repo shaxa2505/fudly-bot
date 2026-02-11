@@ -542,24 +542,24 @@ def build_order_handlers(
                     continue
 
                 if isinstance(offer, dict):
-                    offer_title = offer.get("title", "??????????")
+                    offer_title = offer.get("title", "Товар")
                     offer_photo = offer.get("photo")
                     store_id = offer.get("store_id")
                 else:
-                    offer_title = offer[1] if len(offer) > 1 else "??????????"
+                    offer_title = offer[1] if len(offer) > 1 else "Товар"
                     offer_photo = offer[7] if len(offer) > 7 else None
                     store_id = offer[10] if len(offer) > 10 else None
 
                 store = db.get_store(store_id) if store_id and hasattr(db, "get_store") else None
                 if store:
                     if isinstance(store, dict):
-                        store_name = store.get("name", "??????????????")
+                        store_name = store.get("name", "Магазин")
                         store_address = store.get("address")
                     else:
-                        store_name = store[1] if len(store) > 1 else "??????????????"
+                        store_name = store[1] if len(store) > 1 else "Магазин"
                         store_address = store[2] if len(store) > 2 else None
                 else:
-                    store_name = "??????????????"
+                    store_name = "Магазин"
                     store_address = None
 
                 if booking_status in ("pending", "confirmed"):

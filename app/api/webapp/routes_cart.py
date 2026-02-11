@@ -27,7 +27,12 @@ async def calculate_cart(
                 continue
             offer_id_str, qty_str = item_str.split(":")
             offer_id = int(offer_id_str)
-            quantity = int(qty_str)
+            try:
+                quantity = float(qty_str)
+            except (TypeError, ValueError):
+                continue
+            if quantity <= 0:
+                continue
 
             offer = await db.get_offer(offer_id) if hasattr(db, "get_offer") else None
             if offer and is_offer_active(offer):

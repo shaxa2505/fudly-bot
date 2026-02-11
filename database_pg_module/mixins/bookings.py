@@ -8,6 +8,8 @@ import random
 import string
 from typing import Any
 
+from app.core.units import calc_total_price
+
 from psycopg.rows import dict_row
 
 try:
@@ -46,7 +48,7 @@ class BookingMixin:
         self,
         offer_id: int,
         user_id: int,
-        quantity: int = 1,
+        quantity: float = 1,
         pickup_time: str | None = None,
         pickup_address: str | None = None,
     ):
@@ -220,7 +222,7 @@ class BookingMixin:
                 conn.autocommit = True
                 self.pool.putconn(conn)
 
-    def _reserve_pickup_slot(self, cursor, store_id: int, pickup_time: str, quantity: int) -> bool:
+    def _reserve_pickup_slot(self, cursor, store_id: int, pickup_time: str, quantity: float) -> bool:
         """Reserve pickup slot capacity."""
         try:
             DEFAULT_SLOT_CAPACITY = int(os.environ.get("PICKUP_SLOT_CAPACITY", "5"))
@@ -259,7 +261,7 @@ class BookingMixin:
         )
         return cursor.rowcount > 0
 
-    def _release_pickup_slot(self, cursor, store_id: int, pickup_time: str, quantity: int) -> bool:
+    def _release_pickup_slot(self, cursor, store_id: int, pickup_time: str, quantity: float) -> bool:
         """Release pickup slot capacity (best-effort)."""
         try:
             cursor.execute(
@@ -275,7 +277,7 @@ class BookingMixin:
             logger.debug("pickup_slots table missing or release failed; skipping slot release")
             return False
 
-    def release_pickup_slot(self, store_id: int, pickup_time: str, quantity: int) -> bool:
+    def release_pickup_slot(self, store_id: int, pickup_time: str, quantity: float) -> bool:
         """Release pickup slot capacity using a standalone connection."""
         try:
             with self.get_connection() as conn:
@@ -517,7 +519,7 @@ class BookingMixin:
                 conn.rollback()
                 return False
 
-            qty_to_return = int(qty or 0)
+            qty_to_return = float(qty or 0)
 
             # Return quantity to offer(s)
             if is_cart_booking and cart_items:
@@ -530,7 +532,7 @@ class BookingMixin:
 
                 for item in items or []:
                     item_offer_id = item.get("offer_id")
-                    item_qty = int(item.get("quantity", 1))
+                    item_qty = float(item.get("quantity", 1) or 0)
                     if not item_offer_id:
                         continue
                     cursor.execute(
@@ -571,7 +573,7 @@ class BookingMixin:
 
             # Release pickup slot capacity if applicable (best-effort)
             if pickup_time and store_id:
-                self._release_pickup_slot(cursor, int(store_id), pickup_time, int(qty_to_return))
+                self._release_pickup_slot(cursor, int(store_id), pickup_time, qty_to_return)
 
             conn.commit()
             return True
@@ -617,7 +619,7 @@ class BookingMixin:
             logger.error(f"Failed to mark reminder_sent for booking {booking_id}: {e}")
             return False
 
-    def add_booking(self, user_id: int, offer_id: int, store_id: int, quantity: int = 1):
+    def add_booking(self, user_id: int, offer_id: int, store_id: int, quantity: float = 1):
         """Add new booking (simple version)."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -697,7 +699,7 @@ class BookingMixin:
             total_price = 0
             for item in cart_items:
                 offer_id = item["offer_id"]
-                quantity = item["quantity"]
+                quantity = float(item["quantity"])
 
                 cursor.execute(
                     "SELECT quantity, stock_quantity, status, store_id FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
@@ -737,7 +739,7 @@ class BookingMixin:
                 )
                 logger.info(f"🛒 Reserved offer {offer_id}: {quantity} units (new qty: {new_qty})")
 
-                total_price += item.get("price", 0) * quantity
+                total_price += calc_total_price(item.get("price", 0), quantity)
 
             # Generate booking code
             booking_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))

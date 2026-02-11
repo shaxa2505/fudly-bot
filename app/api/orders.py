@@ -790,7 +790,7 @@ async def get_order_timeline(
     timeline: list[StatusUpdate] = []
 
     # Always have "created" status
-    timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="????? ??????"))
+    timeline.append(StatusUpdate(status="pending", timestamp=created_at, message="Заказ создан"))
 
     if is_pickup:
         if status in ["preparing", "ready", "completed", "cancelled", "rejected"]:
@@ -798,7 +798,7 @@ async def get_order_timeline(
                 StatusUpdate(
                     status="preparing",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="????? ??????????? ?????????",
+                    message="Заказ подтверждён и готовится",
                 )
             )
         if status in ["ready", "completed"]:
@@ -806,7 +806,7 @@ async def get_order_timeline(
                 StatusUpdate(
                     status="ready",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="????? ????? ? ??????",
+                    message="Заказ готов к выдаче",
                 )
             )
         if status == "completed":
@@ -814,7 +814,7 @@ async def get_order_timeline(
                 StatusUpdate(
                     status="completed",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="????? ???????",
+                    message="Заказ выдан",
                 )
             )
     else:
@@ -823,7 +823,7 @@ async def get_order_timeline(
                 StatusUpdate(
                     status="preparing",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="????? ??????????? ?????????",
+                    message="Заказ подтверждён и готовится",
                 )
             )
         if status in ["delivering", "completed"]:
@@ -831,7 +831,7 @@ async def get_order_timeline(
                 StatusUpdate(
                     status="delivering",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="????? ? ????",
+                    message="Заказ в пути",
                 )
             )
         if status == "completed":
@@ -839,7 +839,7 @@ async def get_order_timeline(
                 StatusUpdate(
                     status="completed",
                     timestamp=str(order_dict.get("updated_at", created_at)),
-                    message="????? ?????????",
+                    message="Заказ доставлен",
                 )
             )
 
@@ -848,7 +848,7 @@ async def get_order_timeline(
             StatusUpdate(
                 status="cancelled",
                 timestamp=str(order_dict.get("updated_at", created_at)),
-                message="????? ???????",
+                message="Заказ отменён",
             )
         )
 

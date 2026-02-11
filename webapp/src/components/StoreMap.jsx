@@ -642,11 +642,11 @@ function StoreMap({
                   </div>
                   <div className="store-list-info">
                     <h4>{store.name}</h4>
-                    <p>{store.address || t('?????????? ???? ????????????', 'Manzil ko\'rsatilmagan')}</p>
+                    <p>{store.address || t('Адрес не указан', 'Manzil ko\'rsatilmagan')}</p>
                   </div>
                   {store.distance && (
                     <div className="store-list-distance">
-                      {store.distance.toFixed(1)} {t('????', 'km')}
+                      {store.distance.toFixed(1)} {t('км', 'km')}
                     </div>
                   )}
                 </div>

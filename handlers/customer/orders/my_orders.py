@@ -532,7 +532,7 @@ async def order_detail_handler(callback: types.CallbackQuery) -> None:
 
 
 async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, lang: str) -> None:
-    """???????? ?????? ???????????? (??????????? fallback)."""
+    """Загрузка карточки брони (упрощённый fallback)."""
     user_id = callback.from_user.id
 
     query = """
@@ -588,11 +588,11 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
             booking = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get booking {booking_id}: {e}")
-        await callback.message.answer(_t(lang, "?????? ????????", "Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "Не удалось загрузить", "Yuklab bo'lmadi"))
         return
 
     if not booking:
-        await callback.message.answer(_t(lang, "????? ?? ??????", "Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"))
         return
 
     if hasattr(booking, "get"):
@@ -666,7 +666,7 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
 
 
 async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang: str) -> None:
-    """???????? ?????? ?????? (??????????? fallback)."""
+    """Загрузка карточки заказа (упрощённый fallback)."""
     user_id = callback.from_user.id
 
     query = """
@@ -746,11 +746,11 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
             order = cursor.fetchone()
     except Exception as e:
         logger.error(f"Failed to get order {order_id}: {e}")
-        await callback.message.answer(_t(lang, "?????? ????????", "Yuklab bo'lmadi"))
+        await callback.message.answer(_t(lang, "Не удалось загрузить", "Yuklab bo'lmadi"))
         return
 
     if not order:
-        await callback.message.answer(_t(lang, "????? ?? ??????", "Buyurtma topilmadi"))
+        await callback.message.answer(_t(lang, "Заказ не найден", "Buyurtma topilmadi"))
         return
 
     if hasattr(order, "get"):

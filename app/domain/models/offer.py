@@ -23,8 +23,8 @@ class OfferCreate(BaseModel):
     original_price: int = Field(..., ge=0, description="Оригинальная цена в копейках")
     discount_price: int = Field(..., ge=0, description="Цена со скидкой в копейках")
     
-    quantity: int = Field(default=1, gt=0, description="Количество")
-    unit: str = Field(default="шт", max_length=20, description="Единица измерения")
+    quantity: float = Field(default=1, gt=0, description="Количество")
+    unit: str = Field(default="piece", max_length=20, description="Единица измерения")
     category: str = Field(default="other", max_length=50, description="Категория")
     
     # Proper time types (not strings)
@@ -136,7 +136,7 @@ class OfferUpdate(BaseModel):
     original_price: Optional[int] = Field(None, ge=0)
     discount_price: Optional[int] = Field(None, ge=0)
     
-    quantity: Optional[int] = Field(None, gt=0)
+    quantity: Optional[float] = Field(None, gt=0)
     unit: Optional[str] = Field(None, max_length=20)
     category: Optional[str] = Field(None, max_length=50)
     
@@ -193,7 +193,7 @@ class OfferResponse(BaseModel):
     original_price: float = Field(..., description="Оригинальная цена в рублях")
     discount_price: float = Field(..., description="Цена со скидкой в рублях")
     
-    quantity: int
+    quantity: float
     unit: str
     category: str
     

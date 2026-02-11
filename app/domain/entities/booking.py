@@ -15,7 +15,7 @@ class Booking(BaseModel):
     user_id: int = Field(..., description="User's Telegram ID")
     offer_id: int = Field(..., description="Offer ID")
     store_id: int = Field(..., description="Store ID")
-    quantity: int = Field(..., gt=0, description="Booked quantity")
+    quantity: float = Field(..., gt=0, description="Booked quantity")
     total_price: int = Field(..., gt=0, description="Total price in sum")
     status: BookingStatus = Field(BookingStatus.PENDING, description="Booking status")
     rating: int | None = Field(None, ge=1, le=5, description="User rating (1-5)")
@@ -102,7 +102,7 @@ class Booking(BaseModel):
             user_id=row[1] if len(row) > 1 else 0,
             offer_id=row[2] if len(row) > 2 else 0,
             store_id=row[3] if len(row) > 3 else 0,
-            quantity=row[4] if len(row) > 4 else 1,
+            quantity=float(row[4]) if len(row) > 4 and row[4] is not None else 1.0,
             total_price=row[5] if len(row) > 5 else 0,
             status=row[6] if len(row) > 6 else BookingStatus.PENDING,
             rating=row[7] if len(row) > 7 else None,
@@ -116,7 +116,7 @@ class Booking(BaseModel):
         user_id: int,
         offer_id: int,
         store_id: int,
-        quantity: int,
+        quantity: float,
         total_price: int,
     ) -> Booking:
         """Factory method to create a new booking."""

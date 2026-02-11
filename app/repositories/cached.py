@@ -113,7 +113,7 @@ class CachedOfferRepository(CachedRepositoryMixin, OfferRepository):
         description: str | None = None,
         original_price: float | None = None,
         discount_price: float | None = None,
-        quantity: int = 1,
+        quantity: float = 1,
         available_from: str | None = None,
         available_until: str | None = None,
         expiry_date: str | None = None,
@@ -148,7 +148,7 @@ class CachedOfferRepository(CachedRepositoryMixin, OfferRepository):
         description: str | None = None,
         original_price: float | None = None,
         discount_price: float | None = None,
-        quantity: int = 1,
+        quantity: float = 1,
         available_from: str | None = None,
         available_until: str | None = None,
         expiry_date: str | None = None,
@@ -184,7 +184,7 @@ class CachedOfferRepository(CachedRepositoryMixin, OfferRepository):
         description: str | None = None,
         original_price: float | None = None,
         discount_price: float | None = None,
-        quantity: int | None = None,
+        quantity: float | None = None,
         available_from: str | None = None,
         available_until: str | None = None,
         expiry_date: str | None = None,
@@ -242,7 +242,7 @@ class CachedOfferRepository(CachedRepositoryMixin, OfferRepository):
 
         await self._invalidate_cache(*tags)
 
-    async def decrease_quantity_async(self, offer_id: int, amount: int = 1) -> bool:
+    async def decrease_quantity_async(self, offer_id: int, amount: float = 1) -> bool:
         """Decrease quantity with cache invalidation."""
         result = super().decrease_offer_quantity(offer_id, amount)
 

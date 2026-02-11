@@ -265,7 +265,7 @@ async function updateProductPrice(productId, newPrice) {
             });
 
             if (!response.ok) {
-                throw new Error('?????? ?????????? ????');
+                throw new Error('Ошибка обновления цены');
             }
         }
 // Обновляем локальные данные

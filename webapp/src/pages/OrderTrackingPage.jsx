@@ -185,7 +185,7 @@ function OrderTrackingPage({ user }) {
         />
         <div className="tracking-header">
           <div className="topbar-card tracking-header-inner">
-            <h1>{t('?????', 'Buyurtma')}</h1>
+            <h1>{t('Заказ', 'Buyurtma')}</h1>
           </div>
         </div>
         <div className="tracking-error">

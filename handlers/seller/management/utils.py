@@ -590,7 +590,7 @@ async def send_order_card(
             if item_title is None or item_price is None:
                 offer = database.get_offer(offer_id) if offer_id else None
             if item_title is None:
-                item_title = get_offer_field(offer, "title", "?????") if offer else "?????"
+                item_title = get_offer_field(offer, "title", "Товар") if offer else "Товар"
             if item_price is None:
                 item_price = int(get_offer_field(offer, "discount_price", 0)) if offer else 0
             items_text = f"- {item_title} x {quantity}"

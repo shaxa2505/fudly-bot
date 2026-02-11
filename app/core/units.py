@@ -153,8 +153,22 @@ def clamp_quantity(value: Decimal, max_value: Decimal) -> Decimal:
     return value
 
 
+def coerce_quantity(value: Any, default: float = 1.0) -> float:
+    """Coerce stored quantity to float with a safe default."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def format_quantity_with_unit(value: Any, unit: str, lang: str = "ru") -> str:
+    """Format quantity with localized unit label."""
+    return f"{format_quantity(value, unit, lang)} {unit_label(unit, lang)}"
+
+
 def calc_total_price(price: int | float, quantity: Any) -> int:
     qty = _to_decimal(quantity)
     total = Decimal(str(price)) * qty
     return int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-

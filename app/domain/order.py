@@ -116,7 +116,7 @@ class OrderSnapshot:
     order_type: str | None
     total_price: int | None
     delivery_address: str | None
-    quantity: int | None
+    quantity: float | None
     cart_items: Any | None
     item_title: str | None
     item_price: int | None

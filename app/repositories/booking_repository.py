@@ -50,7 +50,7 @@ class BookingRepository(BaseRepository):
         self,
         offer_id: int,
         user_id: int,
-        quantity: int = 1,
+        quantity: float = 1,
         delivery_address: str | None = None,
     ) -> int:
         """Add new booking.

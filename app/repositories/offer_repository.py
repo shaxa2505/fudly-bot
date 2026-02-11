@@ -53,12 +53,12 @@ class OfferRepository(BaseRepository):
         description: str | None = None,
         original_price: float | None = None,
         discount_price: float | None = None,
-        quantity: int = 1,
+        quantity: float = 1,
         available_from: str | None = None,
         available_until: str | None = None,
         expiry_date: str | None = None,
         photo: str | None = None,
-        unit: str = "шт",
+        unit: str = "piece",
         category: str | None = None,
     ) -> int:
         """Add new offer.
@@ -109,7 +109,7 @@ class OfferRepository(BaseRepository):
         description: str | None = None,
         original_price: float | None = None,
         discount_price: float | None = None,
-        quantity: int | None = None,
+        quantity: float | None = None,
         available_from: str | None = None,
         available_until: str | None = None,
         expiry_date: str | None = None,
@@ -223,7 +223,7 @@ class OfferRepository(BaseRepository):
         except Exception as e:
             self._handle_db_error("delete_offer", e)
 
-    def decrease_offer_quantity(self, offer_id: int, amount: int = 1) -> bool:
+    def decrease_offer_quantity(self, offer_id: int, amount: float = 1) -> bool:
         """Decrease offer quantity.
 
         Args:

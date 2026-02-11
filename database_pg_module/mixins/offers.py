@@ -303,13 +303,13 @@ class OfferMixin:
         description: str = None,
         original_price: int = None,  # Now in kopeks (INTEGER)
         discount_price: int = None,  # Now in kopeks (INTEGER)
-        quantity: int = 1,
-        stock_quantity: int | None = None,
+        quantity: float = 1,
+        stock_quantity: float | None = None,
         available_from: str = None,  # Will be converted to TIME by Pydantic
         available_until: str = None,  # Will be converted to TIME by Pydantic
         photo_id: str = None,  # Unified parameter name
         expiry_date: str = None,  # Will be converted to DATE by Pydantic
-        unit: str = "шт",
+        unit: str = "piece",
         category: str = "other",
     ):
         """
@@ -1133,7 +1133,7 @@ class OfferMixin:
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
-    def update_offer_quantity(self, offer_id: int, quantity: int):
+    def update_offer_quantity(self, offer_id: int, quantity: float):
         """Update offer quantity."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -1152,7 +1152,7 @@ class OfferMixin:
                 (quantity, quantity, quantity, quantity, offer_id),
             )
 
-    def increment_offer_quantity(self, offer_id: int, amount: int = 1):
+    def increment_offer_quantity(self, offer_id: int, amount: float = 1):
         """Increment offer quantity."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -1174,7 +1174,7 @@ class OfferMixin:
             )
             logger.info(f"Offer {offer_id} quantity increased by {amount}")
 
-    def increment_offer_quantity_atomic(self, offer_id: int, amount: int = 1) -> int:
+    def increment_offer_quantity_atomic(self, offer_id: int, amount: float = 1) -> float:
         """Atomically increment and return new quantity."""
         with self.get_connection() as conn:
             cursor = conn.cursor()

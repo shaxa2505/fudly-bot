@@ -285,13 +285,13 @@ async def _send_offer_search_results(
         {
             get_text("ru", "my_items"),
             get_text("uz", "my_items"),
-            "??????",
+            "Товары",
             "Mahsulotlar",
-            "?? ??????",
-            "?? Mahsulotlar",
+            "📦 Товары",
+            "📦 Mahsulotlar",
         }
     )
-    | F.text.contains("??? ??????")
+    | F.text.contains("Мои товары")
     | F.text.contains("Mening mahsulotlarim")
 )
 async def my_offers(message: types.Message, state: FSMContext) -> None:

@@ -17,8 +17,8 @@ class Offer(BaseModel):
     description: str | None = Field(None, max_length=1000, description="Product description")
     original_price: int = Field(..., gt=0, description="Original price in sum")
     discounted_price: int = Field(..., gt=0, description="Discounted price in sum")
-    quantity: int = Field(..., ge=0, description="Available quantity")
-    unit: ProductUnit = Field("шт", description="Unit of measurement")
+    quantity: float = Field(..., ge=0, description="Available quantity")
+    unit: ProductUnit = Field("piece", description="Unit of measurement")
     category: str | None = Field(None, description="Product category")
     photo_url: str | None = Field(None, description="Product photo URL")
 
@@ -59,13 +59,13 @@ class Offer(BaseModel):
             return False
         return datetime.now() > self.expires_at
 
-    def reduce_quantity(self, amount: int = 1) -> None:
+    def reduce_quantity(self, amount: float = 1) -> None:
         """Reduce available quantity."""
         if amount > self.quantity:
             raise ValueError(f"Cannot reduce quantity by {amount}, only {self.quantity} available")
         self.quantity -= amount
 
-    def increase_quantity(self, amount: int = 1) -> None:
+    def increase_quantity(self, amount: float = 1) -> None:
         """Increase available quantity."""
         self.quantity += amount
 
@@ -111,8 +111,8 @@ class Offer(BaseModel):
             description=row[3] if len(row) > 3 else None,
             original_price=row[4] if len(row) > 4 else 0,
             discounted_price=row[5] if len(row) > 5 else 0,
-            quantity=row[6] if len(row) > 6 else 0,
-            unit=row[7] if len(row) > 7 else "шт",
+            quantity=float(row[6]) if len(row) > 6 and row[6] is not None else 0.0,
+            unit=row[7] if len(row) > 7 else "piece",
             category=row[8] if len(row) > 8 else None,
             photo_url=row[9] if len(row) > 9 else None,
             pickup_time_start=row[10] if len(row) > 10 else None,

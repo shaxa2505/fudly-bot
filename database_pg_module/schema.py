@@ -127,15 +127,15 @@ class SchemaMixin:
                     description TEXT,
                     original_price INTEGER,
                     discount_price INTEGER,
-                    quantity INTEGER DEFAULT 1,
-                    stock_quantity INTEGER DEFAULT 0,
+                    quantity REAL DEFAULT 1,
+                    stock_quantity REAL DEFAULT 0,
                     available_from TIME,
                     available_until TIME,
                     expiry_date DATE,
                     photo_id TEXT,
                     status TEXT DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    unit TEXT DEFAULT 'шт',
+                    unit TEXT DEFAULT 'piece',
                     category TEXT DEFAULT 'other',
                     FOREIGN KEY (store_id) REFERENCES stores(store_id)
                 )
@@ -146,7 +146,7 @@ class SchemaMixin:
             if run_runtime_migrations:
                 try:
                     cursor.execute(
-                        "ALTER TABLE offers ADD COLUMN IF NOT EXISTS stock_quantity INTEGER DEFAULT 0"
+                        "ALTER TABLE offers ADD COLUMN IF NOT EXISTS stock_quantity REAL DEFAULT 0"
                     )
                     cursor.execute(
                         """
@@ -156,7 +156,7 @@ class SchemaMixin:
                            OR (stock_quantity = 0 AND COALESCE(quantity, 0) > 0)
                         """
                     )
-                    cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'шт'")
+                    cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'piece'")
                     cursor.execute(
                         "ALTER TABLE offers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other'"
                     )
@@ -422,7 +422,7 @@ class SchemaMixin:
                     order_status TEXT DEFAULT 'pending',
                     cancel_reason VARCHAR(50),
                     cancel_comment TEXT,
-                    quantity INTEGER DEFAULT 1,
+                    quantity REAL DEFAULT 1,
                     total_price REAL,
                     item_title TEXT,
                     item_price INTEGER,
@@ -548,7 +548,7 @@ class SchemaMixin:
                     offer_id INTEGER,
                     store_id INTEGER,
                     store_phone TEXT,
-                    quantity INTEGER DEFAULT 1,
+                    quantity REAL DEFAULT 1,
                     booking_code TEXT,
                     pickup_time TEXT,
                     status TEXT DEFAULT 'active',

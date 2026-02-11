@@ -92,5 +92,19 @@ class BusinessCategory(str, Enum):
     PHARMACY = "pharmacy"
 
 
-ProductUnit = Literal["шт", "кг", "г", "л", "мл", "упак", "м", "см"]
+ProductUnit = Literal[
+    "piece",
+    "kg",
+    "g",
+    "l",
+    "ml",
+    "шт",
+    "кг",
+    "г",
+    "л",
+    "мл",
+    "упак",
+    "м",
+    "см",
+]
 

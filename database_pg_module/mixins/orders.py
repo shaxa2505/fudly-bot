@@ -8,6 +8,8 @@ import string
 import json
 from typing import Any
 
+from app.core.units import calc_total_price
+
 from psycopg.rows import dict_row
 
 try:
@@ -72,7 +74,7 @@ class OrderMixin:
         user_id: int,
         store_id: int,
         offer_id: int,
-        quantity: int,
+        quantity: float,
         order_type: str,
         delivery_address: str = None,
         delivery_lat: float | None = None,
@@ -111,7 +113,7 @@ class OrderMixin:
         cart_items = [
             {
                 "offer_id": int(offer_id),
-                "quantity": int(quantity),
+                "quantity": float(quantity or 1),
                 "price": int(discount_price or 0),
                 "original_price": int(original_price or discount_price or 0),
                 "title": title,
@@ -192,13 +194,13 @@ class OrderMixin:
             for item in items:
                 offer_id = item.get("offer_id")
                 store_id = item.get("store_id")
-                quantity = item.get("quantity", 1)
+                quantity = float(item.get("quantity", 1) or 1)
                 price = item.get("price", 0)
                 delivery_price = (
                     item.get("delivery_price", 0) if order_type in ("delivery", "taxi") else 0
                 )
 
-                total_amount = int(price * quantity)
+                total_amount = calc_total_price(price, quantity)
                 item_title = item.get("title") or ""
                 try:
                     item_price = int(price or 0)
@@ -676,7 +678,7 @@ class OrderMixin:
                 total_price = 0
                 for item in cart_items:
                     offer_id = item["offer_id"]
-                    quantity = item["quantity"]
+                    quantity = float(item["quantity"])
 
                     cursor.execute(
                         "SELECT quantity, stock_quantity, status, discount_price FROM offers WHERE offer_id = %s AND status = 'active' FOR UPDATE",
@@ -717,7 +719,7 @@ class OrderMixin:
                     )
 
                     price = item.get("price", row[3] or 0)
-                    total_price += price * quantity
+                    total_price += calc_total_price(price, quantity)
 
                 # Delivery fee is stored separately and paid on delivery
 
@@ -730,7 +732,7 @@ class OrderMixin:
 
                 # Create order with cart_items
                 cart_items_json = json.dumps(cart_items, ensure_ascii=False)
-                total_quantity = sum(int(item.get("quantity", 1)) for item in cart_items)
+                total_quantity = sum(float(item.get("quantity", 1) or 0) for item in cart_items)
                 item_title = None
                 item_price = None
                 item_original_price = None
