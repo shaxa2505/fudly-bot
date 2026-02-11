@@ -40,6 +40,24 @@ function OrderTrackingPage({ user }) {
   const lang = user?.language || 'ru';
   const t = (ru, uz) => (lang === 'uz' ? uz : ru);
 
+  const formatPhone = (raw) => {
+    if (!raw) return '';
+    const sanitized = String(raw).replace(/[^0-9+]/g, '');
+    const digits = sanitized.replace(/\D/g, '');
+    if (digits.startsWith('998') && digits.length === 12) {
+      return `+998 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10, 12)}`;
+    }
+    if (sanitized.startsWith('+') && digits) {
+      return `+${digits}`;
+    }
+    return sanitized || String(raw);
+  };
+
+  const phoneLink = (raw) => {
+    if (!raw) return '';
+    return String(raw).replace(/[^0-9+]/g, '');
+  };
+
   useEffect(() => {
     loadOrderData(true);
     // Refresh every 30 seconds for real-time updates
@@ -274,9 +292,12 @@ function OrderTrackingPage({ user }) {
           <p className="store-address">Manzil: {order.store_address}</p>
         )}
         {order.store_phone && (
-          <p className="store-phone">
-            <a href={`tel:${order.store_phone}`}>Tel: {order.store_phone}</a>
-          </p>
+          <div className="store-phone">
+            <a className="store-phone-btn" href={`tel:${phoneLink(order.store_phone)}`}>
+              📞 {t('Связаться с магазином', "Do'kon bilan bog'lanish")}
+            </a>
+            <span className="store-phone-number">{formatPhone(order.store_phone)}</span>
+          </div>
         )}
       </div>
 

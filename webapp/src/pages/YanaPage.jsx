@@ -16,7 +16,7 @@ import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
-import { getUserId, getUserLanguage, getCurrentUser, getStoredPhone } from '../utils/auth'
+import { getUserId, getUserLanguage, getCurrentUser } from '../utils/auth'
 import { resolveImageUrl } from '../utils/imageUtils'
 import { calcQuantity } from '../utils/orderMath'
 import { normalizeOrderStatus } from '../utils/orderStatus'
@@ -60,8 +60,6 @@ function YanaPage({ user }) {
   const resolvedPhone = toText(
     user?.phone ||
       cachedUser?.phone ||
-      telegramUser?.phone_number ||
-      getStoredPhone() ||
       ''
   ).trim()
   const resolvedCity = toText((() => {

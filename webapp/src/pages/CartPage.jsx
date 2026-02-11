@@ -4,9 +4,9 @@ import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, B
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
-import { getUnitLabel, blurOnEnter, isValidPhone } from '../utils/helpers'
+import { getUnitLabel, blurOnEnter } from '../utils/helpers'
 import { calcTotalPrice } from '../utils/orderMath'
-import { getCurrentUser, getUserId, getStoredPhone, setStoredPhone, setStoredUser } from '../utils/auth'
+import { getCurrentUser, getUserId, setStoredUser } from '../utils/auth'
 import { readStorageItem, writeStorageItem } from '../utils/storage'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from '../utils/cityUtils'
@@ -119,7 +119,7 @@ function CartPage({ user }) {
 
   const botUsername = import.meta.env.VITE_BOT_USERNAME || 'fudlyuzbot'
   const cachedUser = getCurrentUser()
-  const canonicalPhone = (user?.phone || cachedUser?.phone || '').toString().trim()
+  const canonicalPhone = (user?.phone || '').toString().trim()
   const userId = getUserId()
 
   const [orderLoading, setOrderLoading] = useState(false)
@@ -139,7 +139,6 @@ function CartPage({ user }) {
 
   // Checkout form
   const [showCheckout, setShowCheckout] = useState(() => isCheckoutRoute)
-  const [phone, setPhone] = useState(() => canonicalPhone || getStoredPhone() || '')
   const [address, setAddress] = useState(() => {
     try {
       const loc = JSON.parse(localStorage.getItem('fudly_location') || '{}')
@@ -614,14 +613,6 @@ function CartPage({ user }) {
 
   // Success/Error modals
   const [orderResult, setOrderResult] = useState(null)
-
-  // Keep phone in sync with server profile (bot registration is the single source)
-  useEffect(() => {
-    if (canonicalPhone && canonicalPhone !== phone) {
-      setPhone(canonicalPhone)
-      setStoredPhone(canonicalPhone)
-    }
-  }, [canonicalPhone, phone])
 
   const { entrance = '', floor = '', apartment = '' } = addressMeta
 
@@ -1449,14 +1440,12 @@ function CartPage({ user }) {
       }
       const mergedUser = { ...(getCurrentUser() || {}), ...profile }
       setStoredUser(mergedUser)
-      setStoredPhone(profilePhone)
-      setPhone(profilePhone)
       return profilePhone
     } catch (error) {
       console.warn('Could not refresh profile phone:', error)
       return ''
     }
-  }, [setPhone])
+  }, [])
 
   const requireVerifiedPhone = async () => {
     let verifiedPhone = canonicalPhone
@@ -1464,9 +1453,16 @@ function CartPage({ user }) {
       verifiedPhone = await refreshProfilePhone()
     }
     if (!verifiedPhone) {
-      toast.error('Telefon raqamingiz botda tasdiqlanmagan. Botga o\'ting va raqamni yuboring.')
+      const message = "Telefon raqamingiz botda tasdiqlanmagan. Botga o'ting va raqamni yuboring."
+      toast.error(message)
+      const tg = window.Telegram?.WebApp
+      if (tg?.showAlert) {
+        tg.showAlert(message)
+      } else if (typeof window !== 'undefined' && window.alert) {
+        window.alert(message)
+      }
+      tg?.HapticFeedback?.notificationOccurred?.('error')
       if (botUsername) {
-        const tg = window.Telegram?.WebApp
         const url = `https://t.me/${botUsername}?start=register`
         if (tg?.openTelegramLink) {
           tg.openTelegramLink(url)
@@ -1879,38 +1875,6 @@ function CartPage({ user }) {
     setShowCheckout(true)
   }
 
-  const getResolvedPhone = useCallback(
-    () => (canonicalPhone || phone || '').trim(),
-    [canonicalPhone, phone]
-  )
-
-  const normalizePhoneInput = (value) => value.replace(/[^\d+]/g, '')
-
-  const ensurePhoneOrPrompt = () => {
-    const resolved = getResolvedPhone()
-    if (!resolved) {
-      toast.error('Telefon raqamini kiriting yoki botda tasdiqlang.')
-      if (botUsername) {
-        const tg = window.Telegram?.WebApp
-        const url = `https://t.me/${botUsername}?start=register`
-        if (tg?.openTelegramLink) {
-          tg.openTelegramLink(url)
-        } else {
-          window.open(url, '_blank', 'noopener,noreferrer')
-        }
-      }
-      return ''
-    }
-
-    const normalized = normalizePhoneInput(resolved)
-    if (!canonicalPhone && !isValidPhone(normalized)) {
-      toast.error('Telefon formati: +998XXXXXXXXX')
-      return ''
-    }
-
-    return normalized
-  }
-
   const buildDeliveryAddress = useCallback(() => {
     if (orderType !== 'delivery') return null
     const trimmedAddress = address.trim()
@@ -1950,7 +1914,7 @@ function CartPage({ user }) {
       toast.warning(message)
       return
     }
-    const resolvedPhone = ensurePhoneOrPrompt()
+    const resolvedPhone = await requireVerifiedPhone()
     if (!resolvedPhone) {
       return
     }
@@ -2005,7 +1969,7 @@ function CartPage({ user }) {
     setOrderLoading(true)
 
     try {
-      const resolvedPhone = ensurePhoneOrPrompt()
+      const resolvedPhone = await requireVerifiedPhone()
       if (!resolvedPhone) {
         setOrderLoading(false)
         return
@@ -2029,8 +1993,6 @@ function CartPage({ user }) {
         delivery_fee: orderType === 'delivery' ? deliveryFee : 0,
         payment_method: selectedPaymentMethod,
       }
-
-      setStoredPhone(resolvedPhone)
 
       const result = await api.createOrder(orderData)
 
@@ -2089,7 +2051,7 @@ function CartPage({ user }) {
     setOrderLoading(true)
     let orderId = null
     try {
-      const resolvedPhone = ensurePhoneOrPrompt()
+      const resolvedPhone = await requireVerifiedPhone()
       if (!resolvedPhone) {
         setOrderLoading(false)
         return
@@ -2115,7 +2077,6 @@ function CartPage({ user }) {
         payment_method: 'click',
       }
 
-      setStoredPhone(resolvedPhone)
       const result = await api.createOrder(orderData)
 
       const isSuccess = !!(result?.success || result?.order_id)
@@ -2732,15 +2693,6 @@ function CartPage({ user }) {
                       onKeyDown={blurOnEnter}
                       ref={commentInputRef}
                     />
-                    {!canonicalPhone && (
-                      <input
-                        className="checkout-input"
-                        type="tel"
-                        placeholder="+998 90 123 45 67"
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                      />
-                    )}
                   </section>
 
                   {orderType === 'delivery' && (

@@ -2,7 +2,6 @@ import { blurOnEnter } from '../../utils/helpers'
 
 function SettingsSection({
   phone,
-  setPhone,
   location,
   notifications,
   setNotifications,
@@ -21,7 +20,7 @@ function SettingsSection({
             className="setting-input"
             placeholder="+998 90 123 45 67"
             value={phone}
-            onChange={e => setPhone(e.target.value)}
+            readOnly
             onKeyDown={blurOnEnter}
           />
         </label>

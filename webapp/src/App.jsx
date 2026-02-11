@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-ro
 import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
 import api, { saveTelegramInitData } from './api/client'
-import { setStoredUser, setStoredPhone } from './utils/auth'
+import { setStoredUser } from './utils/auth'
 import { getSavedLocation, saveLocation, buildLocationFromReverseGeocode } from './utils/cityUtils'
 import { getPreferredLocation } from './utils/geolocation'
 import { getScrollContainer } from './utils/scrollContainer'
@@ -314,7 +314,6 @@ function AppContent() {
             }
             setUser(fullUser)
             setStoredUser(fullUser)
-            if (profile.phone) setStoredPhone(profile.phone)
             if (profile.city) {
               try {
                 const savedRaw = localStorage.getItem('fudly_location')

@@ -253,6 +253,42 @@ export default function OrderDetailsPage() {
     })
   }
 
+  const formatPhone = (raw) => {
+    if (!raw) return ''
+    const sanitized = String(raw).replace(/[^0-9+]/g, '')
+    const digits = sanitized.replace(/\D/g, '')
+    if (digits.startsWith('998') && digits.length === 12) {
+      return `+998 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8, 10)} ${digits.slice(10, 12)}`
+    }
+    if (sanitized.startsWith('+') && digits) {
+      return `+${digits}`
+    }
+    return sanitized || String(raw)
+  }
+
+  const phoneLink = (raw) => {
+    if (!raw) return ''
+    return String(raw).replace(/[^0-9+]/g, '')
+  }
+
+  const getReadyMinutesLeft = (updatedAt, readyUntil) => {
+    if (!updatedAt || !readyUntil) return null
+    const base = new Date(updatedAt)
+    if (Number.isNaN(base.getTime())) return null
+    const parts = String(readyUntil).split(':')
+    if (parts.length < 2) return null
+    const hours = Number(parts[0])
+    const minutes = Number(parts[1])
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
+    const deadline = new Date(base)
+    deadline.setHours(hours, minutes, 0, 0)
+    if (deadline < base) {
+      deadline.setDate(deadline.getDate() + 1)
+    }
+    const diffMinutes = Math.floor((deadline - new Date()) / 60000)
+    return diffMinutes
+  }
+
   const handlePayOnline = async () => {
     if (order?.payment_method !== 'click') {
       return
@@ -428,6 +464,11 @@ export default function OrderDetailsPage() {
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
   const showPickupReadyNote = !isDelivery && displayFulfillmentStatus === 'ready'
   const pickupReadyUntil = order?.ready_until
+  const readyMinutesLeft = getReadyMinutesLeft(order?.updated_at, order?.ready_until)
+  const showLateContactNotice = showPickupReadyNote &&
+    readyMinutesLeft !== null &&
+    readyMinutesLeft > 0 &&
+    readyMinutesLeft <= 30
   const hasDeliveryInfo = Boolean(order.delivery_address || order.phone || order.delivery_notes)
   const hasStoreInfo = Boolean(order.store_name || order.store_address || order.store_phone)
 
@@ -575,6 +616,11 @@ export default function OrderDetailsPage() {
                 ? `Olib ketishgacha: ${pickupReadyUntil}`
                 : "2 soat ichida olib ketishingiz kerak, aks holda buyurtma bekor qilinadi."}
             </p>
+            {showLateContactNotice && (
+              <p className="pickup-ready-late">
+                Agar ulgurmasangiz — do'kon bilan bog'laning
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -692,10 +738,15 @@ export default function OrderDetailsPage() {
                   </div>
                 )}
                 {order.store_phone && (
-                  <div className="info-row">
-                    <span className="info-label">Telefon</span>
-                    <span className="info-value">
-                      <a href={`tel:${order.store_phone}`}>{order.store_phone}</a>
+                  <div className="contact-store-block">
+                    <a
+                      className="contact-store-btn"
+                      href={`tel:${phoneLink(order.store_phone)}`}
+                    >
+                      📞 Do'kon bilan bog'lanish
+                    </a>
+                    <span className="contact-store-phone">
+                      {formatPhone(order.store_phone)}
                     </span>
                   </div>
                 )}
@@ -748,10 +799,15 @@ export default function OrderDetailsPage() {
                   </div>
                 )}
                 {order.store_phone && (
-                  <div className="info-row">
-                    <span className="info-label">Telefon</span>
-                    <span className="info-value">
-                      <a href={`tel:${order.store_phone}`}>{order.store_phone}</a>
+                  <div className="contact-store-block">
+                    <a
+                      className="contact-store-btn"
+                      href={`tel:${phoneLink(order.store_phone)}`}
+                    >
+                      📞 Do'kon bilan bog'lanish
+                    </a>
+                    <span className="contact-store-phone">
+                      {formatPhone(order.store_phone)}
                     </span>
                   </div>
                 )}

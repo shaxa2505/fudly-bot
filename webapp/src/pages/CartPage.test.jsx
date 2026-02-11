@@ -46,7 +46,7 @@ describe('CartPage', () => {
   })
 
   it('renders empty cart state', () => {
-    renderWithProviders(<CartPage />)
+    renderWithProviders(<CartPage user={{ phone: '+998901234567' }} />)
 
     expect(screen.getByText("Savatingiz bo'sh")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: "Bosh sahifaga o'tish" })).toBeInTheDocument()
@@ -69,7 +69,6 @@ describe('CartPage', () => {
       })
     )
     localStorage.setItem('fudly_user', JSON.stringify({ phone: '+998901234567' }))
-    localStorage.setItem('fudly_phone', '+998901234567')
 
     renderWithProviders(<CartPage />)
 
