@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { ChevronLeft, MoreHorizontal, Phone, QrCode } from 'lucide-react'
 import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
@@ -10,6 +11,7 @@ import './OrderDetailsPage.css'
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams()
+  const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -112,7 +114,7 @@ export default function OrderDetailsPage() {
       setError(null)
     } catch (err) {
       console.error('Failed to load order details:', err)
-      setError('Buyurtma ma\'lumotlarini yuklab bo\'lmadi')
+      setError("Buyurtma ma'lumotlarini yuklab bo'lmadi")
     } finally {
       if (!silent) {
         setLoading(false)
@@ -123,7 +125,6 @@ export default function OrderDetailsPage() {
 
   useEffect(() => {
     loadOrderDetails({ allowEnrich: true, silent: false })
-    // Auto-refresh every 15 seconds (silent)
     const interval = setInterval(() => loadOrderDetails({ allowEnrich: false, silent: true }), 15000)
     return () => clearInterval(interval)
   }, [orderId, loadOrderDetails])
@@ -217,21 +218,21 @@ export default function OrderDetailsPage() {
     }
   }, [orderId, userId, loadOrderDetails])
 
-  const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('ru-RU')
+  const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('uz-UZ')
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
-      pending: { color: '#F97316', bg: '#FFF4EB' },
-      preparing: { color: '#10B981', bg: '#ECFDF5' },
-      ready: { color: '#8B5CF6', bg: '#FAF5FF' },
-      delivering: { color: '#3B82F6', bg: '#EFF6FF' },
-      completed: { color: '#10B981', bg: '#ECFDF5' },
-      cancelled: { color: '#EF4444', bg: '#FEF2F2' },
-      rejected: { color: '#EF4444', bg: '#FEF2F2' },
-      awaiting_payment: { color: '#F59E0B', bg: '#FFFBEB' },
-      awaiting_proof: { color: '#F59E0B', bg: '#FFFBEB' },
-      proof_submitted: { color: '#3B82F6', bg: '#EFF6FF' },
-      payment_rejected: { color: '#EF4444', bg: '#FEF2F2' },
+      pending: { color: '#C2410C', bg: '#FEF3C7' },
+      preparing: { color: '#1D4ED8', bg: '#DBEAFE' },
+      ready: { color: '#15803D', bg: '#DCFCE7' },
+      delivering: { color: '#0F766E', bg: '#CCFBF1' },
+      completed: { color: '#15803D', bg: '#DCFCE7' },
+      cancelled: { color: '#B91C1C', bg: '#FEE2E2' },
+      rejected: { color: '#B91C1C', bg: '#FEE2E2' },
+      awaiting_payment: { color: '#C2410C', bg: '#FEF3C7' },
+      awaiting_proof: { color: '#C2410C', bg: '#FEF3C7' },
+      proof_submitted: { color: '#1D4ED8', bg: '#DBEAFE' },
+      payment_rejected: { color: '#B91C1C', bg: '#FEE2E2' },
     }
     const palette = statusMap[status] || { color: '#6B7280', bg: '#F3F4F6' }
     return { ...palette, text: displayStatusText(status, 'uz', orderType) }
@@ -244,13 +245,30 @@ export default function OrderDetailsPage() {
   const formatDate = (dateString) => {
     if (!dateString) return '-'
     const date = new Date(dateString)
-    return date.toLocaleString('ru-RU', {
+    if (Number.isNaN(date.getTime())) return String(dateString)
+    return date.toLocaleString('uz-UZ', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const formatTimeOnly = (value) => {
+    if (!value) return ''
+    if (typeof value === 'string') {
+      if (value.includes('T')) {
+        const date = new Date(value)
+        if (!Number.isNaN(date.getTime())) {
+          return date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+        }
+      }
+      const match = value.match(/(\d{1,2}:\d{2})/)
+      if (match) return match[1]
+      return value
+    }
+    return String(value)
   }
 
   const formatPhone = (raw) => {
@@ -271,24 +289,6 @@ export default function OrderDetailsPage() {
     return String(raw).replace(/[^0-9+]/g, '')
   }
 
-  const getReadyMinutesLeft = (updatedAt, readyUntil) => {
-    if (!updatedAt || !readyUntil) return null
-    const base = new Date(updatedAt)
-    if (Number.isNaN(base.getTime())) return null
-    const parts = String(readyUntil).split(':')
-    if (parts.length < 2) return null
-    const hours = Number(parts[0])
-    const minutes = Number(parts[1])
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
-    const deadline = new Date(base)
-    deadline.setHours(hours, minutes, 0, 0)
-    if (deadline < base) {
-      deadline.setDate(deadline.getDate() + 1)
-    }
-    const diffMinutes = Math.floor((deadline - new Date()) / 60000)
-    return diffMinutes
-  }
-
   const handlePayOnline = async () => {
     if (order?.payment_method !== 'click') {
       return
@@ -298,7 +298,7 @@ export default function OrderDetailsPage() {
       const storeId = order.store_id || null
       const available = await apiClient.getPaymentProviders(storeId)
       if (!available.includes('click')) {
-        window.Telegram?.WebApp?.showAlert?.('Bu to\'lov usuli hozircha mavjud emas.')
+        window.Telegram?.WebApp?.showAlert?.("Bu to'lov usuli hozircha mavjud emas.")
         return
       }
 
@@ -321,6 +321,33 @@ export default function OrderDetailsPage() {
     } catch (err) {
       console.error('Failed to open payment link:', err)
     }
+  }
+
+  const handleGetDirections = () => {
+    const address = order?.pickup_address || order?.store_address || order?.delivery_address
+    if (!address) {
+      window.Telegram?.WebApp?.showAlert?.('Manzil topilmadi')
+      return
+    }
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`
+    if (window.Telegram?.WebApp?.openLink) {
+      window.Telegram.WebApp.openLink(url)
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  const handleOpenReceipt = () => {
+    const receiptUrl = order?.receipt_url || order?.invoice_url
+    if (receiptUrl) {
+      if (window.Telegram?.WebApp?.openLink) {
+        window.Telegram.WebApp.openLink(receiptUrl)
+      } else {
+        window.open(receiptUrl, '_blank', 'noopener,noreferrer')
+      }
+      return
+    }
+    window.Telegram?.WebApp?.showAlert?.('Chek tez orada tayyor bo\'ladi')
   }
 
   if (loading) {
@@ -448,413 +475,333 @@ export default function OrderDetailsPage() {
 
   const statusSteps = isDelivery
     ? [
-        { key: 'pending', label: 'Yaratildi' },
-        { key: 'preparing', label: 'Tasdiqlandi' },
+        { key: 'pending', label: 'Tasdiqlandi' },
         { key: 'delivering', label: "Yo'lda" },
-        { key: 'completed', label: 'Yakunlandi' },
+        { key: 'completed', label: 'Yetkazildi' },
       ]
     : [
-        { key: 'pending', label: 'Yaratildi' },
-        { key: 'preparing', label: 'Tasdiqlandi' },
+        { key: 'pending', label: 'Tasdiqlandi' },
+        { key: 'preparing', label: 'Tayyorlanmoqda' },
         { key: 'ready', label: 'Tayyor' },
-        { key: 'completed', label: 'Berildi' },
       ]
 
   const activeStepIndex = Math.max(0, statusSteps.findIndex(step => step.key === displayFulfillmentStatus))
+  const heroTitle = (() => {
+    switch (displayFulfillmentStatus) {
+      case 'ready':
+        return isDelivery ? 'Yetkazib berishga tayyor' : 'Olib ketishga tayyor'
+      case 'preparing':
+        return 'Buyurtma tayyorlanmoqda'
+      case 'delivering':
+        return 'Buyurtma yo\'lda'
+      case 'completed':
+        return 'Buyurtma yakunlandi'
+      case 'cancelled':
+      case 'rejected':
+        return 'Buyurtma bekor qilindi'
+      default:
+        return 'Buyurtma qabul qilindi'
+    }
+  })()
+
+  const readyUntil = order?.ready_until || order?.pickup_time
+  const formattedReady = formatTimeOnly(readyUntil)
+  const heroSubtitle = isDelivery
+    ? (order?.delivery_address ? `Yetkazib berish manzili: ${order.delivery_address}` : 'Yetkazib berish jarayoni')
+    : (formattedReady ? `Iltimos, buyurtmani ${formattedReady} gacha olib keting` : "Buyurtmani vaqtida olib keting")
+
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
-  const showPickupReadyNote = !isDelivery && displayFulfillmentStatus === 'ready'
-  const pickupReadyUntil = order?.ready_until
-  const readyMinutesLeft = getReadyMinutesLeft(order?.updated_at, order?.ready_until)
-  const showLateContactNotice = showPickupReadyNote &&
-    readyMinutesLeft !== null &&
-    readyMinutesLeft > 0 &&
-    readyMinutesLeft <= 30
-  const hasDeliveryInfo = Boolean(order.delivery_address || order.phone || order.delivery_notes)
+  const pickupCode = order?.booking_code || order?.pickup_code
+  const showPickupPanel = !isDelivery && pickupCode
+  const rescueDiscount = Number(order?.discount_amount ?? order?.discount ?? 0)
+  const showDiscount = Number.isFinite(rescueDiscount) && rescueDiscount > 0
+  const hasDeliveryInfo = Boolean(
+    order.delivery_address ||
+    order.phone ||
+    order.delivery_notes ||
+    order.pickup_address ||
+    order.pickup_time
+  )
   const hasStoreInfo = Boolean(order.store_name || order.store_address || order.store_phone)
 
+  const headerId = order?.order_id || order?.booking_id || orderId
+
   return (
-    <div className="order-details-page">
-      <div className="details-header">
-        <div className="topbar-card details-header-inner">
-          <div className="details-header-main">
-            <div className="details-title-row">
-              <h1 className="details-title">Buyurtma #{orderId}</h1>
-              {isSyncing && (
-                <span className="details-sync">
-                  <span className="details-sync-dot"></span>
-                  Yangilanmoqda
-                </span>
-              )}
-            </div>
-          </div>
+    <div className={`order-details-page ${showPickupPanel ? 'with-pickup-panel' : ''}`}>
+      <header className="order-confirmation-header">
+        <button
+          type="button"
+          className="order-confirmation-btn"
+          onClick={() => navigate(-1)}
+          aria-label="Orqaga"
+        >
+          <ChevronLeft size={18} strokeWidth={2.2} />
+        </button>
+        <div className="order-confirmation-center">
+          <span className="order-confirmation-label">Buyurtma tasdiqlash</span>
+          <span className="order-confirmation-id">ID #{headerId}</span>
         </div>
-      </div>
+        <button
+          type="button"
+          className="order-confirmation-btn ghost"
+          onClick={() => window.Telegram?.WebApp?.showAlert?.('Buyurtma ma\'lumotlari yangilanmoqda')}
+          aria-label="Ko'proq"
+        >
+          <MoreHorizontal size={18} strokeWidth={2} />
+        </button>
+      </header>
 
-      {isCancelled && (
-        <div className="status-note">
-          <div className="status-note-title">
-            {fulfillmentStatus === 'rejected' ? 'Buyurtma rad etildi' : 'Buyurtma bekor qilindi'}
+      <main className="order-confirmation-content">
+        {isSyncing && (
+          <div className="order-sync">Yangilanmoqda...</div>
+        )}
+
+        {isCancelled && (
+          <div className="order-alert danger">
+            <strong>{fulfillmentStatus === 'rejected' ? 'Buyurtma rad etildi' : 'Buyurtma bekor qilindi'}</strong>
+            <p>Agar savollaringiz bo'lsa, qo'llab-quvvatlashga yozing.</p>
           </div>
-          <p className="status-note-text">Agar savollaringiz bo'lsa, qo'llab-quvvatlashga yozing.</p>
-        </div>
-      )}
+        )}
 
-      {paymentNotice && (
-        <div className={`action-card tone-${paymentNotice.tone}`}>
-          <div className="action-header">
-            <div className="action-icon">{paymentNotice.icon}</div>
-            <div className="action-content">
-              <h3>{paymentNotice.title}</h3>
+        {paymentNotice && (
+          <div className={`order-alert ${paymentNotice.tone}`}>
+            <div className="order-alert-icon">{paymentNotice.icon}</div>
+            <div className="order-alert-content">
+              <strong>{paymentNotice.title}</strong>
               <p>{paymentNotice.text}</p>
             </div>
-          </div>
-          {paymentNotice.showActions && (
-            <div className="action-buttons">
-              {showPayButton && (
-                <button
-                  className={`action-btn ${isPayPrimary ? 'primary' : 'ghost'}`}
-                  onClick={handlePayOnline}
-                >
-                  {payButtonLabel}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="hero-card">
-        <div className="hero-top">
-          <div className="hero-meta">
-            <span className="hero-store">{order.store_name || "Do'kon"}</span>
-            <span className="details-dot"></span>
-            <span className="hero-date">{formatDate(order.created_at)}</span>
-          </div>
-          <div className="hero-status">
-            <span className="details-type-pill">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
-            <span className="status-pill" style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}>
-              {statusInfo.text}
-            </span>
-          </div>
-          {showPickupReadyNote && pickupReadyUntil && (
-            <div className="hero-deadline">
-              Olib ketishgacha: {pickupReadyUntil}
-            </div>
-          )}
-        </div>
-        <div className="hero-body">
-          <div className="hero-total">
-            <span className="hero-label">Jami</span>
-            <span className="hero-value">{formatMoney(totalWithDelivery)} so'm</span>
-          </div>
-          {orderPhotoUrl && (
-            <div className="hero-photo">
-              <img
-                src={orderPhotoUrl}
-                alt={order.offer_title || 'Buyurtma'}
-                loading="lazy"
-                decoding="async"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }}
-              />
-            </div>
-          )}
-        </div>
-        <div className="hero-grid">
-          <div className="hero-item">
-            <span className="hero-label">Mahsulotlar</span>
-            <span className="hero-value">{totalUnits} dona</span>
-          </div>
-          <div className="hero-item">
-            <span className="hero-label">To'lov usuli</span>
-            <span className="hero-value">{paymentMethodLabels[order.payment_method] || 'Naqd'}</span>
-          </div>
-          <div className="hero-item">
-            <span className="hero-label">Buyurtma turi</span>
-            <span className="hero-value">{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</span>
-          </div>
-        </div>
-        {showPaymentChip && (
-          <div className="hero-chip">{paymentStatusLabel}</div>
-        )}
-      </div>
-
-      {!isCancelled && (
-        <div className="details-section">
-          <h2 className="details-section-title">Buyurtma bosqichlari</h2>
-          <div className="progress-card">
-            {statusSteps.map((step, index) => {
-              const isComplete = index <= activeStepIndex
-              const isCurrent = index === activeStepIndex
-              return (
-                <div
-                  key={step.key}
-                  className={`progress-step ${isComplete ? 'is-complete' : ''} ${isCurrent ? 'is-current' : ''}`}
-                >
-                  <div className="progress-marker">
-                    <span className="progress-dot"></span>
-                    {index < statusSteps.length - 1 && <span className="progress-line"></span>}
-                  </div>
-                  <div className="progress-content">
-                    <span className="progress-title">{step.label}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {showPickupReadyNote && (
-        <div className="pickup-ready-note">
-          <div className="pickup-ready-icon">i</div>
-          <div className="pickup-ready-content">
-            <h3>Buyurtma tayyor</h3>
-            <p>
-              {pickupReadyUntil
-                ? `Olib ketishgacha: ${pickupReadyUntil}`
-                : "2 soat ichida olib ketishingiz kerak, aks holda buyurtma bekor qilinadi."}
-            </p>
-            {showLateContactNotice && (
-              <p className="pickup-ready-late">
-                Agar ulgurmasangiz — do'kon bilan bog'laning
-              </p>
+            {paymentNotice.showActions && showPayButton && (
+              <button
+                className={`order-alert-btn ${isPayPrimary ? 'primary' : 'ghost'}`}
+                onClick={handlePayOnline}
+              >
+                {payButtonLabel}
+              </button>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="details-section">
-        <h2 className="details-section-title">Mahsulotlar</h2>
-        <div className="items-list">
-          {order.items && order.items.length > 0 ? (
-            order.items.map((item, idx) => {
-              const itemPhoto = resolveOrderItemImageUrl(item)
-              const itemTitle = item.offer_title || item.title || 'Mahsulot'
-              const itemTotal = Number(item.price || 0) * Number(item.quantity || 0)
-              return (
-                <div key={idx} className="item-card">
-                  <div className="item-thumb">
-                    {itemPhoto ? (
-                      <img
-                        src={itemPhoto}
-                        alt={itemTitle}
-                        className="item-image"
-                        loading="lazy"
-                        decoding="async"
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                        }}
-                      />
-                    ) : (
-                      <div className="item-placeholder">{itemTitle.trim().charAt(0).toUpperCase()}</div>
-                    )}
-                  </div>
-                  <div className="item-body">
-                    <div className="item-row">
-                      <h3 className="item-title">{itemTitle}</h3>
-                      <span className="item-total">{formatMoney(itemTotal)} so'm</span>
+        <section className="order-hero">
+          <h1>{heroTitle}</h1>
+          <p>{heroSubtitle}</p>
+
+          <div className="order-hero-progress">
+            <div className="order-hero-line">
+              <div
+                className="order-hero-line-fill"
+                style={{ width: `${statusSteps.length > 1 ? (activeStepIndex / (statusSteps.length - 1)) * 100 : 0}%` }}
+              ></div>
+            </div>
+            <div className="order-hero-steps">
+              {statusSteps.map((step, idx) => (
+                <div key={step.key} className="order-hero-step">
+                  <span className={`order-hero-dot ${idx <= activeStepIndex ? 'active' : ''}`}></span>
+                  <span className={`order-hero-label ${idx === activeStepIndex ? 'current' : ''}`}>
+                    {step.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="order-hero-meta">
+            <span className="order-hero-chip" style={{ background: statusInfo.bg, color: statusInfo.color }}>
+              {statusInfo.text}
+            </span>
+            {showPaymentChip && (
+              <span className="order-hero-chip outline">{paymentStatusLabel}</span>
+            )}
+          </div>
+        </section>
+
+        {hasStoreInfo && (
+          <section className="order-merchant">
+            <div className="order-merchant-header">
+              <div>
+                <h2>{order.store_name || "Do'kon"}</h2>
+                <p>{order.store_address || 'Manzil ko\'rsatilmagan'}</p>
+              </div>
+              {order.store_phone && (
+                <a className="order-merchant-call" href={`tel:${phoneLink(order.store_phone)}`}>
+                  <Phone size={16} strokeWidth={2} />
+                </a>
+              )}
+            </div>
+            <div className="order-merchant-map">
+              <div className="order-merchant-dot"></div>
+              <span>Xarita</span>
+            </div>
+          </section>
+        )}
+
+        {hasDeliveryInfo && (
+          <section className="order-info">
+            <h3>{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</h3>
+            <div className="order-info-card">
+              {order.delivery_address && (
+                <div className="order-info-row">
+                  <span>Manzil</span>
+                  <strong>{order.delivery_address}</strong>
+                </div>
+              )}
+              {order.phone && (
+                <div className="order-info-row">
+                  <span>Telefon</span>
+                  <strong>{formatPhone(order.phone)}</strong>
+                </div>
+              )}
+              {order.delivery_notes && (
+                <div className="order-info-row">
+                  <span>Izoh</span>
+                  <strong>{order.delivery_notes}</strong>
+                </div>
+              )}
+              {order.pickup_address && (
+                <div className="order-info-row">
+                  <span>Manzil</span>
+                  <strong>{order.pickup_address}</strong>
+                </div>
+              )}
+              {order.pickup_time && (
+                <div className="order-info-row">
+                  <span>Vaqt</span>
+                  <strong>{formatDate(order.pickup_time)}</strong>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="order-selection">
+          <div className="order-selection-head">
+            <h3>Tanlovingiz</h3>
+            <span>{totalUnits} ta</span>
+          </div>
+          <div className="order-selection-list">
+            {order.items && order.items.length > 0 ? (
+              order.items.map((item, idx) => {
+                const itemPhoto = resolveOrderItemImageUrl(item)
+                const itemTitle = item.offer_title || item.title || 'Mahsulot'
+                const itemTotal = Number(item.price || 0) * Number(item.quantity || 0)
+                return (
+                  <div key={idx} className="order-selection-item">
+                    <div className="order-selection-thumb">
+                      {itemPhoto ? (
+                        <img
+                          src={itemPhoto}
+                          alt={itemTitle}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <span>{itemTitle.trim().charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
-                    <div className="item-sub">
+                    <div className="order-selection-body">
+                      <div className="order-selection-row">
+                        <p>{itemTitle}</p>
+                        <strong>{formatMoney(itemTotal)} so'm</strong>
+                      </div>
                       <span>{item.quantity} x {formatMoney(item.price)} so'm</span>
                     </div>
                   </div>
+                )
+              })
+            ) : (
+              <div className="order-selection-item">
+                <div className="order-selection-thumb">
+                  {orderPhotoUrl ? (
+                    <img
+                      src={orderPhotoUrl}
+                      alt={order.offer_title}
+                      loading="lazy"
+                      decoding="async"
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <span>{(order.offer_title || 'B').trim().charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
-              )
-            })
-          ) : (
-            <div className="item-card">
-              <div className="item-thumb">
-                {orderPhotoUrl ? (
-                  <img
-                    src={orderPhotoUrl}
-                    alt={order.offer_title}
-                    className="item-image"
-                    loading="lazy"
-                    decoding="async"
-                    onError={(e) => {
-                      e.target.style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <div className="item-placeholder">{(order.offer_title || 'B').trim().charAt(0).toUpperCase()}</div>
-                )}
-              </div>
-              <div className="item-body">
-                <div className="item-row">
-                  <h3 className="item-title">{order.offer_title}</h3>
-                  <span className="item-total">{formatMoney(totalWithDelivery)} so'm</span>
-                </div>
-                <div className="item-sub">
+                <div className="order-selection-body">
+                  <div className="order-selection-row">
+                    <p>{order.offer_title}</p>
+                    <strong>{formatMoney(totalWithDelivery)} so'm</strong>
+                  </div>
                   <span>{order.quantity || 1} dona</span>
                 </div>
               </div>
+            )}
+          </div>
+        </section>
+
+        <section className="order-summary">
+          <div className="order-summary-row">
+            <span>Mahsulotlar</span>
+            <strong>{formatMoney(itemsSubtotal)} so'm</strong>
+          </div>
+          {deliveryFee > 0 && (
+            <div className="order-summary-row">
+              <span>Yetkazib berish</span>
+              <strong>{formatMoney(deliveryFee)} so'm</strong>
             </div>
           )}
-        </div>
-      </div>
+          {showDiscount && (
+            <div className="order-summary-row discount">
+              <span>Tejash</span>
+              <strong>-{formatMoney(rescueDiscount)} so'm</strong>
+            </div>
+          )}
+          <div className="order-summary-total">
+            <span>Jami</span>
+            <strong>{formatMoney(totalWithDelivery)} so'm</strong>
+          </div>
+          <div className="order-summary-meta">
+            <span>To'lov usuli</span>
+            <strong>{paymentMethodLabels[order.payment_method] || 'Naqd'}</strong>
+          </div>
+          {isDelivery && (
+            <div className="order-summary-note">
+              Yetkazib berish to'lovi buyurtma qabul qilinganda kuryerga alohida to'lanadi.
+            </div>
+          )}
+        </section>
 
-      {isDelivery && (
-        <div className="details-section">
-          <h2 className="details-section-title">Yetkazib berish</h2>
-          <div className="info-card">
-            {hasDeliveryInfo && (
-              <div className="info-group">
-                <div className="info-group-title">Mijoz</div>
-                {order.delivery_address && (
-                  <div className="info-row">
-                    <span className="info-label">Manzil</span>
-                    <span className="info-value">{order.delivery_address}</span>
-                  </div>
-                )}
-                {order.phone && (
-                  <div className="info-row">
-                    <span className="info-label">Telefon</span>
-                    <span className="info-value">{order.phone}</span>
-                  </div>
-                )}
-                {order.delivery_notes && (
-                  <div className="info-row">
-                    <span className="info-label">Izoh</span>
-                    <span className="info-value">{order.delivery_notes}</span>
-                  </div>
-                )}
-              </div>
-            )}
-            {hasStoreInfo && (
-              <div className="info-group">
-                <div className="info-group-title">Do'kon</div>
-                {order.store_name && (
-                  <div className="info-row">
-                    <span className="info-label">Nomi</span>
-                    <span className="info-value">{order.store_name}</span>
-                  </div>
-                )}
-                {order.store_address && (
-                  <div className="info-row">
-                    <span className="info-label">Manzil</span>
-                    <span className="info-value">{order.store_address}</span>
-                  </div>
-                )}
-                {order.store_phone && (
-                  <div className="contact-store-block">
-                    <a
-                      className="contact-store-btn"
-                      href={`tel:${phoneLink(order.store_phone)}`}
-                    >
-                      📞 Do'kon bilan bog'lanish
-                    </a>
-                    <span className="contact-store-phone">
-                      {formatPhone(order.store_phone)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+        <div className="order-terms">
+          <button
+            type="button"
+            onClick={() => window.Telegram?.WebApp?.openTelegramLink?.('https://t.me/fudly_support')}
+          >
+            Shartlar va qo'llab-quvvatlash
+          </button>
+        </div>
+      </main>
+
+      {showPickupPanel && (
+        <div className="pickup-panel">
+          <div className="pickup-code-card">
+            <div>
+              <span className="pickup-code-label">Olib ketish kodi</span>
+              <span className="pickup-code-value">{pickupCode}</span>
+            </div>
+            <div className="pickup-code-icon">
+              <QrCode size={22} strokeWidth={1.6} />
+            </div>
+          </div>
+          <div className="pickup-actions">
+            <button className="pickup-btn primary" onClick={handleGetDirections}>
+              Yo'nalish
+            </button>
+            <button className="pickup-btn ghost" onClick={handleOpenReceipt}>
+              Chek
+            </button>
           </div>
         </div>
       )}
-
-      {!isDelivery && (
-        <div className="details-section">
-          <h2 className="details-section-title">Olib ketish</h2>
-          <div className="info-card">
-            {(order.booking_code || order.pickup_time || order.pickup_address) && (
-              <div className="info-group">
-                <div className="info-group-title">Buyurtma</div>
-                {order.booking_code && (
-                  <div className="info-row">
-                    <span className="info-label">Kod</span>
-                    <span className="info-value booking-code">{order.booking_code}</span>
-                  </div>
-                )}
-                {order.pickup_time && (
-                  <div className="info-row">
-                    <span className="info-label">Vaqt</span>
-                    <span className="info-value">{formatDate(order.pickup_time)}</span>
-                  </div>
-                )}
-                {order.pickup_address && (
-                  <div className="info-row">
-                    <span className="info-label">Manzil</span>
-                    <span className="info-value">{order.pickup_address}</span>
-                  </div>
-                )}
-              </div>
-            )}
-            {hasStoreInfo && (
-              <div className="info-group">
-                <div className="info-group-title">Do'kon</div>
-                {order.store_name && (
-                  <div className="info-row">
-                    <span className="info-label">Nomi</span>
-                    <span className="info-value">{order.store_name}</span>
-                  </div>
-                )}
-                {order.store_address && (
-                  <div className="info-row">
-                    <span className="info-label">Manzil</span>
-                    <span className="info-value">{order.store_address}</span>
-                  </div>
-                )}
-                {order.store_phone && (
-                  <div className="contact-store-block">
-                    <a
-                      className="contact-store-btn"
-                      href={`tel:${phoneLink(order.store_phone)}`}
-                    >
-                      📞 Do'kon bilan bog'lanish
-                    </a>
-                    <span className="contact-store-phone">
-                      {formatPhone(order.store_phone)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="details-section">
-        <h2 className="details-section-title">To'lov tafsilotlari</h2>
-        <div className="info-card">
-          <div className="info-group">
-            <div className="info-row">
-              <span className="info-label">Mahsulotlar</span>
-              <span className="info-value">{formatMoney(itemsSubtotal)} so'm</span>
-            </div>
-            {deliveryFee > 0 && (
-              <div className="info-row">
-                <span className="info-label">Yetkazib berish</span>
-                <span className="info-value">{formatMoney(deliveryFee)} so'm</span>
-              </div>
-            )}
-            <div className="info-row total-row">
-              <span className="info-label">Jami</span>
-              <span className="info-value total-price">{formatMoney(totalWithDelivery)} so'm</span>
-            </div>
-          </div>
-        </div>
-        {isDelivery && (
-          <div className="payment-note">
-            Yetkazib berish to&apos;lovi buyurtma qabul qilinganda kuryerga alohida to&apos;lanadi.
-          </div>
-        )}
-      </div>
-
-      <div className="support-section">
-        <p className="support-text">Savollar bormi?</p>
-        <button
-          className="support-btn"
-          onClick={() => {
-            window.Telegram?.WebApp?.openTelegramLink?.('https://t.me/fudly_support')
-          }}
-        >
-          Qo'llab-quvvatlash
-        </button>
-      </div>
     </div>
   )
 }
