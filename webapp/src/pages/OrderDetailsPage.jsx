@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, MoreHorizontal, Phone, QrCode } from 'lucide-react'
 import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
-import { deriveDisplayStatus, displayStatusText, normalizeOrderStatus, normalizePaymentStatus, paymentStatusText, resolveOrderType } from '../utils/orderStatus'
+import {
+  deriveDisplayStatus,
+  displayStatusText,
+  normalizeOrderStatus,
+  normalizePaymentStatus,
+  paymentStatusText,
+  resolveOrderType,
+  statusText,
+} from '../utils/orderStatus'
 import { readPendingPayment, clearPendingPayment } from '../utils/pendingPayment'
 import { getUserId } from '../utils/auth'
 import './OrderDetailsPage.css'
@@ -13,9 +21,13 @@ export default function OrderDetailsPage() {
   const { orderId } = useParams()
   const navigate = useNavigate()
   const [order, setOrder] = useState(null)
+  const [timeline, setTimeline] = useState(null)
+  const [timelineLoading, setTimelineLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState(null)
+  const [showQr, setShowQr] = useState(false)
+  const [qrPayload, setQrPayload] = useState(null)
   const enrichmentAttemptedRef = useRef(false)
   const userId = getUserId()
 
@@ -33,6 +45,11 @@ export default function OrderDetailsPage() {
       clearPendingPayment()
     }
   }, [order, orderId])
+
+  useEffect(() => {
+    setShowQr(false)
+    setQrPayload(null)
+  }, [orderId])
 
   const loadOrderDetails = useCallback(async ({ allowEnrich = false, silent = false } = {}) => {
     try {
@@ -76,6 +93,7 @@ export default function OrderDetailsPage() {
         items: Array.isArray(statusPayload.items) ? statusPayload.items : [],
         booking_code: statusPayload.booking_code || statusPayload.pickup_code || '',
         delivery_fee: statusPayload.delivery_cost ?? statusPayload.delivery_fee,
+        qr_code: statusPayload.qr_code,
       }
 
       if (allowEnrich && !enrichmentAttemptedRef.current && foundOrder.items.length === 0) {
@@ -123,16 +141,44 @@ export default function OrderDetailsPage() {
     }
   }, [orderId])
 
+  const loadOrderTimeline = useCallback(async (silent = false) => {
+    const numericOrderId = Number(orderId)
+    if (!Number.isFinite(numericOrderId)) return
+
+    if (!silent) {
+      setTimelineLoading(true)
+    }
+
+    try {
+      const timelineData = await apiClient.getOrderTimeline(numericOrderId)
+      setTimeline(timelineData)
+    } catch (err) {
+      console.warn('Failed to load order timeline:', err)
+      if (!silent) {
+        setTimeline(null)
+      }
+    } finally {
+      if (!silent) {
+        setTimelineLoading(false)
+      }
+    }
+  }, [orderId])
+
   useEffect(() => {
     loadOrderDetails({ allowEnrich: true, silent: false })
-    const interval = setInterval(() => loadOrderDetails({ allowEnrich: false, silent: true }), 15000)
+    loadOrderTimeline(false)
+    const interval = setInterval(() => {
+      loadOrderDetails({ allowEnrich: false, silent: true })
+      loadOrderTimeline(true)
+    }, 15000)
     return () => clearInterval(interval)
-  }, [orderId, loadOrderDetails])
+  }, [orderId, loadOrderDetails, loadOrderTimeline])
 
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         loadOrderDetails({ allowEnrich: false, silent: true })
+        loadOrderTimeline(true)
       }
     }
     window.addEventListener('focus', handleVisibility)
@@ -141,7 +187,7 @@ export default function OrderDetailsPage() {
       window.removeEventListener('focus', handleVisibility)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [loadOrderDetails])
+  }, [loadOrderDetails, loadOrderTimeline])
 
   useEffect(() => {
     if (!userId) return
@@ -204,6 +250,7 @@ export default function OrderDetailsPage() {
         if (type === 'order_status_changed' || type === 'order_created') {
           if (!eventOrderId || Number(eventOrderId) === Number(orderId)) {
             loadOrderDetails({ allowEnrich: false, silent: true })
+            loadOrderTimeline(true)
           }
         }
       } catch (error) {
@@ -216,43 +263,30 @@ export default function OrderDetailsPage() {
         ws.close()
       }
     }
-  }, [orderId, userId, loadOrderDetails])
+  }, [orderId, userId, loadOrderDetails, loadOrderTimeline])
 
   const formatMoney = (value) => Math.round(Number(value || 0)).toLocaleString('uz-UZ')
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
-      pending: { color: '#C2410C', bg: '#FEF3C7' },
-      preparing: { color: '#1D4ED8', bg: '#DBEAFE' },
-      ready: { color: '#15803D', bg: '#DCFCE7' },
-      delivering: { color: '#0F766E', bg: '#CCFBF1' },
-      completed: { color: '#15803D', bg: '#DCFCE7' },
-      cancelled: { color: '#B91C1C', bg: '#FEE2E2' },
-      rejected: { color: '#B91C1C', bg: '#FEE2E2' },
-      awaiting_payment: { color: '#C2410C', bg: '#FEF3C7' },
-      awaiting_proof: { color: '#C2410C', bg: '#FEF3C7' },
-      proof_submitted: { color: '#1D4ED8', bg: '#DBEAFE' },
-      payment_rejected: { color: '#B91C1C', bg: '#FEE2E2' },
+      pending: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
+      preparing: { color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+      ready: { color: 'var(--color-success)', bg: 'var(--color-success-light)' },
+      delivering: { color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+      completed: { color: 'var(--color-success)', bg: 'var(--color-success-light)' },
+      cancelled: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
+      rejected: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
+      awaiting_payment: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
+      awaiting_proof: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
+      proof_submitted: { color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+      payment_rejected: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
     }
-    const palette = statusMap[status] || { color: '#6B7280', bg: '#F3F4F6' }
+    const palette = statusMap[status] || { color: 'var(--color-text-secondary)', bg: 'var(--color-bg-tertiary)' }
     return { ...palette, text: displayStatusText(status, 'uz', orderType) }
   }
 
   const getPaymentStatusLabel = (status) => {
     return paymentStatusText(status, 'uz')
-  }
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '-'
-    const date = new Date(dateString)
-    if (Number.isNaN(date.getTime())) return String(dateString)
-    return date.toLocaleString('uz-UZ', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
   }
 
   const formatTimeOnly = (value) => {
@@ -269,6 +303,18 @@ export default function OrderDetailsPage() {
       return value
     }
     return String(value)
+  }
+
+  const formatTimelineTime = (value) => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return String(value)
+    return date.toLocaleString('uz-UZ', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
   const formatPhone = (raw) => {
@@ -288,7 +334,6 @@ export default function OrderDetailsPage() {
     if (!raw) return ''
     return String(raw).replace(/[^0-9+]/g, '')
   }
-
   const handlePayOnline = async () => {
     if (order?.payment_method !== 'click') {
       return
@@ -350,6 +395,42 @@ export default function OrderDetailsPage() {
     window.Telegram?.WebApp?.showAlert?.('Chek tez orada tayyor bo\'ladi')
   }
 
+  const handleSupport = () => {
+    const link = 'https://t.me/fudly_support'
+    if (window.Telegram?.WebApp?.openTelegramLink) {
+      window.Telegram?.WebApp?.openTelegramLink?.(link)
+      return
+    }
+    window.open(link, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleShowQr = async () => {
+    const existingQr = order?.qr_code || qrPayload?.qr_code
+    if (existingQr) {
+      setShowQr(true)
+      return
+    }
+
+    const numericOrderId = Number(orderId)
+    if (!Number.isFinite(numericOrderId)) {
+      window.Telegram?.WebApp?.showAlert?.('QR kod topilmadi')
+      return
+    }
+
+    try {
+      const data = await apiClient.getOrderQR(numericOrderId)
+      if (data?.qr_code) {
+        setQrPayload(data)
+        setShowQr(true)
+      } else {
+        window.Telegram?.WebApp?.showAlert?.('QR kod topilmadi')
+      }
+    } catch (err) {
+      console.warn('Failed to load QR:', err)
+      window.Telegram?.WebApp?.showAlert?.('QR kod topilmadi')
+    }
+  }
+
   if (loading) {
     return (
       <div className="order-details-page">
@@ -380,7 +461,6 @@ export default function OrderDetailsPage() {
       </div>
     )
   }
-
   const fulfillmentStatus = order.fulfillment_status || normalizeOrderStatus(order.order_status || order.status)
   const orderType = resolveOrderType(order)
   const isDelivery = orderType === 'delivery'
@@ -414,6 +494,9 @@ export default function OrderDetailsPage() {
   const totalWithDelivery = Number(
     explicitTotalWithDelivery ?? calcTotalPrice(itemsSubtotal, deliveryFee)
   )
+  const totalDue = Number.isFinite(Number(explicitTotalWithDelivery))
+    ? Number(explicitTotalWithDelivery)
+    : (Number.isFinite(rawTotal) ? rawTotal : totalWithDelivery)
   const payableTotal = Number(
     explicitItemsTotal ?? (hasItemBreakdown ? rawItemsSubtotal : (rawTotal ?? 0))
   )
@@ -476,13 +559,16 @@ export default function OrderDetailsPage() {
   const statusSteps = isDelivery
     ? [
         { key: 'pending', label: 'Tasdiqlandi' },
+        { key: 'preparing', label: 'Tayyorlanmoqda' },
+        { key: 'ready', label: 'Tayyor' },
         { key: 'delivering', label: "Yo'lda" },
         { key: 'completed', label: 'Yetkazildi' },
       ]
     : [
         { key: 'pending', label: 'Tasdiqlandi' },
         { key: 'preparing', label: 'Tayyorlanmoqda' },
-        { key: 'ready', label: 'Tayyor' },
+        { key: 'ready', label: 'Olib ketish' },
+        { key: 'completed', label: 'Berildi' },
       ]
 
   const activeStepIndex = Math.max(0, statusSteps.findIndex(step => step.key === displayFulfillmentStatus))
@@ -493,7 +579,7 @@ export default function OrderDetailsPage() {
       case 'preparing':
         return 'Buyurtma tayyorlanmoqda'
       case 'delivering':
-        return 'Buyurtma yo\'lda'
+        return "Buyurtma yo'lda"
       case 'completed':
         return 'Buyurtma yakunlandi'
       case 'cancelled':
@@ -508,7 +594,7 @@ export default function OrderDetailsPage() {
   const formattedReady = formatTimeOnly(readyUntil)
   const heroSubtitle = isDelivery
     ? (order?.delivery_address ? `Yetkazib berish manzili: ${order.delivery_address}` : 'Yetkazib berish jarayoni')
-    : (formattedReady ? `Iltimos, buyurtmani ${formattedReady} gacha olib keting` : "Buyurtmani vaqtida olib keting")
+    : (formattedReady ? `Iltimos, buyurtmani ${formattedReady} gacha olib keting` : 'Buyurtmani vaqtida olib keting')
 
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
   const pickupCode = order?.booking_code || order?.pickup_code
@@ -524,6 +610,11 @@ export default function OrderDetailsPage() {
   )
   const hasStoreInfo = Boolean(order.store_name || order.store_address || order.store_phone)
 
+  const timelineItems = Array.isArray(timeline?.timeline) ? timeline.timeline : []
+  const showTimeline = timelineLoading || timelineItems.length > 0
+  const orderTypeLabel = isDelivery ? 'Yetkazib berish' : 'Olib ketish'
+
+  const qrImage = order?.qr_code || qrPayload?.qr_code
   const headerId = order?.order_id || order?.booking_id || orderId
 
   return (
@@ -544,7 +635,7 @@ export default function OrderDetailsPage() {
         <button
           type="button"
           className="order-confirmation-btn ghost"
-          onClick={() => window.Telegram?.WebApp?.showAlert?.('Buyurtma ma\'lumotlari yangilanmoqda')}
+          onClick={() => window.Telegram?.WebApp?.showAlert?.("Buyurtma ma'lumotlari yangilanmoqda")}
           aria-label="Ko'proq"
         >
           <MoreHorizontal size={18} strokeWidth={2} />
@@ -608,28 +699,85 @@ export default function OrderDetailsPage() {
             <span className="order-hero-chip" style={{ background: statusInfo.bg, color: statusInfo.color }}>
               {statusInfo.text}
             </span>
+            <span className="order-hero-chip outline">{orderTypeLabel}</span>
             {showPaymentChip && (
               <span className="order-hero-chip outline">{paymentStatusLabel}</span>
             )}
           </div>
         </section>
+        {showTimeline && (
+          <section className="order-timeline">
+            <div className="order-timeline-header">
+              <div>
+                <h3>Buyurtma holati</h3>
+                {formattedReady && (
+                  <span className="order-timeline-estimate">
+                    {isDelivery
+                      ? `Taxminiy vaqt: ${formattedReady}`
+                      : `Tayyor vaqt: ${formattedReady}`}
+                  </span>
+                )}
+              </div>
+              {timelineLoading && <span className="order-timeline-loading">Yangilanmoqda...</span>}
+            </div>
+            <div className="order-timeline-list">
+              {timelineLoading && timelineItems.length === 0 ? (
+                <div className="order-timeline-empty">Ma'lumotlar yangilanmoqda...</div>
+              ) : (
+                timelineItems.map((item, index) => {
+                  const eventStatus = item.status || item.order_status || item.type || ''
+                  const rawLabel = statusText(eventStatus, 'uz', orderType)
+                  const displayStatus = /[А-Яа-яЁё]/.test(rawLabel) ? 'Buyurtma yangilandi' : rawLabel
+                  const timestamp =
+                    item.created_at ||
+                    item.time ||
+                    item.timestamp ||
+                    item.date
+                  const timeLabel = formatTimelineTime(timestamp)
+                  const rawMessage = item.message || item.note || item.description || ''
+                  const message = /[А-Яа-яЁё]/.test(rawMessage) ? '' : rawMessage
+
+                  return (
+                    <div className="order-timeline-item" key={`${eventStatus}-${timestamp}-${index}`}>
+                      <span className="order-timeline-marker"></span>
+                      <div className="order-timeline-row">
+                        <div className="order-timeline-status">{displayStatus}</div>
+                        <div className="order-timeline-time">{timeLabel}</div>
+                      </div>
+                      {message && (
+                        <div className="order-timeline-message">{message}</div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </section>
+        )}
 
         {hasStoreInfo && (
           <section className="order-merchant">
             <div className="order-merchant-header">
               <div>
                 <h2>{order.store_name || "Do'kon"}</h2>
-                <p>{order.store_address || 'Manzil ko\'rsatilmagan'}</p>
+                <p>{order.store_address || "Manzil ko'rsatilmagan"}</p>
+                {order.store_phone && (
+                  <span className="order-merchant-phone">{formatPhone(order.store_phone)}</span>
+                )}
               </div>
               {order.store_phone && (
-                <a className="order-merchant-call" href={`tel:${phoneLink(order.store_phone)}`}>
-                  <Phone size={16} strokeWidth={2} />
+                <a
+                  className="order-merchant-call"
+                  href={`tel:${phoneLink(order.store_phone)}`}
+                  aria-label="Qo'ng'iroq qilish"
+                >
+                  <Phone size={18} strokeWidth={2} />
                 </a>
               )}
             </div>
             <div className="order-merchant-map">
-              <div className="order-merchant-dot"></div>
-              <span>Xarita</span>
+              <span>Manzil xaritasi</span>
+              <span className="order-merchant-dot"></span>
             </div>
           </section>
         )}
@@ -638,35 +786,38 @@ export default function OrderDetailsPage() {
           <section className="order-info">
             <h3>{isDelivery ? 'Yetkazib berish' : 'Olib ketish'}</h3>
             <div className="order-info-card">
-              {order.delivery_address && (
-                <div className="order-info-row">
-                  <span>Manzil</span>
-                  <strong>{order.delivery_address}</strong>
-                </div>
-              )}
-              {order.phone && (
-                <div className="order-info-row">
-                  <span>Telefon</span>
-                  <strong>{formatPhone(order.phone)}</strong>
-                </div>
-              )}
-              {order.delivery_notes && (
-                <div className="order-info-row">
-                  <span>Izoh</span>
-                  <strong>{order.delivery_notes}</strong>
-                </div>
-              )}
-              {order.pickup_address && (
-                <div className="order-info-row">
-                  <span>Manzil</span>
-                  <strong>{order.pickup_address}</strong>
-                </div>
-              )}
-              {order.pickup_time && (
-                <div className="order-info-row">
-                  <span>Vaqt</span>
-                  <strong>{formatDate(order.pickup_time)}</strong>
-                </div>
+              {isDelivery ? (
+                <>
+                  <div className="order-info-row">
+                    <span>Manzil</span>
+                    <strong>{order.delivery_address || '-'}</strong>
+                  </div>
+                  {order.phone && (
+                    <div className="order-info-row">
+                      <span>Aloqa</span>
+                      <strong>{formatPhone(order.phone)}</strong>
+                    </div>
+                  )}
+                  {order.delivery_notes && (
+                    <div className="order-info-row">
+                      <span>Izoh</span>
+                      <strong>{order.delivery_notes}</strong>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="order-info-row">
+                    <span>Olib ketish manzili</span>
+                    <strong>{order.pickup_address || order.store_address || '-'}</strong>
+                  </div>
+                  {order.pickup_time && (
+                    <div className="order-info-row">
+                      <span>Olib ketish vaqti</span>
+                      <strong>{formatTimeOnly(order.pickup_time)}</strong>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
@@ -674,38 +825,33 @@ export default function OrderDetailsPage() {
 
         <section className="order-selection">
           <div className="order-selection-head">
-            <h3>Tanlovingiz</h3>
+            <h3>Tanlanganlar</h3>
             <span>{totalUnits} ta</span>
           </div>
           <div className="order-selection-list">
-            {order.items && order.items.length > 0 ? (
-              order.items.map((item, idx) => {
-                const itemPhoto = resolveOrderItemImageUrl(item)
-                const itemTitle = item.offer_title || item.title || 'Mahsulot'
-                const itemTotal = Number(item.price || 0) * Number(item.quantity || 0)
+            {hasItemBreakdown ? (
+              order.items.map((item, index) => {
+                const itemQty = Number(item?.quantity || 1)
+                const itemTitle = item?.offer_title || item?.title || item?.name || 'Mahsulot'
+                const itemPrice = Number(item?.price ?? item?.discount_price ?? 0)
+                const itemTotal = Number(item?.total_price ?? (itemPrice * itemQty))
+                const itemImage = resolveOrderItemImageUrl(item) || orderPhotoUrl
+
                 return (
-                  <div key={idx} className="order-selection-item">
+                  <div className="order-selection-item" key={`${itemTitle}-${index}`}>
                     <div className="order-selection-thumb">
-                      {itemPhoto ? (
-                        <img
-                          src={itemPhoto}
-                          alt={itemTitle}
-                          loading="lazy"
-                          decoding="async"
-                          onError={(e) => {
-                            e.target.style.display = 'none'
-                          }}
-                        />
+                      {itemImage ? (
+                        <img src={itemImage} alt={itemTitle} />
                       ) : (
-                        <span>{itemTitle.trim().charAt(0).toUpperCase()}</span>
+                        <span>{itemTitle.slice(0, 1)}</span>
                       )}
                     </div>
                     <div className="order-selection-body">
                       <div className="order-selection-row">
                         <p>{itemTitle}</p>
-                        <strong>{formatMoney(itemTotal)} so'm</strong>
+                        <strong>{formatMoney(itemTotal)} UZS</strong>
                       </div>
-                      <span>{item.quantity} x {formatMoney(item.price)} so'm</span>
+                      <span>{itemQty} ta</span>
                     </div>
                   </div>
                 )
@@ -714,25 +860,17 @@ export default function OrderDetailsPage() {
               <div className="order-selection-item">
                 <div className="order-selection-thumb">
                   {orderPhotoUrl ? (
-                    <img
-                      src={orderPhotoUrl}
-                      alt={order.offer_title}
-                      loading="lazy"
-                      decoding="async"
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                      }}
-                    />
+                    <img src={orderPhotoUrl} alt={order.offer_title || 'Buyurtma'} />
                   ) : (
-                    <span>{(order.offer_title || 'B').trim().charAt(0).toUpperCase()}</span>
+                    <span>{(order.offer_title || 'B').slice(0, 1)}</span>
                   )}
                 </div>
                 <div className="order-selection-body">
                   <div className="order-selection-row">
-                    <p>{order.offer_title}</p>
-                    <strong>{formatMoney(totalWithDelivery)} so'm</strong>
+                    <p>{order.offer_title || 'Buyurtma'}</p>
+                    <strong>{formatMoney(totalDue)} UZS</strong>
                   </div>
-                  <span>{order.quantity || 1} dona</span>
+                  <span>{totalUnits} ta</span>
                 </div>
               </div>
             )}
@@ -742,41 +880,38 @@ export default function OrderDetailsPage() {
         <section className="order-summary">
           <div className="order-summary-row">
             <span>Mahsulotlar</span>
-            <strong>{formatMoney(itemsSubtotal)} so'm</strong>
+            <strong>{formatMoney(itemsSubtotal)} UZS</strong>
           </div>
-          {deliveryFee > 0 && (
+          {isDelivery && (
             <div className="order-summary-row">
               <span>Yetkazib berish</span>
-              <strong>{formatMoney(deliveryFee)} so'm</strong>
+              <strong>{formatMoney(deliveryFee)} UZS</strong>
             </div>
           )}
           {showDiscount && (
             <div className="order-summary-row discount">
-              <span>Tejash</span>
-              <strong>-{formatMoney(rescueDiscount)} so'm</strong>
+              <span>Chegirma</span>
+              <strong>-{formatMoney(rescueDiscount)} UZS</strong>
             </div>
           )}
           <div className="order-summary-total">
-            <span>Jami</span>
-            <strong>{formatMoney(totalWithDelivery)} so'm</strong>
+            <span>Jami to'lov</span>
+            <strong>{formatMoney(totalDue)} UZS</strong>
           </div>
           <div className="order-summary-meta">
             <span>To'lov usuli</span>
-            <strong>{paymentMethodLabels[order.payment_method] || 'Naqd'}</strong>
+            <strong>{paymentMethodLabels[order.payment_method] || '---'}</strong>
           </div>
-          {isDelivery && (
+          {order.delivery_notes && (
             <div className="order-summary-note">
-              Yetkazib berish to'lovi buyurtma qabul qilinganda kuryerga alohida to'lanadi.
+              Izoh: {order.delivery_notes}
             </div>
           )}
         </section>
 
         <div className="order-terms">
-          <button
-            type="button"
-            onClick={() => window.Telegram?.WebApp?.openTelegramLink?.('https://t.me/fudly_support')}
-          >
-            Shartlar va qo'llab-quvvatlash
+          <button type="button" onClick={handleSupport}>
+            Qoidalar va qo'llab-quvvatlash
           </button>
         </div>
       </main>
@@ -786,22 +921,51 @@ export default function OrderDetailsPage() {
           <div className="pickup-code-card">
             <div>
               <span className="pickup-code-label">Olib ketish kodi</span>
-              <span className="pickup-code-value">{pickupCode}</span>
+              <strong className="pickup-code-value">{pickupCode}</strong>
             </div>
-            <div className="pickup-code-icon">
-              <QrCode size={22} strokeWidth={1.6} />
-            </div>
+            <button
+              type="button"
+              className="pickup-code-icon"
+              onClick={handleShowQr}
+              aria-label="QR kod"
+            >
+              <QrCode size={20} strokeWidth={2} />
+            </button>
           </div>
           <div className="pickup-actions">
-            <button className="pickup-btn primary" onClick={handleGetDirections}>
+            <button type="button" className="pickup-btn primary" onClick={handleGetDirections}>
               Yo'nalish
             </button>
-            <button className="pickup-btn ghost" onClick={handleOpenReceipt}>
+            <button type="button" className="pickup-btn ghost" onClick={handleOpenReceipt}>
               Chek
             </button>
+          </div>
+        </div>
+      )}
+
+      {showQr && (
+        <div className="qr-modal" onClick={() => setShowQr(false)}>
+          <div className="qr-modal-card" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="qr-modal-close"
+              onClick={() => setShowQr(false)}
+              aria-label="Yopish"
+            >
+              X
+            </button>
+            <h3>Olib ketish kodi</h3>
+            <p>Buyurtmani olish uchun kassada ko'rsating.</p>
+            {qrImage ? (
+              <img className="qr-modal-code" src={qrImage} alt="QR" />
+            ) : (
+              <div className="qr-modal-code placeholder">QR kod mavjud emas</div>
+            )}
+            {pickupCode && <div className="qr-modal-text">{pickupCode}</div>}
           </div>
         </div>
       )}
     </div>
   )
 }
+

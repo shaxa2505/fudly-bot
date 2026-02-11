@@ -250,7 +250,7 @@ def build_order_handlers(
                 return _detail_response("User mismatch", 403)
 
             for item in order.items:
-                if int(item.quantity) <= 0:
+                if float(item.quantity) <= 0:
                     return _detail_response(
                         f"Invalid quantity for offer {item.offer_id}",
                         400,
@@ -271,7 +271,7 @@ def build_order_handlers(
             idem_hash = None
             if idempotency_key:
                 items_payload = [
-                    {"offer_id": int(item.offer_id), "quantity": int(item.quantity)}
+                    {"offer_id": int(item.offer_id), "quantity": float(item.quantity)}
                     for item in order.items
                 ]
                 items_payload.sort(key=lambda x: x["offer_id"])
@@ -520,7 +520,7 @@ def build_order_handlers(
                 if isinstance(booking, dict):
                     booking_id = booking.get("booking_id")
                     offer_id = booking.get("offer_id")
-                    quantity = booking.get("quantity", 1)
+                    quantity = float(booking.get("quantity", 1) or 1)
                     total_price = booking.get("total_price", 0)
                     booking_status = booking.get("status", "pending")
                     booking_code = booking.get("booking_code")
@@ -529,7 +529,7 @@ def build_order_handlers(
                     booking_id = booking[0]
                     offer_id = booking[2]
                     booking_status = booking[3]
-                    quantity = booking[4]
+                    quantity = float(booking[4]) if len(booking) > 4 and booking[4] is not None else 1.0
                     total_price = booking[5]
                     booking_code = booking[6] if len(booking) > 6 else None
                     created_at = booking[7] if len(booking) > 7 else None

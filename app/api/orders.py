@@ -115,7 +115,7 @@ class OrderStatus(BaseModel):
     # Offer details
     offer_title: str
     offer_photo: str | None
-    quantity: int
+    quantity: float
     total_price: float
     items_total: float | None = None
     total_with_delivery: float | None = None
@@ -398,7 +398,7 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
     cart_items: list[dict[str, Any]] = parse_cart_items(cart_items_json) if is_cart else []
 
     offer_id = booking_dict.get("offer_id")
-    quantity = int(booking_dict.get("quantity") or 1)
+    quantity = float(booking_dict.get("quantity") or 1)
     delivery_cost = booking_dict.get("delivery_cost", 0) or 0
     items_total = 0
     total_price = 0.0
@@ -599,7 +599,7 @@ async def get_user_orders(
 
             for it in cart_items or []:
                 title = it.get("title") or "Товар"
-                qty = int(it.get("quantity") or 1)
+                qty = float(it.get("quantity") or 1)
                 price = int(it.get("price") or 0)
                 items.append(
                     {
@@ -614,7 +614,7 @@ async def get_user_orders(
                     }
                 )
         else:
-            qty = int(r.get("quantity") or 1)
+            qty = float(r.get("quantity") or 1)
             price = int(r.get("offer_price") or 0)
             title = r.get("offer_title") or "Товар"
             photo = r.get("offer_photo") or r.get("offer_photo_id")

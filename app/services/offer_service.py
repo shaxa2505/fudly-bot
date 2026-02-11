@@ -21,7 +21,7 @@ class OfferListItem:
     store_name: str
     store_address: str | None = None
     store_category: str | None = None
-    quantity: int | None = None
+    quantity: float | None = None
     unit: str | None = None
     available_from: str | None = None
     available_until: str | None = None

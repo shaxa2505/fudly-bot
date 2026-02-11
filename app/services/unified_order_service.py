@@ -44,6 +44,7 @@ from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.core.utils import UZB_TZ, get_uzb_time, get_order_field
+from app.core.units import calc_total_price
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
 from app.domain.order import OrderStatus, PaymentStatus
@@ -196,7 +197,7 @@ class OrderItem:
     title: str
     price: int  # discount_price
     original_price: int
-    quantity: int
+    quantity: float
     store_name: str
     store_address: str
     delivery_price: int = 0
@@ -239,7 +240,7 @@ class StatusUpdateContext:
     is_cart: bool
     cart_items_json: Any
     offer_id: int | None
-    quantity: int
+    quantity: float
     total_price: int | None
     item_title: str | None
     item_price: int | None
@@ -387,7 +388,7 @@ class NotificationTemplates:
         if items_total <= 0 and items:
             try:
                 items_total = sum(
-                    int(item.get("price") or 0) * int(item.get("quantity") or 1)
+                    calc_total_price(int(item.get("price") or 0), float(item.get("quantity") or 1))
                     for item in items
                 )
             except Exception:
@@ -430,7 +431,7 @@ class NotificationTemplates:
         if items:
             for item in items:
                 title = html.escape(str(item.get("title") or ""))
-                qty = int(item.get("quantity") or 1)
+                qty = float(item.get("quantity") or 1)
                 lines.append(f"• {title} ×{qty}")
         else:
             lines.append("• —")
@@ -483,7 +484,7 @@ class NotificationTemplates:
         if total_value <= 0 and items:
             try:
                 total_value = sum(
-                    int(item.get("price") or 0) * int(item.get("quantity") or 1)
+                    calc_total_price(int(item.get("price") or 0), float(item.get("quantity") or 1))
                     for item in items
                 )
             except Exception:
@@ -1522,7 +1523,7 @@ class UnifiedOrderService:
         """
         if not items:
             return self._error_result("No items provided")
-        if any(int(getattr(item, "quantity", 0) or 0) <= 0 for item in items):
+        if any(float(getattr(item, "quantity", 0) or 0) <= 0 for item in items):
             return self._error_result("Invalid item quantity")
 
         is_delivery = order_type in ("delivery", "taxi")
@@ -1779,7 +1780,7 @@ class UnifiedOrderService:
                 cart_items = [
                     {
                         "offer_id": int(item["offer_id"]),
-                        "quantity": int(item.get("quantity", 1)),
+                        "quantity": float(item.get("quantity", 1) or 1),
                         "price": int(item.get("price", 0)),
                         "title": item.get("title", ""),
                         "original_price": int(item.get("original_price") or item.get("price") or 0),
@@ -1804,7 +1805,7 @@ class UnifiedOrderService:
 
                 store_orders: list[dict[str, Any]] = []
                 for item in items:
-                    qty = int(item.get("quantity", 1))
+                    qty = float(item.get("quantity", 1) or 1)
                     price = int(item.get("price", 0))
                     store_orders.append(
                         {
@@ -1866,7 +1867,7 @@ class UnifiedOrderService:
         return [
             {
                 "offer_id": int(item["offer_id"]),
-                "quantity": int(item.get("quantity", 1)),
+                "quantity": float(item.get("quantity", 1) or 1),
                 "price": int(item.get("price", 0)),
                 "title": item.get("title", ""),
                 "original_price": int(item.get("original_price") or item.get("price") or 0),
@@ -1884,7 +1885,7 @@ class UnifiedOrderService:
     ) -> list[dict[str, Any]]:
         store_orders: list[dict[str, Any]] = []
         for item in items:
-            qty = int(item.get("quantity", 1))
+            qty = float(item.get("quantity", 1) or 1)
             price = int(item.get("price", 0))
             store_orders.append(
                 {
@@ -2368,7 +2369,7 @@ class UnifiedOrderService:
         order_type: str,
         cart_items_json: Any,
         offer_id: int | None,
-        quantity: int,
+        quantity: float,
         pickup_code: str | None,
         order_delivery_price: int,
     ) -> list[dict[str, Any]]:
@@ -2395,9 +2396,9 @@ class UnifiedOrderService:
                         "order_id": order_id,
                         "offer_id": int(item.get("offer_id") or 0),
                         "store_id": int(store_id or 0),
-                        "quantity": int(item.get("quantity", 1)),
+                        "quantity": float(item.get("quantity", 1) or 1),
                         "price": int(item.get("price", 0)),
-                        "total": int(item.get("price", 0)) * int(item.get("quantity", 1)),
+                        "total": calc_total_price(int(item.get("price", 0)), float(item.get("quantity", 1) or 1)),
                         "pickup_code": pickup_code,
                         "title": item.get("title", ""),
                         "store_name": store_name,
@@ -2423,9 +2424,9 @@ class UnifiedOrderService:
                     "order_id": order_id,
                     "offer_id": int(offer_id),
                     "store_id": int(store_id or 0),
-                    "quantity": int(quantity or 1),
+                    "quantity": float(quantity or 1),
                     "price": int(price),
-                    "total": int(price) * int(quantity or 1),
+                    "total": calc_total_price(int(price), float(quantity or 1)),
                     "pickup_code": pickup_code,
                     "title": title,
                     "store_name": store_name,
@@ -2557,7 +2558,7 @@ class UnifiedOrderService:
                 is_cart = int(entity.get("is_cart_booking") or 0) == 1
                 cart_items_json = entity.get("cart_items")
                 offer_id = entity.get("offer_id")
-                quantity = int(entity.get("quantity") or 1)
+                quantity = float(entity.get("quantity") or 1)
             else:
                 user_id = getattr(entity, "user_id", None)
                 store_id = getattr(entity, "store_id", None)
@@ -2571,7 +2572,7 @@ class UnifiedOrderService:
                 is_cart = int(getattr(entity, "is_cart_booking", 0) or 0) == 1
                 cart_items_json = getattr(entity, "cart_items", None)
                 offer_id = getattr(entity, "offer_id", None)
-                quantity = int(getattr(entity, "quantity", 1) or 1)
+                quantity = float(getattr(entity, "quantity", 1) or 1)
 
             return StatusUpdateContext(
                 entity_id=entity_id,
@@ -2620,7 +2621,7 @@ class UnifiedOrderService:
             is_cart = int(entity.get("is_cart_order") or 0) == 1
             cart_items_json = entity.get("cart_items")
             offer_id = entity.get("offer_id")
-            quantity = int(entity.get("quantity") or 1)
+            quantity = float(entity.get("quantity") or 1)
             total_price = entity.get("total_price")
             item_title = entity.get("item_title")
             item_price = entity.get("item_price")
@@ -2650,7 +2651,7 @@ class UnifiedOrderService:
             is_cart = int(getattr(entity, "is_cart_order", 0) or 0) == 1
             cart_items_json = getattr(entity, "cart_items", None)
             offer_id = getattr(entity, "offer_id", None)
-            quantity = int(getattr(entity, "quantity", 1) or 1)
+            quantity = float(getattr(entity, "quantity", 1) or 1)
             total_price = getattr(entity, "total_price", None)
             item_title = getattr(entity, "item_title", None)
             item_price = getattr(entity, "item_price", None)
@@ -2795,7 +2796,7 @@ class UnifiedOrderService:
         self,
         *,
         offer_id: int,
-        quantity: int,
+        quantity: float,
         customer_lang: str,
         total_price: int | None,
         delivery_price: int,
@@ -2830,7 +2831,7 @@ class UnifiedOrderService:
             {
                 "offer_id": int(offer_id),
                 "title": item_title,
-                "quantity": int(quantity or 1),
+                "quantity": float(quantity or 1),
                 "price": int(item_price or 0),
             }
         ]
@@ -2921,7 +2922,7 @@ class UnifiedOrderService:
         is_cart: bool,
         cart_items_json: Any,
         offer_id: int | None,
-        quantity: int,
+        quantity: float,
         total_price: int | None,
         item_title: str | None,
         item_price: int | None,
@@ -3127,13 +3128,13 @@ class UnifiedOrderService:
                             except Exception:
                                 price = 0
                             try:
-                                qty = int(item.get("quantity") or 1)
+                                qty = float(item.get("quantity") or 1)
                             except Exception:
                                 qty = 1
                             items_total += price * qty
                 if items_total <= 0:
                     try:
-                        qty = int(_get_field(order_row, "quantity", 1) or 1)
+                        qty = float(_get_field(order_row, "quantity", 1) or 1)
                     except Exception:
                         qty = 1
                     try:
@@ -3319,7 +3320,7 @@ class UnifiedOrderService:
         if cart_items_json:
             cart_items = self._load_cart_items(True, cart_items_json) or []
             for item in cart_items:
-                qty = int(item.get("quantity", 1))
+                qty = float(item.get("quantity", 1) or 1)
                 price = int(item.get("price", 0))
                 title = item.get("title", "")
                 item_offer_id = item.get("offer_id")
@@ -3356,13 +3357,13 @@ class UnifiedOrderService:
             items.append(
                 {
                     "title": title,
-                    "quantity": int(quantity or 1),
+                    "quantity": float(quantity or 1),
                     "price": int(price or 0),
                     "offer_id": int(offer_id),
                     "photo": offer_photo,
                 }
             )
-            total = int(price or 0) * int(quantity or 1)
+            total = calc_total_price(int(price or 0), float(quantity or 1))
         return items, total, offer_id if offer_id else None
 
     @staticmethod
@@ -4224,10 +4225,10 @@ class UnifiedOrderService:
                 )
                 for item in cart_items:
                     item_offer_id = item.get("offer_id")
-                    item_qty = item.get("quantity", 1)
+                    item_qty = float(item.get("quantity", 1) or 0)
                     if item_offer_id:
                         try:
-                            self.db.increment_offer_quantity_atomic(item_offer_id, int(item_qty))
+                            self.db.increment_offer_quantity_atomic(item_offer_id, item_qty)
                         except Exception as e:
                             logger.warning(
                                 "Failed to restore quantity for offer %s (qty=%s): %s",
@@ -4237,7 +4238,7 @@ class UnifiedOrderService:
                             )
             elif offer_id:
                 try:
-                    self.db.increment_offer_quantity_atomic(offer_id, int(quantity))
+                    self.db.increment_offer_quantity_atomic(offer_id, float(quantity))
                 except Exception as e:
                     logger.warning(
                         "Failed to restore quantity for offer %s (qty=%s): %s",
@@ -4254,7 +4255,7 @@ class UnifiedOrderService:
                 and hasattr(self.db, "release_pickup_slot")
             ):
                 try:
-                    self.db.release_pickup_slot(int(store_id), pickup_time, int(quantity or 0))
+                    self.db.release_pickup_slot(int(store_id), pickup_time, float(quantity or 0))
                 except Exception as e:
                     logger.warning(
                         "Failed to release pickup slot for store %s (time=%s, qty=%s): %s",

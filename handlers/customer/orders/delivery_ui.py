@@ -9,7 +9,9 @@ import os
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.order_math import calc_total_price
+from app.core.order_math import calc_total_price as calc_total_price_order
+from app.core.units import calc_total_price as calc_total_price_units
+from app.core.units import format_quantity, normalize_unit, unit_label
 from handlers.common.utils import html_escape as _esc
 from localization import get_text
 
@@ -23,18 +25,22 @@ def build_delivery_card_text(
     lang: str,
     title: str,
     price: int,
-    quantity: int,
-    max_qty: int,
+    quantity: float,
+    max_qty: float,
     store_name: str,
     delivery_price: int,
     address: str | None,
     step: str,  # "qty" | "address" | "payment" | "processing"
+    unit: str = "piece",
 ) -> str:
     """Build delivery order card text."""
     currency = "so'm" if lang == "uz" else "сум"
+    unit_type = normalize_unit(unit)
+    unit_text = unit_label(unit_type, lang)
+    qty_text = format_quantity(quantity, unit_type, lang)
 
-    subtotal = price * quantity
-    total = calc_total_price(subtotal, delivery_price)
+    subtotal = calc_total_price_units(price, quantity)
+    total = calc_total_price_order(subtotal, delivery_price)
 
     lines = [
         f"<b>{get_text(lang, 'delivery_card_title')}</b>",
@@ -46,9 +52,12 @@ def build_delivery_card_text(
     ]
 
     # Price info
-    lines.append(f"{get_text(lang, 'delivery_price_label')}: {price:,} {currency}")
+    price_text = f"{price:,} {currency}"
+    if unit_type != "piece":
+        price_text = f"{price:,} {currency} / {unit_text}"
+    lines.append(f"{get_text(lang, 'delivery_price_label')}: {price_text}")
     lines.append(
-        f"{get_text(lang, 'delivery_qty_label')}: <b>{quantity}</b> {'dona' if lang == 'uz' else 'шт'}"
+        f"{get_text(lang, 'delivery_qty_label')}: <b>{qty_text}</b> {unit_text}"
     )
     lines.append(f"{get_text(lang, 'delivery_delivery_label')}: {delivery_price:,} {currency}")
     lines.append("-" * 24)
@@ -75,34 +84,57 @@ def build_delivery_card_text(
 def build_delivery_qty_keyboard(
     lang: str,
     offer_id: int,
-    quantity: int,
-    max_qty: int,
+    quantity: float,
+    max_qty: float,
+    unit: str = "piece",
 ) -> InlineKeyboardBuilder:
     """Build quantity selection keyboard for delivery."""
     kb = InlineKeyboardBuilder()
 
-    # Row 1: [-] [qty] [+]
-    minus_ok = quantity > 1
-    plus_ok = quantity < max_qty
+    unit_type = normalize_unit(unit)
+    unit_text = unit_label(unit_type, lang)
 
-    kb.button(
-        text="-" if minus_ok else ".",
-        callback_data=f"dlv_qty_{offer_id}_{quantity - 1}" if minus_ok else "dlv_noop",
-    )
-    kb.button(text=str(quantity), callback_data="dlv_noop")
-    kb.button(
-        text="+" if plus_ok else ".",
-        callback_data=f"dlv_qty_{offer_id}_{quantity + 1}" if plus_ok else "dlv_noop",
-    )
+    if unit_type == "piece":
+        minus_ok = quantity > 1
+        plus_ok = quantity < max_qty
 
-    # Row 2: Continue
+        kb.button(
+            text="-" if minus_ok else ".",
+            callback_data=f"dlv_qty_{offer_id}_{int(quantity - 1)}" if minus_ok else "dlv_noop",
+        )
+        kb.button(text=str(int(quantity)), callback_data="dlv_noop")
+        kb.button(
+            text="+" if plus_ok else ".",
+            callback_data=f"dlv_qty_{offer_id}_{int(quantity + 1)}" if plus_ok else "dlv_noop",
+        )
+        kb.adjust(3)
+    else:
+        if unit_type in {"kg", "l"}:
+            options = [0.5, 1, 2, 5]
+        elif unit_type == "g":
+            options = [200, 500, 1000]
+        else:
+            options = [250, 500, 1000]
+
+        for opt in options:
+            if max_qty > 0 and opt > max_qty:
+                continue
+            label = f"{format_quantity(opt, unit_type, lang)} {unit_text}"
+            kb.button(text=label, callback_data=f"dlv_qty_{offer_id}_{opt}")
+        kb.button(
+            text="Другое" if lang == "ru" else "Boshqa",
+            callback_data=f"dlv_qty_custom_{offer_id}",
+        )
+        kb.adjust(2)
+
     next_text = get_text(lang, "delivery_next_button")
     kb.button(text=next_text, callback_data=f"dlv_to_address_{offer_id}")
-
-    # Row 3: Cancel
     kb.button(text=get_text(lang, "cancel"), callback_data="dlv_cancel")
 
-    kb.adjust(3, 1, 1)
+    if unit_type == "piece":
+        kb.adjust(3, 1, 1)
+    else:
+        kb.adjust(2, 1, 1)
     return kb
 
 

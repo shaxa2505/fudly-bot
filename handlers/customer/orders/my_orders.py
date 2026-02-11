@@ -22,6 +22,7 @@ from aiogram.types import WebAppInfo
 from app.core.utils import UZB_TZ, get_uzb_time
 from app.core.sanitize import sanitize_phone
 from app.core.order_math import calc_delivery_fee, calc_items_total, parse_cart_items
+from app.core.units import calc_total_price
 from app.domain.order import PaymentStatus
 from app.integrations.payment_service import get_payment_service
 from app.domain.order_labels import normalize_order_status, status_emoji, status_label
@@ -347,7 +348,7 @@ async def my_orders_handler(message: types.Message) -> None:
             # Вычисляем total из quantity × discount_price
             quantity = _get_field(booking, "quantity") or 1
             discount_price = _get_field(booking, "discount_price") or 0
-            total = quantity * discount_price
+            total = calc_total_price(discount_price, quantity)
 
             emoji, status_text = _get_status_info(status, False, lang)
 
@@ -614,7 +615,7 @@ async def _show_booking_detail(callback: types.CallbackQuery, booking_id: int, l
             "discount_price": discount_price,
             "original_price": booking[11],
             "unit": booking[12],
-            "total_price": quantity * discount_price,
+            "total_price": calc_total_price(discount_price, quantity),
         }
 
     status = _normalize_status(data.get("status", "pending"))
@@ -803,7 +804,7 @@ async def _show_order_detail(callback: types.CallbackQuery, order_id: int, lang:
         price = data.get("item_price")
         if price is None:
             price = data.get("discount_price", 0)
-        items_total = int(price or 0) * int(qty or 1)
+        items_total = calc_total_price(price or 0, qty)
 
     total_price = int(data.get("total_price") or 0)
     delivery_fee = 0
@@ -1237,7 +1238,7 @@ async def orders_history_handler(callback: types.CallbackQuery) -> None:
         # Вычисляем total
         quantity = _get_field(b, "quantity") or 1
         discount_price = _get_field(b, "discount_price") or 0
-        total = quantity * discount_price
+        total = calc_total_price(discount_price, quantity)
 
         lines.append(f"<b>#{booking_id}</b> • {store_name}")
         lines.append(f"   {_t(lang, 'Самовывоз', 'Olib ketish')} • {_format_price(total, lang)}")

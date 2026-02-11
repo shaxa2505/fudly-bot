@@ -20,6 +20,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.core.utils import get_offer_field, get_store_field
+from app.core.units import calc_total_price, normalize_unit, parse_quantity_input
 from app.integrations.payment_service import get_payment_service
 from app.keyboards import main_menu_customer
 from app.services.unified_order_service import (
@@ -51,6 +52,17 @@ router = Router()
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
+
+
+def _default_quantity_for_unit(unit: str) -> float:
+    unit_type = normalize_unit(unit)
+    if unit_type in {"kg", "l"}:
+        return 0.5
+    if unit_type == "g":
+        return 200.0
+    if unit_type == "ml":
+        return 250.0
+    return 1.0
 
 
 def setup_dependencies(
@@ -142,7 +154,7 @@ async def resume_delivery_after_phone(
         await message.answer(get_text(lang, "offer_not_found"))
         return
 
-    max_qty = get_offer_field(offer, "quantity", 0)
+    max_qty = float(get_offer_field(offer, "quantity", 0) or 0)
     if max_qty <= 0:
         await message.answer(get_text(lang, "no_offers"))
         return
@@ -162,6 +174,7 @@ async def resume_delivery_after_phone(
         or get_offer_field(offer, "original_price", 0)
     )
     title = get_offer_field(offer, "title", "")
+    unit = normalize_unit(get_offer_field(offer, "unit", None))
     store_name = get_store_field(store, "name", "")
     delivery_price = get_store_field(store, "delivery_price", 0)
     min_order = get_store_field(store, "min_order_amount", 0)
@@ -173,10 +186,15 @@ async def resume_delivery_after_phone(
     except Exception:
         pass
 
+    quantity = _default_quantity_for_unit(unit)
+    if max_qty > 0 and quantity > max_qty:
+        quantity = max_qty
+
     await state.update_data(
         offer_id=offer_id,
         store_id=store_id,
-        quantity=1,
+        unit=unit,
+        quantity=quantity,
         max_qty=max_qty,
         price=int(price or 0),
         title=title,
@@ -190,9 +208,18 @@ async def resume_delivery_after_phone(
     await state.set_state(OrderDelivery.quantity)
 
     text = build_delivery_card_text(
-        lang, title, int(price or 0), 1, max_qty, store_name, delivery_price, None, "qty"
+        lang,
+        title,
+        int(price or 0),
+        quantity,
+        max_qty,
+        store_name,
+        delivery_price,
+        None,
+        "qty",
+        unit,
     )
-    kb = build_delivery_qty_keyboard(lang, offer_id, 1, max_qty)
+    kb = build_delivery_qty_keyboard(lang, offer_id, quantity, max_qty, unit)
     await _send_delivery_card(message, text, kb, offer_photo)
 
 
@@ -239,7 +266,7 @@ async def start_delivery_order(
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    max_qty = get_offer_field(offer, "quantity", 0)
+    max_qty = float(get_offer_field(offer, "quantity", 0) or 0)
     if max_qty <= 0:
         await callback.answer(get_text(lang, "no_offers"), show_alert=True)
         return
@@ -262,6 +289,7 @@ async def start_delivery_order(
         or get_offer_field(offer, "original_price", 0)
     )
     title = get_offer_field(offer, "title", "")
+    unit = normalize_unit(get_offer_field(offer, "unit", None))
     store_name = get_store_field(store, "name", "")
     delivery_price = get_store_field(store, "delivery_price", 0)
     min_order = get_store_field(store, "min_order_amount", 0)
@@ -277,10 +305,15 @@ async def start_delivery_order(
     offer_photo = get_offer_field(offer, "photo", None) or get_offer_field(offer, "photo_id", None)
 
     # Save to state
+    quantity = _default_quantity_for_unit(unit)
+    if max_qty > 0 and quantity > max_qty:
+        quantity = max_qty
+
     await state.update_data(
         offer_id=offer_id,
         store_id=store_id,
-        quantity=1,
+        unit=unit,
+        quantity=quantity,
         max_qty=max_qty,
         price=int(price or 0),
         title=title,
@@ -295,9 +328,18 @@ async def start_delivery_order(
 
     # Build and show card
     text = build_delivery_card_text(
-        lang, title, price, 1, max_qty, store_name, delivery_price, None, "qty"
+        lang,
+        title,
+        price,
+        quantity,
+        max_qty,
+        store_name,
+        delivery_price,
+        None,
+        "qty",
+        unit,
     )
-    kb = build_delivery_qty_keyboard(lang, offer_id, 1, max_qty)
+    kb = build_delivery_qty_keyboard(lang, offer_id, quantity, max_qty, unit)
 
     # Update existing message
     try:
@@ -451,16 +493,23 @@ async def dlv_change_qty(
     try:
         parts = callback.data.split("_")
         offer_id = int(parts[2])
-        new_qty = int(parts[3])
+        raw_qty = parts[3]
     except (ValueError, IndexError):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
     data = await state.get_data()
-    max_qty = data.get("max_qty", 1)
+    unit = data.get("unit", "piece")
+    max_qty = float(data.get("max_qty", 1) or 1)
     price = data.get("price", 0)
 
-    if new_qty < 1 or new_qty > max_qty:
+    try:
+        new_qty = float(parse_quantity_input(raw_qty, unit))
+    except ValueError:
+        await callback.answer(get_text(lang, "error"), show_alert=True)
+        return
+
+    if new_qty <= 0 or (max_qty > 0 and new_qty > max_qty):
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
@@ -477,13 +526,28 @@ async def dlv_change_qty(
         data.get("delivery_price", 0),
         None,
         "qty",
+        unit,
     )
-    kb = build_delivery_qty_keyboard(lang, offer_id, new_qty, max_qty)
+    kb = build_delivery_qty_keyboard(lang, offer_id, new_qty, max_qty, unit)
 
     offer_photo = data.get("offer_photo")
     await _edit_delivery_card(callback, text, kb, offer_photo)
 
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("dlv_qty_custom_"))
+async def dlv_custom_qty(
+    callback: types.CallbackQuery, state: FSMContext, db: DatabaseProtocol
+) -> None:
+    """Prompt for custom quantity input."""
+    if not callback.from_user:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    await callback.answer()
+    await callback.message.answer(get_text(lang, "delivery_qty_hint"))
 
 
 @router.callback_query(F.data.startswith("dlv_to_address_"))
@@ -501,15 +565,16 @@ async def dlv_to_address(
 
     min_order = int(data.get("min_order", 0) or 0)
     price = int(data.get("price", 0) or 0)
-    quantity = int(data.get("quantity", 1) or 1)
+    quantity = float(data.get("quantity", 1) or 1)
+    items_total = calc_total_price(price, quantity)
 
-    if min_order > 0 and (price * quantity) < min_order:
+    if min_order > 0 and items_total < min_order:
         currency = "so'm" if lang == "uz" else "сум"
         msg = get_text(
             lang,
             "cart_delivery_min_order",
             min=f"{min_order:,}",
-            total=f"{price * quantity:,}",
+            total=f"{items_total:,}",
             currency=currency,
         )
         await callback.answer(msg, show_alert=True)
@@ -528,6 +593,7 @@ async def dlv_to_address(
         data.get("delivery_price", 0),
         None,
         "address",
+        data.get("unit", "piece"),
     )
     kb = build_delivery_address_keyboard(lang, offer_id, data.get("saved_address"))
 
@@ -562,9 +628,10 @@ async def dlv_back_to_qty(
         data.get("delivery_price", 0),
         None,
         "qty",
+        data.get("unit", "piece"),
     )
     kb = build_delivery_qty_keyboard(
-        lang, offer_id, data.get("quantity", 1), data.get("max_qty", 1)
+        lang, offer_id, data.get("quantity", 1), data.get("max_qty", 1), data.get("unit", "piece")
     )
 
     offer_photo = data.get("offer_photo")
@@ -609,6 +676,7 @@ async def dlv_use_saved_address(
         data.get("delivery_price", 0),
         saved_address,
         "payment",
+        data.get("unit", "piece"),
     )
     kb = build_delivery_payment_keyboard(lang, offer_id)
 
@@ -646,6 +714,7 @@ async def dlv_new_address(
         data.get("delivery_price", 0),
         None,
         "address",
+        data.get("unit", "piece"),
     )
 
     # Show input hint
@@ -747,6 +816,7 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
         data.get("delivery_price", 0),
         text,
         "payment",
+        data.get("unit", "piece"),
     )
     kb = build_delivery_payment_keyboard(lang, offer_id)
 
@@ -779,6 +849,7 @@ async def dlv_back_to_address(
         data.get("delivery_price", 0),
         None,
         "address",
+        data.get("unit", "piece"),
     )
     kb = build_delivery_address_keyboard(lang, offer_id, data.get("saved_address"))
 
@@ -851,7 +922,7 @@ async def dlv_pay_click(
         try:
             offer_id = data.get("offer_id")
             store_id = data.get("store_id")
-            quantity = int(data.get("quantity", 1))
+            quantity = float(data.get("quantity", 1) or 1)
             delivery_price = int(data.get("delivery_price", 0))
 
             offer = db.get_offer(offer_id)
@@ -919,9 +990,9 @@ async def dlv_pay_click(
 
     if not order_total:
         price = int(data.get("price", 0))
-        quantity = int(data.get("quantity", 1))
+        quantity = float(data.get("quantity", 1) or 1)
         delivery_cost = int(data.get("delivery_price", 0))
-        order_total = price * quantity + delivery_cost
+        order_total = calc_total_price(price, quantity) + delivery_cost
 
     return_url = None
     try:
@@ -1007,7 +1078,7 @@ async def dlv_pay_cash(
     try:
         offer_id = data.get("offer_id")
         store_id = data.get("store_id")
-        quantity = int(data.get("quantity", 1))
+        quantity = float(data.get("quantity", 1) or 1)
         delivery_price = int(data.get("delivery_price", 0))
 
         offer = db.get_offer(offer_id)
@@ -1095,6 +1166,7 @@ async def _return_to_address_step(message: types.Message, state: FSMContext, dat
         data.get("delivery_price", 0),
         None,
         "address",
+        data.get("unit", "piece"),
     )
     kb = build_delivery_address_keyboard(lang, int(offer_id), data.get("saved_address"))
 
@@ -1133,23 +1205,24 @@ async def dlv_quantity_text(
 
     # Try to parse quantity
     try:
-        qty = int(text)
         data = await state.get_data()
-        max_qty = data.get("max_qty", 1)
+        unit = data.get("unit", "piece")
+        qty = float(parse_quantity_input(text, unit))
+        max_qty = float(data.get("max_qty", 1) or 1)
         min_order = int(data.get("min_order", 0) or 0)
         price = int(data.get("price", 0) or 0)
 
-
-        if qty < 1 or qty > max_qty:
+        if qty <= 0 or (max_qty > 0 and qty > max_qty):
             raise ValueError()
 
-        if min_order > 0 and (price * qty) < min_order:
-            currency = "so'm" if lang == "uz" else "сум"
+        items_total = calc_total_price(price, qty)
+        if min_order > 0 and items_total < min_order:
+            currency = "so'm" if lang == "uz" else "???"
             msg = get_text(
                 lang,
                 "cart_delivery_min_order",
                 min=f"{min_order:,}",
-                total=f"{price * qty:,}",
+                total=f"{items_total:,}",
                 currency=currency,
             )
             await message.answer(msg)
@@ -1172,6 +1245,7 @@ async def dlv_quantity_text(
             data.get("delivery_price", 0),
             None,
             "address",
+            unit,
         )
         kb = build_delivery_address_keyboard(lang, offer_id, data.get("saved_address"))
 

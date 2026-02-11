@@ -82,7 +82,7 @@ def build_recently_viewed_handlers(
                                     "store_name": offer.get("store_name", ""),
                                     "photo": offer.get("photo"),
                                     "photo_id": offer.get("photo_id"),
-                                    "quantity": offer.get("quantity", 0),
+                                    "quantity": float(offer.get("quantity", 0) or 0),
                                     "available": offer.get("status") == "active"
                                     if offer.get("status")
                                     else True,

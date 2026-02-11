@@ -20,6 +20,7 @@ from app.core.order_math import (
     calc_total_price,
     parse_cart_items,
 )
+from app.core.units import format_quantity, unit_label
 from app.services.unified_order_service import (
     OrderItem,
     OrderStatus,
@@ -249,7 +250,7 @@ async def create_order(
             raise HTTPException(status_code=403, detail="User mismatch")
 
         for item in order.items:
-            if int(item.quantity) <= 0:
+            if float(item.quantity) <= 0:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid quantity for offer {item.offer_id}",
@@ -266,7 +267,7 @@ async def create_order(
         idem_hash = None
         if idem_key:
             items_payload = [
-                {"offer_id": int(item.offer_id), "quantity": int(item.quantity)}
+                {"offer_id": int(item.offer_id), "quantity": float(item.quantity)}
                 for item in order.items
             ]
             items_payload.sort(key=lambda x: x["offer_id"])
@@ -615,7 +616,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
 
             for it in cart_items or []:
                 title = it.get("title") or "Tovar"
-                qty = int(it.get("quantity") or 1)
+                qty = float(it.get("quantity") or 1)
                 price = int(it.get("price") or 0)
                 items.append(
                     {
@@ -630,7 +631,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                     }
                 )
         else:
-            qty = int(r.get("quantity") or 1)
+            qty = float(r.get("quantity") or 1)
             price = int(r.get("item_price") or r.get("offer_price") or 0)
             title = r.get("item_title") or r.get("offer_title") or "Tovar"
             photo = r.get("offer_photo") or r.get("offer_photo_id")
@@ -718,7 +719,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                             ),
                             "booking_code": b[4] if len(b) > 4 else None,
                             "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
-                            "quantity": b[6] if len(b) > 6 else 1,
+                            "quantity": float(b[6]) if len(b) > 6 and b[6] is not None else 1.0,
                             "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
                             "offer_title": b[8] if len(b) > 8 else None,
                             "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
@@ -801,7 +802,7 @@ async def get_orders(db=Depends(get_db), user: dict = Depends(get_current_user))
                         ),
                         "booking_code": b[4] if len(b) > 4 else None,
                         "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
-                        "quantity": b[6] if len(b) > 6 else 1,
+                        "quantity": float(b[6]) if len(b) > 6 and b[6] is not None else 1.0,
                         "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
                         "offer_title": b[8] if len(b) > 8 else None,
                         "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
@@ -892,12 +893,13 @@ async def notify_partner_webapp_order(
     owner_id: int,
     entity_id: int,
     offer_title: str,
-    quantity: int,
+    quantity: float,
     total: float,
     user_id: int,
     delivery_address: str | None,
     phone: str | None,
     photo: str | None,
+    unit: str | None = None,
     is_delivery: bool = False,
 ) -> None:
     """Send notification to partner about new webapp order."""
@@ -919,14 +921,15 @@ async def notify_partner_webapp_order(
         return html.escape(str(val)) if val is not None else ""
 
     currency = "so'm" if partner_lang == "uz" else "сум"
-    unit_label = "dona" if partner_lang == "uz" else "шт"
+    unit_text = unit_label(unit or "piece", partner_lang)
+    qty_text = format_quantity(quantity, unit or "piece", partner_lang)
 
     if partner_lang == "uz":
         text = (
             f"🔔 <b>YANGI BUYURTMA (Mini App)!</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Miqdor: <b>{quantity}</b> {unit_label}\n"
+            f"📦 Miqdor: <b>{qty_text}</b> {unit_text}\n"
             f"💰 Jami: <b>{int(total):,}</b> {currency}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 <b>Xaridor:</b>\n"
@@ -947,7 +950,7 @@ async def notify_partner_webapp_order(
             f"🔔 <b>НОВЫЙ ЗАКАЗ (Mini App)!</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"🛒 <b>{_esc(offer_title)}</b>\n"
-            f"📦 Количество: <b>{quantity}</b> {unit_label}\n"
+            f"📦 Количество: <b>{qty_text}</b> {unit_text}\n"
             f"💰 Итого: <b>{int(total):,}</b> {currency}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 <b>Покупатель:</b>\n"

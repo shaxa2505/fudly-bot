@@ -44,6 +44,16 @@ UNIT_ALIASES = {
     # ML
     "мл": UNIT_ML,
     "ml": UNIT_ML,
+    # Cyrillic aliases (unicode escapes)
+    "\u0448\u0442": UNIT_PIECE,
+    "\u0448\u0442\u0443\u043a": UNIT_PIECE,
+    "\u0448\u0442\u0443\u043a\u0430": UNIT_PIECE,
+    "\u043a\u0433": UNIT_KG,
+    "\u043a\u0438\u043b\u043e\u0433\u0440\u0430\u043c\u043c": UNIT_KG,
+    "\u0433": UNIT_G,
+    "\u0433\u0440": UNIT_G,
+    "\u043b": UNIT_L,
+    "\u043c\u043b": UNIT_ML,
 }
 
 WEIGHT_UNITS = {UNIT_KG, UNIT_G}

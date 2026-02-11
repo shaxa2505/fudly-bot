@@ -40,7 +40,7 @@ class BookingService:
 
     # -------------------- Creation --------------------
     def create_atomic_booking(
-        self, offer_id: int, user_id: int, quantity: int
+        self, offer_id: int, user_id: int, quantity: float
     ) -> tuple[bool, int | None, str | None]:
         """Atomically create a booking and decrement quantity.
 
@@ -91,7 +91,7 @@ class BookingService:
         """
         booking_id = get_booking_field(booking, "booking_id")
         offer_id = get_booking_field(booking, "offer_id")
-        quantity = int(get_booking_field(booking, "quantity", 1) or 1)
+        quantity = float(get_booking_field(booking, "quantity", 1) or 1)
         if not booking_id:
             return False
         ok = self.cancel(booking_id)
@@ -110,7 +110,7 @@ class BookingService:
             return False
 
     # -------------------- Inventory adjustments --------------------
-    def adjust_offer_quantity(self, offer_id: int, delta: int) -> None:
+    def adjust_offer_quantity(self, offer_id: int, delta: float) -> None:
         try:
             self.db.increment_offer_quantity_atomic(offer_id, delta)
         except Exception as e:
@@ -158,7 +158,7 @@ class BookingService:
 
     # -------------------- High-level creation wrapper --------------------
     def create_booking_with_limit(
-        self, offer_id: int, user_id: int, quantity: int, max_allowed: int
+        self, offer_id: int, user_id: int, quantity: float, max_allowed: int
     ) -> tuple[bool, int | None, str | None, str]:
         """Check user active limit then atomically create booking.
 
@@ -221,7 +221,7 @@ def set_booking_status_direct(db: DatabaseProtocol, booking_id: int, status: str
         self,
         offer_id: int,
         user_id: int,
-        quantity: int,
+        quantity: float,
         max_allowed: int,
         delivery_option: int,
         delivery_address: str,

@@ -332,7 +332,7 @@ class BookingItem(BaseModel):
     offer_id: int
     offer_title: str
     offer_photo: str | None
-    quantity: int
+    quantity: float
     total_price: int
     status: str
     store_name: str

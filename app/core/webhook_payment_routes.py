@@ -7,6 +7,7 @@ from typing import Any, Callable
 from aiohttp import web
 
 from app.core.webhook_api_utils import add_cors_headers
+from app.core.units import calc_total_price
 from app.integrations.payment_service import get_payment_service
 from logging_config import logger
 
@@ -126,21 +127,21 @@ def build_payment_handlers(
                         for item in cart_items:
                             try:
                                 price = int(item.get("price") or 0)
-                                qty = int(item.get("quantity") or 1)
+                                qty = float(item.get("quantity") or 1)
                             except Exception:
                                 price = 0
                                 qty = 1
-                            items_total += price * qty
+                            items_total += calc_total_price(price, qty)
                 if not items_total:
                     try:
-                        qty = int(order.get("quantity") or 1)
+                        qty = float(order.get("quantity") or 1)
                     except Exception:
                         qty = 1
                     try:
                         price = int(order.get("item_price") or 0)
                     except Exception:
                         price = 0
-                    items_total = max(0, price * qty)
+                    items_total = max(0, calc_total_price(price, qty))
                 if items_total:
                     amount = items_total
 

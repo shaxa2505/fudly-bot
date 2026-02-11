@@ -1,12 +1,12 @@
 .orders-page {
-  background: #f9f9f7;
-  color: #1f2937;
-  --orders-accent: #1f4a36;
-  --orders-accent-dark: #163528;
-  --orders-muted: #9a9a96;
-  --orders-border: #e6e0d8;
-  --orders-surface: #ffffff;
-  --orders-shadow: 0 12px 24px rgba(28, 25, 23, 0.08);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  --orders-accent: var(--color-primary);
+  --orders-accent-dark: var(--color-primary-dark);
+  --orders-muted: var(--color-text-tertiary);
+  --orders-border: var(--color-border-light);
+  --orders-surface: var(--color-bg-primary);
+  --orders-shadow: var(--shadow-sm);
 }
 
 .orders-topbar {
@@ -14,9 +14,9 @@
   top: var(--app-surface-top);
   z-index: var(--z-sticky);
   padding: var(--app-top-inset) var(--page-padding-x) 0;
-  background: rgba(249, 249, 247, 0.92);
+  background: rgba(248, 245, 241, 0.94);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(28, 25, 23, 0.06);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .orders-topbar-inner {
@@ -35,18 +35,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #2b2b2b;
+  color: var(--color-text-primary);
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .orders-topbar-btn:active {
   transform: scale(0.96);
-  background: #f2efe9;
+  background: var(--color-bg-tertiary);
 }
 
 .orders-topbar-btn.ghost {
   border-color: transparent;
-  background: rgba(31, 74, 54, 0.08);
+  background: var(--color-primary-bg);
   color: var(--orders-accent);
 }
 
@@ -56,13 +56,13 @@
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #1c1c1c;
+  color: var(--color-text-primary);
 }
 
 .orders-tabs {
   display: flex;
   gap: 0;
-  border-top: 1px solid rgba(28, 25, 23, 0.06);
+  border-top: 1px solid var(--color-border-light);
 }
 
 .orders-tab {
@@ -131,7 +131,7 @@
 .orders-spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #e5e1da;
+  border: 3px solid var(--color-border-light);
   border-top-color: var(--orders-accent);
   border-radius: 50%;
   animation: orders-spin 0.8s linear infinite;
@@ -154,7 +154,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #f2efe9;
+  background: var(--color-bg-tertiary);
   margin: 0 auto 10px;
   display: flex;
   align-items: center;
@@ -167,18 +167,18 @@
   margin: 0 0 6px;
   font-size: 15px;
   font-weight: 700;
-  color: #1c1c1c;
+  color: var(--color-text-primary);
 }
 
 .orders-empty p {
   margin: 0 0 12px;
   font-size: 12px;
-  color: var(--orders-muted);
+  color: var(--color-text-secondary);
 }
 
 .orders-empty-btn {
   background: var(--orders-accent);
-  color: #fff;
+  color: var(--color-text-inverse);
   border-radius: 12px;
   padding: 10px 16px;
   font-size: 11px;
@@ -214,14 +214,14 @@
   width: 64px;
   height: 64px;
   border-radius: 12px;
-  background: #f1eee8;
+  background: var(--color-bg-tertiary);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   font-weight: 700;
-  color: #9b948a;
+  color: var(--orders-muted);
   flex-shrink: 0;
 }
 
@@ -251,7 +251,7 @@
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: #1c1c1c;
+  color: var(--color-text-primary);
 }
 
 .order-card-status {
@@ -275,7 +275,7 @@
 
 .order-card-sub {
   font-size: 11px;
-  color: #a8a29e;
+  color: var(--color-text-tertiary);
 }
 
 .order-card-progress {
@@ -327,7 +327,7 @@
 
 .order-card-progress-dot.active {
   background: var(--orders-accent);
-  box-shadow: 0 0 0 3px rgba(31, 74, 54, 0.12);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .order-card-progress-labels {
@@ -351,7 +351,7 @@
 .order-card-primary {
   flex: 1;
   background: var(--orders-accent);
-  color: #fff;
+  color: var(--color-text-inverse);
   border-radius: 12px;
   padding: 12px 16px;
   font-size: 10px;
@@ -370,17 +370,17 @@
   width: 48px;
   border-radius: 12px;
   border: 1px solid var(--orders-border);
-  background: #faf9f7;
+  background: var(--color-bg-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #3f3f3f;
+  color: var(--color-text-primary);
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .order-card-icon:active {
   transform: scale(0.96);
-  background: #f2efe9;
+  background: var(--color-bg-tertiary);
 }
 
 .order-card-footer {
@@ -389,13 +389,13 @@
   justify-content: space-between;
   gap: 12px;
   padding-top: 6px;
-  border-top: 1px solid #f1ede6;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .order-card-price {
   font-size: 14px;
   font-weight: 700;
-  color: #1c1c1c;
+  color: var(--color-text-primary);
 }
 
 .order-card-more {
@@ -415,8 +415,8 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #9f1239;
-  background: rgba(244, 63, 94, 0.12);
+  color: var(--color-error-dark);
+  background: var(--color-error-light);
 }
 
 .order-card-cancel:disabled {
@@ -449,13 +449,13 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: #f1eee8;
+  background: var(--color-bg-tertiary);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  color: #9b948a;
+  color: var(--orders-muted);
   flex-shrink: 0;
 }
 
@@ -485,13 +485,13 @@
   margin: 0;
   font-size: 13px;
   font-weight: 700;
-  color: #1c1c1c;
+  color: var(--color-text-primary);
 }
 
 .order-history-price {
   font-size: 12px;
   font-weight: 700;
-  color: #1c1c1c;
+  color: var(--color-text-primary);
 }
 
 .order-history-meta {
@@ -528,14 +528,14 @@
 
 .orders-cta {
   margin-top: 10px;
-  border-top: 1px solid var(--orders-border);
+  border-top: 1px solid var(--color-border-light);
   padding-top: 18px;
 }
 
 .orders-cta-btn {
   width: 100%;
   background: var(--orders-accent);
-  color: #fff;
+  color: var(--color-text-inverse);
   border-radius: 16px;
   padding: 18px;
   display: flex;
@@ -543,7 +543,7 @@
   justify-content: space-between;
   gap: 12px;
   text-align: left;
-  box-shadow: var(--orders-shadow);
+  box-shadow: var(--shadow-primary);
   transition: transform var(--transition-fast);
 }
 

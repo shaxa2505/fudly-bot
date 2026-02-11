@@ -189,14 +189,14 @@ def is_store_open_now(store: Any, now: datetime | None = None) -> bool:
     return _is_time_in_window(start, end, current)
 
 
-def _get_offer_quantity(offer: Any) -> int | None:
+def _get_offer_quantity(offer: Any) -> float | None:
     raw_qty = get_val(offer, "stock_quantity")
     if raw_qty is None:
         raw_qty = get_val(offer, "quantity")
     if raw_qty is None:
         return None
     try:
-        return int(raw_qty)
+        return float(raw_qty)
     except (TypeError, ValueError):
         return None
 
@@ -232,8 +232,8 @@ class OfferResponse(BaseModel):
     original_price: float
     discount_price: float
     discount_percent: float
-    quantity: int
-    unit: str = "шт"
+    quantity: float
+    unit: str = "piece"
     category: str
     store_id: int
     store_name: str
@@ -285,7 +285,7 @@ class CategoryResponse(BaseModel):
 
 class OrderItem(BaseModel):
     offer_id: int = Field(validation_alias=AliasChoices("offer_id", "id"))
-    quantity: int = Field(..., ge=1)
+    quantity: float = Field(..., gt=0)
 
 
 class CreateOrderRequest(BaseModel):
@@ -315,7 +315,7 @@ class OrderResponse(BaseModel):
     order_id: int
     status: str
     total: float
-    items_count: int
+    items_count: float
 
 
 class FavoriteRequest(BaseModel):
@@ -325,7 +325,7 @@ class FavoriteRequest(BaseModel):
 
 class CartItem(BaseModel):
     offer_id: int
-    quantity: int
+    quantity: float
     title: str
     price: float
     photo: str | None = None
@@ -334,7 +334,7 @@ class CartItem(BaseModel):
 class CartResponse(BaseModel):
     items: list[CartItem]
     total: float
-    items_count: int
+    items_count: float
 
 
 class FilterParams(BaseModel):

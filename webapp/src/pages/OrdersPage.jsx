@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, ChevronLeft, Info, MessageCircle } from 'lucide-react'
 import api from '../api/client'
@@ -89,19 +89,19 @@ function OrdersPage() {
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
-      pending: { color: '#C2410C', bg: '#FEF3C7' },
-      preparing: { color: '#1D4ED8', bg: '#DBEAFE' },
-      ready: { color: '#15803D', bg: '#DCFCE7' },
-      delivering: { color: '#0F766E', bg: '#CCFBF1' },
-      completed: { color: '#15803D', bg: '#DCFCE7' },
-      cancelled: { color: '#B91C1C', bg: '#FEE2E2' },
-      rejected: { color: '#B91C1C', bg: '#FEE2E2' },
-      awaiting_payment: { color: '#C2410C', bg: '#FEF3C7' },
-      awaiting_proof: { color: '#C2410C', bg: '#FEF3C7' },
-      proof_submitted: { color: '#1D4ED8', bg: '#DBEAFE' },
-      payment_rejected: { color: '#B91C1C', bg: '#FEE2E2' },
+      pending: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
+      preparing: { color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+      ready: { color: 'var(--color-success)', bg: 'var(--color-success-light)' },
+      delivering: { color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+      completed: { color: 'var(--color-success)', bg: 'var(--color-success-light)' },
+      cancelled: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
+      rejected: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
+      awaiting_payment: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
+      awaiting_proof: { color: 'var(--color-warning)', bg: 'var(--color-warning-light)' },
+      proof_submitted: { color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
+      payment_rejected: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
     }
-    const palette = statusMap[status] || { color: '#6B7280', bg: '#F3F4F6' }
+    const palette = statusMap[status] || { color: 'var(--color-text-secondary)', bg: 'var(--color-bg-tertiary)' }
     return { ...palette, text: displayStatusText(status, lang, orderType) }
   }
 
@@ -194,8 +194,10 @@ function OrdersPage() {
       return [
         {
           label: 'Tasdiqlandi',
-          statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected', 'preparing'],
+          statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected'],
         },
+        { label: 'Tayyorlanmoqda', statuses: ['preparing'] },
+        { label: 'Tayyor', statuses: ['ready'] },
         { label: "Yo'lda", statuses: ['delivering'] },
         { label: 'Yetkazildi', statuses: ['completed'] },
       ]
@@ -206,8 +208,9 @@ function OrdersPage() {
         label: 'Tasdiqlandi',
         statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected'],
       },
-      { label: 'Pishmoqda', statuses: ['preparing'] },
-      { label: 'Olib ketish', statuses: ['ready', 'completed'] },
+      { label: 'Tayyorlanmoqda', statuses: ['preparing'] },
+      { label: 'Olib ketish', statuses: ['ready'] },
+      { label: 'Berildi', statuses: ['completed'] },
     ]
   }
 
@@ -620,3 +623,4 @@ function OrdersPage() {
 }
 
 export default OrdersPage
+
