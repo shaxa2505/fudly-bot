@@ -6,7 +6,6 @@ const BANNERS = [
     id: 1,
     title: "Ichimliklar To'plami",
     subtitle: "Siz uchun maxsus saralangan premium sharbatlar",
-    badge: "Kun taklifi",
     image: '/images/hero/drinks.jpeg',
     position: 'center bottom',
     category: 'drinks'
@@ -15,7 +14,6 @@ const BANNERS = [
     id: 2,
     title: "Pishiriqlar To'plami",
     subtitle: "Yangi pishgan mahsulotlar har kuni",
-    badge: "Kun taklifi",
     image: '/images/hero/dairy.jpeg',
     position: 'center',
     category: 'bakery'
@@ -24,7 +22,6 @@ const BANNERS = [
     id: 3,
     title: "Go'sht Mahsulotlari",
     subtitle: "Sifatli va yangi mahsulotlar",
-    badge: "Kun taklifi",
     image: '/images/hero/meat.jpeg',
     position: 'center',
     category: 'meat'
@@ -33,7 +30,6 @@ const BANNERS = [
     id: 4,
     title: 'Mevalar To\'plami',
     subtitle: "Tabiiy va foydali mahsulotlar",
-    badge: "Kun taklifi",
     image: '/images/hero/produce.jpeg',
     position: 'center',
     category: 'fruits'
@@ -136,7 +132,9 @@ const HeroBanner = memo(function HeroBanner({ onCategorySelect }) {
         <div className="hero-banner__image" aria-hidden="true" />
         <div className="hero-banner__overlay" aria-hidden="true" />
         <div className="banner-content">
-          <span className="banner-badge">{currentBanner.badge}</span>
+          {currentBanner.badge && (
+            <span className="banner-badge">{currentBanner.badge}</span>
+          )}
           <h2 className="banner-title">{currentBanner.title}</h2>
           <p className="banner-subtitle">{currentBanner.subtitle}</p>
         </div>
