@@ -110,7 +110,6 @@ def _pluralize_minutes_ru(minutes: int) -> str:
 def _status_dot(status: str) -> str:
     return {
         OrderStatus.PENDING: "🟡",
-        OrderStatus.CONFIRMED: "🟢",
         OrderStatus.PREPARING: "🟢",
         OrderStatus.READY: "🟣",
         OrderStatus.DELIVERING: "🟣",
@@ -214,7 +213,7 @@ def _count_statuses(entries: list[dict[str, Any]]) -> dict[str, int]:
         status = entry["status"]
         if status == OrderStatus.PENDING:
             counts["pending"] += 1
-        elif status in (OrderStatus.CONFIRMED, OrderStatus.PREPARING):
+        elif status == OrderStatus.PREPARING:
             counts["in_work"] += 1
         elif status in (OrderStatus.READY, OrderStatus.DELIVERING):
             counts["ready"] += 1
@@ -226,11 +225,10 @@ def _count_statuses(entries: list[dict[str, Any]]) -> dict[str, int]:
 def _filter_entries(entries: list[dict[str, Any]], filter_type: str) -> list[dict[str, Any]]:
     status_map = {
         "pending": {OrderStatus.PENDING},
-        "in_work": {OrderStatus.CONFIRMED, OrderStatus.PREPARING},
+        "in_work": {OrderStatus.PREPARING},
         "ready": {OrderStatus.READY, OrderStatus.DELIVERING},
         "history": {OrderStatus.COMPLETED, OrderStatus.REJECTED, OrderStatus.CANCELLED},
         "active": {
-            OrderStatus.CONFIRMED,
             OrderStatus.PREPARING,
             OrderStatus.READY,
             OrderStatus.DELIVERING,
