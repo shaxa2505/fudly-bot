@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, Banknote, X, Leaf } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, Banknote, X } from 'lucide-react'
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -805,13 +805,6 @@ function CartPage({ user }) {
   const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
   const summaryTotal = calcTotalPrice(subtotal, serviceFee)
-  const ecoSavedGrams = Math.max(0, Math.round(safeItemsCount * 120))
-  const ecoInsightText = safeItemsCount > 0
-    ? `${safeItemsCount} dona mahsulot isrof bo'lishining oldi olinmoqda.`
-    : `Bu buyurtma ovqat isrofini kamaytiradi.`
-  const ecoInsightMeta = ecoSavedGrams > 0
-    ? `Taxminan ${ecoSavedGrams}g CO2e tejandi`
-    : `Taxminiy CO2e tejami hisoblanmoqda`
     const deliveryOptions = useMemo(() => {
       const hoursRaw = storeWorkingHours || DEFAULT_WORKING_HOURS
       const range = extractRangeFromText(hoursRaw)
@@ -2310,7 +2303,7 @@ function CartPage({ user }) {
                     )}
                     <div className="cart-item-footer">
                       <div className="cart-item-prices">
-                        <span className="cart-item-price-pill">
+                        <span className="cart-item-price">
                           {formatSum(unitPrice)} so'm
                         </span>
                         {showOriginalPrice && (
@@ -2419,18 +2412,6 @@ function CartPage({ user }) {
         )}
 
         {!isCheckoutRoute && (
-          <section className="cart-eco">
-            <div className="cart-eco-icon" aria-hidden="true">
-              <Leaf size={16} strokeWidth={2.2} aria-hidden="true" />
-            </div>
-            <div className="cart-eco-body">
-              <p className="cart-eco-text">{ecoInsightText}</p>
-              <p className="cart-eco-meta">{ecoInsightMeta}</p>
-            </div>
-          </section>
-        )}
-
-        {!isCheckoutRoute && (
           <section className="cart-summary">
             <div className="cart-summary-card">
               <h3 className="cart-summary-title">Buyurtma ma'lumoti</h3>
@@ -2444,10 +2425,7 @@ function CartPage({ user }) {
                   <span>{formatSum(serviceFee)} so'm</span>
                 </div>
                 <div className="cart-summary-row savings">
-                  <span className="cart-summary-savings-label">
-                    <Leaf size={14} strokeWidth={2.2} aria-hidden="true" />
-                    <span>Tejamkorlik</span>
-                  </span>
+                  <span>Tejamkorlik</span>
                   <span>{savingsLabel}</span>
                 </div>
               </div>

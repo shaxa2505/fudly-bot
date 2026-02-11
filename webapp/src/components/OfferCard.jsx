@@ -91,6 +91,11 @@ const OfferCard = memo(function OfferCard({
   const availability = getOfferAvailability(offer)
   const timeRange = availability.timeRange
   const isUnavailableNow = Boolean(timeRange && !availability.isAvailableNow)
+  const timeBadgeLabel = availability.endLabel
+    ? `By ${availability.endLabel}`
+    : availability.startLabel
+      ? `By ${availability.startLabel}`
+      : ''
 
   const handleAddClick = useCallback((e) => {
     e.stopPropagation()
@@ -141,6 +146,7 @@ const OfferCard = memo(function OfferCard({
   const showDiscountTag = discountPercent > 0
   const isLowStock = !isOutOfStock && stockLimit > 0 && stockLimit <= 5
   const locationText = offer.store_address || offer.address || offer.district || offer.region || ''
+  const locationShort = locationText ? locationText.split(',')[0].trim() : ''
 
   const titleCandidates = [
     offer.title,
@@ -163,18 +169,6 @@ const OfferCard = memo(function OfferCard({
   const showStoreName = Boolean(storeNameNormalized && storeNameNormalized !== normalizeText(titleText).toLowerCase())
   const offerId = offer?.id ?? offer?.offer_id ?? offer?.offerId
   const isFav = offerId ? isFavorite(offerId) : false
-  const ratingValue = Number(
-    offer.store_rating ??
-    offer.rating ??
-    offer.rating_avg ??
-    offer.store_rating_avg ??
-    offer.avg_rating ??
-    offer.store_avg_rating ??
-    0
-  )
-  const showRating = Number.isFinite(ratingValue) && ratingValue > 0
-  const ratingText = showRating ? ratingValue.toFixed(1) : ''
-  const showRatingLocation = Boolean(showRating && locationText)
   const priceLabel = priceValue > 0
     ? `${Math.round(priceValue).toLocaleString('ru-RU')} so'm`
     : ''
@@ -187,6 +181,46 @@ const OfferCard = memo(function OfferCard({
     if (!offerId) return
     toggleFavorite(offer)
   }, [offer, offerId, toggleFavorite])
+
+  const formatDistanceMeters = (value) => {
+    const raw = Number(value)
+    if (!Number.isFinite(raw) || raw <= 0) return ''
+    if (raw < 950) return `${Math.round(raw)} m`
+    return `${(raw / 1000).toFixed(1)} km`
+  }
+
+  const formatDistanceKm = (value) => {
+    const raw = Number(value)
+    if (!Number.isFinite(raw) || raw <= 0) return ''
+    return `${raw.toFixed(1)} km`
+  }
+
+  const distanceKm = offer?.distance_km ?? offer?.distanceKm
+  const distanceMeters = offer?.distance_m ?? offer?.distanceM ?? offer?.distance_meters
+  const distanceRaw = offer?.distance
+  let distanceLabel = ''
+
+  if (distanceKm != null) {
+    distanceLabel = formatDistanceKm(distanceKm)
+  } else if (distanceMeters != null) {
+    distanceLabel = formatDistanceMeters(distanceMeters)
+  } else if (typeof distanceRaw === 'string') {
+    distanceLabel = distanceRaw.trim()
+  } else if (Number.isFinite(Number(distanceRaw))) {
+    const numeric = Number(distanceRaw)
+    distanceLabel = numeric < 20 ? formatDistanceKm(numeric) : formatDistanceMeters(numeric)
+  }
+
+  if (!distanceLabel && locationShort) {
+    distanceLabel = locationShort
+  }
+
+  const metaTag = (() => {
+    if (isLowStock) return { text: 'Kam qoldi', variant: 'alert' }
+    if (isUnavailableNow) return { text: 'Hozir yopiq', variant: 'closed' }
+    if (timeRange) return { text: timeRange, variant: 'primary', icon: true }
+    return null
+  })()
 
   return (
     <div
@@ -227,33 +261,28 @@ const OfferCard = memo(function OfferCard({
             }
           }}
         />
-        <div className="offer-tags">
-          {isUnavailableNow && (
-            <span className="offer-tag offer-tag--closed">Hozir yopiq</span>
-          )}
-          {showDiscountTag ? (
-            <span className="offer-tag offer-tag--discount">
-              -{discountPercent}%
-            </span>
-          ) : (timeRange && (
-            <span className="offer-tag">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-              {timeRange}
-            </span>
-          ))}
-          {isLowStock && (
-            <span className="offer-tag offer-tag--alert">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-                <path d="M12 7v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <circle cx="12" cy="16.5" r="1" fill="currentColor"/>
-              </svg>
-              Kam qoldi
-            </span>
-          )}
+        {showDiscountTag && (
+          <div className="offer-discount-badge">-{discountPercent}%</div>
+        )}
+        <div className="offer-image-overlay">
+          <div className="offer-image-meta">
+            {metaTag ? (
+              <span className={`offer-meta-tag offer-meta-tag--${metaTag.variant}`}>
+                {metaTag.icon && (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                    <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                )}
+                {metaTag.text}
+              </span>
+            ) : (
+              <span />
+            )}
+            {distanceLabel && (
+              <span className="offer-meta-distance">{distanceLabel}</span>
+            )}
+          </div>
         </div>
         <button
           type="button"
@@ -269,7 +298,7 @@ const OfferCard = memo(function OfferCard({
             fill={isFav ? 'currentColor' : 'none'}
             aria-hidden="true"
           >
-            <path d="M12 21s-7-4.35-7-10a4 4 0 017-2.4A4 4 0 0119 11c0 5.65-7 10-7 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12 21s-7-4.35-7-10a4 4 0 017-2.4A4 4 0 0119 11c0 5.65-7 10-7 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         {isOutOfStock && (
@@ -277,25 +306,17 @@ const OfferCard = memo(function OfferCard({
         )}
       </div>
       <div className="offer-body">
-        {showStoreName && (
-          <span className="offer-store" title={storeName}>{storeName}</span>
-        )}
-        <h3 className="offer-title" title={titleText}>{titleText}</h3>
-        {showRating ? (
-          <div className="offer-rating-row" aria-label={`Reyting ${ratingText}`}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 3.5l2.47 5 5.52.8-4 3.9.94 5.5L12 16.7l-4.93 2.6.94-5.5-4-3.9 5.52-.8L12 3.5z"/>
-            </svg>
-            <span className="offer-rating-value">{ratingText}</span>
-            {showRatingLocation && (
-              <span className="offer-rating-location">{locationText}</span>
+        {(showStoreName || timeBadgeLabel) && (
+          <div className={`offer-body-top ${showStoreName ? '' : 'only-time'}`}>
+            {showStoreName && (
+              <span className="offer-store" title={storeName}>{storeName}</span>
+            )}
+            {timeBadgeLabel && (
+              <span className="offer-time-badge">{timeBadgeLabel}</span>
             )}
           </div>
-        ) : (
-          locationText && (
-            <p className="offer-location" title={locationText}>{locationText}</p>
-          )
         )}
+        <h3 className="offer-title" title={titleText}>{titleText}</h3>
         <div className="offer-footer">
           <div className="offer-price-block">
             {oldPriceLabel && (
@@ -312,7 +333,7 @@ const OfferCard = memo(function OfferCard({
               aria-label="Savatga qo'shish"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             </button>
           </div>

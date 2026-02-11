@@ -1755,53 +1755,6 @@
   cursor: not-allowed;
 }
 
-.cart-page .bottom-nav {
-  background: rgba(255, 255, 255, 0.9);
-  border-top: 1px solid rgba(226, 232, 240, 0.7);
-  padding: 12px 22px max(18px, var(--safe-area-bottom));
-}
-
-.cart-page .bottom-nav-content {
-  align-items: flex-end;
-}
-
-.cart-page .nav-item {
-  gap: 6px;
-}
-
-.cart-page .nav-label {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.cart-page .nav-item:nth-child(3) {
-  transform: translateY(-12px);
-}
-
-.cart-page .nav-item:nth-child(3) .nav-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--color-primary);
-  color: #FFFFFF;
-  box-shadow: 0 12px 24px rgba(58, 90, 64, 0.22);
-}
-
-.cart-page .nav-item:nth-child(3).active .nav-icon {
-  background: var(--color-primary);
-}
-
-.cart-page .nav-item:nth-child(3) .nav-icon svg {
-  width: 28px;
-  height: 28px;
-}
-
-.cart-page .nav-item:nth-child(3) .nav-label {
-  color: var(--color-primary);
-}
-
 .cart-main {
   padding: 16px var(--page-padding-x) 0;
   display: flex;
@@ -1929,19 +1882,19 @@
 }
 
 .cart-store-card {
-  background: var(--cart-card);
-  border-radius: 20px;
-  border: 1px solid var(--cart-border);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  overflow: hidden;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .cart-store-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
-  background: #F8FAFC;
+  padding: 0 0 12px;
+  background: transparent;
   border-bottom: 1px solid var(--cart-border);
 }
 
@@ -1988,21 +1941,22 @@
 .cart-item-row {
   display: flex;
   gap: 16px;
-  padding: 16px;
+  padding: 14px 0;
   align-items: flex-start;
 }
 
 .cart-item-row + .cart-item-row {
-  border-top: 1px solid var(--cart-border);
+  border-top: 1px solid #EEF2EB;
 }
 
 .cart-item-thumb {
-  width: 88px;
-  height: 88px;
+  width: 84px;
+  height: 84px;
   border-radius: 16px;
   overflow: hidden;
-  background: #F1F5F9;
-  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  border: none;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.12);
 }
 
 .cart-item-image {
@@ -2081,19 +2035,14 @@
 .cart-item-prices {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   margin-top: 0;
   flex-wrap: nowrap;
 }
 
-.cart-item-price-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #E7ECE6;
+.cart-item-price {
   color: #2D2D2D;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -2133,18 +2082,20 @@
   align-items: center;
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  height: 34px;
-  padding: 0 4px;
-  gap: 2px;
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+  height: 32px;
+  padding: 0 6px;
+  gap: 6px;
+  box-shadow: none;
   flex-shrink: 0;
+  min-width: 88px;
+  justify-content: space-between;
 }
 
 .cart-item-qty button {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: #64748B;
@@ -2168,7 +2119,7 @@
 }
 
 .cart-item-qty-value {
-  min-width: 18px;
+  min-width: 16px;
   font-size: 12px;
   font-weight: 700;
   color: #2D2D2D;
@@ -2302,80 +2253,35 @@
   background: rgba(6, 95, 70, 0.18);
 }
 
-.cart-eco {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(163, 177, 138, 0.16);
-  border: 1px solid rgba(163, 177, 138, 0.3);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-}
-
-.cart-eco-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  background: var(--cart-primary);
-  color: #FFFFFF;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.cart-eco-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cart-eco-text {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #2D2D2D;
-  line-height: 1.4;
-}
-
-.cart-eco-meta {
-  margin: 0;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--cart-primary);
-}
-
 .cart-summary {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--cart-border);
 }
 
 .cart-summary-card {
-  background: var(--cart-card);
-  border-radius: 20px;
-  padding: 18px;
-  border: 1px solid var(--cart-border);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .cart-summary-title {
-  margin: 0 0 12px;
-  font-size: 11px;
+  margin: 0 0 14px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #94A3B8;
+  letter-spacing: 0.18em;
+  color: #9AA3AF;
 }
 
 .cart-summary-rows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cart-summary-row {
@@ -2391,16 +2297,9 @@
   font-weight: 600;
 }
 
-.cart-summary-savings-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--cart-primary);
-}
-
 .cart-summary-total {
-  margin-top: 14px;
-  padding-top: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--cart-border);
   display: flex;
   align-items: center;
@@ -2432,11 +2331,11 @@
   width: 100%;
   border: none;
   border-radius: 14px;
-  padding: 16px;
+  padding: 14px 16px;
   font-size: 14px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  text-transform: none;
+  letter-spacing: 0.02em;
   color: #FFFFFF;
   background: var(--cart-primary);
   box-shadow: 0 12px 24px rgba(58, 90, 64, 0.22);
@@ -2461,16 +2360,17 @@
 
   .cart-item-row {
     gap: 12px;
-    padding: 14px;
+    padding: 14px 0;
   }
 
   .cart-item-qty {
-    height: 32px;
+    height: 30px;
+    min-width: 80px;
   }
 
   .cart-item-qty button {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
   }
 }
 
