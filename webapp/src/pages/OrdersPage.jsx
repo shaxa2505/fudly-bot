@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronLeft, Info, MessageCircle } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -12,6 +12,7 @@ import { resolveImageUrl } from '../utils/imageUtils'
 import { calcItemsTotal, calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import { deriveDisplayStatus as deriveStatus, displayStatusText, normalizeOrderStatus, resolveOrderType } from '../utils/orderStatus'
 import './YanaPage.css'
+import './OrdersPage.css'
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -29,6 +30,9 @@ const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
 
 const CANCELABLE_STATUSES = new Set(['pending'])
 
+const TAB_ACTIVE = 'active'
+const TAB_HISTORY = 'history'
+
 function OrdersPage() {
   const navigate = useNavigate()
   const { cartCount } = useCart()
@@ -38,6 +42,7 @@ function OrdersPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [cancelingOrderId, setCancelingOrderId] = useState(null)
+  const [activeTab, setActiveTab] = useState(TAB_ACTIVE)
 
   const normalizeOrder = (order) => {
     const displayStatus = deriveStatus(order)
@@ -84,19 +89,19 @@ function OrdersPage() {
 
   const getStatusInfo = (status, orderType) => {
     const statusMap = {
-      pending: { color: '#FF9500', bg: '#FFF4E5' },
-      preparing: { color: '#FF9500', bg: '#FFF4E5' },
-      ready: { color: '#007AFF', bg: '#E5F2FF' },
-      delivering: { color: '#007AFF', bg: '#E5F2FF' },
-      completed: { color: '#53B175', bg: '#E8F5E9' },
-      cancelled: { color: '#FF3B30', bg: '#FFEBEE' },
-      rejected: { color: '#FF3B30', bg: '#FFEBEE' },
-      awaiting_payment: { color: '#FF9500', bg: '#FFF4E5' },
-      awaiting_proof: { color: '#FF9500', bg: '#FFF4E5' },
-      proof_submitted: { color: '#007AFF', bg: '#E5F2FF' },
-      payment_rejected: { color: '#FF3B30', bg: '#FFEBEE' },
+      pending: { color: '#C2410C', bg: '#FEF3C7' },
+      preparing: { color: '#1D4ED8', bg: '#DBEAFE' },
+      ready: { color: '#15803D', bg: '#DCFCE7' },
+      delivering: { color: '#0F766E', bg: '#CCFBF1' },
+      completed: { color: '#15803D', bg: '#DCFCE7' },
+      cancelled: { color: '#B91C1C', bg: '#FEE2E2' },
+      rejected: { color: '#B91C1C', bg: '#FEE2E2' },
+      awaiting_payment: { color: '#C2410C', bg: '#FEF3C7' },
+      awaiting_proof: { color: '#C2410C', bg: '#FEF3C7' },
+      proof_submitted: { color: '#1D4ED8', bg: '#DBEAFE' },
+      payment_rejected: { color: '#B91C1C', bg: '#FEE2E2' },
     }
-    const palette = statusMap[status] || { color: '#999', bg: '#F5F5F5' }
+    const palette = statusMap[status] || { color: '#6B7280', bg: '#F3F4F6' }
     return { ...palette, text: displayStatusText(status, lang, orderType) }
   }
 
@@ -160,27 +165,19 @@ function OrdersPage() {
       storeName,
       bookingCode,
       photoUrl,
+      isDelivery,
     }
   }
 
-  const formatOrderDateTime = (dateStr) => {
+  const formatOrderDate = (dateStr) => {
     if (!dateStr) return ''
     try {
       const date = new Date(dateStr)
       if (Number.isNaN(date.getTime())) return String(dateStr)
-      const now = new Date()
-      const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
-      const time = date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
-
-      if (diffDays === 0) return `Bugun, ${time}`
-      if (diffDays === 1) return `Kecha, ${time}`
-      if (diffDays < 7) return `${diffDays} kun oldin, ${time}`
-
-      const dateLabel = date.toLocaleDateString('uz-UZ', {
+      return date.toLocaleDateString('uz-UZ', {
         day: 'numeric',
-        month: 'short'
+        month: 'short',
       })
-      return `${dateLabel} - ${time}`
     } catch {
       return String(dateStr)
     }
@@ -190,6 +187,35 @@ function OrdersPage() {
     const numeric = Number(value || 0)
     if (!Number.isFinite(numeric)) return '0'
     return Math.round(numeric).toLocaleString('uz-UZ')
+  }
+
+  const getProgressSteps = (orderType) => {
+    if (orderType === 'delivery') {
+      return [
+        {
+          label: 'Tasdiqlandi',
+          statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected', 'preparing'],
+        },
+        { label: "Yo'lda", statuses: ['delivering'] },
+        { label: 'Yetkazildi', statuses: ['completed'] },
+      ]
+    }
+
+    return [
+      {
+        label: 'Tasdiqlandi',
+        statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected'],
+      },
+      { label: 'Pishmoqda', statuses: ['preparing'] },
+      { label: 'Olib ketish', statuses: ['ready', 'completed'] },
+    ]
+  }
+
+  const getProgressIndex = (status, steps) => {
+    const normalized = normalizeOrderStatus(status)
+    const index = steps.findIndex(step => step.statuses.includes(normalized))
+    if (index === -1) return 0
+    return Math.max(0, index)
   }
 
   const activeOrders = useMemo(() => (
@@ -220,193 +246,373 @@ function OrdersPage() {
         progress={progress}
       />
 
-      <header className="profile-topbar">
-        <div className="profile-topbar-inner">
-          <div className="profile-topbar-center">
-            <h1 className="profile-title">Buyurtmalar</h1>
+      <header className="orders-topbar">
+        <div className="orders-topbar-inner">
+          <button
+            type="button"
+            className="orders-topbar-btn"
+            onClick={() => navigate(-1)}
+            aria-label="Orqaga"
+          >
+            <ChevronLeft size={18} strokeWidth={2.2} />
+          </button>
+          <div className="orders-topbar-center">
+            <h1 className="orders-topbar-title">Buyurtmalar</h1>
           </div>
+          <button
+            type="button"
+            className="orders-topbar-btn ghost"
+            onClick={() => toast.info('Buyurtmalar bo\'limi yangilanmoqda')}
+            aria-label="Ma'lumot"
+          >
+            <Info size={18} strokeWidth={2} />
+          </button>
+        </div>
+        <div className="orders-tabs">
+          <button
+            type="button"
+            className={`orders-tab ${activeTab === TAB_ACTIVE ? 'active' : ''}`}
+            onClick={() => setActiveTab(TAB_ACTIVE)}
+          >
+            Faol ({activeOrders.length})
+          </button>
+          <button
+            type="button"
+            className={`orders-tab ${activeTab === TAB_HISTORY ? 'active' : ''}`}
+            onClick={() => setActiveTab(TAB_HISTORY)}
+          >
+            Tarix
+          </button>
         </div>
       </header>
 
-      <section className="profile-section active-orders-section">
-        <div className="profile-section-header">
-          <h3 className="profile-section-title">Faol buyurtmalar</h3>
-          <span className="profile-section-badge">{activeOrders.length} ta</span>
-        </div>
-        {loading ? (
-          <div className="profile-section-loading">
-            <div className="profile-spinner"></div>
-            <p>Yuklanmoqda...</p>
-          </div>
-        ) : activeOrders.length === 0 ? (
-          <div className="profile-empty-state">
-            <div className="profile-empty-icon">IMG</div>
-            <h3>Faol buyurtmalar yo'q</h3>
-            <p>Yangi buyurtmalar shu yerda ko'rinadi.</p>
-            <button className="profile-cta-btn" onClick={() => navigate('/')}>Xarid qilish</button>
-          </div>
-        ) : (
-          <div className="active-orders-scroll">
-            {activeOrders.map((order, idx) => {
-              const summary = getOrderSummary(order)
-              const statusInfo = getStatusInfo(summary.status, resolveOrderType(order))
-              const canCancel = CANCELABLE_STATUSES.has(summary.orderStatus)
-              return (
-                <div
-                  key={summary.orderId || idx}
-                  className="active-order-card"
-                  onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
-                  style={{ animationDelay: `${idx * 0.05}s` }}
-                >
-                  <div className={`active-order-image ${summary.photoUrl ? 'has-image' : ''}`}>
-                    <span className="order-image-placeholder">IMG</span>
-                    {summary.photoUrl && (
-                      <img
-                        src={summary.photoUrl}
-                        alt={summary.offerTitle}
-                        loading="lazy"
-                        decoding="async"
-                        onError={(event) => {
-                          event.currentTarget.style.display = 'none'
-                          event.currentTarget.parentElement.classList.remove('has-image')
-                        }}
-                      />
-                    )}
-                    <div className="active-order-overlay"></div>
-                    <span className="active-order-quantity">{summary.quantity} dona</span>
-                  </div>
-                  <div className="active-order-body">
-                    <div className="active-order-title-row">
-                      <h4 className="active-order-title">{summary.storeName}</h4>
-                      <span
-                        className="active-order-status"
-                        style={{ color: statusInfo.color, background: statusInfo.bg }}
-                      >
-                        {statusInfo.text}
-                      </span>
-                    </div>
-                    <p className="active-order-subtitle">{formatOrderDateTime(summary.createdAt)}</p>
-                    <div className="active-order-footer">
-                      <span className="active-order-price">{formatSum(summary.totalPrice)} so'm</span>
-                      <button
-                        type="button"
-                        className="active-order-arrow"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (summary.orderId) {
-                            navigate(`/order/${summary.orderId}`)
-                          }
-                        }}
-                        aria-label="Buyurtma tafsilotlari"
-                      >
-                        <ArrowRight size={16} strokeWidth={2.4} />
-                      </button>
-                    </div>
-                    {canCancel && (
-                      <button
-                        type="button"
-                        className="active-order-cancel"
-                        disabled={cancelingOrderId === summary.orderId}
-                        onClick={async (event) => {
-                          event.stopPropagation()
-                          const orderId = summary.orderId
-                          setCancelingOrderId(orderId)
-
-                          setOrders(prev => prev.map(o =>
-                            (o.id || o.booking_id || o.order_id) === orderId
-                              ? { ...o, status: 'cancelled', order_status: 'cancelled' }
-                              : o
-                          ))
-
-                          try {
-                            await api.cancelOrder(orderId)
-                            toast.success('Buyurtma bekor qilindi')
-                            setTimeout(() => loadOrders(true), 500)
-                          } catch (error) {
-                            console.error('Cancel order failed:', error)
-                            loadOrders(true)
-                            const errorMsg =
-                              error?.response?.data?.detail ||
-                              error?.response?.data?.message ||
-                              error?.message
-                            toast.error(errorMsg || 'Bekor qilishda xatolik')
-                          } finally {
-                            setCancelingOrderId(null)
-                          }
-                        }}
-                      >
-                        {cancelingOrderId === summary.orderId ? 'Bekor qilinmoqda...' : 'Bekor qilish'}
-                      </button>
-                    )}
-                  </div>
+      <main className="orders-content">
+        {activeTab === TAB_ACTIVE ? (
+          <>
+            <section className="orders-section">
+              <div className="orders-section-header">
+                <h2 className="orders-section-title">Joriy buyurtma</h2>
+              </div>
+              {loading ? (
+                <div className="orders-loading">
+                  <div className="orders-spinner"></div>
+                  <p>Yuklanmoqda...</p>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
+              ) : activeOrders.length === 0 ? (
+                <div className="orders-empty">
+                  <div className="orders-empty-icon">*</div>
+                  <h3>Faol buyurtmalar yo'q</h3>
+                  <p>Yangi buyurtmalar shu yerda ko'rinadi.</p>
+                  <button className="orders-empty-btn" onClick={() => navigate('/')}>Xarid qilish</button>
+                </div>
+              ) : (
+                <div className="orders-active-list">
+                  {activeOrders.map((order, idx) => {
+                    const summary = getOrderSummary(order)
+                    const orderType = resolveOrderType(order)
+                    const statusInfo = getStatusInfo(summary.status, orderType)
+                    const canCancel = CANCELABLE_STATUSES.has(summary.orderStatus)
+                    const steps = getProgressSteps(orderType)
+                    const progressIndex = getProgressIndex(summary.orderStatus || summary.status, steps)
+                    const progressWidth = steps.length > 1
+                      ? Math.round((progressIndex / (steps.length - 1)) * 100)
+                      : 0
 
-      <section className="profile-section order-history-section">
-        <div className="profile-section-header">
-          <h3 className="profile-section-title">Buyurtmalar tarixi</h3>
-        </div>
-        {loading ? (
-          <div className="profile-section-loading">
-            <div className="profile-spinner"></div>
-            <p>Yuklanmoqda...</p>
-          </div>
-        ) : completedOrders.length === 0 ? (
-          <div className="profile-empty-state">
-            <div className="profile-empty-icon">IMG</div>
-            <h3>Buyurtmalar yo'q</h3>
-            <p>Birinchi buyurtmangizni bering!</p>
-            <button className="profile-cta-btn" onClick={() => navigate('/')}>Xarid qilish</button>
-          </div>
+                    return (
+                      <div
+                        key={summary.orderId || idx}
+                        className="order-card"
+                        style={{ animationDelay: `${idx * 0.04}s` }}
+                      >
+                        <div className="order-card-header">
+                          <div className={`order-card-thumb ${summary.photoUrl ? 'has-image' : ''}`}>
+                            {summary.photoUrl ? (
+                              <img
+                                src={summary.photoUrl}
+                                alt={summary.offerTitle}
+                                loading="lazy"
+                                decoding="async"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none'
+                                  event.currentTarget.parentElement.classList.remove('has-image')
+                                }}
+                              />
+                            ) : (
+                              <span>{summary.offerTitle.trim().charAt(0).toUpperCase()}</span>
+                            )}
+                          </div>
+                          <div className="order-card-main">
+                            <div className="order-card-title-row">
+                              <h3 className="order-card-title">{summary.storeName}</h3>
+                              <span
+                                className="order-card-status"
+                                style={{ color: statusInfo.color, borderColor: statusInfo.color }}
+                              >
+                                {statusInfo.text}
+                              </span>
+                            </div>
+                            <div className="order-card-meta">
+                              ID: #{summary.orderId} &bull; {summary.quantity} ta
+                            </div>
+                            <div className="order-card-sub">
+                              {formatOrderDate(summary.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="order-card-progress">
+                          <div className="order-card-progress-track">
+                            <div className="order-card-progress-line"></div>
+                            <div
+                              className="order-card-progress-fill"
+                              style={{ width: `${progressWidth}%` }}
+                            ></div>
+                            <div className="order-card-progress-dots">
+                              {steps.map((step, stepIdx) => (
+                                <span
+                                  key={`${summary.orderId}-step-${stepIdx}`}
+                                  className={`order-card-progress-dot ${stepIdx <= progressIndex ? 'active' : ''}`}
+                                ></span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="order-card-progress-labels">
+                            {steps.map((step, stepIdx) => (
+                              <span
+                                key={`${summary.orderId}-label-${stepIdx}`}
+                                className={stepIdx <= progressIndex ? 'active' : ''}
+                              >
+                                {step.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="order-card-actions">
+                          <button
+                            type="button"
+                            className="order-card-primary"
+                            onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
+                          >
+                            Tafsilotlar
+                          </button>
+                          <button
+                            type="button"
+                            className="order-card-icon"
+                            onClick={() => {
+                              const link = 'https://t.me/fudly_support'
+                              if (window.Telegram?.WebApp?.openTelegramLink) {
+                                window.Telegram.WebApp.openTelegramLink(link)
+                              } else {
+                                window.open(link, '_blank', 'noopener,noreferrer')
+                              }
+                            }}
+                            aria-label="Qo'llab-quvvatlash"
+                          >
+                            <MessageCircle size={18} strokeWidth={2} />
+                          </button>
+                        </div>
+
+                        <div className="order-card-footer">
+                          <span className="order-card-price">{formatSum(summary.totalPrice)} so'm</span>
+                          <button
+                            type="button"
+                            className="order-card-more"
+                            onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
+                          >
+                            Batafsil
+                            <ArrowRight size={14} strokeWidth={2.2} />
+                          </button>
+                        </div>
+
+                        {canCancel && (
+                          <button
+                            type="button"
+                            className="order-card-cancel"
+                            disabled={cancelingOrderId === summary.orderId}
+                            onClick={async () => {
+                              const orderId = summary.orderId
+                              setCancelingOrderId(orderId)
+
+                              setOrders(prev => prev.map(o =>
+                                (o.id || o.booking_id || o.order_id) === orderId
+                                  ? { ...o, status: 'cancelled', order_status: 'cancelled' }
+                                  : o
+                              ))
+
+                              try {
+                                await api.cancelOrder(orderId)
+                                toast.success('Buyurtma bekor qilindi')
+                                setTimeout(() => loadOrders(true), 500)
+                              } catch (error) {
+                                console.error('Cancel order failed:', error)
+                                loadOrders(true)
+                                const errorMsg =
+                                  error?.response?.data?.detail ||
+                                  error?.response?.data?.message ||
+                                  error?.message
+                                toast.error(errorMsg || 'Bekor qilishda xatolik')
+                              } finally {
+                                setCancelingOrderId(null)
+                              }
+                            }}
+                          >
+                            {cancelingOrderId === summary.orderId ? 'Bekor qilinmoqda...' : 'Bekor qilish'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="orders-section">
+              <div className="orders-section-header">
+                <h2 className="orders-section-title">Oldingi xaridlar</h2>
+              </div>
+              {loading ? (
+                <div className="orders-loading">
+                  <div className="orders-spinner"></div>
+                  <p>Yuklanmoqda...</p>
+                </div>
+              ) : completedOrders.length === 0 ? (
+                <div className="orders-empty compact">
+                  <h3>Buyurtmalar tarixi bo'sh</h3>
+                  <p>Birinchi buyurtmangizni bering!</p>
+                </div>
+              ) : (
+                <div className="orders-history-list">
+                  {completedOrders.map((order, idx) => {
+                    const summary = getOrderSummary(order)
+                    const statusInfo = getStatusInfo(summary.status, resolveOrderType(order))
+                    return (
+                      <button
+                        key={summary.orderId || `history-${idx}`}
+                        type="button"
+                        className="order-history-card"
+                        onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
+                      >
+                        <div className={`order-history-thumb ${summary.photoUrl ? 'has-image' : ''}`}>
+                          {summary.photoUrl ? (
+                            <img
+                              src={summary.photoUrl}
+                              alt={summary.offerTitle}
+                              loading="lazy"
+                              decoding="async"
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none'
+                                event.currentTarget.parentElement.classList.remove('has-image')
+                              }}
+                            />
+                          ) : (
+                            <span>{summary.offerTitle.trim().charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="order-history-main">
+                          <div className="order-history-row">
+                            <h4>{summary.storeName}</h4>
+                            <span className="order-history-price">{formatSum(summary.totalPrice)} so'm</span>
+                          </div>
+                          <div className="order-history-meta">
+                            <span>{formatOrderDate(summary.createdAt)}</span>
+                            <span className="order-history-dot"></span>
+                            <span className="order-history-status">{statusInfo.text}</span>
+                          </div>
+                        </div>
+                        <span className="order-history-action">
+                          Qayta
+                          <ArrowRight size={12} strokeWidth={2.2} />
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="orders-cta">
+              <button
+                type="button"
+                className="orders-cta-btn"
+                onClick={() => navigate('/')}
+              >
+                <div>
+                  <span className="orders-cta-title">Barqaror tanlov</span>
+                  <span className="orders-cta-text">Tumaningizdagi qolgan takliflarni ko'ring.</span>
+                </div>
+                <ArrowRight size={18} strokeWidth={2.2} />
+              </button>
+            </section>
+          </>
         ) : (
-          <div className="order-history-list">
-            {completedOrders.map((order, idx) => {
-              const summary = getOrderSummary(order)
-              return (
-                <button
-                  key={summary.orderId || `history-${idx}`}
-                  type="button"
-                  className="order-history-item"
-                  onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
-                >
-                  <div className="order-history-left">
-                    <div className={`order-history-thumb ${summary.photoUrl ? 'has-image' : ''}`}>
-                      <span>IMG</span>
-                      {summary.photoUrl && (
-                        <img
-                          src={summary.photoUrl}
-                          alt={summary.offerTitle}
-                          loading="lazy"
-                          decoding="async"
-                          onError={(event) => {
-                            event.currentTarget.style.display = 'none'
-                            event.currentTarget.parentElement.classList.remove('has-image')
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div className="order-history-info">
-                      <p className="order-history-title">{summary.storeName}</p>
-                      <p className="order-history-date">{formatOrderDateTime(summary.createdAt)}</p>
-                    </div>
-                  </div>
-                  <div className="order-history-right">
-                    <span className="order-history-price">{formatSum(summary.totalPrice)} so'm</span>
-                    <span className="order-history-action">
-                      Qayta
-                      <ArrowRight size={12} strokeWidth={2.2} />
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+          <section className="orders-section">
+            <div className="orders-section-header">
+              <h2 className="orders-section-title">Buyurtmalar tarixi</h2>
+            </div>
+            {loading ? (
+              <div className="orders-loading">
+                <div className="orders-spinner"></div>
+                <p>Yuklanmoqda...</p>
+              </div>
+            ) : completedOrders.length === 0 ? (
+              <div className="orders-empty">
+                <div className="orders-empty-icon">*</div>
+                <h3>Buyurtmalar tarixi bo'sh</h3>
+                <p>Yangi buyurtmalar shu yerda ko'rinadi.</p>
+                <button className="orders-empty-btn" onClick={() => navigate('/')}>Xarid qilish</button>
+              </div>
+            ) : (
+              <div className="orders-history-list">
+                {completedOrders.map((order, idx) => {
+                  const summary = getOrderSummary(order)
+                  const statusInfo = getStatusInfo(summary.status, resolveOrderType(order))
+                  return (
+                    <button
+                      key={summary.orderId || `history-${idx}`}
+                      type="button"
+                      className="order-history-card"
+                      onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
+                    >
+                      <div className={`order-history-thumb ${summary.photoUrl ? 'has-image' : ''}`}>
+                        {summary.photoUrl ? (
+                          <img
+                            src={summary.photoUrl}
+                            alt={summary.offerTitle}
+                            loading="lazy"
+                            decoding="async"
+                            onError={(event) => {
+                              event.currentTarget.style.display = 'none'
+                              event.currentTarget.parentElement.classList.remove('has-image')
+                            }}
+                          />
+                        ) : (
+                          <span>{summary.offerTitle.trim().charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="order-history-main">
+                        <div className="order-history-row">
+                          <h4>{summary.storeName}</h4>
+                          <span className="order-history-price">{formatSum(summary.totalPrice)} so'm</span>
+                        </div>
+                        <div className="order-history-meta">
+                          <span>{formatOrderDate(summary.createdAt)}</span>
+                          <span className="order-history-dot"></span>
+                          <span className="order-history-status">{statusInfo.text}</span>
+                        </div>
+                      </div>
+                      <span className="order-history-action">
+                        Qayta
+                        <ArrowRight size={12} strokeWidth={2.2} />
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </section>
         )}
-      </section>
+      </main>
 
       <BottomNav currentPage="orders" cartCount={cartCount} />
     </div>

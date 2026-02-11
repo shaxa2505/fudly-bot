@@ -1466,6 +1466,13 @@ function CartPage({ user }) {
     }
   }, [])
 
+  const getResolvedPhone = useCallback(() => {
+    const directPhone = (canonicalPhone || '').toString().trim()
+    if (directPhone) return directPhone
+    const stored = getCurrentUser()
+    return (stored?.phone || '').toString().trim()
+  }, [canonicalPhone])
+
   const requireVerifiedPhone = async () => {
     let verifiedPhone = canonicalPhone
     if (!verifiedPhone) {
