@@ -2266,7 +2266,8 @@ function CartPage({ user }) {
               const unitPrice = discountPrice ?? originalPrice ?? 0
               const showOriginalPrice = discountPrice != null && originalPrice != null && originalPrice > discountPrice
               const subtitle = item.offer.description || item.offer.short_description || item.offer.store_address || ''
-              const itemSubtitle = subtitle || storeName || ''
+              const storeLabel = item.offer.store_name || item.offer.store?.name || storeName || ''
+              const itemSubtitle = storeLabel || subtitle || ''
               const availability = getOfferAvailability(item.offer)
               const isUnavailableNow = availability.timeRange && !availability.isAvailableNow
               return (

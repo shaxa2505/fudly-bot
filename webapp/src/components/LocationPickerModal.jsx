@@ -28,7 +28,6 @@ const DEFAULT_DETAILS = {
 const QUICK_CHIPS = [
   { id: 'home', label: 'Home' },
   { id: 'work', label: 'Work' },
-  { id: 'yunusabad', label: 'Yunusabad' },
 ]
 
 const LOCAL_CITY_INDEX = (() => {
@@ -1080,7 +1079,7 @@ function LocationPickerModal({
                         type="text"
                         value={details.entrance}
                         onChange={(event) => handleDetailChange('entrance', event.target.value)}
-                        placeholder="1"
+                        placeholder="Masalan, 1"
                       />
                     </label>
                     <label className="location-picker-field">
@@ -1089,7 +1088,7 @@ function LocationPickerModal({
                         type="text"
                         value={details.floor}
                         onChange={(event) => handleDetailChange('floor', event.target.value)}
-                        placeholder="4"
+                        placeholder="Masalan, 4"
                       />
                     </label>
                     <label className="location-picker-field">
@@ -1098,7 +1097,7 @@ function LocationPickerModal({
                         type="text"
                         value={details.apartment}
                         onChange={(event) => handleDetailChange('apartment', event.target.value)}
-                        placeholder="24"
+                        placeholder="Masalan, 24"
                       />
                     </label>
                   </div>

@@ -434,6 +434,12 @@
   outline: none;
 }
 
+.location-picker-field input::placeholder,
+.location-picker-note::placeholder {
+  color: rgba(45, 45, 45, 0.35);
+  font-weight: 500;
+}
+
 .location-picker-note {
   resize: none;
   font-weight: 600;
@@ -498,6 +504,18 @@
   height: 100%;
   background: var(--color-bg-primary, #F9F9F9);
   animation: search-fade 0.22s ease;
+  position: relative;
+  padding-top: 8px;
+}
+
+.location-picker-search-view::before {
+  content: '';
+  width: 48px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  align-self: center;
+  margin-bottom: 10px;
 }
 
 .location-picker-search-header {
@@ -505,7 +523,7 @@
   grid-template-columns: 44px 1fr 44px;
   align-items: center;
   gap: 8px;
-  padding: 16px 20px 6px;
+  padding: 4px 20px 6px;
 }
 
 .location-picker-search-title {
@@ -553,7 +571,7 @@
 }
 
 .location-picker-search-field {
-  padding: 6px 20px 10px;
+  padding: 6px 20px 12px;
 }
 
 .location-picker-input {
@@ -561,8 +579,8 @@
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(45, 45, 45, 0.1);
+  border-radius: 20px;
+  border: 1px solid rgba(45, 45, 45, 0.12);
   background: #ffffff;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -602,6 +620,11 @@
   caret-color: var(--color-primary, #3A5A40);
 }
 
+.location-picker-input input::placeholder {
+  color: var(--color-text-muted, #8C8C8C);
+  font-weight: 500;
+}
+
 .location-picker-clear {
   border: none;
   background: rgba(0, 0, 0, 0.06);
@@ -627,7 +650,7 @@
 }
 
 .location-picker-results {
-  padding: 8px 20px 20px;
+  padding: 6px 20px 20px;
   overflow-y: auto;
   flex: 1;
   display: flex;
