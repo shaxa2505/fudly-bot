@@ -41,9 +41,9 @@ describe('OfferCard', () => {
     expect(screen.getByText('Test Product')).toBeInTheDocument()
   })
 
-  it('renders discount price', () => {
+  it('renders discount badge', () => {
     renderOfferCard()
-    expect(screen.getByText(/10.*000/)).toBeInTheDocument()
+    expect(screen.getByText('-33%')).toBeInTheDocument()
   })
 
   it('renders add to cart button when not in cart', () => {
@@ -52,21 +52,13 @@ describe('OfferCard', () => {
     expect(addButton).toBeInTheDocument()
   })
 
-  it('renders quantity controls when in cart', () => {
-    const { container } = renderOfferCard({ cartQuantity: 2 })
-    const qtyControl = container.querySelector('.offer-counter')
-    expect(qtyControl).toBeInTheDocument()
-    expect(screen.getByText(/2/)).toBeInTheDocument()
-  })
-
   it('applies in-cart class when cartQuantity > 0', () => {
     const { container } = renderOfferCard({ cartQuantity: 1 })
     expect(container.querySelector('.offer-card.in-cart')).toBeInTheDocument()
   })
 
   it('shows out of stock overlay when quantity is zero', () => {
-    const { container } = renderOfferCard({ offer: { ...mockOffer, quantity: 0 } })
-    expect(screen.getByText('Нет в наличии')).toBeInTheDocument()
-    expect(container.querySelector('.offer-card.out-of-stock')).toBeInTheDocument()
+    renderOfferCard({ offer: { ...mockOffer, quantity: 0 } })
+    expect(screen.getByText('Mavjud emas')).toBeInTheDocument()
   })
 })

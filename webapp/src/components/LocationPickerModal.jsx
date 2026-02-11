@@ -8,6 +8,7 @@ import {
   CITY_TRANSLATIONS,
 } from '../utils/cityUtils'
 import { getPreferredLocation } from '../utils/geolocation'
+import { readStorageItem, writeStorageItem } from '../utils/storage'
 import './LocationPickerModal.css'
 
 const LEAFLET_CDN = 'https://unpkg.com/leaflet@1.9.4/dist'
@@ -17,6 +18,18 @@ const REVERSE_GEOCODE_DELAY_MS = 280
 const MIN_REVERSE_DISTANCE_M = 18
 const GEO_ACCURACY_METERS = 200
 const CITY_SUGGESTION_LIMIT = 4
+const DETAILS_STORAGE_KEY = 'fudly_address_meta'
+const DEFAULT_DETAILS = {
+  entrance: '',
+  floor: '',
+  apartment: '',
+  note: '',
+}
+const QUICK_CHIPS = [
+  { id: 'home', label: 'Home' },
+  { id: 'work', label: 'Work' },
+  { id: 'yunusabad', label: 'Yunusabad' },
+]
 
 const LOCAL_CITY_INDEX = (() => {
   const seen = new Set()
@@ -265,6 +278,8 @@ function LocationPickerModal({
   const [mapAddress, setMapAddress] = useState('')
   const [mapLocation, setMapLocation] = useState(null)
   const [mapResolving, setMapResolving] = useState(false)
+  const [details, setDetails] = useState(DEFAULT_DETAILS)
+  const [activeChip, setActiveChip] = useState('home')
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const mapMarkerRef = useRef(null)
@@ -314,10 +329,31 @@ function LocationPickerModal({
       }
     }
     setMapResolving(false)
+    try {
+      const saved = readStorageItem(DETAILS_STORAGE_KEY)
+      const parsed = saved ? JSON.parse(saved) : {}
+      setDetails({
+        entrance: parsed?.entrance || '',
+        floor: parsed?.floor || '',
+        apartment: parsed?.apartment || '',
+        note: parsed?.note || '',
+      })
+    } catch {
+      setDetails(DEFAULT_DETAILS)
+    }
+    setActiveChip('home')
     return () => {
       activeRef.current = false
     }
   }, [isOpen, location?.address, location?.city, coords?.lat, coords?.lon])
+
+  const handleDetailChange = useCallback((field, value) => {
+    setDetails((prev) => ({ ...prev, [field]: value }))
+  }, [])
+
+  const handleChipSelect = useCallback((chipId) => {
+    setActiveChip(chipId)
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -756,19 +792,46 @@ function LocationPickerModal({
   }, [isOpen, mode, mapCenter?.lat, mapCenter?.lon])
 
   const handleConfirmMap = useCallback(() => {
-    if (mapLocation) {
-      onApply?.(mapLocation)
-      return
+    const normalizedDetails = {
+      entrance: details.entrance.trim(),
+      floor: details.floor.trim(),
+      apartment: details.apartment.trim(),
+      note: details.note.trim(),
     }
-    onApply?.({
-      city: location?.city || '',
-      address: mapAddress || '',
-      coordinates: { lat: mapCenter.lat, lon: mapCenter.lon },
-      region: location?.region || '',
-      district: location?.district || '',
-      source: 'geo',
-    })
-  }, [mapAddress, mapCenter?.lat, mapCenter?.lon, mapLocation, location, onApply])
+    try {
+      writeStorageItem(DETAILS_STORAGE_KEY, JSON.stringify(normalizedDetails))
+    } catch {
+      // ignore storage errors
+    }
+    const hasDetails = Object.values(normalizedDetails).some(Boolean)
+    const baseLocation = mapLocation
+      ? { ...mapLocation }
+      : {
+          city: location?.city || '',
+          address: mapAddress || '',
+          coordinates: { lat: mapCenter.lat, lon: mapCenter.lon },
+          region: location?.region || '',
+          district: location?.district || '',
+          source: 'geo',
+        }
+    if (hasDetails) {
+      baseLocation.details = normalizedDetails
+    }
+    onApply?.(baseLocation)
+  }, [
+    details.apartment,
+    details.entrance,
+    details.floor,
+    details.note,
+    mapAddress,
+    mapCenter.lat,
+    mapCenter.lon,
+    mapLocation,
+    location?.city,
+    location?.district,
+    location?.region,
+    onApply,
+  ])
 
   if (!isOpen) return null
 

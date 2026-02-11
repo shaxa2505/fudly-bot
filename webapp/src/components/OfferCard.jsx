@@ -319,10 +319,10 @@ const OfferCard = memo(function OfferCard({
         <h3 className="offer-title" title={titleText}>{titleText}</h3>
         <div className="offer-footer">
           <div className="offer-price-block">
+            <span className="offer-price">{priceLabel}</span>
             {oldPriceLabel && (
               <span className="offer-old-price">{oldPriceLabel}</span>
             )}
-            <span className="offer-price">{priceLabel}</span>
           </div>
           <div className="offer-action">
             <button
