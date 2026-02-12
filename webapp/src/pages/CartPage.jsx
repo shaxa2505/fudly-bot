@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, Minus, LocateFixed, Banknote, X } from 'lucide-react'
+import { ShoppingCart, Home, Sparkles, ChevronRight, Plus, LocateFixed, Banknote, X } from 'lucide-react'
+import QuantityControl from '../components/QuantityControl'
 import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -2329,24 +2330,17 @@ function CartPage({ user }) {
                           </span>
                         )}
                       </div>
-                      <div className="cart-item-qty">
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(item.offer.id, -1)}
-                          aria-label={`${item.offer.title} miqdorini kamaytirish`}
-                        >
-                          <Minus size={12} strokeWidth={2} />
-                        </button>
-                        <span className="cart-item-qty-value">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(item.offer.id, 1)}
-                          aria-label={`${item.offer.title} miqdorini oshirish`}
-                          disabled={item.quantity >= stockLimit || isUnavailableNow}
-                        >
-                          <Plus size={12} strokeWidth={2} />
-                        </button>
-                      </div>
+                      <QuantityControl
+                        value={item.quantity}
+                        onDecrement={() => handleQuantityChange(item.offer.id, -1)}
+                        onIncrement={() => handleQuantityChange(item.offer.id, 1)}
+                        disableIncrement={item.quantity >= stockLimit || isUnavailableNow}
+                        size="sm"
+                        className="cart-item-qty"
+                        decrementLabel={`${item.offer.title} miqdorini kamaytirish`}
+                        incrementLabel={`${item.offer.title} miqdorini oshirish`}
+                        stopPropagation
+                      />
                     </div>
                     {maxStock != null && item.quantity >= maxStock && (
                       <p className="cart-item-stock-warning">

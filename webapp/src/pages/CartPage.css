@@ -2081,61 +2081,35 @@
   color: #475569;
 }
 
-.cart-item-qty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #FFFFFF;
+.cart-item-qty.quantity-control {
+  --qc-height: 28px;
+  --qc-pad: 2px;
+  --qc-gap: 6px;
+  --qc-btn-size: 22px;
+  --qc-value-font: 12px;
+  min-width: 92px;
   border: 1px solid #E6EBF2;
-  border-radius: 999px;
-  height: 28px;
-  padding: 0 10px;
-  gap: 0;
   box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
-  flex: 0 0 auto;
-  min-width: 90px;
-  width: 90px;
-  overflow: hidden;
 }
 
-.cart-item-qty button {
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: #9AA4B2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  line-height: 0;
-  padding: 0;
-  transition: transform var(--transition-fast), background var(--transition-fast);
-  flex: 0 0 auto;
-}
-
-.cart-item-qty button svg {
-  display: block;
-}
-
-.cart-item-qty button:active {
-  transform: scale(0.94);
-  background: rgba(148, 163, 184, 0.18);
-}
-
-.cart-item-qty button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.cart-item-qty-value {
-  min-width: 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #2D2D2D;
+.cart-item-qty .quantity-control__btn {
+  width: var(--qc-btn-size);
+  height: var(--qc-btn-size);
+  font-size: 18px;
   line-height: 1;
-  text-align: center;
+  color: #9AA4B2;
+}
+
+.cart-item-qty .quantity-control__btn:active:not(:disabled) {
+  background: rgba(148, 163, 184, 0.18);
+  transform: scale(0.94);
+}
+
+.cart-item-qty .quantity-control__value {
+  min-width: 16px;
+  font-size: var(--qc-value-font);
+  font-weight: 700;
+  color: #2D2D2D;
 }
 
 .cart-recommendations {
@@ -2374,16 +2348,10 @@
     padding: 0;
   }
 
-  .cart-item-qty {
-    height: 26px;
+  .cart-item-qty.quantity-control {
+    --qc-height: 26px;
+    --qc-btn-size: 18px;
     min-width: 84px;
-    width: 84px;
-    padding: 0 8px;
-  }
-
-  .cart-item-qty button {
-    width: 18px;
-    height: 18px;
   }
 }
 
