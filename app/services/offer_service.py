@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.cache import CacheManager
+from app.core.location_search import build_nearby_radius_steps
 from app.core.utils import get_field, get_offer_field, get_store_field
 from app.repositories import OfferRepository, StoreRepository
 
@@ -107,6 +108,7 @@ class OfferService:
         district: str | None = None,
         latitude: float | None = None,
         longitude: float | None = None,
+        max_distance_km: float | None = None,
         sort_by: str | None = None,
         min_price: float | None = None,
         max_price: float | None = None,
@@ -118,36 +120,69 @@ class OfferService:
         """Return hot offers with optional location scoping and fallback."""
         raw_offers: list[Any] = []
         used_scope = (None, None, None)
-        scopes = self._build_location_scopes(city, region, district)
+        used_nearby_strategy = False
+        has_precise_location = latitude is not None and longitude is not None
 
-        for scope_city, scope_region, scope_district in scopes:
-            raw_offers = self._fetch_hot_offers(
-                scope_city,
-                scope_region,
-                scope_district,
-                limit,
-                offset,
-                sort_by,
-                min_price,
-                max_price,
-                min_discount,
-                category,
-                store_id,
-                only_today,
-                latitude,
-                longitude,
-            )
-            if raw_offers is None:
-                raw_offers = []
-            elif not isinstance(raw_offers, list):
-                raw_offers = list(raw_offers)
-            used_scope = (scope_city, scope_region, scope_district)
-            if raw_offers:
-                break
+        if has_precise_location and hasattr(self._db, "get_nearby_offers"):
+            for radius_km in build_nearby_radius_steps(max_distance_km):
+                raw = self._db.get_nearby_offers(
+                    latitude=latitude,
+                    longitude=longitude,
+                    limit=limit,
+                    offset=offset,
+                    category=category,
+                    sort_by=sort_by,
+                    min_price=min_price,
+                    max_price=max_price,
+                    min_discount=min_discount,
+                    store_id=store_id,
+                    only_today=only_today,
+                    max_distance_km=radius_km,
+                )
+                if raw is None:
+                    raw_offers = []
+                elif isinstance(raw, list):
+                    raw_offers = raw
+                else:
+                    raw_offers = list(raw)
+                if raw_offers:
+                    used_nearby_strategy = True
+                    break
+
+        if not raw_offers:
+            scopes = self._build_location_scopes(city, region, district)
+            for scope_city, scope_region, scope_district in scopes:
+                raw = self._fetch_hot_offers(
+                    scope_city,
+                    scope_region,
+                    scope_district,
+                    limit,
+                    offset,
+                    sort_by,
+                    min_price,
+                    max_price,
+                    min_discount,
+                    category,
+                    store_id,
+                    only_today,
+                    latitude,
+                    longitude,
+                )
+                if raw is None:
+                    raw_offers = []
+                elif isinstance(raw, list):
+                    raw_offers = raw
+                else:
+                    raw_offers = list(raw)
+                used_scope = (scope_city, scope_region, scope_district)
+                if raw_offers:
+                    break
 
         total = 0
         if raw_offers:
-            if hasattr(self._db, "count_offers_by_filters"):
+            if used_nearby_strategy:
+                total = len(raw_offers)
+            elif hasattr(self._db, "count_offers_by_filters"):
                 total = int(
                     self._db.count_offers_by_filters(
                         city=used_scope[0],
@@ -169,25 +204,6 @@ class OfferService:
                         district=used_scope[2],
                     )
                 )
-        elif latitude is not None and longitude is not None and hasattr(self._db, "get_nearby_offers"):
-            raw_offers = self._db.get_nearby_offers(
-                latitude=latitude,
-                longitude=longitude,
-                limit=limit,
-                offset=offset,
-                category=category,
-                sort_by=sort_by,
-                min_price=min_price,
-                max_price=max_price,
-                min_discount=min_discount,
-                store_id=store_id,
-                only_today=only_today,
-            )
-            if raw_offers is None:
-                raw_offers = []
-            elif not isinstance(raw_offers, list):
-                raw_offers = list(raw_offers)
-            total = len(raw_offers)
 
         items = [self._to_offer_list_item(row) for row in raw_offers]
         return OfferListResult(items=items, total=total)

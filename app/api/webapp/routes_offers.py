@@ -1,27 +1,29 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import inspect
 import os
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from app.api.rate_limit import limiter
+from app.core.caching import get_cache_service
+from app.core.location_search import build_nearby_radius_steps
+from app.core.utils import normalize_city
+
 from .common import (
     CATEGORIES,
+    PRICE_STORAGE_UNIT,
     CategoryResponse,
     OfferListResponse,
     OfferResponse,
-    PRICE_STORAGE_UNIT,
     get_db,
     get_val,
     is_offer_active,
     logger,
     normalize_price,
 )
-from app.core.utils import normalize_city
-from app.core.caching import get_cache_service
-from app.api.rate_limit import limiter
 
 router = APIRouter()
 
@@ -432,8 +434,7 @@ async def get_offers(
         apply_filters = True
         apply_sort = True
         apply_slice = True
-        max_distance = max_distance_km if max_distance_km is not None else 10.0
-        extended_distance = max_distance if max_distance_km is not None else 25.0
+        nearby_radius_steps = build_nearby_radius_steps(max_distance_km)
 
         cache_ttl = _get_cache_ttl(
             "WEBAPP_CACHE_SEARCH_TTL" if search else "WEBAPP_CACHE_OFFERS_TTL",
@@ -524,24 +525,11 @@ async def get_offers(
             apply_sort = False
             apply_slice = False
         else:
-            async def _fetch_nearby_offers() -> list[Any]:
+            async def _fetch_nearby_offers() -> tuple[list[Any], float | None]:
                 if lat_val is None or lon_val is None or not hasattr(db, "get_nearby_offers"):
-                    return []
-                nearby = await _db_call(
-                    db,
-                    "get_nearby_offers",
-                    latitude=lat_val,
-                    longitude=lon_val,
-                    limit=limit,
-                    offset=offset,
-                    category=category_filter,
-                    sort_by=sort_key,
-                    min_price=storage_min_price,
-                    max_price=storage_max_price,
-                    min_discount=min_discount,
-                    max_distance_km=max_distance,
-                )
-                if not nearby and extended_distance and extended_distance > max_distance:
+                    return [], None
+
+                for radius_km in nearby_radius_steps:
                     nearby = await _db_call(
                         db,
                         "get_nearby_offers",
@@ -554,13 +542,11 @@ async def get_offers(
                         min_price=storage_min_price,
                         max_price=storage_max_price,
                         min_discount=min_discount,
-                        max_distance_km=extended_distance,
+                        max_distance_km=radius_km,
                     )
-                return nearby
-
-            has_location_filters = bool(normalized_city or region or district)
-            if not has_location_filters:
-                raw_offers = await _fetch_nearby_offers()
+                    if nearby:
+                        return nearby, radius_km
+                return [], None
 
             async def _fetch_scoped_offers(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
@@ -639,6 +625,10 @@ async def get_offers(
                     )
                 return []
 
+            has_precise_location = lat_val is not None and lon_val is not None
+            if has_precise_location:
+                raw_offers, _ = await _fetch_nearby_offers()
+
             scopes: list[tuple[str | None, str | None, str | None]] = []
             if district:
                 scopes.append((None, region, district))
@@ -656,13 +646,14 @@ async def get_offers(
                 if scope in seen:
                     continue
                 seen.add(scope)
-                if not raw_offers:
-                    raw_offers = await _fetch_scoped_offers(*scope)
+                if raw_offers:
+                    break
+                raw_offers = await _fetch_scoped_offers(*scope)
                 if raw_offers:
                     break
 
-            if not raw_offers:
-                raw_offers = await _fetch_nearby_offers()
+            if not raw_offers and not has_precise_location:
+                raw_offers, _ = await _fetch_nearby_offers()
 
             apply_filters = False
             apply_sort = False

@@ -14,9 +14,11 @@ def _get_offers():
 
 
 class DummyOffersDb:
-    def __init__(self, hot_offers, nearby_offers):
+    def __init__(self, hot_offers, nearby_offers, nearby_by_radius=None):
         self._hot_offers = hot_offers
         self._nearby_offers = nearby_offers
+        self._nearby_by_radius = nearby_by_radius or {}
+        self.nearby_calls = []
 
     async def get_hot_offers(
         self,
@@ -52,6 +54,10 @@ class DummyOffersDb:
         store_id=None,
         only_today=False,
     ):
+        self.nearby_calls.append(max_distance_km)
+        if self._nearby_by_radius:
+            rounded = round(float(max_distance_km or 0), 1)
+            return list(self._nearby_by_radius.get(rounded, []))
         return list(self._nearby_offers)
 
 
@@ -102,12 +108,12 @@ async def _call_offers(get_offers, db, **overrides):
 
 
 @pytest.mark.asyncio
-async def test_city_scoped_offers_preferred_over_nearby():
+async def test_nearby_preferred_over_city_when_coordinates_present():
     db = DummyOffersDb(hot_offers=[_sample_offer(1)], nearby_offers=[_sample_offer(2)])
     get_offers = _get_offers()
     result = await _call_offers(get_offers, db, city="Tashkent", lat=41.3, lon=69.2)
 
-    assert [item.id for item in result] == [1]
+    assert [item.id for item in result] == [2]
 
 
 @pytest.mark.asyncio
@@ -117,3 +123,39 @@ async def test_nearby_used_when_no_city_offers():
     result = await _call_offers(get_offers, db, city="Tashkent", lat=41.3, lon=69.2)
 
     assert [item.id for item in result] == [2]
+
+
+@pytest.mark.asyncio
+async def test_nearby_radius_expands_until_results():
+    db = DummyOffersDb(
+        hot_offers=[_sample_offer(1)],
+        nearby_offers=[],
+        nearby_by_radius={
+            3.0: [],
+            7.0: [_sample_offer(2)],
+        },
+    )
+    get_offers = _get_offers()
+    result = await _call_offers(get_offers, db, city="Tashkent", lat=41.3, lon=69.2)
+
+    assert [item.id for item in result] == [2]
+    assert db.nearby_calls == [3.0, 7.0]
+
+
+@pytest.mark.asyncio
+async def test_scoped_fallback_used_if_nearby_empty():
+    db = DummyOffersDb(
+        hot_offers=[_sample_offer(1)],
+        nearby_offers=[],
+        nearby_by_radius={
+            3.0: [],
+            7.0: [],
+            15.0: [],
+            25.0: [],
+        },
+    )
+    get_offers = _get_offers()
+    result = await _call_offers(get_offers, db, city="Tashkent", lat=41.3, lon=69.2)
+
+    assert [item.id for item in result] == [1]
+    assert db.nearby_calls == [3.0, 7.0, 15.0, 25.0]

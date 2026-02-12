@@ -106,6 +106,88 @@ class TestOfferService:
             only_today=False,
         )
 
+    def test_list_hot_offers_prefers_nearby_with_coordinates(
+        self, service: OfferService, mock_db: MagicMock
+    ) -> None:
+        """Coordinates should trigger near-first strategy before scoped city lookup."""
+        nearby_offer = {
+            "offer_id": 2,
+            "store_id": 11,
+            "title": "Nearby Offer",
+            "original_price": 10000.0,
+            "discount_price": 7000.0,
+            "quantity": 5,
+            "unit": "шт",
+            "category": "bakery",
+            "store_name": "Nearby Store",
+            "address": "Nearby address",
+            "discount_percent": 30.0,
+        }
+        mock_db.get_nearby_offers.side_effect = (
+            lambda **kwargs: [nearby_offer] if kwargs.get("max_distance_km") == 3.0 else []
+        )
+
+        result = service.list_hot_offers(
+            city="Ташкент",
+            limit=10,
+            offset=0,
+            latitude=41.3,
+            longitude=69.2,
+        )
+
+        assert result.total == 1
+        assert len(result.items) == 1
+        assert result.items[0].id == 2
+        mock_db.get_hot_offers.assert_not_called()
+        mock_db.count_offers_by_filters.assert_not_called()
+
+    def test_list_hot_offers_expands_radius_then_falls_back_to_scoped(
+        self, service: OfferService, mock_db: MagicMock
+    ) -> None:
+        """If nearby is empty on all default radii, service should use scoped city query."""
+        radius_calls: list[float] = []
+
+        def _nearby(**kwargs):
+            radius_calls.append(float(kwargs.get("max_distance_km") or 0))
+            return []
+
+        mock_db.get_nearby_offers.side_effect = _nearby
+
+        result = service.list_hot_offers(
+            city="Ташкент",
+            limit=10,
+            offset=0,
+            latitude=41.3,
+            longitude=69.2,
+        )
+
+        assert [item.id for item in result.items] == [1]
+        assert radius_calls == [3.0, 7.0, 15.0, 25.0]
+        mock_db.get_hot_offers.assert_called_once()
+
+    def test_list_hot_offers_respects_explicit_nearby_radius(
+        self, service: OfferService, mock_db: MagicMock
+    ) -> None:
+        """Explicit max distance should disable auto-expansion."""
+        radius_calls: list[float] = []
+
+        def _nearby(**kwargs):
+            radius_calls.append(float(kwargs.get("max_distance_km") or 0))
+            return []
+
+        mock_db.get_nearby_offers.side_effect = _nearby
+
+        service.list_hot_offers(
+            city="Ташкент",
+            limit=10,
+            offset=0,
+            latitude=41.3,
+            longitude=69.2,
+            max_distance_km=12.5,
+        )
+
+        assert radius_calls == [12.5]
+
     def test_get_store_returns_details(self, mock_db: MagicMock) -> None:
         """Test get_store returns StoreDetails."""
         # Store tuple structure (matching database schema):
