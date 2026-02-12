@@ -114,6 +114,7 @@ function HomePage() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchResults, setSearchResults] = useState({ offers: [], stores: [] })
   const [searchResultsLoading, setSearchResultsLoading] = useState(false)
+  const [virtuosoScrollParent, setVirtuosoScrollParent] = useState(null)
   const searchInputRef = useRef(null)
   const searchResultsRequestRef = useRef(0)
   const categoriesScrollRef = useRef(null)
@@ -253,6 +254,14 @@ function HomePage() {
     loadingRef.current = false
     pendingScrollRef.current = Number.isFinite(cached.scrollTop) ? cached.scrollTop : 0
   }, [locationCacheKey])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    const rafId = requestAnimationFrame(() => {
+      setVirtuosoScrollParent(getScrollContainer())
+    })
+    return () => cancelAnimationFrame(rafId)
+  }, [])
 
   const registerCategoryTab = useCallback((id, node) => {
     if (node) {
@@ -986,7 +995,6 @@ function HomePage() {
                 className="search-clear"
                 onClick={() => {
                   setSearchQuery('')
-                  setSearchSuggestions([])
                   setSearchResults({ offers: [], stores: [] })
                   setSearchResultsLoading(false)
                 }}
@@ -1331,7 +1339,7 @@ function HomePage() {
       ) : (
         <VirtuosoGrid
           data={offers}
-          useWindowScroll
+          customScrollParent={virtuosoScrollParent || undefined}
           listClassName="offers-grid"
           overscan={200}
           endReached={() => {

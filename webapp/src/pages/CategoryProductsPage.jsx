@@ -74,6 +74,7 @@ function CategoryProductsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [virtuosoScrollParent, setVirtuosoScrollParent] = useState(null)
   const [minDiscount, setMinDiscount] = useState(null)
   const [priceRange, setPriceRange] = useState('all')
   const [sortBy, setSortBy] = useState('default')
@@ -122,6 +123,14 @@ function CategoryProductsPage() {
       })
     })
   }, [offers.length])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    const rafId = requestAnimationFrame(() => {
+      setVirtuosoScrollParent(getScrollContainer())
+    })
+    return () => cancelAnimationFrame(rafId)
+  }, [])
 
   const loadOffers = async (options = {}) => {
     const { searchOverride, reset = false } = options
@@ -485,7 +494,7 @@ function CategoryProductsPage() {
       ) : (
         <VirtuosoGrid
           data={offers}
-          useWindowScroll
+          customScrollParent={virtuosoScrollParent || undefined}
           listClassName="products-grid"
           overscan={200}
           endReached={() => {

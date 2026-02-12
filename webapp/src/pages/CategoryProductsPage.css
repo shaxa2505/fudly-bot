@@ -327,11 +327,6 @@
   padding: 12px var(--page-padding-x) 24px;
 }
 
-.products-grid > * {
-  content-visibility: auto;
-  contain-intrinsic-size: 260px 200px;
-}
-
 .category-empty {
   grid-column: 1 / -1;
 }
