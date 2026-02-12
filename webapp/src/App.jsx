@@ -150,12 +150,14 @@ function AppContent() {
       const contentLeft = Math.max(readInset(contentInsets, 'left'), safeLeft)
 
       applyInsets({
-        top: contentTop,
+        // Keep headers aligned with Telegram chrome buttons on inner pages.
+        top: safeTop,
         right: contentRight,
         bottom: contentBottom,
         left: contentLeft,
       })
-      root.style.setProperty('--tg-top-inset', toPx(contentTop))
+      root.style.setProperty('--tg-top-inset', toPx(safeTop))
+      root.style.setProperty('--tg-content-top-inset', toPx(contentTop))
       root.style.setProperty('--safe-area-top-raw', toPx(safeTop))
     }
 
