@@ -170,14 +170,35 @@ function YanaPage({ user }) {
 
   const loadSavedMetric = async (force = false) => {
     try {
-      const response = await api.getOrders({ force })
+      const summary = await api.getOrdersSummary({ force })
+      const totalWeight = Number(summary?.saved_weight_kg || 0)
+      const totalQuantity = Number(summary?.completed_quantity || 0)
+
+      if (totalWeight > 0) {
+        const formatted = Number.isInteger(totalWeight)
+          ? totalWeight.toFixed(0)
+          : totalWeight.toFixed(1)
+        setSavedMetric({ value: formatted, unit: 'kg' })
+        return
+      }
+
+      if (Number.isFinite(totalQuantity)) {
+        setSavedMetric({ value: totalQuantity, unit: 'ta' })
+        return
+      }
+    } catch (error) {
+      console.warn('Failed to load saved metric summary:', error)
+    }
+
+    try {
+      const response = await api.getOrders({ force, limit: 100, offset: 0, include_meta: true })
       const allOrders = [
         ...(response.orders || []),
         ...(response.bookings || []),
       ]
       setSavedMetric(calculateSavedMetric(allOrders))
     } catch (error) {
-      console.warn('Failed to load saved metric:', error)
+      console.warn('Failed to load saved metric fallback:', error)
       setSavedMetric({ value: 0, unit: 'ta' })
     }
   }

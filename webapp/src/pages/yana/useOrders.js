@@ -69,7 +69,11 @@ export function useOrders(activeSection) {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const { bookings = [], orders: rawOrders = [] } = await api.getOrders()
+      const { bookings = [], orders: rawOrders = [] } = await api.getOrders({
+        limit: 100,
+        offset: 0,
+        include_meta: true,
+      })
 
       const normalizedOrders = normalizeOrders(rawOrders)
       const normalizedBookings = normalizeBookings(bookings)

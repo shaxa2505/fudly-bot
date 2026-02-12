@@ -158,14 +158,17 @@ function OrdersPage() {
   }, [])
 
   useEffect(() => {
+    if (activeTab !== TAB_ACTIVE) return undefined
+    const hasActive = orders.some((o) => ACTIVE_STATUSES.has(o.status))
+    if (!hasActive) return undefined
+
     const interval = setInterval(() => {
-      if (orders.some(o => ACTIVE_STATUSES.has(o.status))) {
-        refreshOrders()
-      }
-    }, 10000)
+      if (document.visibilityState !== 'visible') return
+      refreshOrders()
+    }, 30000)
 
     return () => clearInterval(interval)
-  }, [orders])
+  }, [activeTab, orders])
 
   const toNumeric = (value) => {
     if (typeof value === 'string') {

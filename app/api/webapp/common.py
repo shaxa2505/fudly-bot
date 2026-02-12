@@ -318,6 +318,12 @@ class OrderResponse(BaseModel):
     items_count: float
 
 
+class OrdersSummaryResponse(BaseModel):
+    completed_orders: int = 0
+    completed_quantity: float = 0
+    saved_weight_kg: float | None = None
+
+
 class FavoriteRequest(BaseModel):
     offer_id: int | None = None
     store_id: int | None = None
@@ -556,6 +562,7 @@ __all__ = [
     "OrderItem",
     "CreateOrderRequest",
     "OrderResponse",
+    "OrdersSummaryResponse",
     "FavoriteRequest",
     "CartItem",
     "CartResponse",

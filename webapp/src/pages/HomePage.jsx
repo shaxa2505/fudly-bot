@@ -117,7 +117,6 @@ function HomePage() {
   const searchResultsRequestRef = useRef(0)
   const categoriesScrollRef = useRef(null)
   const categoryTabRefs = useRef(new Map())
-  const categoryMarkersRef = useRef([])
   const activeCategoryRef = useRef(activeCategory)
   const manualSearchRef = useRef(0)
   const latestRequestRef = useRef(0)
@@ -142,7 +141,6 @@ function HomePage() {
         .join(', ')
     : ''
   const hasPreciseLocation = Boolean(location.coordinates || location.address)
-  const observerTarget = useRef(null)
   const autoLocationAttempted = useRef(null)
   const loadingRef = useRef(false)
   const offsetRef = useRef(0)
@@ -285,12 +283,6 @@ function HomePage() {
   }, [selectedCategory])
 
   useEffect(() => {
-    categoryMarkersRef.current = Array.from(
-      document.querySelectorAll('.home-page [data-category-id]')
-    )
-  }, [offers, selectedCategory])
-
-  useEffect(() => {
     if (pendingScrollRef.current == null) return
     const targetScroll = pendingScrollRef.current
     pendingScrollRef.current = null
@@ -308,55 +300,13 @@ function HomePage() {
     })
   }, [offers.length])
 
-  // Sync active tab with scroll position when showing all categories.
-  useEffect(() => {
+  const handleOffersRange = useCallback((range) => {
     if (selectedCategory !== 'all' || searchQuery.trim()) return
-    let rafId = 0
-
-    const updateActiveFromScroll = () => {
-      rafId = 0
-      const markers = categoryMarkersRef.current
-      if (!markers.length) return
-
-      const subheader = document.querySelector('.home-subheader')
-      const stickyOffset = subheader
-        ? Math.max(subheader.getBoundingClientRect().bottom, 0) + 4
-        : 0
-
-      let candidate = null
-      for (const marker of markers) {
-        const rect = marker.getBoundingClientRect()
-        if (rect.bottom <= stickyOffset) continue
-        candidate = marker
-        break
-      }
-
-      if (!candidate) return
-      const nextCategory = normalizeCategoryId(candidate.dataset.categoryId || 'all')
-      if (nextCategory !== activeCategoryRef.current) {
-        setActiveCategory(nextCategory)
-      }
-    }
-
-    const onScroll = () => {
-      if (rafId) return
-      rafId = window.requestAnimationFrame(updateActiveFromScroll)
-    }
-
-    const scrollContainer = getScrollContainer()
-    if (!scrollContainer) {
-      updateActiveFromScroll()
-      return () => {
-        if (rafId) window.cancelAnimationFrame(rafId)
-      }
-    }
-
-    scrollContainer.addEventListener('scroll', onScroll, { passive: true })
-    updateActiveFromScroll()
-
-    return () => {
-      scrollContainer.removeEventListener('scroll', onScroll)
-      if (rafId) window.cancelAnimationFrame(rafId)
+    const firstVisible = offers[range.startIndex]
+    if (!firstVisible) return
+    const nextCategory = normalizeCategoryId(firstVisible.category || 'all')
+    if (nextCategory !== activeCategoryRef.current) {
+      setActiveCategory(nextCategory)
     }
   }, [selectedCategory, searchQuery, offers])
 
@@ -914,24 +864,6 @@ function HomePage() {
     return () => clearTimeout(timer)
   }, [selectedCategory, searchQuery, cityForApi, location.region, location.district, minDiscount, sortBy, priceRange, loadOffers])
 
-  // Infinite scroll
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMore) {
-          loadOffers(false)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current)
-    }
-
-    return () => observer.disconnect()
-  }, [hasMore, loadOffers])
-
   // Cart is now saved automatically via CartContext
 
   const reverseGeocode = async (lat, lon) => {
@@ -1364,12 +1296,14 @@ function HomePage() {
       </div>
 
       {/* Offers Grid */}
-      <div className="offers-grid">
-        {loading && offers.length === 0 ? (
-          Array.from({ length: 6 }).map((_, i) => (
+      {loading && offers.length === 0 ? (
+        <div className="offers-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
             <OfferCardSkeleton key={i} />
-          ))
-        ) : offers.length === 0 ? (
+          ))}
+        </div>
+      ) : offers.length === 0 ? (
+        <div className="offers-grid">
           <div className="empty-state">
             <div className="empty-state-icon">
               <Search size={80} strokeWidth={1.5} color="#7C7C7C" aria-hidden="true" />
@@ -1392,33 +1326,46 @@ function HomePage() {
               Filterni tozalash
             </button>
           </div>
-        ) : (
-          offers.map((offer, index) => {
-            const offerKey = offer.id || offer.offer_id || `${offer.store_id || 'store'}-${offer.title || 'offer'}-${index}`
-            return (
-              <div
-                key={offerKey}
-                className="offer-card-wrapper"
-                data-category-id={normalizeCategoryId(offer.category)}
-              >
-                <OfferCard
-                  offer={offer}
-                  cartQuantity={getQuantity(offer.id || offer.offer_id)}
-                  onAddToCart={addToCart}
-                  onRemoveFromCart={removeFromCart}
-                  imagePriority={index < 4}
-                />
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* Loading more */}
-      {hasMore && (
-        <div ref={observerTarget} className="loading-more">
-          {loading && <div className="spinner" />}
         </div>
+      ) : (
+        <VirtuosoGrid
+          data={offers}
+          useWindowScroll
+          listClassName="offers-grid"
+          overscan={200}
+          endReached={() => {
+            if (hasMore && !loadingRef.current) {
+              loadOffers(false)
+            }
+          }}
+          rangeChanged={handleOffersRange}
+          itemKey={(index, offer) => (
+            offer.id || offer.offer_id || `${offer.store_id || 'store'}-${offer.title || 'offer'}-${index}`
+          )}
+          components={{
+            Footer: () => (
+              hasMore ? (
+                <div className="loading-more">
+                  {loading && <span>Yuklanmoqda...</span>}
+                </div>
+              ) : null
+            ),
+          }}
+          itemContent={(index, offer) => (
+            <div
+              className="offer-card-wrapper"
+              data-category-id={normalizeCategoryId(offer.category)}
+            >
+              <OfferCard
+                offer={offer}
+                cartQuantity={getQuantity(offer.id || offer.offer_id)}
+                onAddToCart={addToCart}
+                onRemoveFromCart={removeFromCart}
+                imagePriority={index < 4}
+              />
+            </div>
+          )}
+        />
       )}
 
       {/* Bottom Navigation */}

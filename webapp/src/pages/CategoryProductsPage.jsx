@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation } from 'react-router-dom'
+import { VirtuosoGrid } from 'react-virtuoso'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import OfferCard from '../components/OfferCard'
@@ -260,11 +261,6 @@ function CategoryProductsPage() {
     setSortBy('default')
   }
 
-  const handleLoadMore = async () => {
-    if (loadingMore || !hasMore) return
-    await loadOffers({ reset: false })
-  }
-
   const renderFilterChips = () => {
     if (!hasActiveFilters) return null
 
@@ -456,12 +452,14 @@ function CategoryProductsPage() {
       {renderFilterChips()}
 
       {/* Products Grid */}
-      <div className="products-grid">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
+      {loading ? (
+        <div className="products-grid">
+          {Array.from({ length: 6 }).map((_, i) => (
             <OfferCardSkeleton key={i} />
-          ))
-        ) : offers.length === 0 ? (
+          ))}
+        </div>
+      ) : offers.length === 0 ? (
+        <div className="products-grid">
           <div className="category-empty">
             <div className="empty-state">
               <div className="empty-state-icon" aria-hidden="true">
@@ -483,31 +481,40 @@ function CategoryProductsPage() {
               )}
             </div>
           </div>
-        ) : (
-          offers.map((offer, index) => (
+        </div>
+      ) : (
+        <VirtuosoGrid
+          data={offers}
+          useWindowScroll
+          listClassName="products-grid"
+          overscan={200}
+          endReached={() => {
+            if (hasMore && !loading && !loadingMore) {
+              loadOffers({ reset: false })
+            }
+          }}
+          itemKey={(index, offer) => (
+            offer.id || offer.offer_id || `${offer.store_id || 'store'}-${index}`
+          )}
+          components={{
+            Footer: () => (
+              hasMore ? (
+                <div className="category-load-more">
+                  {loadingMore && <span>Yuklanmoqda...</span>}
+                </div>
+              ) : null
+            ),
+          }}
+          itemContent={(index, offer) => (
             <OfferCard
-              key={offer.id}
               offer={offer}
-              cartQuantity={getQuantity(offer.id)}
+              cartQuantity={getQuantity(offer.id || offer.offer_id)}
               onAddToCart={addToCart}
               onRemoveFromCart={removeFromCart}
               imagePriority={index < 4}
             />
-          ))
-        )}
-      </div>
-
-      {!loading && hasMore && (
-        <div className="category-load-more">
-          <button
-            type="button"
-            className="category-load-more-btn"
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-          >
-            {loadingMore ? 'Yuklanmoqda...' : 'Yana yuklash'}
-          </button>
-        </div>
+          )}
+        />
       )}
 
       <ScrollTopButton />

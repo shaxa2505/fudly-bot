@@ -39,6 +39,7 @@ from app.api.rate_limit import limiter
 from .common import (
     CreateOrderRequest,
     OrderResponse,
+    OrdersSummaryResponse,
     get_current_user,
     get_db,
     get_val,
@@ -109,6 +110,44 @@ def _require_user_id(user: dict[str, Any]) -> int:
     if user_id == 0:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user_id
+
+
+_COMPLETED_STATUSES = ("completed", "cancelled", "rejected")
+
+
+async def _fetch_completed_stats(
+    db: Any,
+    table: str,
+    status_field: str,
+    user_id: int,
+) -> tuple[int, float]:
+    query = f"""
+        SELECT
+            COUNT(*) AS cnt,
+            COALESCE(SUM(quantity), 0) AS qty
+        FROM {table}
+        WHERE user_id = %s
+          AND LOWER(COALESCE({status_field}, '')) = ANY(%s)
+    """
+    try:
+        rows = await db.execute(query, (int(user_id), list(_COMPLETED_STATUSES)))
+    except Exception as exc:
+        logger.warning("Orders summary query failed for %s: %s", table, exc)
+        return 0, 0.0
+
+    if not rows:
+        return 0, 0.0
+
+    row = rows[0]
+    try:
+        count = int(row[0] or 0)
+    except Exception:
+        count = int(getattr(row, "get", lambda *_: 0)("cnt", 0) or 0)
+    try:
+        quantity = float(row[1] or 0)
+    except Exception:
+        quantity = float(getattr(row, "get", lambda *_: 0)("qty", 0) or 0)
+    return count, quantity
 
 
 def _normalize_phone(raw_phone: str | None) -> str:
@@ -849,6 +888,36 @@ async def get_orders(
         "has_more": has_more,
         "next_offset": next_offset,
     }
+
+
+@router.get("/orders/summary", response_model=OrdersSummaryResponse)
+@limiter.limit("60/minute")
+async def get_orders_summary(
+    db=Depends(get_db),
+    user: dict = Depends(get_current_user),
+) -> OrdersSummaryResponse:
+    """Get compact aggregated user metrics without loading the full orders list."""
+    user_id = _require_user_id(user)
+
+    orders_count, orders_qty = await _fetch_completed_stats(
+        db, "orders", "order_status", user_id
+    )
+    bookings_count, bookings_qty = await _fetch_completed_stats(
+        db, "bookings", "status", user_id
+    )
+
+    archive_count = 0
+    archive_qty = 0.0
+    if await _bookings_archive_exists(db):
+        archive_count, archive_qty = await _fetch_completed_stats(
+            db, "bookings_archive", "status", user_id
+        )
+
+    return OrdersSummaryResponse(
+        completed_orders=orders_count + bookings_count + archive_count,
+        completed_quantity=orders_qty + bookings_qty + archive_qty,
+        saved_weight_kg=None,
+    )
 
 
 @router.post("/orders/{order_id}/cancel", response_model=CancelOrderResponse)

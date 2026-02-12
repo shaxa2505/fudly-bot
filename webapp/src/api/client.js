@@ -336,6 +336,13 @@ const api = {
     return data
   },
 
+  async getOrdersSummary(options = {}) {
+    const normalizedOptions =
+      typeof options === 'boolean' ? { force: options } : (options || {})
+    const { force = false } = normalizedOptions
+    return cachedGet('/orders/summary', {}, 30000, { force })
+  },
+
   async getUserBookings(status = null) {
     try {
       const data = await this.getUserOrders(status)
@@ -347,7 +354,7 @@ const api = {
 
   async getDeliveryOrders(userId) {
     try {
-      const data = await this.getOrders()
+      const data = await this.getOrders({ limit: 100, offset: 0, include_meta: true })
       return data.orders || []
     } catch (error) {
       console.error('Error fetching delivery orders:', error)

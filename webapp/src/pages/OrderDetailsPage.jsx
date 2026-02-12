@@ -99,7 +99,12 @@ export default function OrderDetailsPage() {
       if (allowEnrich && !enrichmentAttemptedRef.current && foundOrder.items.length === 0) {
         enrichmentAttemptedRef.current = true
         try {
-          const response = await apiClient.getOrders({ force: true })
+          const response = await apiClient.getOrders({
+            force: true,
+            limit: 100,
+            offset: 0,
+            include_meta: true,
+          })
           const all = [...(response.orders || []), ...(response.bookings || [])]
           const raw = all.find(o => (o.order_id || o.booking_id) === numericOrderId)
           if (raw) {
