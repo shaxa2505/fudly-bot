@@ -246,7 +246,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, calc(-50% - 8px));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -351,10 +351,11 @@
   position: relative;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transform: translateY(-8px);
 }
 
 .app-header-action:active {
-  transform: scale(0.96);
+  transform: translateY(-8px) scale(0.96);
 }
 
 .app-header-action:focus-visible {

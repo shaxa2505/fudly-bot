@@ -53,6 +53,40 @@ const waitForTelegramWebApp = async (timeoutMs = 3000, stepMs = 100) => {
   return window.Telegram?.WebApp || null
 }
 
+const resolveCssColor = (varName, fallback) => {
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
+  return value || fallback
+}
+
+const applyTelegramChromeColors = (tg) => {
+  if (!tg) return
+
+  const fallbackBg = '#F9F9F9'
+  const fallbackText = '#2D2D2D'
+  const fallbackButton = '#3A5A40'
+  const appChromeColor = resolveCssColor(
+    '--color-bg-secondary',
+    resolveCssColor('--color-bg-primary', fallbackBg)
+  )
+
+  document.documentElement.style.setProperty(
+    '--tg-theme-bg-color',
+    tg.themeParams?.bg_color || appChromeColor
+  )
+  document.documentElement.style.setProperty(
+    '--tg-theme-text-color',
+    tg.themeParams?.text_color || fallbackText
+  )
+  document.documentElement.style.setProperty(
+    '--tg-theme-button-color',
+    tg.themeParams?.button_color || fallbackButton
+  )
+
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', appChromeColor)
+  tg.setHeaderColor?.(appChromeColor)
+  tg.setBackgroundColor?.(appChromeColor)
+}
+
 // Main app content with routing
 function AppContent() {
   const navigate = useNavigate()
@@ -300,10 +334,8 @@ function AppContent() {
         tg.expand()
       }
 
-      // Set theme colors immediately
-      document.documentElement.style.setProperty('--tg-theme-bg-color', tg.themeParams.bg_color || '#F9F9F9')
-      document.documentElement.style.setProperty('--tg-theme-text-color', tg.themeParams.text_color || '#2D2D2D')
-      document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#3A5A40')
+      // Sync Telegram chrome (safe area/header) with app colors.
+      applyTelegramChromeColors(tg)
 
       // Get user from Telegram
       const tgUser = tg.initDataUnsafe?.user || parseUserFromInitData(tg.initData)

@@ -1939,6 +1939,85 @@ Quyidan tanlang.""",
         "too_many_requests": "Juda ko'p so'rovlar. Keyinroq urinib ko'ring.",
     },
 }
+_MOJIBAKE_MARKERS = ("рџ", "вЂ", "Ð", "Ñ")
+_MOJIBAKE_FOLLOWUP_CHARS = set(
+    "°±²³´µ¶·ё№є»јЅѕїЃѓ‚„…†‡€‰Љ‹ЊЋЏђ‘’“”•–—™љ›њќћџЎўЈ¤Ґ¦§Ё©Є«¬®Ї"
+)
+
+
+def _looks_like_mojibake(text: str) -> bool:
+    if any(marker in text for marker in _MOJIBAKE_MARKERS):
+        return True
+    for idx in range(len(text) - 1):
+        if text[idx] in {"Р", "С"} and text[idx + 1] in _MOJIBAKE_FOLLOWUP_CHARS:
+            return True
+    return False
+
+
+def _fix_mojibake_text(text: str) -> str:
+    if not text:
+        return text
+
+    current = text
+    for _ in range(3):
+        if not _looks_like_mojibake(current):
+            break
+        fixed = None
+        for encoding in ("cp1251", "cp1252", "latin1", "cp866"):
+            try:
+                candidate = current.encode(encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+            if candidate and candidate != current:
+                fixed = candidate
+                break
+        if fixed is None:
+            fixed = _decode_utf8_from_mixed_cp1251(current)
+        if fixed is None:
+            break
+        current = fixed
+    return current
+
+
+def _decode_utf8_from_mixed_cp1251(text: str) -> str | None:
+    raw = bytearray()
+    for ch in text:
+        code = ord(ch)
+        if code <= 0xFF:
+            raw.append(code)
+            continue
+        try:
+            raw.extend(ch.encode("cp1251"))
+        except UnicodeEncodeError:
+            return None
+    try:
+        candidate = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    if not candidate or candidate == text:
+        return None
+    return candidate
+
+
+def _normalize_mojibake(value: object) -> object:
+    if isinstance(value, str):
+        return _fix_mojibake_text(value)
+    if isinstance(value, dict):
+        normalized: dict[object, object] = {}
+        for k, v in value.items():
+            key = _fix_mojibake_text(k) if isinstance(k, str) else k
+            normalized[key] = _normalize_mojibake(v)
+        return normalized
+    if isinstance(value, list):
+        return [_normalize_mojibake(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_normalize_mojibake(v) for v in value)
+    return value
+
+
+# Normalize static localization data once at import time.
+LANGUAGES = _normalize_mojibake(LANGUAGES)
+TEXTS = _normalize_mojibake(TEXTS)
 
 
 def get_text(lang: str, key: str, **kwargs: str) -> str:
@@ -1955,10 +2034,12 @@ def get_text(lang: str, key: str, **kwargs: str) -> str:
     try:
         texts = TEXTS.get(lang, TEXTS.get("ru", {}))
         text = texts.get(key, key)
+        text = _fix_mojibake_text(text)
 
         # Р•СЃР»Рё С‚РµРєСЃС‚ РЅРµ РЅР°Р№РґРµРЅ, РїСЂРѕР±СѓРµРј СЂСѓСЃСЃРєРёР№
         if text == key and lang != "ru":
             text = TEXTS.get("ru", {}).get(key, key)
+            text = _fix_mojibake_text(text)
 
         # Р¤РѕСЂРјР°С‚РёСЂСѓРµРј, РµСЃР»Рё РµСЃС‚СЊ РїР°СЂР°РјРµС‚СЂС‹ Рё С‚РµРєСЃС‚ СЃРѕРґРµСЂР¶РёС‚ РїР»РµР№СЃС…РѕР»РґРµСЂС‹
         if kwargs and text != key:
@@ -1981,12 +2062,12 @@ def get_text(lang: str, key: str, **kwargs: str) -> str:
 
 def get_language_name(lang: str) -> str:
     """РџРѕР»СѓС‡РёС‚СЊ РЅР°Р·РІР°РЅРёРµ СЏР·С‹РєР°"""
-    return LANGUAGES.get(lang, LANGUAGES["ru"])
+    return _fix_mojibake_text(LANGUAGES.get(lang, LANGUAGES["ru"]))
 
 
 def get_cities(lang: str) -> list[str]:
     """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РіРѕСЂРѕРґРѕРІ РЅР° РЅСѓР¶РЅРѕРј СЏР·С‹РєРµ"""
-    return [
+    return _normalize_mojibake([
         "РўР°С€РєРµРЅС‚" if lang == "ru" else "Toshkent",
         "РЎР°РјР°СЂРєР°РЅРґ" if lang == "ru" else "Samarqand",
         "Р‘СѓС…Р°СЂР°" if lang == "ru" else "Buxoro",
@@ -1995,13 +2076,22 @@ def get_cities(lang: str) -> list[str]:
         "Р¤РµСЂРіР°РЅР°" if lang == "ru" else "Farg'ona",
         "РҐРёРІР°" if lang == "ru" else "Xiva",
         "РќСѓРєСѓСЃ" if lang == "ru" else "Nukus",
-    ]
+    ])
 
 
 def get_categories(lang: str) -> list[str]:
     """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№ Р±РёР·РЅРµСЃР° РЅР° РЅСѓР¶РЅРѕРј СЏР·С‹РєРµ"""
     if lang == "ru":
-        return ["Р РµСЃС‚РѕСЂР°РЅ", "РљР°С„Рµ", "РџРµРєР°СЂРЅСЏ", "РЎСѓРїРµСЂРјР°СЂРєРµС‚", "РљРѕРЅРґРёС‚РµСЂСЃРєР°СЏ", "Р¤Р°СЃС‚С„СѓРґ"]
+        return _normalize_mojibake(
+            [
+                "Р РµСЃС‚РѕСЂР°РЅ",
+                "РљР°С„Рµ",
+                "РџРµРєР°СЂРЅСЏ",
+                "РЎСѓРїРµСЂРјР°СЂРєРµС‚",
+                "РљРѕРЅРґРёС‚РµСЂСЃРєР°СЏ",
+                "Р¤Р°СЃС‚С„СѓРґ",
+            ]
+        )
     else:
         return ["Restoran", "Kafe", "Nonvoyxona", "Supermarket", "Qandolatxona", "Fastfud"]
 
@@ -2009,7 +2099,7 @@ def get_categories(lang: str) -> list[str]:
 def get_product_categories(lang: str) -> list[str]:
     """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№ С‚РѕРІР°СЂРѕРІ - СЃРѕРІРїР°РґР°РµС‚ СЃ С‚РµРјРё, С‡С‚Рѕ РІС‹Р±РёСЂР°РµС‚ РїР°СЂС‚РЅС‘СЂ"""
     if lang == "ru":
-        return [
+        return _normalize_mojibake([
             "Р’С‹РїРµС‡РєР°",
             "РњРѕР»РѕС‡РЅС‹Рµ",
             "РњСЏСЃРЅС‹Рµ",
@@ -2020,7 +2110,7 @@ def get_product_categories(lang: str) -> list[str]:
             "Р—Р°РјРѕСЂРѕР¶РµРЅРЅРѕРµ",
             "РЎР»Р°РґРѕСЃС‚Рё",
             "Р”СЂСѓРіРѕРµ",
-        ]
+        ])
     else:
         return [
             "Pishiriq",
@@ -2038,8 +2128,9 @@ def get_product_categories(lang: str) -> list[str]:
 
 def normalize_category(category: str) -> str:
     """РќРѕСЂРјР°Р»РёР·РѕРІР°С‚СЊ РєР°С‚РµРіРѕСЂРёСЋ Рє Р°РЅРіР»РёР№СЃРєРѕРјСѓ РґР»СЏ Р‘Р” (РґР»СЏ С‚Р°Р±Р»РёС†С‹ offers)"""
+    category = _fix_mojibake_text(category)
     # РњР°РїРїРёРЅРі РєР°С‚РµРіРѕСЂРёР№ С‚РѕРІР°СЂРѕРІ (product categories) РІ Р°РЅРіР»РёР№СЃРєРёРµ РЅР°Р·РІР°РЅРёСЏ Р‘Р”
-    product_mapping = {
+    product_mapping = _normalize_mojibake({
         # Р СѓСЃСЃРєРёР№
         "Р’С‹РїРµС‡РєР°": "bakery",
         "РњРѕР»РѕС‡РЅС‹Рµ": "dairy",
@@ -2077,16 +2168,16 @@ def normalize_category(category: str) -> str:
         "Tayyor ovqat": "ready_food",
         "Р”СЂСѓРіРѕРµ": "other",
         "Boshqa": "other",
-    }
+    })
     # РњР°РїРїРёРЅРі РєР°С‚РµРіРѕСЂРёР№ РјР°РіР°Р·РёРЅРѕРІ (store categories)
-    store_mapping = {
+    store_mapping = _normalize_mojibake({
         "Restoran": "Р РµСЃС‚РѕСЂР°РЅ",
         "Kafe": "РљР°С„Рµ",
         "Nonvoyxona": "РџРµРєР°СЂРЅСЏ",
         "Supermarket": "РЎСѓРїРµСЂРјР°СЂРєРµС‚",
         "Qandolatxona": "РљРѕРЅРґРёС‚РµСЂСЃРєР°СЏ",
         "Fastfud": "Р¤Р°СЃС‚С„СѓРґ",
-    }
+    })
     # РЎРЅР°С‡Р°Р»Р° РїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё РІ product_mapping, РїРѕС‚РѕРј РІ store_mapping
     return product_mapping.get(category, store_mapping.get(category, category))
 

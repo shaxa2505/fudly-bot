@@ -36,6 +36,82 @@ SUPPORTED_LANGUAGES = ("ru", "uz")
 LOCALE_DIR = Path(__file__).parent.parent.parent / "locales"
 
 
+_MOJIBAKE_MARKERS = ("рџ", "вЂ", "Ð", "Ñ")
+_MOJIBAKE_FOLLOWUP_CHARS = set(
+    "°±²³´µ¶·ё№є»јЅѕїЃѓ‚„…†‡€‰Љ‹ЊЋЏђ‘’“”•–—™љ›њќћџЎўЈ¤Ґ¦§Ё©Є«¬®Ї"
+)
+
+
+def _looks_like_mojibake(text: str) -> bool:
+    if any(marker in text for marker in _MOJIBAKE_MARKERS):
+        return True
+    for idx in range(len(text) - 1):
+        if text[idx] in {"Р", "С"} and text[idx + 1] in _MOJIBAKE_FOLLOWUP_CHARS:
+            return True
+    return False
+
+
+def _fix_mojibake_text(text: str) -> str:
+    if not text:
+        return text
+
+    current = text
+    for _ in range(3):
+        if not _looks_like_mojibake(current):
+            break
+        fixed = None
+        for encoding in ("cp1251", "cp1252", "latin1", "cp866"):
+            try:
+                candidate = current.encode(encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+            if candidate and candidate != current:
+                fixed = candidate
+                break
+        if fixed is None:
+            fixed = _decode_utf8_from_mixed_cp1251(current)
+        if fixed is None:
+            break
+        current = fixed
+    return current
+
+
+def _decode_utf8_from_mixed_cp1251(text: str) -> str | None:
+    raw = bytearray()
+    for ch in text:
+        code = ord(ch)
+        if code <= 0xFF:
+            raw.append(code)
+            continue
+        try:
+            raw.extend(ch.encode("cp1251"))
+        except UnicodeEncodeError:
+            return None
+    try:
+        candidate = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    if not candidate or candidate == text:
+        return None
+    return candidate
+
+
+def _normalize_mojibake(value: Any) -> Any:
+    if isinstance(value, str):
+        return _fix_mojibake_text(value)
+    if isinstance(value, dict):
+        normalized: dict[Any, Any] = {}
+        for k, v in value.items():
+            key = _fix_mojibake_text(k) if isinstance(k, str) else k
+            normalized[key] = _normalize_mojibake(v)
+        return normalized
+    if isinstance(value, list):
+        return [_normalize_mojibake(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_normalize_mojibake(v) for v in value)
+    return value
+
+
 def get_language(user_id: int | None = None) -> str:
     """Get language for user or default."""
     if user_id is None:
@@ -85,7 +161,7 @@ def translate(key: str, user_id: int | None = None, lang: str | None = None, **k
 
     # Try gettext first
     translator = _get_translator(language)
-    translated = translator.gettext(key)
+    translated = _fix_mojibake_text(translator.gettext(key))
 
     # If gettext didn't find translation (returned same key),
     # fall back to dictionary-based localization
@@ -93,7 +169,7 @@ def translate(key: str, user_id: int | None = None, lang: str | None = None, **k
         try:
             from localization import get_text
 
-            translated = get_text(language, key)
+            translated = _fix_mojibake_text(get_text(language, key))
         except (ImportError, KeyError):
             pass
 
@@ -104,7 +180,7 @@ def translate(key: str, user_id: int | None = None, lang: str | None = None, **k
         except (KeyError, ValueError):
             pass
 
-    return translated or key
+    return _fix_mojibake_text(translated or key)
 
 
 # Shorthand alias
@@ -136,7 +212,7 @@ def ngettext(
     language = lang or get_language(user_id)
     translator = _get_translator(language)
 
-    translated = translator.ngettext(singular, plural, n)
+    translated = _fix_mojibake_text(translator.ngettext(singular, plural, n))
 
     if kwargs:
         kwargs["n"] = n
@@ -145,15 +221,15 @@ def ngettext(
         except (KeyError, ValueError):
             pass
 
-    return translated
+    return _fix_mojibake_text(translated)
 
 
 def get_available_languages() -> list[dict[str, str]]:
     """Get list of available languages with their names."""
-    return [
+    return _normalize_mojibake([
         {"code": "ru", "name": "Русский", "flag": "🇷🇺"},
         {"code": "uz", "name": "O'zbek", "flag": "🇺🇿"},
-    ]
+    ])
 
 
 def format_number(n: int | float, lang: str | None = None) -> str:
@@ -172,7 +248,7 @@ def format_currency(amount: int | float, lang: str | None = None) -> str:
     if lang == "uz":
         return f"{formatted} so'm"
     else:
-        return f"{formatted} сум"
+        return _fix_mojibake_text(f"{formatted} сум")
 
 
 class LazyString:
@@ -257,6 +333,10 @@ MONTH_NAMES = {
         "dekabr",
     ],
 }
+
+# Normalize static locale constants once at import time.
+DATE_FORMATS = _normalize_mojibake(DATE_FORMATS)
+MONTH_NAMES = _normalize_mojibake(MONTH_NAMES)
 
 
 def format_date(date, format_type: str = "short", lang: str | None = None) -> str:
