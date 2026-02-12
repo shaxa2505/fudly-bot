@@ -388,11 +388,15 @@ function AppContent() {
     }
 
     const handleBack = () => {
+      if (location.pathname === '/checkout') {
+        navigate('/cart')
+        return
+      }
       if (!isHome) {
         navigate(-1)
-      } else {
-        tg.close()
+        return
       }
+      tg.close()
     }
 
     tg.BackButton.onClick(handleBack)

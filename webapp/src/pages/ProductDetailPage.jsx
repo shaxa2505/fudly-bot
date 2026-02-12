@@ -386,14 +386,6 @@ function ProductDetailPage() {
             </div>
           )}
 
-          <div className="pdp-note">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-              <path d="M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M11 12h2v4h-2z" fill="currentColor"/>
-            </svg>
-            <span>Bu surpriz paket. Tarkibi mavjudlikka qarab ozgina farq qilishi mumkin.</span>
-          </div>
         </div>
       </section>
 

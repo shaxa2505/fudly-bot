@@ -386,7 +386,7 @@ def _build_list_keyboard(
 
     kb.row(
         types.InlineKeyboardButton(
-            text="??",
+            text="⬅️",
             callback_data=f"seller_orders_page:{filter_type}:{prev_page}",
         ),
         types.InlineKeyboardButton(
@@ -394,7 +394,7 @@ def _build_list_keyboard(
             callback_data="seller_orders_page_info",
         ),
         types.InlineKeyboardButton(
-            text="??",
+            text="➡️",
             callback_data=f"seller_orders_page:{filter_type}:{next_page}",
         ),
         width=3,

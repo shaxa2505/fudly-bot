@@ -1143,6 +1143,16 @@ function CartPage({ user }) {
     }
   }
 
+  useEffect(() => {
+    if (isCheckoutRoute) {
+      setShowCheckout(true)
+      return
+    }
+    if (showCheckout) {
+      setShowCheckout(false)
+    }
+  }, [isCheckoutRoute, showCheckout])
+
   const handleRestorePendingCart = useCallback(() => {
     if (!pendingPayment?.cart) {
       toast.error("Savatni tiklab bo'lmadi")
