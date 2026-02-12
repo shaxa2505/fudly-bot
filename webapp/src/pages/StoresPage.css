@@ -40,6 +40,8 @@
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--sp-topbar-height)) / 2)
   );
   --sp-topbar-total-height: calc(var(--sp-topbar-height) + var(--sp-top-inset) + var(--sp-topbar-gap));
+  /* Keep address row aligned with Telegram header controls on Stores page. */
+  --app-header-inset: 6px;
 }
 
 .sp-header {
