@@ -78,6 +78,7 @@ function CategoryProductsPage() {
   const [minDiscount, setMinDiscount] = useState(null)
   const [priceRange, setPriceRange] = useState('all')
   const [sortBy, setSortBy] = useState('default')
+  const [hasNearbyFallback, setHasNearbyFallback] = useState(false)
   const hasActiveFilters = Boolean(minDiscount || priceRange !== 'all' || sortBy !== 'default')
   const restoringRef = useRef(false)
   const pendingScrollRef = useRef(null)
@@ -101,6 +102,7 @@ function CategoryProductsPage() {
     setMinDiscount(cached.minDiscount ?? null)
     setPriceRange(cached.priceRange || 'all')
     setSortBy(cached.sortBy || 'default')
+    setHasNearbyFallback(Boolean(cached.hasNearbyFallback))
     setHasMore(typeof cached.hasMore === 'boolean' ? cached.hasMore : true)
     setOffset(Number.isFinite(cached.offset) ? cached.offset : 0)
     setLoading(false)
@@ -196,10 +198,16 @@ function CategoryProductsPage() {
       const nextOffset = Number.isFinite(data?.next_offset)
         ? data.next_offset
         : currentOffset + items.length
+      const usedFallback = Boolean(data?.used_fallback)
 
       setOffers(prev => (reset ? items : [...prev, ...items]))
       setHasMore(hasMoreResult)
       setOffset(nextOffset ?? currentOffset)
+      if (reset) {
+        setHasNearbyFallback(usedFallback && items.length > 0)
+      } else if (usedFallback && items.length > 0) {
+        setHasNearbyFallback(true)
+      }
     } catch (error) {
       console.error('Error loading offers:', error)
       alert('Xatolik yuz berdi')
@@ -220,11 +228,23 @@ function CategoryProductsPage() {
       minDiscount,
       priceRange,
       sortBy,
+      hasNearbyFallback,
       isLoading: loading,
       hasMore,
       offset,
     }
-  }, [offers, searchQuery, debouncedSearch, minDiscount, priceRange, sortBy, loading, hasMore, offset])
+  }, [
+    offers,
+    searchQuery,
+    debouncedSearch,
+    minDiscount,
+    priceRange,
+    sortBy,
+    hasNearbyFallback,
+    loading,
+    hasMore,
+    offset,
+  ])
 
   useEffect(() => {
     return () => {
@@ -459,6 +479,12 @@ function CategoryProductsPage() {
       )}
 
       {renderFilterChips()}
+
+      {hasNearbyFallback && (
+        <div className="category-location-warning">
+          Yaqin atrofda natija topilmadi. Kengaytirilgan hududdagi mahsulotlar ko'rsatilmoqda.
+        </div>
+      )}
 
       {/* Products Grid */}
       {loading ? (
