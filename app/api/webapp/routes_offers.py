@@ -567,7 +567,7 @@ async def get_offers(
             ) -> list[Any]:
                 if category_filter:
                     if hasattr(db, "get_offers_by_city_and_category"):
-                        return await _db_call(
+                        offers_by_city = await _db_call(
                             db,
                             "get_offers_by_city_and_category",
                             city=city_scope,
@@ -581,6 +581,38 @@ async def get_offers(
                             max_price=storage_max_price,
                             min_discount=min_discount,
                         )
+                        if (
+                            not offers_by_city
+                            and city_scope
+                            and not region_scope
+                            and not district_scope
+                            and hasattr(db, "resolve_geo_location")
+                        ):
+                            resolved_geo = await _db_call(
+                                db,
+                                "resolve_geo_location",
+                                region=None,
+                                district=city_scope,
+                                city=city_scope,
+                            )
+                            resolved_region = get_val(resolved_geo, "region_name_ru")
+                            resolved_district = get_val(resolved_geo, "district_name_ru")
+                            if resolved_region or resolved_district:
+                                offers_by_city = await _db_call(
+                                    db,
+                                    "get_offers_by_city_and_category",
+                                    city=None,
+                                    category=category_filter,
+                                    limit=limit,
+                                    offset=offset,
+                                    region=resolved_region,
+                                    district=resolved_district,
+                                    sort_by=sort_key,
+                                    min_price=storage_min_price,
+                                    max_price=storage_max_price,
+                                    min_discount=min_discount,
+                                )
+                        return offers_by_city or []
                     if hasattr(db, "get_offers_by_category") and city_scope:
                         if isinstance(category_filter, (list, tuple)):
                             combined: list[Any] = []
@@ -753,7 +785,7 @@ async def get_offers(
             if total == 0 and offers:
                 total = None
             has_more = (
-                (offset + len(offers) < total)
+                len(offers) > 0 and (offset + len(offers) < total)
                 if total is not None
                 else (len(offers) == limit)
             )
