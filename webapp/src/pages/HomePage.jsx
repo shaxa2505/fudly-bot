@@ -456,6 +456,7 @@ function HomePage() {
       const params = {
         limit: OFFERS_LIMIT,
         offset: currentOffset,
+        include_meta: true,
       }
       if (cityForApi) {
         params.city = cityForApi
@@ -507,7 +508,6 @@ function HomePage() {
         params.sort_by = 'urgent'
       }
 
-      let usedFallback = false
       let data = await api.getOffers(params, { force })
       let items = Array.isArray(data?.items)
         ? data.items
@@ -520,31 +520,7 @@ function HomePage() {
         ? data.has_more
         : items.length === OFFERS_LIMIT
       let nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
-
-      const hasLocationFilters = Boolean(
-        params.city || params.region || params.district || params.lat || params.lon
-      )
-      if (trimmedSearchValue && items.length === 0 && hasLocationFilters) {
-        usedFallback = true
-        const fallbackParams = { ...params }
-        delete fallbackParams.city
-        delete fallbackParams.region
-        delete fallbackParams.district
-        delete fallbackParams.lat
-        delete fallbackParams.lon
-        data = await api.getOffers(fallbackParams, { force: true })
-        items = Array.isArray(data?.items)
-          ? data.items
-          : (Array.isArray(data?.offers) ? data.offers : (Array.isArray(data) ? data : []))
-        total = Number.isFinite(data?.total) ? data.total : null
-        if (total === 0 && items.length > 0) {
-          total = null
-        }
-        hasMoreResult = typeof data?.has_more === 'boolean'
-          ? data.has_more
-          : items.length === OFFERS_LIMIT
-        nextOffset = Number.isFinite(data?.next_offset) ? data.next_offset : null
-      }
+      const usedFallback = Boolean(data?.used_fallback)
 
       if (requestId !== latestRequestRef.current) {
         return
@@ -567,6 +543,8 @@ function HomePage() {
       setHasMore(hasMoreResult)
       if (reset) {
         setHasNearbyFallback(usedFallback && items.length > 0)
+      } else if (usedFallback && items.length > 0) {
+        setHasNearbyFallback(true)
       }
     } catch (error) {
       console.error('Error loading offers:', error)

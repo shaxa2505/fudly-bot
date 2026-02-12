@@ -159,3 +159,57 @@ async def test_scoped_fallback_used_if_nearby_empty():
 
     assert [item.id for item in result] == [1]
     assert db.nearby_calls == [3.0, 7.0, 15.0, 25.0]
+
+
+@pytest.mark.asyncio
+async def test_meta_reports_nearby_strategy_and_radius():
+    db = DummyOffersDb(
+        hot_offers=[_sample_offer(1)],
+        nearby_offers=[],
+        nearby_by_radius={
+            3.0: [],
+            7.0: [_sample_offer(2)],
+        },
+    )
+    get_offers = _get_offers()
+    result = await _call_offers(
+        get_offers,
+        db,
+        city="Tashkent",
+        lat=41.3,
+        lon=69.2,
+        include_meta=True,
+    )
+
+    assert [item.id for item in result.items] == [2]
+    assert result.location_strategy == "nearby"
+    assert result.used_radius_km == 7.0
+    assert result.used_fallback is False
+
+
+@pytest.mark.asyncio
+async def test_meta_reports_scope_fallback_when_nearby_empty():
+    db = DummyOffersDb(
+        hot_offers=[_sample_offer(1)],
+        nearby_offers=[],
+        nearby_by_radius={
+            3.0: [],
+            7.0: [],
+            15.0: [],
+            25.0: [],
+        },
+    )
+    get_offers = _get_offers()
+    result = await _call_offers(
+        get_offers,
+        db,
+        city="Tashkent",
+        lat=41.3,
+        lon=69.2,
+        include_meta=True,
+    )
+
+    assert [item.id for item in result.items] == [1]
+    assert result.location_strategy == "scope"
+    assert result.used_radius_km is None
+    assert result.used_fallback is True

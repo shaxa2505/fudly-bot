@@ -435,6 +435,9 @@ async def get_offers(
         apply_sort = True
         apply_slice = True
         nearby_radius_steps = build_nearby_radius_steps(max_distance_km)
+        location_strategy: str | None = None
+        used_radius_km: float | None = None
+        used_fallback = False
 
         cache_ttl = _get_cache_ttl(
             "WEBAPP_CACHE_SEARCH_TTL" if search else "WEBAPP_CACHE_OFFERS_TTL",
@@ -472,6 +475,7 @@ async def get_offers(
             )
             if hasattr(db, "get_store"):
                 store_fallback = await _db_call(db, "get_store", store_id)
+            location_strategy = "store"
             apply_filters = False
             apply_sort = False
             apply_slice = False
@@ -524,6 +528,7 @@ async def get_offers(
             apply_filters = False
             apply_sort = False
             apply_slice = False
+            location_strategy = "search"
         else:
             async def _fetch_nearby_offers() -> tuple[list[Any], float | None]:
                 if lat_val is None or lon_val is None or not hasattr(db, "get_nearby_offers"):
@@ -548,6 +553,9 @@ async def get_offers(
                         return nearby, radius_km
                 return [], None
 
+            nearby_attempted = False
+            nearby_found = False
+            scoped_found = False
             async def _fetch_scoped_offers(
                 city_scope: str | None, region_scope: str | None, district_scope: str | None
             ) -> list[Any]:
@@ -627,7 +635,11 @@ async def get_offers(
 
             has_precise_location = lat_val is not None and lon_val is not None
             if has_precise_location:
-                raw_offers, _ = await _fetch_nearby_offers()
+                nearby_attempted = True
+                raw_offers, used_radius_km = await _fetch_nearby_offers()
+                nearby_found = bool(raw_offers)
+                if nearby_found:
+                    location_strategy = "nearby"
 
             scopes: list[tuple[str | None, str | None, str | None]] = []
             if district:
@@ -650,10 +662,19 @@ async def get_offers(
                     break
                 raw_offers = await _fetch_scoped_offers(*scope)
                 if raw_offers:
+                    scoped_found = True
+                    location_strategy = "scope"
                     break
 
             if not raw_offers and not has_precise_location:
-                raw_offers, _ = await _fetch_nearby_offers()
+                nearby_attempted = True
+                raw_offers, used_radius_km = await _fetch_nearby_offers()
+                nearby_found = bool(raw_offers)
+                if nearby_found:
+                    location_strategy = "nearby"
+
+            if scoped_found and has_precise_location and nearby_attempted and not nearby_found:
+                used_fallback = True
 
             apply_filters = False
             apply_sort = False
@@ -758,7 +779,12 @@ async def get_offers(
 
         if include_meta:
             total: int | None = None
-            if not store_id and not search and hasattr(db, "count_offers_by_filters"):
+            if (
+                not store_id
+                and not search
+                and location_strategy not in {"nearby", "scope"}
+                and hasattr(db, "count_offers_by_filters")
+            ):
                 total = int(
                     (await _db_call(
                         db,
@@ -788,6 +814,9 @@ async def get_offers(
                 limit=limit,
                 has_more=has_more,
                 next_offset=next_offset,
+                location_strategy=location_strategy,
+                used_radius_km=used_radius_km,
+                used_fallback=used_fallback,
             )
             if cache and cache_key and cache_ttl > 0:
                 await cache.set(cache_key, response.model_dump(), ttl=cache_ttl)

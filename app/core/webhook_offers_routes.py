@@ -8,6 +8,7 @@ from typing import Any
 
 from aiohttp import web
 
+from app.core.location_search import build_nearby_radius_steps
 from app.core.utils import normalize_city
 from app.core.webhook_api_utils import add_cors_headers
 from app.core.webhook_helpers import (
@@ -48,6 +49,13 @@ def build_offer_store_handlers(bot: Any, db: Any):
         min_discount = _parse_float(request.query.get("min_discount"))
         lat = _parse_float(request.query.get("lat") or request.query.get("latitude"))
         lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
+        max_distance_km = _parse_float(request.query.get("max_distance_km"))
+        include_meta = str(request.query.get("include_meta", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         price_unit = os.getenv("PRICE_STORAGE_UNIT", "sums").lower()
         if price_unit == "kopeks":
             if min_price is not None:
@@ -70,11 +78,15 @@ def build_offer_store_handlers(bot: Any, db: Any):
 
         try:
             raw_offers: list[Any] = []
+            location_strategy: str | None = None
+            used_radius_km: float | None = None
+            used_fallback = False
 
             if store_id:
                 if hasattr(db, "get_store_offers"):
                     raw_offers = db.get_store_offers(int(store_id)) or []
                     logger.info(f"get_store_offers({store_id}) returned {len(raw_offers)} items")
+                location_strategy = "store"
             elif search:
                 if hasattr(db, "search_offers"):
 
@@ -122,6 +134,7 @@ def build_offer_store_handlers(bot: Any, db: Any):
                             if raw_offers:
                                 break
                     logger.info(f"search_offers returned {len(raw_offers)} items")
+                location_strategy = "search"
             else:
 
                 def _fetch_scoped_offers(
@@ -188,6 +201,40 @@ def build_offer_store_handlers(bot: Any, db: Any):
                         )
                     return []
 
+                def _fetch_nearby_offers() -> tuple[list[Any], float | None]:
+                    if lat is None or lon is None or not hasattr(db, "get_nearby_offers"):
+                        return [], None
+                    for radius_km in build_nearby_radius_steps(max_distance_km):
+                        nearby = (
+                            db.get_nearby_offers(
+                                latitude=lat,
+                                longitude=lon,
+                                limit=limit,
+                                offset=offset,
+                                category=category_filter,
+                                sort_by=sort_by,
+                                min_price=min_price,
+                                max_price=max_price,
+                                min_discount=min_discount,
+                                max_distance_km=radius_km,
+                            )
+                            or []
+                        )
+                        if nearby:
+                            return nearby, radius_km
+                    return [], None
+
+                nearby_attempted = False
+                nearby_found = False
+                scoped_found = False
+                has_precise_location = lat is not None and lon is not None
+                if has_precise_location:
+                    nearby_attempted = True
+                    raw_offers, used_radius_km = _fetch_nearby_offers()
+                    nearby_found = bool(raw_offers)
+                    if nearby_found:
+                        location_strategy = "nearby"
+
                 scopes: list[tuple[str | None, str | None, str | None]] = []
                 if district:
                     scopes.append((None, region, district))
@@ -205,30 +252,23 @@ def build_offer_store_handlers(bot: Any, db: Any):
                     if scope in seen:
                         continue
                     seen.add(scope)
-                    raw_offers = _fetch_scoped_offers(*scope)
                     if raw_offers:
                         break
+                    raw_offers = _fetch_scoped_offers(*scope)
+                    if raw_offers:
+                        scoped_found = True
+                        location_strategy = "scope"
+                        break
 
-                if (
-                    not raw_offers
-                    and lat is not None
-                    and lon is not None
-                    and hasattr(db, "get_nearby_offers")
-                ):
-                    raw_offers = (
-                        db.get_nearby_offers(
-                            latitude=lat,
-                            longitude=lon,
-                            limit=limit,
-                            offset=offset,
-                            category=category_filter,
-                            sort_by=sort_by,
-                            min_price=min_price,
-                            max_price=max_price,
-                            min_discount=min_discount,
-                        )
-                        or []
-                    )
+                if not raw_offers and not has_precise_location:
+                    nearby_attempted = True
+                    raw_offers, used_radius_km = _fetch_nearby_offers()
+                    nearby_found = bool(raw_offers)
+                    if nearby_found:
+                        location_strategy = "nearby"
+
+                if scoped_found and has_precise_location and nearby_attempted and not nearby_found:
+                    used_fallback = True
 
             # Convert offers with photo URLs (parallel loading)
             async def load_offer_with_photo(o: Any) -> dict:
@@ -239,6 +279,21 @@ def build_offer_store_handlers(bot: Any, db: Any):
             offers = await asyncio.gather(*[load_offer_with_photo(o) for o in raw_offers])
 
             logger.info(f"Returning {len(offers)} offers")
+            if include_meta:
+                has_more = len(offers) == limit
+                next_offset = offset + len(offers) if has_more else None
+                payload = {
+                    "items": offers,
+                    "total": None,
+                    "offset": offset,
+                    "limit": limit,
+                    "has_more": has_more,
+                    "next_offset": next_offset,
+                    "location_strategy": location_strategy,
+                    "used_radius_km": used_radius_km,
+                    "used_fallback": used_fallback,
+                }
+                return add_cors_headers(web.json_response(payload))
             return add_cors_headers(web.json_response(offers))
 
         except Exception as e:

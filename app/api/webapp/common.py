@@ -7,7 +7,8 @@ import logging
 import os
 import re
 import time
-from datetime import date, datetime, time as dt_time
+from datetime import date, datetime
+from datetime import time as dt_time
 from typing import Any
 from urllib.parse import parse_qsl, unquote
 
@@ -255,6 +256,9 @@ class OfferListResponse(BaseModel):
     limit: int
     has_more: bool
     next_offset: int | None = None
+    location_strategy: str | None = None
+    used_radius_km: float | None = None
+    used_fallback: bool = False
 
 
 class StoreResponse(BaseModel):
