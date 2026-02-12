@@ -40,8 +40,6 @@
     calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--sp-topbar-height)) / 2)
   );
   --sp-topbar-total-height: calc(var(--sp-topbar-height) + var(--sp-top-inset) + var(--sp-topbar-gap));
-  /* Keep address row aligned with Telegram header controls on Stores page. */
-  --app-header-inset: 6px;
 }
 
 .sp-header {
@@ -177,7 +175,7 @@
 
 .sp-subheader {
   position: sticky;
-  top: calc(var(--app-surface-top) + var(--app-header-total-height));
+  top: calc(var(--app-surface-top) + var(--sp-topbar-total-height));
   z-index: 19;
   background: rgba(248, 250, 249, 0.8);
   padding: 0 var(--page-padding-x, 16px) 16px;
