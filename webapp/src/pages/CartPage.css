@@ -956,8 +956,9 @@
 
 .cart-topbar-title h1 {
   margin: 0;
-  font-size: var(--font-xl);
-  font-weight: var(--font-semibold);
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
+  line-height: var(--app-header-text-line-height);
   letter-spacing: -0.02em;
 }
 
@@ -1724,10 +1725,10 @@
 
 .cart-header-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
   text-align: center;
-  line-height: 1;
+  line-height: var(--app-header-text-line-height);
   justify-self: center;
 }
 

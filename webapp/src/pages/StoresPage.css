@@ -88,11 +88,11 @@
 .sp-location-label {
   display: block;
   text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: var(--app-header-label-size);
+  font-weight: var(--app-header-label-weight);
+  letter-spacing: var(--app-header-label-letter-spacing);
   text-transform: uppercase;
-  color: var(--sp-text-muted);
+  color: var(--app-header-label-color);
   line-height: 1;
   margin-top: 0;
 }
@@ -129,8 +129,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
+  line-height: var(--app-header-text-line-height);
   color: var(--sp-text);
 }
 

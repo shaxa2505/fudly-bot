@@ -207,6 +207,13 @@
 :root {
   --app-header-height: 34px;
   --app-header-gap: 6px;
+  --app-header-text-size: 15px;
+  --app-header-text-weight: 800;
+  --app-header-text-line-height: 1;
+  --app-header-label-size: 10px;
+  --app-header-label-weight: 700;
+  --app-header-label-letter-spacing: 0.22em;
+  --app-header-label-color: rgba(58, 90, 64, 0.6);
   --app-header-inset: max(
     6px,
     var(--safe-area-top-raw, 0px),
@@ -272,20 +279,20 @@
 
 .app-header-label {
   display: block;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
+  font-size: var(--app-header-label-size);
+  font-weight: var(--app-header-label-weight);
+  letter-spacing: var(--app-header-label-letter-spacing);
   text-transform: uppercase;
-  color: rgba(58, 90, 64, 0.6);
+  color: var(--app-header-label-color);
   line-height: 1;
 }
 
 .app-header-title-text {
   margin: 0;
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
   color: var(--color-text-primary);
-  line-height: 1.1;
+  line-height: var(--app-header-text-line-height);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -322,8 +329,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
-  font-weight: 800;
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
+  line-height: var(--app-header-text-line-height);
   color: var(--color-text-primary);
 }
 

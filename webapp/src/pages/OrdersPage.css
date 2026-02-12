@@ -46,10 +46,11 @@
 
 .orders-topbar-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
+  line-height: var(--app-header-text-line-height);
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--color-text-primary);
 }
 

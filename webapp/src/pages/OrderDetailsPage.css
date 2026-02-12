@@ -94,17 +94,19 @@
 }
 
 .order-confirmation-label {
-  font-size: 10px;
-  letter-spacing: 0.22em;
+  font-size: var(--app-header-label-size);
+  letter-spacing: var(--app-header-label-letter-spacing);
   text-transform: uppercase;
-  color: var(--details-muted);
-  font-weight: 700;
+  color: var(--app-header-label-color);
+  font-weight: var(--app-header-label-weight);
+  line-height: 1;
 }
 
 .order-confirmation-id {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--details-accent);
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
+  line-height: var(--app-header-text-line-height);
+  color: var(--color-text-primary);
 }
 
 .order-confirmation-content {

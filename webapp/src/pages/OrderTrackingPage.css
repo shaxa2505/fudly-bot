@@ -28,10 +28,11 @@
 }
 
 .tracking-header h1 {
-  font-size: var(--font-2xl);
-  font-weight: var(--font-semibold);
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
   color: var(--color-text-primary);
   margin: 0;
+  line-height: var(--app-header-text-line-height);
 }
 
 /* Loading & Error States */

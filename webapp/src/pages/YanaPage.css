@@ -59,11 +59,11 @@
 
 .profile-title {
   margin: 0;
-  font-size: var(--font-lg);
-  font-weight: var(--font-bold);
+  font-size: var(--app-header-text-size);
+  font-weight: var(--app-header-text-weight);
   color: var(--color-text-primary);
   text-align: center;
-  line-height: 1;
+  line-height: var(--app-header-text-line-height);
   letter-spacing: -0.01em;
 }
 
