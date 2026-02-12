@@ -300,16 +300,35 @@ def create_api_app(db: Any = None, offer_service: Any = None, bot_token: str = N
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         response = await call_next(request)
-        # Content Security Policy
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://telegram.org https://web.telegram.org https://cdn.jsdelivr.net https://unpkg.com; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data: https://fonts.gstatic.com; "
-            "connect-src 'self' https://api.telegram.org; "
-            "frame-ancestors 'self' https://web.telegram.org"
-        )
+        # Content Security Policy (stricter outside partner panel)
+        is_partner_panel = request.url.path.startswith("/partner-panel")
+        if is_partner_panel:
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://telegram.org https://web.telegram.org https://cdn.jsdelivr.net https://unpkg.com; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data: https://fonts.gstatic.com; "
+                "connect-src 'self' https://api.telegram.org; "
+                "frame-ancestors 'self' https://web.telegram.org; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+        else:
+            csp = (
+                "default-src 'self'; "
+                "script-src 'self' https://telegram.org https://web.telegram.org https://cdn.jsdelivr.net https://unpkg.com; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
+                "img-src 'self' data: https:; "
+                "font-src 'self' data: https://fonts.gstatic.com; "
+                "connect-src 'self' https://api.telegram.org; "
+                "frame-ancestors 'self' https://web.telegram.org; "
+                "object-src 'none'; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+        response.headers["Content-Security-Policy"] = csp
         if request.url.path.startswith("/partner-panel"):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"

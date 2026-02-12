@@ -27,6 +27,7 @@ from app.core.order_math import (
 )
 from app.core.utils import UZB_TZ, get_uzb_time, to_uzb_datetime
 from app.services.unified_order_service import OrderStatus as UnifiedOrderStatus, PaymentStatus
+from app.api.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 
@@ -487,6 +488,7 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
 
 
 @router.get("")
+@limiter.limit("60/minute")
 async def get_user_orders(
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -663,6 +665,7 @@ async def upload_payment_proof(
 
 
 @router.get("/{booking_id}/status", response_model=OrderStatus)
+@limiter.limit("60/minute")
 async def get_order_status(
     booking_id: int,
     db=Depends(get_db),
@@ -713,6 +716,7 @@ async def get_order_status(
 
 
 @router.get("/{booking_id}/timeline", response_model=OrderTimeline)
+@limiter.limit("60/minute")
 async def get_order_timeline(
     booking_id: int,
     db=Depends(get_db),
@@ -869,6 +873,7 @@ async def get_order_timeline(
 
 
 @router.post("/calculate-delivery", response_model=DeliveryResult)
+@limiter.limit("60/minute")
 async def calculate_delivery(
     request: DeliveryCalculation,
     db=Depends(get_db),
@@ -893,6 +898,7 @@ async def calculate_delivery(
 
 
 @router.get("/{booking_id}/qr")
+@limiter.limit("60/minute")
 async def get_order_qr_code(
     booking_id: int,
     db=Depends(get_db),

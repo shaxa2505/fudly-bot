@@ -1,6 +1,7 @@
 ﻿"""Photo and payment card routes for webhook Mini App API."""
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from aiohttp import web
@@ -32,6 +33,32 @@ def build_media_handlers(bot: Any, db: Any):
         """GET /api/v1/payment-card/{store_id} - Get payment card for store."""
         store_id = request.match_info.get("store_id")
         try:
+            init_data = request.headers.get("X-Telegram-Init-Data")
+            environment = os.getenv("ENVIRONMENT", "production").lower()
+            is_dev = environment in ("development", "dev", "local", "test")
+
+            if not init_data and not is_dev:
+                return add_cors_headers(
+                    web.json_response({"detail": "Authentication required"}, status=401)
+                )
+            if init_data:
+                try:
+                    from app.api.webapp.common import validate_init_data
+
+                    validated = validate_init_data(init_data, bot.token)
+                except Exception as exc:
+                    logger.warning("Payment-card auth validation error: %s", exc)
+                    validated = None
+
+                user = validated.get("user") if isinstance(validated, dict) else None
+                if not isinstance(user, dict) or not user.get("id"):
+                    if not is_dev:
+                        return add_cors_headers(
+                            web.json_response(
+                                {"detail": "Invalid Telegram initData"}, status=401
+                            )
+                        )
+
             payment_card = None
             payment_instructions = None
 

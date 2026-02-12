@@ -372,6 +372,7 @@ class OrdersHistoryResponse(BaseModel):
 
 
 @router.get("/user/orders", response_model=OrdersHistoryResponse)
+@limiter.limit("60/minute")
 async def get_user_orders(
     user_id: int | None = None,
     status: str | None = None,
@@ -494,6 +495,7 @@ async def get_user_orders(
 
 
 @router.get("/user/bookings", response_model=OrdersHistoryResponse)
+@limiter.limit("60/minute")
 async def get_user_bookings(
     user_id: int | None = None,
     status: str | None = None,

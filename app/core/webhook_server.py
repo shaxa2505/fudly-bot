@@ -52,6 +52,8 @@ async def create_webhook_app(
 ) -> web.Application:
     """Create aiohttp web application with webhook handlers."""
     app = web.Application()
+    environment = os.getenv("ENVIRONMENT", "production").lower()
+    is_dev = environment in ("development", "dev", "local", "test")
     partner_panel_enabled = os.getenv("PARTNER_PANEL_ENABLED", "0").strip().lower() in {
         "1",
         "true",
@@ -163,6 +165,11 @@ async def create_webhook_app(
 
         try:
             logger.info(f"Webhook request received from {request.remote}")
+
+            if not secret_token and not is_dev:
+                logger.error("Secret token is not configured; refusing webhook in production")
+                metrics["updates_errors"] += 1
+                return web.Response(status=500, text="Secret token not configured")
 
             # Verify secret token if configured
             if secret_token:

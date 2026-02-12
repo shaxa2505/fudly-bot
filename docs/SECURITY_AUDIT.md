@@ -17,32 +17,32 @@ Impact: Reduces spoofing risk for payment callbacks.
 Recommendation: Ensure `UZUM_MERCHANT_WEBHOOK_SECRET` is set in production.
 Effort: Small.
 
-Issue S2 (P1) - Telegram webhook secret token is optional.
-Problem: Webhook handler validates `X-Telegram-Bot-Api-Secret-Token` only when configured.
+Issue S2 (P1) - Telegram webhook secret token enforced in production (Fixed).
+Problem: Webhook handler now refuses requests when `SECRET_TOKEN` is missing in production.
 Evidence: `app/core/webhook_server.py`.
-Impact: If webhook URL is discovered, fake updates could be injected.
-Recommendation: Always set `SECRET_TOKEN` in production and fail fast when missing.
+Impact: Reduces risk of fake updates if webhook URL is discovered.
+Recommendation: Ensure `SECRET_TOKEN` is set in production.
 Effort: Small.
 
-Issue S3 (P1) - Rate limiting gaps on read-heavy endpoints.
-Problem: Several read endpoints lack `@limiter` coverage (orders status/timeline, list endpoints).
-Evidence: `app/api/orders.py`, `app/api/webapp/routes_orders.py`.
-Impact: Authenticated abuse can amplify DB load and degrade service (DoS).
-Recommendation: Add per-route limits and/or global burst limits for read-heavy routes.
-Effort: Small to Medium.
+Issue S3 (P1) - Rate limiting added to read-heavy order endpoints (Mitigated).
+Problem: Orders list/status/timeline/QR endpoints now have per-route limits.
+Evidence: `app/api/orders.py`, `app/api/webapp/routes_orders.py`, `app/api/auth.py`.
+Impact: Reduced risk of DB load amplification by authenticated abuse.
+Recommendation: Extend limits to other high-traffic read endpoints as needed.
+Effort: Small to Medium (done for orders).
 
-Issue S4 (P2) - Payment card endpoint is unauthenticated.
-Problem: `/api/v1/payment-card/{store_id}` returns card data without auth.
+Issue S4 (P2) - Payment card endpoint now requires auth (Mitigated).
+Problem: Endpoint checks `X-Telegram-Init-Data` in production.
 Evidence: `app/core/webhook_media_routes.py`.
-Impact: Exposes payment card data publicly; raises phishing/compliance risks.
-Recommendation: Require auth or serve masked card details only.
-Effort: Small.
+Impact: Reduces exposure of payment card data to unauthenticated users.
+Recommendation: Consider masking card details in responses.
+Effort: Small (done).
 
-Issue S5 (P2) - CSP allows unsafe inline scripts and third-party CDNs.
-Problem: CSP includes `'unsafe-inline'` and broad external sources for scripts/styles.
+Issue S5 (P2) - CSP hardened for main app (Mitigated).
+Problem: Removed `'unsafe-inline'` from `script-src` outside the partner panel; added `object-src 'none'`, `base-uri`, `form-action`.
 Evidence: `app/api/api_server.py`.
-Impact: Increases blast radius if a third-party asset is compromised.
-Recommendation: Self-host critical assets or add SRI; reduce inline scripts over time.
+Impact: Reduced XSS blast radius for the main app; partner panel still allows inline scripts.
+Recommendation: Move partner panel inline scripts into external files and drop `'unsafe-inline'` there too; add SRI for CDN assets.
 Effort: Medium.
 
 ## Resolved Or Mitigated In This Pass

@@ -256,7 +256,6 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     user_id = request.query.get("user_id")
     store_id = request.query.get("store_id")
     ws_token = request.query.get("ws_token") or request.query.get("token")
-    init_data = request.query.get("init_data") or request.headers.get("X-Telegram-Init-Data")
 
     authenticated_user_id = None
     token_payload = None
@@ -268,12 +267,6 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                 "WebSocket auth via token: user_id=%s",
                 authenticated_user_id,
             )
-
-    if authenticated_user_id is None and init_data:
-        authenticated_user_id = _get_authenticated_user_id(init_data)
-        logger.debug(
-            f"WebSocket auth attempt: init_data={'present' if init_data else 'missing'}, authenticated_user_id={authenticated_user_id}"
-        )
 
     environment = os.getenv("ENVIRONMENT", "production").lower()
     is_dev = environment in ("development", "dev", "local", "test")
@@ -291,7 +284,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         if not authenticated_user_id:
             # Debug level - this is expected when users open Partner Panel outside Telegram
             logger.debug(
-                f"WebSocket auth skipped: is_dev={is_dev}, user_id={user_id}, has_init_data={bool(init_data)}"
+                f"WebSocket auth skipped: is_dev={is_dev}, user_id={user_id}"
             )
             await ws.send_json({"type": "error", "message": "Authentication required"})
             await ws.close()

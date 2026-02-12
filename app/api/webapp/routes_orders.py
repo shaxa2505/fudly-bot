@@ -473,6 +473,7 @@ async def create_order(
 
 
 @router.get("/orders")
+@limiter.limit("60/minute")
 async def get_orders(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),

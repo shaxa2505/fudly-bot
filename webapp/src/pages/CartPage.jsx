@@ -1210,6 +1210,10 @@ function CartPage({ user }) {
         return
       }
       if (['cancelled', 'rejected'].includes(orderStatus)) {
+        clearPendingPayment()
+        setPendingPayment(null)
+        setPendingStatus('cleared')
+        setPendingStatusChecked(true)
         toast.error("Buyurtma bekor qilingan")
         return
       }
@@ -1288,6 +1292,14 @@ function CartPage({ user }) {
       const data = await api.getOrderStatus(pendingPayment.orderId)
       const orderStatus = String(data?.status || data?.order_status || '').toLowerCase()
       const paymentStatus = String(data?.payment_status || '').toLowerCase()
+      if (['cancelled', 'rejected'].includes(orderStatus)) {
+        clearPendingPayment()
+        setPendingPayment(null)
+        setPendingStatus('cleared')
+        setPendingStatusChecked(true)
+        return
+      }
+
       const awaiting = paymentStatus === 'awaiting_payment' || orderStatus === 'awaiting_payment'
       const doneStatuses = new Set(['completed', 'cancelled', 'rejected', 'delivering', 'ready', 'preparing'])
 

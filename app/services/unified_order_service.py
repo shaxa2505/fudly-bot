@@ -394,7 +394,7 @@ class NotificationTemplates:
                 items_total = int(total or 0)
 
         delivery_fee = int(delivery_price or 0) if display_type == "delivery" else 0
-        grand_total = items_total + (delivery_fee if display_type == "delivery" else 0)
+        grand_total = items_total
 
         label_order = get_text(lang, "label_order")
         label_status = get_text(lang, "label_status")
@@ -404,7 +404,6 @@ class NotificationTemplates:
         label_items = get_text(lang, "label_items")
         label_amount = get_text(lang, "label_amount")
         label_items_cost = get_text(lang, "label_items_cost")
-        label_delivery = get_text(lang, "label_delivery_fee")
         label_total = get_text(lang, "label_total")
 
         def _fmt_money(value: int) -> str:
@@ -442,8 +441,10 @@ class NotificationTemplates:
                 f"{label_items_cost}: {_fmt_money(items_total)} {currency}",
             ]
         )
-        if display_type == "delivery":
-            lines.append(f"{label_delivery}: {_fmt_money(delivery_fee)} {currency}")
+        if display_type == "delivery" and delivery_fee:
+            delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+            if delivery_note and delivery_note != "delivery_fee_paid_to_courier":
+                lines.append(f"<i>{delivery_note}</i>")
         lines.append(f"{label_total}: {_fmt_money(grand_total)} {currency}")
 
         hint = NotificationTemplates._seller_status_hint(status, lang, display_type)
