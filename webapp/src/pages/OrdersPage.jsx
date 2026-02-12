@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, Info, MessageCircle } from 'lucide-react'
+import { ArrowRight, MessageCircle } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
@@ -382,25 +382,11 @@ function OrdersPage() {
 
       <header className="orders-topbar app-header">
         <div className="app-header-inner">
-          <button
-            type="button"
-            className="app-header-action"
-            onClick={() => navigate(-1)}
-            aria-label="Orqaga"
-          >
-            <ChevronLeft size={18} strokeWidth={2.2} />
-          </button>
+          <div className="app-header-spacer" aria-hidden="true" />
           <div className="app-header-title">
             <h1 className="app-header-title-text">Buyurtmalar</h1>
           </div>
-          <button
-            type="button"
-            className="app-header-action"
-            onClick={() => toast.info('Buyurtmalar bo\'limi yangilanmoqda')}
-            aria-label="Ma'lumot"
-          >
-            <Info size={18} strokeWidth={2} />
-          </button>
+          <div className="app-header-spacer" aria-hidden="true" />
         </div>
         <div className="orders-tabs">
           <button

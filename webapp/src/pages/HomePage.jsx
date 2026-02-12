@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Search, SlidersHorizontal } from 'lucide-react'
+import { Search, SlidersHorizontal } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
 import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
@@ -1025,10 +1025,7 @@ function HomePage() {
               </svg>
             </button>
           </div>
-          <button type="button" className="header-notification" aria-label="Bildirishnomalar">
-            <Bell size={18} strokeWidth={2} aria-hidden="true" />
-            <span className="header-notification-dot" aria-hidden="true" />
-          </button>
+          <div className="header-spacer" aria-hidden="true" />
         </div>
       </header>
 
