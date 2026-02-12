@@ -9,6 +9,7 @@ const CACHE_TTL = 30000 // 30 seconds cache
 const CACHE_MAX_TTL = 600000 // 10 minutes max TTL for LRU eviction
 const requestCache = new LRUCache(100, CACHE_MAX_TTL)
 const inFlightRequests = new Map()
+const wsTokenCache = { token: null, expiresAt: 0, userId: null }
 
 // Retry configuration
 const RETRY_CONFIG = {
@@ -25,89 +26,48 @@ const RETRY_CONFIG = {
 
 const IDEMPOTENT_METHODS = new Set(['get', 'head', 'options', 'put', 'delete'])
 
-const INITDATA_KEY = 'fudly_init_data'
-const INITDATA_TS_KEY = 'fudly_init_data_ts'
 const INITDATA_TTL_MS = 24 * 60 * 60 * 1000
-
-const getSessionStorage = () => {
-  try {
-    return window.sessionStorage
-  } catch {
-    return null
-  }
-}
-
-const getLocalStorage = () => {
-  try {
-    return window.localStorage
-  } catch {
-    return null
-  }
-}
-
-const readStoredInitData = (userId = null) => {
-  const suffix = userId ? `_${userId}` : ''
-  const storages = [getSessionStorage(), getLocalStorage()].filter(Boolean)
-  if (!storages.length) return null
-
-  for (const storage of storages) {
-    const initData = storage.getItem(`${INITDATA_KEY}${suffix}`)
-    if (!initData) continue
-    const tsRaw = storage.getItem(`${INITDATA_TS_KEY}${suffix}`)
-    const ts = tsRaw ? Number(tsRaw) : 0
-    if (!ts || Date.now() - ts > INITDATA_TTL_MS) {
-      storage.removeItem(`${INITDATA_KEY}${suffix}`)
-      storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
-      continue
-    }
-    return initData
-  }
-
-  return null
-}
+let inMemoryInitData = null
+let inMemoryInitDataTs = 0
+let inMemoryUserId = null
 
 export const saveTelegramInitData = (initData, userId = null) => {
-  const storage = getSessionStorage() || getLocalStorage()
-  if (!storage || !initData) return
-  const suffix = userId ? `_${userId}` : ''
-  storage.setItem(`${INITDATA_KEY}${suffix}`, initData)
-  storage.setItem(`${INITDATA_TS_KEY}${suffix}`, String(Date.now()))
+  if (!initData) return
+  inMemoryInitData = initData
+  inMemoryInitDataTs = Date.now()
   if (userId) {
-    storage.setItem('fudly_last_user_id', String(userId))
+    inMemoryUserId = String(userId)
   }
 }
 
 export const clearTelegramInitData = (userId = null) => {
-  const suffix = userId ? `_${userId}` : ''
-  const storages = [getSessionStorage(), getLocalStorage()].filter(Boolean)
-  for (const storage of storages) {
-    storage.removeItem(`${INITDATA_KEY}${suffix}`)
-    storage.removeItem(`${INITDATA_TS_KEY}${suffix}`)
-    if (!userId) {
-      storage.removeItem('fudly_last_user_id')
-    }
+  if (userId && inMemoryUserId && String(userId) !== String(inMemoryUserId)) {
+    return
+  }
+  inMemoryInitData = null
+  inMemoryInitDataTs = 0
+  wsTokenCache.token = null
+  wsTokenCache.expiresAt = 0
+  wsTokenCache.userId = null
+  if (!userId) {
+    inMemoryUserId = null
   }
 }
 
 export const getTelegramInitData = () => {
   const tgWebApp = window.Telegram?.WebApp
   const tgInitData = tgWebApp?.initData
+  const tgUserId = tgWebApp?.initDataUnsafe?.user?.id
   if (tgInitData) {
+    saveTelegramInitData(tgInitData, tgUserId)
     return tgInitData
   }
 
-  const tgUserId = tgWebApp?.initDataUnsafe?.user?.id
-  if (tgUserId) {
-    return readStoredInitData(tgUserId)
+  if (inMemoryInitData && Date.now() - inMemoryInitDataTs <= INITDATA_TTL_MS) {
+    return inMemoryInitData
   }
 
-  const storage = getSessionStorage() || getLocalStorage()
-  const lastUserId = storage?.getItem('fudly_last_user_id')
-  if (lastUserId) {
-    return readStoredInitData(lastUserId)
-  }
-
-  return readStoredInitData()
+  return null
 }
 
 const getCacheScopeKey = () => {
@@ -115,12 +75,8 @@ const getCacheScopeKey = () => {
   if (tgUserId) {
     return `u:${tgUserId}`
   }
-  const storage = getSessionStorage()
-  const lastUserId =
-    storage?.getItem('fudly_last_user_id') ||
-    getLocalStorage()?.getItem('fudly_last_user_id')
-  if (lastUserId) {
-    return `u:${lastUserId}`
+  if (inMemoryUserId) {
+    return `u:${inMemoryUserId}`
   }
   return 'u:anon'
 }
@@ -311,6 +267,41 @@ const api = {
 
     // Telegram file_id or storage id - use our API endpoint
     return `${API_BASE}/photo/${encodeURIComponent(normalized)}`
+  },
+
+  async getWsToken(options = {}) {
+    const { force = false } = options || {}
+    const currentUserId =
+      window.Telegram?.WebApp?.initDataUnsafe?.user?.id || inMemoryUserId || null
+    if (
+      wsTokenCache.userId != null &&
+      currentUserId != null &&
+      String(wsTokenCache.userId) !== String(currentUserId)
+    ) {
+      wsTokenCache.token = null
+      wsTokenCache.expiresAt = 0
+      wsTokenCache.userId = null
+    }
+    if (!force && wsTokenCache.token && Date.now() < wsTokenCache.expiresAt - 5000) {
+      return wsTokenCache.token
+    }
+    const initData = getTelegramInitData()
+    if (!initData) {
+      return ''
+    }
+    const { data } = await client.post('/auth/ws-token')
+    const token = data?.token || ''
+    if (!token) {
+      wsTokenCache.token = null
+      wsTokenCache.expiresAt = 0
+      return ''
+    }
+    const ttlSeconds = Number(data?.expires_in || 0)
+    const ttlMs = Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ttlSeconds * 1000 : 0
+    wsTokenCache.token = token
+    wsTokenCache.expiresAt = Date.now() + (ttlMs || 60000)
+    wsTokenCache.userId = currentUserId
+    return token
   },
 
   // Auth endpoints

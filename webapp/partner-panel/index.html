@@ -651,39 +651,9 @@
             const resolvedUserId = tgUserId || (urlUserId ? String(urlUserId) : '');
             let authExpired = false;
 
-            if (finalData && source !== 'cache') {
-                try {
-                    if (resolvedUserId) {
-                        localStorage.setItem(`partner_init_data_${resolvedUserId}`, finalData);
-                        localStorage.setItem('partner_last_user_id', resolvedUserId);
-                    } else {
-                        localStorage.setItem('partner_init_data', finalData);
-                    }
-                } catch (e) {}
-            } else if (!finalData) {
-                try {
-                    if (resolvedUserId) {
-                        const cached = localStorage.getItem(`partner_init_data_${resolvedUserId}`);
-                        if (cached) {
-                            finalData = cached;
-                            source = 'cache';
-                        }
-                    } else {
-                        const cached = localStorage.getItem('partner_init_data');
-                        if (cached) {
-                            finalData = cached;
-                            source = 'cache';
-                        }
-                    }
-                } catch (e) {}
-            }
-
             if (finalData && tgUserId) {
                 const initDataUserId = extractUserIdFromInitData(finalData);
                 if (initDataUserId && initDataUserId !== tgUserId) {
-                    try {
-                        localStorage.removeItem(`partner_init_data_${tgUserId}`);
-                    } catch (e) {}
                     finalData = '';
                     source = 'mismatch';
                 }
@@ -695,13 +665,6 @@
             if (isAuthExpired(initAuthTs)) {
                 authExpired = true;
                 finalData = '';
-                try {
-                    if (resolvedUserId) {
-                        localStorage.removeItem(`partner_init_data_${resolvedUserId}`);
-                    } else {
-                        localStorage.removeItem('partner_init_data');
-                    }
-                } catch (e) {}
             }
 
             const urlAuthExpired = isAuthExpired(urlAuthTs);
@@ -4191,7 +4154,17 @@ async function toggleProductAvailability(id) {
         let wsReconnectTimeout = null;
         let wsPingInterval = null;
 
-        function connectWebSocket() {
+        async function fetchWsToken() {
+            try {
+                const response = await apiFetch('/api/partner/ws-token', { method: 'POST' });
+                return response?.token || '';
+            } catch (error) {
+                console.warn('⚠️ Failed to fetch WS token:', error);
+                return '';
+            }
+        }
+
+        async function connectWebSocket() {
             // Skip if no store info yet
             if (!state.store || !state.store.store_id) {
                 console.log('⏸️ Waiting for store info before connecting WebSocket');
@@ -4205,15 +4178,15 @@ async function toggleProductAvailability(id) {
             if (auth.userId && auth.userId !== 'none') {
                 params.set('user_id', auth.userId);
             }
-            // Send full init_data for authentication
-            if (auth.data) {
-                params.set('init_data', auth.data);
+            const wsToken = await fetchWsToken();
+            if (wsToken) {
+                params.set('ws_token', wsToken);
             }
             const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/ws/notifications?${params.toString()}`;
 
             console.log(`🔌 Connecting to WebSocket for store ${storeId}`);
             console.log(`🔐 WebSocket auth:`, { 
-                hasInitData: !!auth.data, 
+                hasToken: !!wsToken,
                 userId: auth.userId,
                 storeId 
             });

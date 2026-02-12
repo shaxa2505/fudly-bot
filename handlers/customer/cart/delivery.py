@@ -210,6 +210,7 @@ def register(router: Router) -> None:
             store_id=store_id,
             delivery_price=delivery_price,
             is_cart_order=True,
+            address=None,
             delivery_lat=None,
             delivery_lon=None,
         )
@@ -243,6 +244,12 @@ def register(router: Router) -> None:
         longitude = message.location.longitude
 
         await state.update_data(delivery_lat=latitude, delivery_lon=longitude)
+
+        data = await state.get_data()
+        saved_address = data.get("address")
+        if saved_address:
+            await _send_cart_payment_selection(message, state, lang, str(saved_address))
+            return
 
         delivery_address = None
         try:
@@ -282,8 +289,16 @@ def register(router: Router) -> None:
             await state.clear()
             return
 
-        if len(delivery_address) < 10 and not (delivery_lat and delivery_lon):
+        if len(delivery_address) < 10:
             await message.answer(get_text(lang, "cart_delivery_address_too_short"))
+            return
+
+        if delivery_lat is None or delivery_lon is None:
+            await state.update_data(address=delivery_address)
+            await message.answer(
+                get_text(lang, "cart_delivery_location_prompt"),
+                reply_markup=location_request_keyboard(lang),
+            )
             return
 
         await _send_cart_payment_selection(message, state, lang, delivery_address)

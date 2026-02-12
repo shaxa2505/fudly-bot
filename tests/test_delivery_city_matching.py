@@ -17,7 +17,7 @@ class DummyDB:
 
 
 @pytest.mark.asyncio
-async def test_delivery_allows_store_district_match():
+async def test_delivery_requires_coordinates():
     store = {
         "store_id": 1,
         "city": "Samarkand",
@@ -25,37 +25,43 @@ async def test_delivery_allows_store_district_match():
         "district": "Kattakurgan",
         "delivery_price": 10000,
         "min_order_amount": 30000,
+        "latitude": 39.654,
+        "longitude": 66.975,
     }
 
     result = await calculate_delivery_cost(
-        "Kattaqo'rg'on shahri",
-        "Some address",
-        1,
-        DummyDB(store),
-    )
-
-    assert result.can_deliver is True
-    assert result.delivery_cost == 10000.0
-    assert result.min_order_amount == 30000.0
-
-
-@pytest.mark.asyncio
-async def test_delivery_blocks_unrelated_city():
-    store = {
-        "store_id": 1,
-        "city": "Samarkand",
-        "region": "Samarkand",
-        "district": "Kattakurgan",
-        "delivery_price": 10000,
-        "min_order_amount": 30000,
-    }
-
-    result = await calculate_delivery_cost(
-        "Tashkent",
+        "Samarkand",
         "Some address",
         1,
         DummyDB(store),
     )
 
     assert result.can_deliver is False
-    assert "Samarkand" in (result.message or "")
+    assert "xaritada" in (result.message or "").lower()
+
+
+@pytest.mark.asyncio
+async def test_delivery_clamps_radius_to_max():
+    store = {
+        "store_id": 1,
+        "city": "Samarkand",
+        "region": "Samarkand",
+        "district": "Kattakurgan",
+        "delivery_price": 10000,
+        "min_order_amount": 30000,
+        "latitude": 0.0,
+        "longitude": 0.0,
+        "delivery_radius_km": 1000,
+    }
+
+    result = await calculate_delivery_cost(
+        "Samarkand",
+        "Some address",
+        1,
+        DummyDB(store),
+        delivery_lat=0.2,
+        delivery_lon=0.0,
+    )
+
+    assert result.can_deliver is False
+    assert "radiusi 10 km" in (result.message or "").lower()

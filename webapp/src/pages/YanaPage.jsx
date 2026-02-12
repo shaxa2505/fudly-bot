@@ -10,7 +10,7 @@ import {
   MapPin,
   Pencil,
 } from 'lucide-react'
-import api, { API_BASE_URL, getTelegramInitData } from '../api/client'
+import api, { API_BASE_URL } from '../api/client'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 import BottomNav from '../components/BottomNav'
@@ -101,7 +101,7 @@ function YanaPage({ user }) {
   const userId = getUserId()
   const notificationsStorageKey = userId ? `fudly_notifications_${userId}` : 'fudly_notifications'
 
-  const getWsUrl = () => {
+  const getWsUrl = async () => {
     const envBase = import.meta.env.VITE_WS_URL
     const baseSource = (envBase || API_BASE_URL || '').trim()
     if (!baseSource) return ''
@@ -128,9 +128,13 @@ function YanaPage({ user }) {
     if (userId) {
       params.set('user_id', userId)
     }
-    const initData = getTelegramInitData()
-    if (initData) {
-      params.set('init_data', initData)
+    try {
+      const token = await api.getWsToken()
+      if (token) {
+        params.set('ws_token', token)
+      }
+    } catch (error) {
+      console.warn('Could not fetch WS token:', error)
     }
     const query = params.toString()
     return `${wsEndpoint}${query ? `?${query}` : ''}`
@@ -247,48 +251,58 @@ function YanaPage({ user }) {
     if (!userId || !notifications) return
 
     let ws
-    try {
-      ws = new WebSocket(getWsUrl())
-    } catch (error) {
-      console.warn('WebSocket init failed:', error)
-      return
-    }
+    let cancelled = false
 
-    ws.onmessage = (event) => {
+    const connect = async () => {
+      const wsUrl = await getWsUrl()
+      if (!wsUrl || cancelled) return
+
       try {
-        const data = JSON.parse(event.data)
-        if (data.type === 'order_status_changed' || data.type === 'order_created') {
-          loadSavedMetric(true)
-          return
-        }
-
-        if (data.type !== 'notification' || !data.payload) return
-
-        const newItem = {
-          id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
-          title: data.payload.title || 'Bildirishnoma',
-          message: data.payload.message || '',
-          type: data.payload.type || 'system',
-          created_at: data.payload.created_at || new Date().toISOString(),
-          data: data.payload.data || {},
-        }
-
-        setNotificationsList((prev) => {
-          const next = [newItem, ...prev]
-          notificationsRef.current = next
-          persistNotifications(next)
-          return next
-        })
-
-        if (data.payload.data?.order_id || data.payload.data?.booking_id) {
-          loadSavedMetric(true)
-        }
+        ws = new WebSocket(wsUrl)
       } catch (error) {
-        console.warn('Failed to parse notification:', error)
+        console.warn('WebSocket init failed:', error)
+        return
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === 'order_status_changed' || data.type === 'order_created') {
+            loadSavedMetric(true)
+            return
+          }
+
+          if (data.type !== 'notification' || !data.payload) return
+
+          const newItem = {
+            id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+            title: data.payload.title || 'Bildirishnoma',
+            message: data.payload.message || '',
+            type: data.payload.type || 'system',
+            created_at: data.payload.created_at || new Date().toISOString(),
+            data: data.payload.data || {},
+          }
+
+          setNotificationsList((prev) => {
+            const next = [newItem, ...prev]
+            notificationsRef.current = next
+            persistNotifications(next)
+            return next
+          })
+
+          if (data.payload.data?.order_id || data.payload.data?.booking_id) {
+            loadSavedMetric(true)
+          }
+        } catch (error) {
+          console.warn('Failed to parse notification:', error)
+        }
       }
     }
 
+    connect()
+
     return () => {
+      cancelled = true
       if (ws) {
         ws.close()
       }

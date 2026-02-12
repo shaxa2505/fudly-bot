@@ -44,6 +44,7 @@ from app.services.unified_order_service import (
 )
 from database_protocol import DatabaseProtocol
 from app.api.rate_limit import limiter
+from app.core.ws_tokens import issue_ws_token
 
 router = APIRouter(tags=["partner-panel"])
 
@@ -412,6 +413,15 @@ async def get_profile(request: Request, authorization: str = Header(None)):
         if store_info
         else None,
     }
+
+
+@router.post("/ws-token")
+@limiter.limit("60/minute")
+async def create_ws_token(request: Request, authorization: str = Header(None)):
+    """Issue short-lived WebSocket token for partner panel."""
+    telegram_id = verify_telegram_webapp(authorization)
+    token, ttl = await issue_ws_token(telegram_id)
+    return {"token": token, "expires_in": ttl}
 
 
 # ============================================

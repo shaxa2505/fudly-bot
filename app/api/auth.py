@@ -16,6 +16,8 @@ from pydantic import BaseModel
 
 from app.core.config import load_settings
 from app.core.async_db import AsyncDBProxy
+from app.api.rate_limit import limiter
+from app.core.ws_tokens import issue_ws_token
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,13 @@ class NotificationSettingsResponse(BaseModel):
     """Notification settings response."""
 
     enabled: bool
+
+
+class WsTokenResponse(BaseModel):
+    """Short-lived WebSocket token response."""
+
+    token: str
+    expires_in: int
 
 
 def validate_telegram_webapp_data(init_data: str, bot_token: str) -> dict[str, Any] | None:
@@ -253,6 +262,17 @@ async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile
         registered=bool(user.phone),  # Считаем зарегистрированным если есть телефон
         notifications_enabled=getattr(user, "notifications_enabled", True),
     )
+
+
+@router.post("/auth/ws-token", response_model=WsTokenResponse)
+@limiter.limit("60/minute")
+async def create_ws_token(
+    x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
+) -> WsTokenResponse:
+    """Issue short-lived WebSocket auth token."""
+    user_id = _get_authenticated_user_id(x_telegram_init_data)
+    token, ttl = await issue_ws_token(user_id)
+    return WsTokenResponse(token=token, expires_in=ttl)
 
 
 @router.get("/user/profile", response_model=UserProfile)

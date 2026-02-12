@@ -15,10 +15,12 @@ from __future__ import annotations
 from typing import Any
 
 from aiogram import F, Router, types
+from aiogram.filters import BaseFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
+from app.core.geocoding import reverse_geocode_store
 from app.core.utils import get_offer_field, get_store_field
 from app.core.units import calc_total_price, normalize_unit, parse_quantity_input
 from app.integrations.payment_service import get_payment_service
@@ -52,6 +54,26 @@ router = Router()
 # Module-level dependencies
 db: DatabaseProtocol | None = None
 bot: Any | None = None
+
+
+class IsNotCartOrder(BaseFilter):
+    """Filter messages that are not part of cart delivery flow."""
+
+    async def __call__(self, message: types.Message, state: FSMContext) -> bool:  # type: ignore[override]
+        data = await state.get_data()
+        return not bool(data.get("is_cart_order"))
+
+
+def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
+    """Keyboard for requesting delivery geolocation."""
+    location_text = get_text(lang, "cart_delivery_location_button")
+    return types.ReplyKeyboardMarkup(
+        keyboard=[
+            [types.KeyboardButton(text=location_text, request_location=True)],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
 
 
 def _default_quantity_for_unit(unit: str) -> float:
@@ -138,6 +160,17 @@ async def _edit_delivery_card(
         logger.warning("Failed to send delivery card fallback: %s", e)
 
 
+async def _send_location_prompt(message: types.Message, lang: str) -> None:
+    """Ask user to share delivery location."""
+    try:
+        await message.answer(
+            get_text(lang, "cart_delivery_location_prompt"),
+            reply_markup=location_request_keyboard(lang),
+        )
+    except Exception as e:
+        logger.warning("Failed to send location prompt: %s", e)
+
+
 async def resume_delivery_after_phone(
     message: types.Message, state: FSMContext, db: DatabaseProtocol, pending_payload: str
 ) -> None:
@@ -203,6 +236,8 @@ async def resume_delivery_after_phone(
         min_order=min_order,
         saved_address=saved_address,
         address=None,
+        delivery_lat=None,
+        delivery_lon=None,
         offer_photo=offer_photo,
     )
     await state.set_state(OrderDelivery.quantity)
@@ -322,6 +357,8 @@ async def start_delivery_order(
         min_order=min_order,
         saved_address=saved_address,
         address=None,
+        delivery_lat=None,
+        delivery_lon=None,
         offer_photo=offer_photo,
     )
     await state.set_state(OrderDelivery.quantity)
@@ -532,6 +569,7 @@ async def dlv_change_qty(
 
     offer_photo = data.get("offer_photo")
     await _edit_delivery_card(callback, text, kb, offer_photo)
+    await _send_location_prompt(callback.message, lang)
 
     await callback.answer()
 
@@ -599,6 +637,7 @@ async def dlv_to_address(
 
     offer_photo = data.get("offer_photo")
     await _edit_delivery_card(callback, text, kb, offer_photo)
+    await _send_location_prompt(callback.message, lang)
 
     await callback.answer()
 
@@ -636,6 +675,7 @@ async def dlv_back_to_qty(
 
     offer_photo = data.get("offer_photo")
     await _edit_delivery_card(callback, text, kb, offer_photo)
+    await _send_location_prompt(callback.message, lang)
 
     await callback.answer()
 
@@ -658,7 +698,15 @@ async def dlv_use_saved_address(
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
-    await state.update_data(address=saved_address)
+    await state.update_data(address=saved_address, delivery_lat=None, delivery_lon=None)
+    delivery_lat = data.get("delivery_lat")
+    delivery_lon = data.get("delivery_lon")
+    if delivery_lat is None or delivery_lon is None:
+        await state.set_state(OrderDelivery.address)
+        if callback.message:
+            await _send_location_prompt(callback.message, lang)
+        await callback.answer(get_text(lang, "cart_delivery_location_prompt"), show_alert=True)
+        return
 
     # Don't create order yet - wait for payment method selection (Click)
     logger.info(f"User {user_id} selected saved address, waiting for payment selection")
@@ -699,7 +747,7 @@ async def dlv_new_address(
 
     # Keep card but ask for text input
     await state.set_state(OrderDelivery.address)
-    await state.update_data(awaiting_address_input=True)
+    await state.update_data(awaiting_address_input=True, delivery_lat=None, delivery_lon=None)
 
     # Add hint to card
     data = await state.get_data()
@@ -748,7 +796,79 @@ async def dlv_new_address(
     await callback.answer()
 
 
-@router.message(OrderDelivery.address)
+@router.message(OrderDelivery.address, IsNotCartOrder(), F.location)
+async def dlv_location_input(message: types.Message, state: FSMContext) -> None:
+    """Handle location input for delivery orders."""
+    if not message.from_user or not message.location:
+        return
+
+    global db
+    if not db:
+        await message.answer(_service_unavailable(_lang_code(message.from_user)))
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    latitude = message.location.latitude
+    longitude = message.location.longitude
+
+    await state.update_data(delivery_lat=latitude, delivery_lon=longitude)
+
+    data = await state.get_data()
+    saved_address = data.get("address")
+    if saved_address:
+        await state.set_state(OrderDelivery.payment_method_select)
+        card_text = build_delivery_card_text(
+            lang,
+            data.get("title", ""),
+            data.get("price", 0),
+            data.get("quantity", 1),
+            data.get("max_qty", 1),
+            data.get("store_name", ""),
+            data.get("delivery_price", 0),
+            str(saved_address),
+            "payment",
+            data.get("unit", "piece"),
+        )
+        kb = build_delivery_payment_keyboard(lang, data.get("offer_id"))
+        offer_photo = data.get("offer_photo")
+        await _send_delivery_card(message, card_text, kb, offer_photo)
+        return
+
+    delivery_address = None
+    try:
+        geo = await reverse_geocode_store(latitude, longitude)
+        if geo:
+            delivery_address = geo.get("display_name")
+    except Exception as e:
+        logger.warning("Delivery reverse geocode failed: %s", e)
+
+    if delivery_address:
+        await state.update_data(address=str(delivery_address))
+        await state.set_state(OrderDelivery.payment_method_select)
+        card_text = build_delivery_card_text(
+            lang,
+            data.get("title", ""),
+            data.get("price", 0),
+            data.get("quantity", 1),
+            data.get("max_qty", 1),
+            data.get("store_name", ""),
+            data.get("delivery_price", 0),
+            str(delivery_address),
+            "payment",
+            data.get("unit", "piece"),
+        )
+        kb = build_delivery_payment_keyboard(lang, data.get("offer_id"))
+        offer_photo = data.get("offer_photo")
+        await _send_delivery_card(message, card_text, kb, offer_photo)
+        return
+
+    await message.answer(
+        get_text(lang, "cart_delivery_location_received"),
+        reply_markup=location_request_keyboard(lang),
+    )
+
+
+@router.message(OrderDelivery.address, IsNotCartOrder())
 async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     """Handle address text input for delivery orders (Tez buyurtma, etc.)."""
     if not message.from_user:
@@ -797,7 +917,13 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
     store_id = data.get("store_id")
     quantity = data.get("quantity", 1)
     delivery_price = data.get("delivery_price", 0)
+    delivery_lat = data.get("delivery_lat")
+    delivery_lon = data.get("delivery_lon")
     user_id = message.from_user.id
+
+    if delivery_lat is None or delivery_lon is None:
+        await _send_location_prompt(message, lang)
+        return
 
     # Don't create order yet - wait for payment method selection (Click)
     logger.info(f"User {user_id} saved address, waiting for payment selection")
@@ -900,11 +1026,18 @@ async def dlv_pay_click(
 
     # Ensure we have address and other required data
     address = data.get("address")
+    delivery_lat = data.get("delivery_lat")
+    delivery_lon = data.get("delivery_lon")
     if not address:
         logger.error("? No address in state for Click payment")
         await _return_to_address_step(callback.message, state, data, lang)
         await state.update_data(delivery_payment_in_progress=False)
         await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
+        return
+    if delivery_lat is None or delivery_lon is None:
+        await _return_to_address_step(callback.message, state, data, lang)
+        await state.update_data(delivery_payment_in_progress=False)
+        await callback.answer(get_text(lang, "cart_delivery_location_prompt"), show_alert=True)
         return
 
     # Create order if not created yet
@@ -957,6 +1090,8 @@ async def dlv_pay_click(
                 items=[order_item],
                 order_type=order_type,
                 delivery_address=address if order_type == "delivery" else None,
+                delivery_lat=delivery_lat,
+                delivery_lon=delivery_lon,
                 payment_method="click",
                 notify_customer=False,
                 notify_sellers=False,
@@ -1066,11 +1201,18 @@ async def dlv_pay_cash(
 
     # Ensure we have address and other required data
     address = data.get("address")
+    delivery_lat = data.get("delivery_lat")
+    delivery_lon = data.get("delivery_lon")
     if not address:
         logger.error("No address in state for cash payment")
         await _return_to_address_step(callback.message, state, data, lang)
         await state.update_data(delivery_payment_in_progress=False)
         await callback.answer(get_text(lang, "cart_delivery_address_prompt"), show_alert=True)
+        return
+    if delivery_lat is None or delivery_lon is None:
+        await _return_to_address_step(callback.message, state, data, lang)
+        await state.update_data(delivery_payment_in_progress=False)
+        await callback.answer(get_text(lang, "cart_delivery_location_prompt"), show_alert=True)
         return
 
     order_service = get_unified_order_service()
@@ -1120,6 +1262,8 @@ async def dlv_pay_cash(
             items=[order_item],
             order_type=order_type,
             delivery_address=address if order_type == "delivery" else None,
+            delivery_lat=delivery_lat,
+            delivery_lon=delivery_lon,
             payment_method="cash",
             notify_customer=True,
             notify_sellers=True,
@@ -1185,6 +1329,7 @@ async def _return_to_address_step(message: types.Message, state: FSMContext, dat
     except Exception:
         offer_photo = data.get("offer_photo")
         await _send_delivery_card(message, text, kb, offer_photo)
+    await _send_location_prompt(message, lang)
 
 # Legacy quantity handler for manual input
 @router.message(OrderDelivery.quantity)
@@ -1258,6 +1403,7 @@ async def dlv_quantity_text(
 
         offer_photo = data.get("offer_photo")
         await _send_delivery_card(message, card_text, kb, offer_photo)
+        await _send_location_prompt(message, lang)
 
     except ValueError:
         await message.answer(get_text(lang, "delivery_quantity_invalid"))

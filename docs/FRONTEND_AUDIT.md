@@ -74,19 +74,19 @@ Recommendation: Add confirmation/undo, and revert UI on failure.
 Effort: Small to Medium.
 
 ## Security
-Issue S1 (P1) - Telegram initData is persisted in storage.
-Problem: `initData` is written to session/local storage with a 24h TTL.
-Evidence: `webapp/src/api/client.js:69-74`.
-Impact: If XSS occurs or devices are shared, auth data can be exfiltrated or reused.
-Recommendation: Keep initData in memory/session only and use short-lived server tokens.
-Effort: Medium.
+Issue S1 (P1) - Telegram initData persistence removed (Fixed).
+Problem: initData is now kept in memory only with a short TTL.
+Evidence: `webapp/src/api/client.js:29-70`.
+Impact: Reduced risk of token leakage via storage.
+Recommendation: Keep initData in memory and rely on short-lived server tokens.
+Effort: Medium (done).
 
-Issue S2 (P1) - init_data sent via WebSocket query params.
-Problem: Auth data is appended to WS URLs.
-Evidence: `webapp/src/pages/OrderDetailsPage.jsx:222`, `webapp/src/pages/CartPage.jsx:1376`.
-Impact: Query strings can leak via logs/proxies.
-Recommendation: Use a short-lived WS token from HTTPS and pass it via headers/subprotocol.
-Effort: Medium.
+Issue S2 (P1) - WebSocket auth moved to short-lived token (Fixed).
+Problem: WS URLs no longer include init_data; a ws_token is fetched over HTTPS.
+Evidence: `webapp/src/api/client.js:272-305`, `webapp/src/pages/OrderDetailsPage.jsx:221-240`, `webapp/src/pages/CartPage.jsx:1385-1406`, `webapp/src/pages/YanaPage.jsx:132-134`.
+Impact: Reduced query-string leakage risk.
+Recommendation: Keep ws_token flow and remove init_data fallback server-side after migration.
+Effort: Medium (done).
 
 Security note: No `dangerouslySetInnerHTML` usage found in `webapp/src`, so direct DOM XSS injection risk is lower.
 

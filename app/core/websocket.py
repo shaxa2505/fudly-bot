@@ -5,6 +5,7 @@ Provides WebSocket endpoint for web clients to receive
 real-time updates about bookings, offers, etc.
 """
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -20,6 +21,7 @@ from app.core.notifications import (
     Notification,
     NotificationService,
 )
+from app.core.ws_tokens import consume_ws_token
 
 logger = logging.getLogger(__name__)
 
@@ -253,10 +255,21 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     # Get user info from query params
     user_id = request.query.get("user_id")
     store_id = request.query.get("store_id")
+    ws_token = request.query.get("ws_token") or request.query.get("token")
     init_data = request.query.get("init_data") or request.headers.get("X-Telegram-Init-Data")
 
     authenticated_user_id = None
-    if init_data:
+    token_payload = None
+    if ws_token:
+        token_payload = await consume_ws_token(ws_token)
+        if token_payload:
+            authenticated_user_id = token_payload.get("user_id")
+            logger.debug(
+                "WebSocket auth via token: user_id=%s",
+                authenticated_user_id,
+            )
+
+    if authenticated_user_id is None and init_data:
         authenticated_user_id = _get_authenticated_user_id(init_data)
         logger.debug(
             f"WebSocket auth attempt: init_data={'present' if init_data else 'missing'}, authenticated_user_id={authenticated_user_id}"
@@ -310,9 +323,15 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         except ValueError:
             store_id = None
 
+    token_store_id = token_payload.get("store_id") if isinstance(token_payload, dict) else None
+    if token_store_id and store_id and int(token_store_id) != int(store_id):
+        await ws.send_json({"type": "error", "message": "Store mismatch"})
+        await ws.close()
+        return ws
+
     if store_id and authenticated_user_id is not None and not is_dev:
         db = request.app.get("db") if hasattr(request, "app") else None
-        if not _user_can_access_store(db, store_id, authenticated_user_id):
+        if not await _user_can_access_store(db, store_id, authenticated_user_id):
             await ws.send_json({"type": "error", "message": "Access denied"})
             await ws.close()
             return ws
@@ -373,21 +392,26 @@ def _get_authenticated_user_id(init_data: str) -> int | None:
     return None
 
 
-def _user_can_access_store(db: Any, store_id: int, user_id: int) -> bool:
+async def _user_can_access_store(db: Any, store_id: int, user_id: int) -> bool:
     """Verify that user owns or administers the store."""
     if not db:
         return False
 
+    async def _maybe_await(value):
+        if inspect.isawaitable(value):
+            return await value
+        return value
+
     if hasattr(db, "is_store_admin"):
         try:
-            if db.is_store_admin(store_id, user_id):
+            if await _maybe_await(db.is_store_admin(store_id, user_id)):
                 return True
         except Exception:
             pass
 
     if hasattr(db, "get_store_owner"):
         try:
-            owner = db.get_store_owner(store_id)
+            owner = await _maybe_await(db.get_store_owner(store_id))
             if isinstance(owner, dict):
                 owner_id = owner.get("owner_id")
             else:
@@ -399,7 +423,7 @@ def _user_can_access_store(db: Any, store_id: int, user_id: int) -> bool:
 
     if hasattr(db, "get_store_by_owner"):
         try:
-            store = db.get_store_by_owner(user_id)
+            store = await _maybe_await(db.get_store_by_owner(user_id))
             if store:
                 store_id_val = (
                     store.get("store_id")
@@ -415,7 +439,7 @@ def _user_can_access_store(db: Any, store_id: int, user_id: int) -> bool:
 
     if hasattr(db, "get_user_stores"):
         try:
-            stores = db.get_user_stores(user_id) or []
+            stores = await _maybe_await(db.get_user_stores(user_id)) or []
             for store in stores:
                 store_id_val = (
                     store.get("store_id")

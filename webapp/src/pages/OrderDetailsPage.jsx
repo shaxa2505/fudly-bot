@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, MoreHorizontal, Phone, QrCode } from 'lucide-react'
-import apiClient, { API_BASE_URL, getTelegramInitData } from '../api/client'
+import apiClient, { API_BASE_URL } from '../api/client'
 import { resolveOrderItemImageUrl } from '../utils/imageUtils'
 import { calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import {
@@ -192,7 +192,7 @@ export default function OrderDetailsPage() {
   useEffect(() => {
     if (!userId) return
 
-    const buildWsUrl = () => {
+    const buildWsUrl = async () => {
       const envBase = import.meta.env.VITE_WS_URL
       const baseSource = (envBase || API_BASE_URL || '').trim()
       if (!baseSource) return ''
@@ -217,48 +217,59 @@ export default function OrderDetailsPage() {
       if (userId) {
         params.set('user_id', userId)
       }
-      const initData = getTelegramInitData()
-      if (initData) {
-        params.set('init_data', initData)
+      try {
+        const token = await apiClient.getWsToken()
+        if (token) {
+          params.set('ws_token', token)
+        }
+      } catch (error) {
+        console.warn('Could not fetch WS token:', error)
       }
       const query = params.toString()
       return `${wsEndpoint}${query ? `?${query}` : ''}`
     }
 
-    const wsUrl = buildWsUrl()
-    if (!wsUrl) return
-
     let ws
-    try {
-      ws = new WebSocket(wsUrl)
-    } catch (error) {
-      console.warn('WebSocket init failed:', error)
-      return
-    }
+    let cancelled = false
 
-    ws.onmessage = (event) => {
+    const connect = async () => {
+      const wsUrl = await buildWsUrl()
+      if (!wsUrl || cancelled) return
+
       try {
-        const payload = JSON.parse(event.data)
-        const type = payload?.type
-        const data =
-          payload?.payload?.data ||
-          payload?.payload ||
-          payload?.data ||
-          {}
-        const eventOrderId = data?.order_id || data?.booking_id
-
-        if (type === 'order_status_changed' || type === 'order_created') {
-          if (!eventOrderId || Number(eventOrderId) === Number(orderId)) {
-            loadOrderDetails({ allowEnrich: false, silent: true })
-            loadOrderTimeline(true)
-          }
-        }
+        ws = new WebSocket(wsUrl)
       } catch (error) {
-        console.warn('Failed to parse order update:', error)
+        console.warn('WebSocket init failed:', error)
+        return
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          const type = payload?.type
+          const data =
+            payload?.payload?.data ||
+            payload?.payload ||
+            payload?.data ||
+            {}
+          const eventOrderId = data?.order_id || data?.booking_id
+
+          if (type === 'order_status_changed' || type === 'order_created') {
+            if (!eventOrderId || Number(eventOrderId) === Number(orderId)) {
+              loadOrderDetails({ allowEnrich: false, silent: true })
+              loadOrderTimeline(true)
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to parse order update:', error)
+        }
       }
     }
 
+    connect()
+
     return () => {
+      cancelled = true
       if (ws) {
         ws.close()
       }

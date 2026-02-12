@@ -40,7 +40,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from PIL import Image
 
 from app.core.geocoding import geocode_store_address
-from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
+from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM, MAX_DELIVERY_RADIUS_KM
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.core.utils import UZB_TZ, get_uzb_time, get_order_field, to_uzb_datetime
@@ -1534,14 +1534,8 @@ class UnifiedOrderService:
         if is_delivery and not delivery_address:
             return self._error_result("Delivery address required")
 
-        if is_delivery and delivery_address and (delivery_lat is None or delivery_lon is None):
-            try:
-                geo = await geocode_store_address(delivery_address, None)
-                if geo:
-                    delivery_lat = geo.get("latitude")
-                    delivery_lon = geo.get("longitude")
-            except Exception as geo_err:
-                logger.warning("Delivery geocode failed in create_order: %s", geo_err)
+        if is_delivery and (delivery_lat is None or delivery_lon is None):
+            return self._error_result("Yetkazib berish manzilini xaritada belgilang")
 
         payment_method = PaymentStatus.normalize_method(payment_method)
         if is_delivery and payment_method == "cash" and not _delivery_cash_enabled():
@@ -1599,6 +1593,35 @@ class UnifiedOrderService:
             if store_delivery_enabled is not None and not bool(store_delivery_enabled):
                 return self._error_result("Yetkazib berish mavjud emas")
 
+            min_order_amount = (
+                store.get("min_order_amount")
+                if isinstance(store, dict)
+                else getattr(store, "min_order_amount", None)
+            )
+            try:
+                min_order_amount = int(min_order_amount or 0)
+            except Exception:
+                min_order_amount = 0
+            if min_order_amount > 0:
+                items_total = sum(calc_total_price(item.price, item.quantity) for item in items)
+                if items_total < min_order_amount:
+                    lang = "ru"
+                    if hasattr(self.db, "get_user_language"):
+                        try:
+                            lang = self.db.get_user_language(user_id) or "ru"
+                        except Exception:
+                            lang = "ru"
+                    currency = get_text(lang, "currency")
+                    return self._error_result(
+                        get_text(
+                            lang,
+                            "cart_delivery_min_order",
+                            min=f"{min_order_amount:,}",
+                            total=f"{int(items_total):,}",
+                            currency=currency,
+                        )
+                    )
+
             store_lat = _parse_coord(
                 store.get("latitude") if isinstance(store, dict) else getattr(store, "latitude", None)
             )
@@ -1621,6 +1644,7 @@ class UnifiedOrderService:
             radius_km = _parse_coord(radius_raw)
             if radius_km is None or radius_km <= 0:
                 radius_km = float(DEFAULT_DELIVERY_RADIUS_KM)
+            radius_km = max(1.0, min(float(radius_km), float(MAX_DELIVERY_RADIUS_KM)))
 
             distance_km = _distance_km(store_lat, store_lon, delivery_lat_val, delivery_lon_val)
             if distance_km > radius_km:

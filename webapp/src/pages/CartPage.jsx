@@ -863,7 +863,7 @@ function CartPage({ user }) {
 
       return options.concat(slots)
     }, [storeWorkingHours])
-    const deliverySlotLabel = useMemo(() => {
+  const deliverySlotLabel = useMemo(() => {
       const option = deliveryOptions.find(item => item.id === deliverySlot)
       if (!option) return ''
       if (option.id === 'fast') {
@@ -873,7 +873,8 @@ function CartPage({ user }) {
         return `${option.label} ${option.time}`
       }
       return option.time || option.label || ''
-    }, [deliveryOptions, deliverySlot])
+  }, [deliveryOptions, deliverySlot])
+  const hasDeliveryCoords = Number.isFinite(deliveryCoords?.lat) && Number.isFinite(deliveryCoords?.lon)
   const deliveryOptionDisabled = storeInfoLoading || !storeDeliveryEnabled
   const deliverySummaryMin = deliveryCheck?.minOrderAmount ?? (Number.isFinite(minOrderAmount) ? minOrderAmount : null)
   const deliverySummaryEta = deliveryCheck?.estimatedTime || ''
@@ -902,6 +903,14 @@ function CartPage({ user }) {
         status: 'warn',
         label: 'Manzil kiritilmagan',
         message: 'Manzil kiritilmagan',
+      }
+    }
+
+    if (!hasDeliveryCoords) {
+      return {
+        status: 'warn',
+        label: 'Manzil belgilanmagan',
+        message: 'Xaritada manzilni belgilang',
       }
     }
 
@@ -956,6 +965,7 @@ function CartPage({ user }) {
     orderType,
     storeDeliveryEnabled,
     storeInfoLoading,
+    hasDeliveryCoords,
   ])
   const pendingItemsCount = useMemo(() => {
     const cart = pendingPayment?.cart
@@ -1356,7 +1366,7 @@ function CartPage({ user }) {
   useEffect(() => {
     if (!userId || !pendingPayment?.orderId) return
 
-    const buildWsUrl = () => {
+    const buildWsUrl = async () => {
       const envBase = import.meta.env.VITE_WS_URL
       const baseSource = (envBase || API_BASE_URL || '').trim()
       if (!baseSource) return ''
@@ -1381,47 +1391,58 @@ function CartPage({ user }) {
       if (userId) {
         params.set('user_id', userId)
       }
-      const initData = getTelegramInitData()
-      if (initData) {
-        params.set('init_data', initData)
+      try {
+        const token = await api.getWsToken()
+        if (token) {
+          params.set('ws_token', token)
+        }
+      } catch (error) {
+        console.warn('Could not fetch WS token:', error)
       }
       const query = params.toString()
       return `${wsEndpoint}${query ? `?${query}` : ''}`
     }
 
-    const wsUrl = buildWsUrl()
-    if (!wsUrl) return
-
     let ws
-    try {
-      ws = new WebSocket(wsUrl)
-    } catch (error) {
-      console.warn('WebSocket init failed:', error)
-      return
-    }
+    let cancelled = false
 
-    ws.onmessage = (event) => {
+    const connect = async () => {
+      const wsUrl = await buildWsUrl()
+      if (!wsUrl || cancelled) return
+
       try {
-        const payload = JSON.parse(event.data)
-        const type = payload?.type
-        const data =
-          payload?.payload?.data ||
-          payload?.payload ||
-          payload?.data ||
-          {}
-        const eventOrderId = data?.order_id || data?.booking_id
-
-        if (type === 'order_status_changed' || type === 'order_created') {
-          if (!eventOrderId || Number(eventOrderId) === Number(pendingPayment?.orderId)) {
-            refreshPendingStatus()
-          }
-        }
+        ws = new WebSocket(wsUrl)
       } catch (error) {
-        console.warn('Failed to parse order update:', error)
+        console.warn('WebSocket init failed:', error)
+        return
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          const type = payload?.type
+          const data =
+            payload?.payload?.data ||
+            payload?.payload ||
+            payload?.data ||
+            {}
+          const eventOrderId = data?.order_id || data?.booking_id
+
+          if (type === 'order_status_changed' || type === 'order_created') {
+            if (!eventOrderId || Number(eventOrderId) === Number(pendingPayment?.orderId)) {
+              refreshPendingStatus()
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to parse order update:', error)
+        }
       }
     }
 
+    connect()
+
     return () => {
+      cancelled = true
       if (ws) {
         ws.close()
       }
@@ -1656,6 +1677,19 @@ function CartPage({ user }) {
         message: 'Manzil kiritilmagan',
       })
       return { ok: false, reason: 'address' }
+    }
+
+    if (!Number.isFinite(deliveryCoords?.lat) || !Number.isFinite(deliveryCoords?.lon)) {
+      if (shouldToast) {
+        toast.warning('Xaritada manzilni belgilang')
+      }
+      setDeliveryCheck({
+        status: 'warn',
+        canDeliver: false,
+        label: 'Manzil belgilanmagan',
+        message: 'Xaritada manzilni belgilang',
+      })
+      return { ok: false, reason: 'coords' }
     }
 
     const city = resolveDeliveryCity()
@@ -1961,6 +1995,10 @@ function CartPage({ user }) {
       toast.warning('Yetkazib berish manzilini kiriting')
       return
     }
+    if (orderType === 'delivery' && (!Number.isFinite(deliveryCoords?.lat) || !Number.isFinite(deliveryCoords?.lon))) {
+      toast.warning('Xaritada manzilni belgilang')
+      return
+    }
     if (deliveryRequiresPrepay && !hasOnlineProviders) {
       toast.error('Yetkazib berish uchun to\'lov usullari mavjud emas')
       return
@@ -1998,6 +2036,10 @@ function CartPage({ user }) {
       toast.warning(
         `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
       )
+      return
+    }
+    if (orderType === 'delivery' && (!Number.isFinite(deliveryCoords?.lat) || !Number.isFinite(deliveryCoords?.lon))) {
+      toast.warning('Xaritada manzilni belgilang')
       return
     }
 
@@ -2900,7 +2942,7 @@ function CartPage({ user }) {
                 <button
                   className={`checkout-confirm${checkoutBusy ? ' is-loading' : ''}`}
                   onClick={proceedToPayment}
-                  disabled={checkoutBusy || hasUnavailableItems || !getResolvedPhone() || !orderType || (orderType === 'delivery' && !address.trim())}
+                  disabled={checkoutBusy || hasUnavailableItems || !getResolvedPhone() || !orderType || (orderType === 'delivery' && (!address.trim() || !hasDeliveryCoords))}
                 >
                   {checkoutBusy && <span className="checkout-confirm-spinner" aria-hidden="true"></span>}
                   <span>{checkoutButtonLabel}</span>

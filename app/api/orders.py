@@ -17,8 +17,7 @@ from pydantic import BaseModel, Field, AliasChoices
 
 from app.api.webapp.common import get_current_user
 from app.core.async_db import AsyncDBProxy
-from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
-from app.core.geocoding import geocode_store_address
+from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM, MAX_DELIVERY_RADIUS_KM
 from app.core.order_math import (
     calc_delivery_fee,
     calc_items_total,
@@ -288,16 +287,6 @@ async def calculate_delivery_cost(
 
     delivery_lat_val = _parse_coord(delivery_lat)
     delivery_lon_val = _parse_coord(delivery_lon)
-    if (delivery_lat_val is None or delivery_lon_val is None) and address:
-        try:
-            geo = await geocode_store_address(address, city)
-            if geo:
-                delivery_lat_val = _parse_coord(geo.get("latitude"))
-                delivery_lon_val = _parse_coord(geo.get("longitude"))
-        except Exception:
-            delivery_lat_val = None
-            delivery_lon_val = None
-
     if delivery_lat_val is None or delivery_lon_val is None:
         return DeliveryResult(
             can_deliver=False,
@@ -310,6 +299,7 @@ async def calculate_delivery_cost(
     radius_km = _parse_coord(store_dict.get("delivery_radius_km"))
     if radius_km is None or radius_km <= 0:
         radius_km = float(DEFAULT_DELIVERY_RADIUS_KM)
+    radius_km = max(1.0, min(float(radius_km), float(MAX_DELIVERY_RADIUS_KM)))
 
     distance_km = _distance_km(store_lat, store_lon, delivery_lat_val, delivery_lon_val)
     if distance_km > radius_km:

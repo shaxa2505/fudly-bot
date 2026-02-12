@@ -32,6 +32,7 @@ from app.core.webhook_user_history import (
     build_search_history_handlers,
 )
 from app.core.websocket import get_websocket_manager, setup_websocket_routes
+from app.core.ws_tokens import issue_ws_token
 from logging_config import logger
 
 # Cache for reverse geocoding results (lat,lng -> payload)
@@ -356,6 +357,30 @@ async def create_webhook_app(
     api_click_callback = build_click_callback(db)
     api_payme_callback = build_payme_callback()
 
+    async def api_ws_token(request: web.Request) -> web.Response:
+        """POST /api/v1/auth/ws-token - issue short-lived WS token (aiohttp fallback)."""
+        init_data = request.headers.get("X-Telegram-Init-Data")
+        if not init_data:
+            return add_cors_headers(
+                web.json_response({"detail": "Authentication required"}, status=401)
+            )
+        try:
+            from app.api.webapp.common import validate_init_data
+
+            validated = validate_init_data(init_data, bot.token)
+        except Exception as exc:
+            logger.warning("WS token validate_init_data error: %s", exc)
+            validated = None
+
+        user = validated.get("user") if isinstance(validated, dict) else None
+        if not isinstance(user, dict) or not user.get("id"):
+            return add_cors_headers(
+                web.json_response({"detail": "Invalid Telegram initData"}, status=401)
+            )
+
+        token, ttl = await issue_ws_token(int(user.get("id")))
+        return add_cors_headers(web.json_response({"token": token, "expires_in": ttl}))
+
     # Register routes
     path_main = webhook_path if webhook_path.startswith("/") else f"/{webhook_path}"
     path_alt = path_main.rstrip("/") + "/"
@@ -498,6 +523,8 @@ async def create_webhook_app(
         else:
             app.router.add_options("/api/v1/categories", cors_preflight)
             app.router.add_get("/api/v1/categories", api_categories)
+            app.router.add_options("/api/v1/auth/ws-token", cors_preflight)
+            app.router.add_post("/api/v1/auth/ws-token", api_ws_token)
             app.router.add_options("/api/v1/search/suggestions", cors_preflight)
             app.router.add_get("/api/v1/search/suggestions", api_search_suggestions)
             app.router.add_options("/api/v1/stats/hot-deals", cors_preflight)

@@ -11,7 +11,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.geocoding import reverse_geocode_store
-from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM
+from app.core.constants import DEFAULT_DELIVERY_RADIUS_KM, MAX_DELIVERY_RADIUS_KM
 from localization import get_text
 from handlers.common.cancel import is_cancel_text
 from handlers.common.utils import can_manage_store, is_main_menu_button
@@ -98,6 +98,7 @@ def _format_delivery_settings(store: dict | None, lang: str) -> tuple[str, str, 
         delivery_radius_km = int(radius_raw) if radius_raw is not None else DEFAULT_DELIVERY_RADIUS_KM
     except (TypeError, ValueError):
         delivery_radius_km = DEFAULT_DELIVERY_RADIUS_KM
+    delivery_radius_km = max(1, min(delivery_radius_km, MAX_DELIVERY_RADIUS_KM))
     delivery_label = get_text(lang, "store_delivery_price_label")
     min_order_label = get_text(lang, "store_min_order_label")
     radius_label = get_text(lang, "store_delivery_radius_label")
@@ -588,7 +589,7 @@ async def handle_store_delivery_radius(message: types.Message, state: FSMContext
         await message.answer(get_text(lang, "store_delivery_radius_invalid"))
         return
 
-    radius_km = max(1, int(amount))
+    radius_km = max(1, min(int(amount), MAX_DELIVERY_RADIUS_KM))
 
     try:
         db.update_store_delivery_settings(store_id, delivery_radius_km=radius_km)

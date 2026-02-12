@@ -857,6 +857,9 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
             store_name=data.get("store_name", ""),
             delivery_price=delivery_price,
             saved_address=saved_address,
+            address=None,
+            delivery_lat=None,
+            delivery_lon=None,
             offer_photo=data.get("offer_photo"),
             order_type="delivery",  # FIXED: Explicitly mark as delivery order
         )
@@ -866,6 +869,7 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
         from handlers.customer.orders.delivery import (
             build_delivery_address_keyboard,
             build_delivery_card_text,
+            location_request_keyboard,
         )
 
         card_text = build_delivery_card_text(
@@ -897,6 +901,14 @@ async def pbook_confirm(callback: types.CallbackQuery, state: FSMContext) -> Non
             await bot.send_message(
                 user_id, card_text, parse_mode="HTML", reply_markup=kb.as_markup()
             )
+        try:
+            await bot.send_message(
+                user_id,
+                get_text(lang, "cart_delivery_location_prompt"),
+                reply_markup=location_request_keyboard(lang),
+            )
+        except Exception as e:
+            logger.warning("Failed to send delivery location prompt: %s", e)
     else:
         # Pickup - create booking directly
         await state.update_data(quantity=quantity, delivery_option=0, delivery_cost=0)
