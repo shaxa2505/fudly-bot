@@ -214,11 +214,7 @@
   --app-header-label-weight: 700;
   --app-header-label-letter-spacing: 0.22em;
   --app-header-label-color: rgba(58, 90, 64, 0.6);
-  --app-header-inset: max(
-    6px,
-    var(--safe-area-top-raw, 0px),
-    calc((var(--safe-area-top, 0px) + var(--safe-area-top-raw, 0px) - var(--app-header-height)) / 2)
-  );
+  --app-header-inset: 6px;
   --app-header-total-height: calc(var(--app-header-height) + var(--app-header-inset) + var(--app-header-gap));
 }
 
