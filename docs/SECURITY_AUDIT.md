@@ -10,11 +10,11 @@ Date: 2026-02-12
 - Scale readiness: early-stage OK. Without pagination, Redis-backed realtime, and DB tuning, growth will hit bottlenecks fast.
 
 ## Security Findings (Active)
-Issue S1 (P0) - Merchant webhook signatures are optional in production.
-Problem: `UZUM_MERCHANT_REQUIRE_SIGNATURE` is optional and `_require_signature` returns when no secret is configured.
+Issue S1 (P0) - Merchant webhook signatures are enforced in production (Fixed).
+Problem: Signatures are now required by default in production.
 Evidence: `app/api/merchant_webhooks.py`.
-Impact: If Basic Auth leaks or traffic is intercepted, callbacks can be spoofed to confirm/reverse payments.
-Recommendation: Require signatures in production, set `UZUM_MERCHANT_WEBHOOK_SECRET`, and verify timestamps/nonce if supported.
+Impact: Reduces spoofing risk for payment callbacks.
+Recommendation: Ensure `UZUM_MERCHANT_WEBHOOK_SECRET` is set in production.
 Effort: Small.
 
 Issue S2 (P1) - Telegram webhook secret token is optional.

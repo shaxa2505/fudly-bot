@@ -45,13 +45,23 @@ def _env_flag(name: str, default: bool = False) -> bool:
 async def _require_signature(request: Request) -> None:
     """Optional HMAC signature verification for merchant webhooks."""
     secret = os.getenv("UZUM_MERCHANT_WEBHOOK_SECRET")
-    require_sig = _env_flag("UZUM_MERCHANT_REQUIRE_SIGNATURE", False)
+    require_sig_raw = os.getenv("UZUM_MERCHANT_REQUIRE_SIGNATURE")
+    if require_sig_raw is None:
+        require_sig = not _is_dev_env()
+    else:
+        require_sig = _env_flag("UZUM_MERCHANT_REQUIRE_SIGNATURE", False)
+        if require_sig is False and not _is_dev_env():
+            require_sig = True
+
     if not secret:
-        if require_sig and not _is_dev_env():
+        if require_sig:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Merchant webhook signature not configured",
             )
+        return
+
+    if not require_sig:
         return
 
     signature = request.headers.get("X-Uzum-Signature") or request.headers.get("X-Signature")

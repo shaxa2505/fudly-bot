@@ -566,6 +566,45 @@ test('delivery payment creates online payment link', async ({ page }) => {
   await expect(page.getByText("Savatingiz bo'sh")).toBeVisible()
 })
 
+test('delivery requires map pin before confirm', async ({ page }) => {
+  apiState.store = {
+    delivery_enabled: true,
+    delivery_price: 5000,
+    min_order_amount: 0,
+  }
+
+  await page.addInitScript(() => {
+    localStorage.setItem('fudly_cart_v2', JSON.stringify({
+      '1': {
+        offer: {
+          id: 1,
+          title: 'Non',
+          discount_price: 5000,
+          original_price: 10000,
+          store_id: 99,
+        },
+        quantity: 1,
+      },
+    }))
+  })
+
+  await page.goto('/cart', { waitUntil: 'domcontentloaded' })
+
+  await page.getByRole('button', { name: "To'lovga o'tish" }).click()
+
+  const deliveryButton = page
+    .locator('.order-type-options')
+    .getByRole('button', { name: /Yetkazib berish/ })
+  await expect(deliveryButton).toBeEnabled()
+  await deliveryButton.click()
+
+  await page.getByPlaceholder('Manzilni kiriting').fill('Toshkent, Yunusobod')
+
+  const confirmButton = page.getByRole('button', { name: /Buyurtmani tasdiqlash/ })
+  await expect(confirmButton).toBeDisabled()
+  await expect(page.getByText('Xaritada manzilni belgilang')).toBeVisible()
+})
+
 test('checkout resumes pending payment when cart matches', async ({ page }) => {
   await page.route('**/api/v1/orders/777/status', async (route) => {
     return fulfillJson(route, {
