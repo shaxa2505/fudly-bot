@@ -458,7 +458,7 @@ function StoresPage() {
       <header className="app-header">
         <div className="app-header-inner">
           <div className="app-header-spacer" aria-hidden="true" />
-          <div className="app-header-title">
+          <div className="app-header-title app-header-title--stacked">
             <span className="app-header-label">Yetkazish manzili</span>
             <button className="app-header-button" type="button" onClick={requestLocation}>
               <span className="app-header-button-text">{cityLatin || 'Tanlanmagan'}</span>

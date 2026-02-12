@@ -2025,8 +2025,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .cart-item-prices {
@@ -2035,6 +2036,8 @@
   gap: 8px;
   margin-top: 0;
   flex-wrap: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .cart-item-price {
@@ -2087,7 +2090,7 @@
   padding: 0 8px;
   gap: 6px;
   box-shadow: none;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   min-width: 96px;
   width: 96px;
   justify-content: space-between;

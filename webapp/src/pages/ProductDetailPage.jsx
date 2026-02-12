@@ -154,14 +154,14 @@ function ProductDetailPage() {
     const todayLabel = now.toDateString()
     const tomorrow = new Date(now)
     tomorrow.setDate(now.getDate() + 1)
-    if (expiryDate.toDateString() === todayLabel) return `Today, ${timeLabel}`
-    if (expiryDate.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${timeLabel}`
+    if (expiryDate.toDateString() === todayLabel) return `Bugun, ${timeLabel}`
+    if (expiryDate.toDateString() === tomorrow.toDateString()) return `Ertaga, ${timeLabel}`
     return `${expiryDate.toLocaleDateString('ru-RU')} ${timeLabel}`
   }
 
   const pickupLabel = availability.timeRange || '—'
   const expiryLabel = buildExpiryDisplay() || '—'
-  const remainingLabel = hasStock ? `${stockValue} items left` : 'Out of stock'
+  const remainingLabel = hasStock ? `${stockValue} ta qoldi` : 'Tugagan'
   const co2ValueRaw =
     offer?.co2_saved ??
     offer?.co2_saved_kg ??
@@ -169,6 +169,45 @@ function ProductDetailPage() {
     offer?.saved_co2_kg
   const co2Value = Number(co2ValueRaw)
   const co2Label = Number.isFinite(co2Value) && co2Value > 0 ? `${co2Value} kg` : '—'
+
+  const resolveCoords = (data) => {
+    if (!data) return null
+    const lat =
+      data.latitude ??
+      data.lat ??
+      data.coordinates?.lat ??
+      data.location?.lat ??
+      data.geo?.lat ??
+      data.coord_lat
+    const lon =
+      data.longitude ??
+      data.lon ??
+      data.long ??
+      data.coordinates?.lon ??
+      data.location?.lon ??
+      data.geo?.lon ??
+      data.coord_lon
+    if (lat == null || lon == null) return null
+    const latNum = Number(lat)
+    const lonNum = Number(lon)
+    if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) return null
+    return { lat: latNum, lon: lonNum }
+  }
+
+  const handleOpenMap = () => {
+    const coords = resolveCoords(store) || resolveCoords(offer)
+    const address = storeAddress || offer?.store_address || ''
+    const query = coords
+      ? `${coords.lat},${coords.lon}`
+      : address
+    if (!query) return
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+    if (window.Telegram?.WebApp?.openLink) {
+      window.Telegram.WebApp.openLink(url)
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer')
+    }
+  }
 
   const handleQuantityChange = (delta) => {
     if (!hasStock) {
@@ -283,7 +322,7 @@ function ProductDetailPage() {
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
                   <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                Pickup Time
+                Olib ketish vaqti
               </div>
               <div className="pdp-info-value">{pickupLabel}</div>
             </div>
@@ -292,7 +331,7 @@ function ProductDetailPage() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M6 2h12v4l-4 4v4l-4 4v4H6v-4l4-4v-4L6 6V2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                Expires In
+                Tugash vaqti
               </div>
               <div className="pdp-info-value">{expiryLabel}</div>
             </div>
@@ -302,7 +341,7 @@ function ProductDetailPage() {
                   <path d="M4 7h16v10H4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                   <path d="M4 7l4-3h8l4 3" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                 </svg>
-                Remaining
+                Qolgan
               </div>
               <div className="pdp-info-value">{remainingLabel}</div>
             </div>
@@ -311,7 +350,7 @@ function ProductDetailPage() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M7 21c5.5 0 10-4.5 10-10V3S9 3 4 8c-2.6 2.6-2 6.5 1.5 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                 </svg>
-                Saved CO2
+                CO2 tejandi
               </div>
               <div className="pdp-info-value">{co2Label}</div>
             </div>
@@ -322,7 +361,7 @@ function ProductDetailPage() {
               <div className="pdp-store-row">
                 <div className="pdp-store-avatar">{storeInitial}</div>
                 <div className="pdp-store-info">
-                  <div className="pdp-store-name">{storeName || 'Store'}</div>
+                  <div className="pdp-store-name">{storeName || 'Do\'kon'}</div>
                   <div className="pdp-store-meta">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M12 21s-6-5-6-10a6 6 0 1112 0c0 5-6 10-6 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -337,11 +376,11 @@ function ProductDetailPage() {
                 <span className="pdp-store-chevron">›</span>
               </div>
               <div className="pdp-map-preview">
-                <button type="button" className="pdp-map-button">
+                <button type="button" className="pdp-map-button" onClick={handleOpenMap}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M12 19l7-16-7 4-7-4 7 16z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
                   </svg>
-                  View on Map
+                  Xaritada ko'rish
                 </button>
               </div>
             </div>
@@ -353,7 +392,7 @@ function ProductDetailPage() {
               <path d="M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               <path d="M11 12h2v4h-2z" fill="currentColor"/>
             </svg>
-            <span>This is a surprise bag item. The contents may vary slightly depending on availability.</span>
+            <span>Bu surpriz paket. Tarkibi mavjudlikka qarab ozgina farq qilishi mumkin.</span>
           </div>
         </div>
       </section>
@@ -377,8 +416,8 @@ function ProductDetailPage() {
           >
             <span className="pdp-add-text">
               {!hasStock
-                ? "Out of stock"
-                : (isUnavailableNow ? "Closed" : (addedToCart ? "Added!" : "Add to Cart"))
+                ? "Tugagan"
+                : (isUnavailableNow ? "Yopiq" : (addedToCart ? "Qo'shildi!" : "Savatga qo'shish"))
               }
             </span>
             {hasStock && (
