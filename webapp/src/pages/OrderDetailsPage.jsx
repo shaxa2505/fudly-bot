@@ -273,10 +273,14 @@ export default function OrderDetailsPage() {
     return Number(value || 0)
   }
 
-  const formatMoney = (value) => {
+  const toMoneyInt = (value) => {
     const numeric = toNumeric(value)
-    if (!Number.isFinite(numeric)) return '0'
-    return Math.round(numeric + Number.EPSILON).toLocaleString('uz-UZ')
+    if (!Number.isFinite(numeric)) return 0
+    return Math.round(numeric + Number.EPSILON)
+  }
+
+  const formatMoney = (value) => {
+    return toMoneyInt(value).toLocaleString('uz-UZ')
   }
 
   const getStatusInfo = (status, orderType) => {
@@ -301,13 +305,22 @@ export default function OrderDetailsPage() {
     return paymentStatusText(status, 'uz')
   }
 
+  const TIMELINE_TIMEZONE = 'Asia/Tashkent'
+  const UZ_MONTHS_SHORT = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek']
+  const hasTimezoneHint = (raw) => /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
+
   const formatTimeOnly = (value) => {
     if (!value) return ''
     if (typeof value === 'string') {
-      if (value.includes('T')) {
+      if (value.includes('T') || hasTimezoneHint(value)) {
         const date = new Date(value)
         if (!Number.isNaN(date.getTime())) {
-          return date.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+          return new Intl.DateTimeFormat('uz-UZ', {
+            timeZone: TIMELINE_TIMEZONE,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }).format(date)
         }
       }
       const match = value.match(/(\d{1,2}:\d{2})/)
@@ -319,14 +332,25 @@ export default function OrderDetailsPage() {
 
   const formatTimelineTime = (value) => {
     if (!value) return ''
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return String(value)
-    return date.toLocaleString('uz-UZ', {
+    const raw = String(value).trim()
+    const localMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
+    if (localMatch && !hasTimezoneHint(raw)) {
+      const day = localMatch[3]
+      const monthIndex = Number(localMatch[2]) - 1
+      const month = UZ_MONTHS_SHORT[monthIndex] || localMatch[2]
+      const timeLabel = `${localMatch[4]}:${localMatch[5]}`
+      return `${day}-${month}, ${timeLabel}`
+    }
+    const date = new Date(raw)
+    if (Number.isNaN(date.getTime())) return raw
+    return new Intl.DateTimeFormat('uz-UZ', {
+      timeZone: TIMELINE_TIMEZONE,
       day: '2-digit',
       month: 'short',
       hour: '2-digit',
       minute: '2-digit',
-    })
+      hour12: false,
+    }).format(date)
   }
 
   const formatPhone = (raw) => {
@@ -483,19 +507,21 @@ export default function OrderDetailsPage() {
   const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
   const showPaymentChip = paymentStatusLabel && paymentStatusLabel !== "To'lov talab qilinmaydi"
 
-  const explicitItemsTotal = toNumeric(order?.items_total ?? order?.itemsTotal ?? 0)
+  const explicitItemsTotal = toMoneyInt(order?.items_total ?? order?.itemsTotal ?? 0)
   const hasItemBreakdown = Array.isArray(order.items) && order.items.length > 0
   const rawItemsSubtotal = hasItemBreakdown
     ? order.items.reduce((sum, item) => {
+        const lineTotal = toNumeric(item?.total_price ?? 0)
+        if (Number.isFinite(lineTotal) && lineTotal > 0) {
+          return sum + toMoneyInt(lineTotal)
+        }
         const price = toNumeric(item?.price ?? item?.discount_price ?? 0)
         const qty = toNumeric(item?.quantity ?? 0)
         if (!Number.isFinite(price) || !Number.isFinite(qty)) return sum
-        return sum + Math.round(price * qty)
+        return sum + toMoneyInt(price * qty)
       }, 0)
     : 0
-  const itemsSubtotal = Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
-    ? explicitItemsTotal
-    : rawItemsSubtotal
+  const itemsSubtotal = rawItemsSubtotal > 0 ? rawItemsSubtotal : explicitItemsTotal
   const rawTotal = (() => {
     const candidates = isDelivery
       ? [order?.total_with_delivery, order?.total_price, order?.total_amount, order?.total, order?.items_total]
@@ -506,19 +532,24 @@ export default function OrderDetailsPage() {
     }
     return 0
   })()
+  const rawTotalRounded = toMoneyInt(rawTotal)
   const deliveryFee = isDelivery
-    ? calcDeliveryFee(rawTotal || null, itemsSubtotal, {
+    ? toMoneyInt(calcDeliveryFee(rawTotal || null, itemsSubtotal, {
       deliveryFee: order?.delivery_fee,
       isDelivery,
-    })
+    }))
     : 0
-  const totalDue = rawTotal > 0
-    ? rawTotal
-    : calcTotalPrice(itemsSubtotal, deliveryFee)
+  const rescueDiscount = toMoneyInt(order?.discount_amount ?? order?.discount ?? 0)
+  const showDiscount = Number.isFinite(rescueDiscount) && rescueDiscount > 0
+  const derivedTotal = Math.max(0, itemsSubtotal + deliveryFee - (showDiscount ? rescueDiscount : 0))
+  const totalDue = (() => {
+    if (rawTotalRounded > 0 && derivedTotal > 0 && Math.abs(rawTotalRounded - derivedTotal) <= 1) {
+      return derivedTotal
+    }
+    return rawTotalRounded > 0 ? rawTotalRounded : derivedTotal
+  })()
   const payableTotal = Number(
-    Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
-      ? explicitItemsTotal
-      : (hasItemBreakdown ? rawItemsSubtotal : (rawTotal || 0))
+    totalDue
   )
   const totalUnits = hasItemBreakdown
     ? calcQuantity(order.items, item => Number(item?.quantity || 0))
@@ -619,8 +650,6 @@ export default function OrderDetailsPage() {
   const orderPhotoUrl = resolveOrderItemImageUrl(order)
   const pickupCode = order?.booking_code || order?.pickup_code
   const showPickupPanel = !isDelivery && pickupCode
-  const rescueDiscount = Number(order?.discount_amount ?? order?.discount ?? 0)
-  const showDiscount = Number.isFinite(rescueDiscount) && rescueDiscount > 0
   const hasDeliveryInfo = Boolean(
     order.delivery_address ||
     order.phone ||
