@@ -4129,11 +4129,13 @@ class UnifiedOrderService:
             True if successful
         """
         try:
+            self._last_status_error = None
             ctx = self._get_status_update_context(
                 entity_id=entity_id,
                 entity_type=entity_type,
             )
             if not ctx:
+                self._last_status_error = "Order not found"
                 return False
 
             # Normalize statuses and enforce safe transitions/idempotence
@@ -4147,36 +4149,30 @@ class UnifiedOrderService:
             normalized_payment_status = PaymentStatus.normalize(
                 ctx.payment_status, payment_method=ctx.payment_method
             )
-            terminal_statuses = {
-                OrderStatus.COMPLETED,
-                OrderStatus.CANCELLED,
-                OrderStatus.REJECTED,
-            }
-
-            payment_cleared = (
-                normalized_payment_method == "cash"
-                or PaymentStatus.is_cleared(
-                    ctx.payment_status,
-                    payment_method=ctx.payment_method,
-                    payment_proof_photo_id=ctx.payment_proof_photo_id,
-                )
-            )
-            if target_status in (
-                OrderStatus.READY,
-                OrderStatus.DELIVERING,
-                OrderStatus.COMPLETED,
-            ) and not payment_cleared:
-                logger.info(
-                    f"STATUS_UPDATE blocked due to unpaid order: #{entity_id} "
-                    f"status={current_status} -> {target_status}, "
-                    f"payment_status={normalized_payment_status}, method={normalized_payment_method}"
-                )
-                return False
+            terminal_statuses = set(TERMINAL_STATUSES)
 
             # Idempotent update: requested status already set
             if current_status == target_status:
                 logger.info(f"STATUS_UPDATE no-op (already {target_status}): #{entity_id}")
                 return True
+
+            transition_ok, transition_error = self.validate_transition(
+                current_status=current_status,
+                target_status=target_status,
+                order_type=ctx.order_type,
+                payment_status=ctx.payment_status,
+                payment_method=ctx.payment_method,
+                payment_proof_photo_id=ctx.payment_proof_photo_id,
+            )
+            if not transition_ok:
+                logger.info(
+                    "STATUS_UPDATE blocked: #%s %s -> %s (%s)",
+                    entity_id,
+                    current_status,
+                    target_status,
+                    transition_error,
+                )
+                return False
 
             if (
                 ctx.entity_type == "order"
@@ -4184,6 +4180,7 @@ class UnifiedOrderService:
                 and normalized_payment_status != PaymentStatus.CONFIRMED
                 and target_status not in (OrderStatus.CANCELLED, OrderStatus.REJECTED)
             ):
+                self._last_status_error = "Payment not confirmed"
                 logger.info(
                     "STATUS_UPDATE blocked: payment not confirmed for #%s (target=%s)",
                     entity_id,
@@ -4193,18 +4190,14 @@ class UnifiedOrderService:
 
             # Do not move away from terminal statuses (completed/cancelled/rejected)
             if current_status in terminal_statuses and target_status != current_status:
+                self._last_status_error = (
+                    f"Нельзя изменить терминальный статус '{current_status}'."
+                )
                 logger.info(
-                    f"STATUS_UPDATE ignored for terminal entity: #{entity_id} "
+                    f"STATUS_UPDATE blocked for terminal entity: #{entity_id} "
                     f"status={current_status} -> {target_status}"
                 )
-                return True
-
-            if target_status == OrderStatus.DELIVERING:
-                if ctx.order_type not in ("delivery", "taxi"):
-                    logger.info(
-                        f"STATUS_UPDATE invalid delivering for pickup: #{entity_id} order_type={ctx.order_type}"
-                    )
-                    return False
+                return False
 
             update_ok, short_circuit = self._apply_status_update(
                 ctx=ctx,
@@ -4215,6 +4208,8 @@ class UnifiedOrderService:
             if short_circuit:
                 return True
             if not update_ok:
+                if not self._last_status_error:
+                    self._last_status_error = "Failed to persist status update"
                 return False
 
             # Restore quantity if rejected or cancelled
@@ -4247,6 +4242,7 @@ class UnifiedOrderService:
             return True
 
         except Exception as e:
+            self._last_status_error = str(e)
             logger.error(f"Failed to update status: {e}")
             return False
 

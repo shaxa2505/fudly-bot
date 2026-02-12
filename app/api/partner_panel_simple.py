@@ -209,6 +209,14 @@ def _to_sums(price_in_kopeks: int | float | None) -> int:
         return 0
 
 
+def _status_transition_error(unified_service: Any | None) -> str:
+    if unified_service and hasattr(unified_service, "get_last_status_error"):
+        reason = unified_service.get_last_status_error()
+        if reason:
+            return str(reason)
+    return "Status transition not allowed"
+
+
 DEFAULT_WORKING_HOURS = "08:00 - 23:00"
 
 def _parse_time_value(value: object) -> dt_time | None:
@@ -1098,7 +1106,7 @@ async def cancel_order(
 
     ok = await unified_service.cancel_order(order_id, "order")
     if not ok:
-        raise HTTPException(status_code=400, detail="Status transition not allowed")
+        raise HTTPException(status_code=400, detail=_status_transition_error(unified_service))
 
     await db.execute(
         """
@@ -1375,7 +1383,7 @@ async def confirm_order(
     if unified_service:
         ok = await unified_service.confirm_order(order_id, "order")
         if not ok:
-            raise HTTPException(status_code=400, detail="Status transition not allowed")
+            raise HTTPException(status_code=400, detail=_status_transition_error(unified_service))
     else:
         if hasattr(db, "update_order_status"):
             if isinstance(order, dict):
@@ -1385,7 +1393,10 @@ async def confirm_order(
             else:
                 order_type = order[5] if len(order) > 5 else "delivery"
             target_status = OrderStatus.READY if order_type == "pickup" else OrderStatus.PREPARING
-            await db.update_order_status(order_id, target_status)
+            try:
+                await db.update_order_status(order_id, target_status)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Return type based on order_type for frontend
     db_order_type = (
@@ -1472,18 +1483,21 @@ async def update_order_status(
     else:
         if not hasattr(db, "update_order_status"):
             raise HTTPException(status_code=500, detail="Order service unavailable")
-        if status == "ready":
-            await db.update_order_status(order_id, OrderStatus.READY)
-        elif status == "delivering":
-            await db.update_order_status(order_id, OrderStatus.DELIVERING)
-        elif status == "completed":
-            await db.update_order_status(order_id, OrderStatus.COMPLETED)
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported status transition")
+        try:
+            if status == "ready":
+                await db.update_order_status(order_id, OrderStatus.READY)
+            elif status == "delivering":
+                await db.update_order_status(order_id, OrderStatus.DELIVERING)
+            elif status == "completed":
+                await db.update_order_status(order_id, OrderStatus.COMPLETED)
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported status transition")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         ok = True
 
     if not ok:
-        raise HTTPException(status_code=400, detail="Status transition not allowed")
+        raise HTTPException(status_code=400, detail=_status_transition_error(unified_service))
 
     # Return type based on order_type for frontend
     db_order_type = (

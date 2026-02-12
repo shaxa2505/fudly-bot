@@ -975,6 +975,13 @@ async def cancel_order(
 
     ok = await order_service.cancel_order(order_id, entity_type)
     if not ok:
+        detail = (
+            order_service.get_last_status_error()
+            if hasattr(order_service, "get_last_status_error")
+            else None
+        )
+        if detail:
+            raise HTTPException(status_code=400, detail=str(detail))
         raise HTTPException(status_code=500, detail="Failed to cancel order")
 
     return CancelOrderResponse(success=True, status="cancelled")

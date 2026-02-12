@@ -49,21 +49,17 @@ class TestOfferValidation:
 
     def test_offer_discounted_price_less_than_original(self, db, test_store):
         """Test business rule: discounted price should be less than original"""
-        # Create offer where price > original_price (invalid business logic)
-        offer_id = db.add_offer(
-            store_id=test_store,
-            title="Bad Pricing",
-            description="Test",
-            original_price=30000.0,
-            discount_price=50000.0,  # More expensive than original!
-            quantity=5,
-            available_from="10:00",
-            available_until="12:00",
-        )
-
-        # Database allows this, but application should validate
-        # This test documents expected behavior
-        assert offer_id is not None
+        with pytest.raises(ValueError):
+            db.add_offer(
+                store_id=test_store,
+                title="Bad Pricing",
+                description="Test",
+                original_price=30000.0,
+                discount_price=50000.0,  # More expensive than original!
+                quantity=5,
+                available_from="10:00",
+                available_until="12:00",
+            )
 
     def test_offer_quantity_positive(self, db, test_store):
         """Test that quantity must be positive"""

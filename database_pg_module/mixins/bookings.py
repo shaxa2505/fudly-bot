@@ -9,6 +9,7 @@ import string
 from typing import Any
 
 from app.core.units import calc_total_price
+from app.domain.order_fsm import validate_order_transition
 
 from psycopg.rows import dict_row
 
@@ -447,7 +448,26 @@ class BookingMixin:
     def update_booking_status(self, booking_id: int, status: str):
         """Update booking status."""
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                "SELECT status, payment_proof_photo_id FROM bookings WHERE booking_id = %s",
+                (booking_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return
+
+            result = validate_order_transition(
+                current_status=row.get("status"),
+                target_status=status,
+                order_type="pickup",
+                payment_method="cash",
+                payment_status=None,
+                payment_proof_photo_id=row.get("payment_proof_photo_id"),
+            )
+            if not result.allowed:
+                raise ValueError(result.reason or "Status transition not allowed")
+
             cursor.execute(
                 "UPDATE bookings SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE booking_id = %s",
                 (status, booking_id),

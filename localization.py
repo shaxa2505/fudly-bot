@@ -556,7 +556,7 @@ TEXTS = {
         "error_price_gt_zero": "Р¦РµРЅР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ 0.",
         "error_price_too_high": "РЎР»РёС€РєРѕРј Р±РѕР»СЊС€Р°СЏ С†РµРЅР°.",
         "error_discount_less_than_original": "Р¦РµРЅР° СЃРѕ СЃРєРёРґРєРѕР№ РґРѕР»Р¶РЅР° Р±С‹С‚СЊ РјРµРЅСЊС€Рµ РѕР±С‹С‡РЅРѕР№ С†РµРЅС‹.",
-        "error_min_discount": "РњРёРЅРёРјР°Р»СЊРЅР°СЏ СЃРєРёРґРєР° вЂ” 20%. РЈРєР°Р¶РёС‚Рµ СЃРєРёРґРєСѓ РЅРµ РјРµРЅСЊС€Рµ 20%.",
+        "error_min_discount": "Минимальная скидка — 20%. Укажите цену со скидкой ниже на 20% или больше.",
         "warn_discount_low": "вљ пёЏ Р’РЅРёРјР°РЅРёРµ: СЃРєРёРґРєР° РјРµРЅСЊС€Рµ 10%. Р РµРєРѕРјРµРЅРґСѓРµРј РґРµР»Р°С‚СЊ СЃРєРёРґРєСѓ РѕС‚ 30% РґР»СЏ РїСЂРёРІР»РµС‡РµРЅРёСЏ РєР»РёРµРЅС‚РѕРІ.",
         "booking_how_many": "РЎРєРѕР»СЊРєРѕ РІС‹ С…РѕС‚РёС‚Рµ Р·Р°Р±СЂРѕРЅРёСЂРѕРІР°С‚СЊ? (1-{max_qty})",
         # РџР°СЂС‚РЅС‘СЂ
@@ -1597,7 +1597,7 @@ Buyurtmani olishda shu kodni ko'rsating.""",
         "error_price_gt_zero": "Narx 0 dan katta bo'lishi kerak.",
         "error_price_too_high": "Juda katta narx.",
         "error_discount_less_than_original": "Chegirma narxi oddiy narxdan kichik bo'lishi kerak.",
-        "error_min_discount": "Minimal chegirma вЂ” 20%. Iltimos, 20% yoki undan ko'proq kiriting.",
+        "error_min_discount": "Minimal chegirma — 20%. Chegirmali narxni kamida 20% pastroq kiriting.",
         "warn_discount_low": "вљ пёЏ Diqqat: chegirma 10% dan kichik. Mijozlarni jalb qilish uchun 30% va undan yuqori tavsiya etamiz.",
         "booking_how_many": "Nechta buyurtma qilmoqchisiz? (1-{max_qty})",
         "booking_step_quantity": """в”Џв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”Ѓв”“

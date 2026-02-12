@@ -9,6 +9,7 @@ import json
 from typing import Any
 
 from app.core.units import calc_total_price
+from app.domain.order_fsm import validate_order_transition
 
 from psycopg.rows import dict_row
 
@@ -523,7 +524,35 @@ class OrderMixin:
             True if update was successful
         """
         with self.get_connection() as conn:
-            cursor = conn.cursor()
+            cursor = conn.cursor(row_factory=dict_row)
+            cursor.execute(
+                """
+                SELECT order_status, order_type, delivery_address,
+                       payment_method, payment_status, payment_proof_photo_id
+                FROM orders
+                WHERE order_id = %s
+                """,
+                (order_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+
+            current_status = row.get("order_status")
+            order_type = row.get("order_type") or (
+                "delivery" if row.get("delivery_address") else "pickup"
+            )
+            result = validate_order_transition(
+                current_status=current_status,
+                target_status=order_status,
+                order_type=order_type,
+                payment_method=row.get("payment_method"),
+                payment_status=row.get("payment_status"),
+                payment_proof_photo_id=row.get("payment_proof_photo_id"),
+            )
+            if not result.allowed:
+                raise ValueError(result.reason or "Status transition not allowed")
+
             cursor.execute(
                 "UPDATE orders SET order_status = %s, updated_at = CURRENT_TIMESTAMP WHERE order_id = %s",
                 (order_status, order_id),

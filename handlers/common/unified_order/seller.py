@@ -43,6 +43,14 @@ def _safe_caption(text: str) -> str:
     return text[: MAX_CAPTION_LENGTH - 3] + "..."
 
 
+def _transition_error_text(order_service: Any | None, lang: str) -> str:
+    if order_service and hasattr(order_service, "get_last_status_error"):
+        reason = order_service.get_last_status_error()
+        if reason:
+            return str(reason)
+    return get_text(lang, "error") or "Error"
+
+
 def _is_paid_online_order(entity: Any) -> bool:
     payment_method = _get_entity_field(entity, "payment_method")
     payment_status = _get_entity_field(entity, "payment_status")
@@ -233,7 +241,7 @@ async def unified_confirm_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer(get_text(lang, "error") or "Error", show_alert=True)
+        await callback.answer(_transition_error_text(order_service, lang), show_alert=True)
         return
 
     # Build updated seller message
@@ -415,7 +423,7 @@ async def unified_reject_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer(get_text(lang, "error") or "Error", show_alert=True)
+        await callback.answer(_transition_error_text(order_service, lang), show_alert=True)
         return
 
     # NOTE: Customer notification is handled by UnifiedOrderService.reject_order()
@@ -506,7 +514,7 @@ async def order_ready_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
+        await callback.answer(_transition_error_text(order_service, lang), show_alert=True)
         return
 
     from app.core.utils import get_offer_field
@@ -832,7 +840,7 @@ async def _process_delivery_handover(
             success = False
 
     if not success:
-        error_text = get_text(lang, "error_generic")
+        error_text = _transition_error_text(order_service, lang)
         if isinstance(event, types.Message):
             await event.answer(error_text)
         else:
@@ -1016,7 +1024,7 @@ async def order_complete_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
+        await callback.answer(_transition_error_text(order_service, lang), show_alert=True)
         return
 
     from app.core.utils import get_offer_field
@@ -1185,7 +1193,7 @@ async def order_cancel_seller_handler(callback: types.CallbackQuery) -> None:
             success = False
 
     if not success:
-        await callback.answer(get_text(lang, "error"), show_alert=True)
+        await callback.answer(_transition_error_text(order_service, lang), show_alert=True)
         return
 
     try:
