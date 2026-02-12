@@ -11,6 +11,8 @@ import {
   Heart,
   ShoppingBag,
   Bell,
+  MapPin,
+  List,
 } from 'lucide-react'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
@@ -503,29 +505,6 @@ function StoresPage() {
         </div>
       </div>
 
-      <div className="sp-view-toggle-wrap">
-        <div className="sp-view-toggle" role="tablist" aria-label="Ko'rinish">
-          <button
-            className={`sp-view-pill ${viewMode === 'list' ? 'active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'list'}
-            onClick={() => setViewMode('list')}
-          >
-            Ro'yxat
-          </button>
-          <button
-            className={`sp-view-pill ${viewMode === 'map' ? 'active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'map'}
-            onClick={() => setViewMode('map')}
-          >
-            Xarita
-          </button>
-        </div>
-      </div>
-
       <div className="sp-chip-row" role="tablist" aria-label="Filtrlar">
         {FILTER_CHIPS.map((chip) => (
           <button
@@ -538,6 +517,23 @@ function StoresPage() {
             {chip.label}
           </button>
         ))}
+      </div>
+
+      <div className="sp-section-header">
+        <h3 className="sp-section-title">Do'konlar</h3>
+        <button
+          type="button"
+          className="sp-section-action"
+          onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+          aria-label={viewMode === 'list' ? "Xaritani ko'rish" : "Ro'yxatni ko'rish"}
+        >
+          <span>{viewMode === 'list' ? 'Xarita' : "Ro'yxat"}</span>
+          {viewMode === 'list' ? (
+            <MapPin size={16} strokeWidth={2} />
+          ) : (
+            <List size={16} strokeWidth={2} />
+          )}
+        </button>
       </div>
       <div className="sp-divider" />
 
@@ -557,7 +553,7 @@ function StoresPage() {
           </div>
         ) : isLoading ? (
           <div className="sp-store-list">
-            {[...Array(3)].map((_, i) => (
+            {[...Array(4)].map((_, i) => (
               <div key={i} className="sp-store-card sp-skeleton">
                 <div className="sp-skel-media"></div>
                 <div className="sp-skel-body">
@@ -605,6 +601,12 @@ function StoresPage() {
                 ? `${Math.round(originalPrice).toLocaleString()} so'm`
                 : ''
               const nextOpenLabel = getNextOpenLabel(store, hoursLabel)
+              const discountPercent =
+                originalPrice && currentPrice && originalPrice > currentPrice
+                  ? Math.round((1 - currentPrice / originalPrice) * 100)
+                  : null
+              const discountLabel = discountPercent ? `-${discountPercent}%` : ''
+              const overlayTag = status?.tone === 'low' ? status.label : ''
 
               return (
                 <article
@@ -638,13 +640,24 @@ function StoresPage() {
                       </>
                     )}
 
-                    {status && (
+                    {status?.tone === 'closed' && (
                       <span className={`sp-store-status ${status.tone}`}>
-                        {status.showIcon && (
-                          <Store size={10} strokeWidth={2} className="sp-store-status-icon" />
-                        )}
+                        <Store size={10} strokeWidth={2} className="sp-store-status-icon" />
                         {status.label}
                       </span>
+                    )}
+
+                    {discountLabel && (
+                      <span className="sp-store-discount">{discountLabel}</span>
+                    )}
+
+                    {(overlayTag || distanceLabel) && (
+                      <div className="sp-store-overlay">
+                        {overlayTag && <span className="sp-store-tag">{overlayTag}</span>}
+                        {distanceLabel && (
+                          <span className="sp-store-distance">{distanceLabel}</span>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -652,6 +665,9 @@ function StoresPage() {
                     <div className="sp-store-top">
                       <div>
                         <h3 className="sp-store-title">{store.name}</h3>
+                        {store.address && (
+                          <p className="sp-store-address">{store.address}</p>
+                        )}
                         <div className="sp-store-meta">
                           {store.rating > 0 && (
                             <span className="sp-meta-item sp-store-rating">
@@ -659,7 +675,6 @@ function StoresPage() {
                               {store.rating.toFixed(1)}
                             </span>
                           )}
-                          {distanceLabel && <span className="sp-meta-item">{distanceLabel}</span>}
                           {meta.label && <span className="sp-meta-item">{meta.label}</span>}
                         </div>
                       </div>
@@ -679,13 +694,13 @@ function StoresPage() {
 
                     <div className="sp-store-bottom">
                       <div className="sp-store-price">
-                        {originalPrice != null && currentPrice != null && (
-                          <span className="sp-store-price-old">{originalLabel}</span>
-                        )}
                         {currentPrice != null ? (
                           <span className={`sp-store-price-current ${priceTone}`}>{priceLabel}</span>
                         ) : (
                           <span className="sp-store-price-placeholder">-- ---</span>
+                        )}
+                        {originalPrice != null && currentPrice != null && (
+                          <span className="sp-store-price-old">{originalLabel}</span>
                         )}
                       </div>
 

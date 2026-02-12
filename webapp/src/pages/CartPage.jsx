@@ -2311,7 +2311,7 @@ function CartPage({ user }) {
                     <div className="cart-item-footer">
                       <div className="cart-item-prices">
                         <span className="cart-item-price">
-                          {formatSum(unitPrice)} so'm
+                          {formatSum(unitPrice)}
                         </span>
                         {showOriginalPrice && (
                           <span className="cart-item-price-old">
