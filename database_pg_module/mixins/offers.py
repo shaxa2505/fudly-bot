@@ -3,12 +3,12 @@ Offer-related database operations.
 """
 from __future__ import annotations
 
-from typing import Any
 import re
-
-from app.core.utils import calc_discount_percent
+from typing import Any
 
 from psycopg.rows import dict_row
+
+from app.core.utils import calc_discount_percent
 
 try:
     from logging_config import logger
@@ -452,26 +452,6 @@ class OfferMixin:
 
             cursor.execute(query, params)
             rows = [dict(row) for row in cursor.fetchall()]
-            if not rows and city and not region and not district:
-                resolved_region, resolved_district = self._resolve_city_fallback(city)
-                if resolved_region or resolved_district:
-                    return self.get_hot_offers(
-                        city=None,
-                        limit=limit,
-                        offset=offset,
-                        business_type=business_type,
-                        region=resolved_region,
-                        district=resolved_district,
-                        sort_by=sort_by,
-                        min_price=min_price,
-                        max_price=max_price,
-                        min_discount=min_discount,
-                        category=category,
-                        store_id=store_id,
-                        only_today=only_today,
-                        latitude=latitude,
-                        longitude=longitude,
-                    )
             return rows
 
     def get_active_offers(
@@ -966,6 +946,168 @@ class OfferMixin:
 
             cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
+
+    def count_nearby_offers(
+        self,
+        latitude: float,
+        longitude: float,
+        category: str | list[str] | None = None,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+    ) -> int:
+        """Count offers near coordinates with the same filters as get_nearby_offers."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            distance_expr = (
+                "6371 * 2 * ASIN(SQRT("
+                "POWER(SIN(RADIANS(%s - s.latitude) / 2), 2) + "
+                "COS(RADIANS(s.latitude)) * COS(RADIANS(%s)) * "
+                "POWER(SIN(RADIANS(%s - s.longitude) / 2), 2)"
+                "))"
+            )
+            query = f"""
+                SELECT COUNT(*)
+                FROM (
+                    SELECT o.category, o.discount_price, o.original_price, o.store_id, o.expiry_date,
+                           s.category as store_category,
+                           {distance_expr} as distance_km
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE o.status = 'active'
+                      AND COALESCE(o.stock_quantity, o.quantity) > 0
+                      AND (s.status = 'approved' OR s.status = 'active')
+                      AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                      AND s.latitude IS NOT NULL
+                      AND s.longitude IS NOT NULL
+                ) as t
+            """
+            params: list[Any] = [latitude, latitude, longitude]
+            where_parts: list[str] = []
+
+            if max_distance_km is not None:
+                where_parts.append("t.distance_km <= %s")
+                params.append(max_distance_km)
+            categories = self._normalize_category_filter(category)
+            if categories:
+                if len(categories) == 1:
+                    where_parts.append("t.category = %s")
+                    params.append(categories[0])
+                else:
+                    where_parts.append("t.category = ANY(%s)")
+                    params.append(categories)
+            if business_type:
+                where_parts.append("t.store_category = %s")
+                params.append(business_type)
+            if min_price is not None:
+                where_parts.append("t.discount_price >= %s")
+                params.append(min_price)
+            if max_price is not None:
+                where_parts.append("t.discount_price <= %s")
+                params.append(max_price)
+            if min_discount is not None:
+                where_parts.append(
+                    "t.original_price > 0"
+                    " AND (1.0 - t.discount_price::numeric / t.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+            if store_id is not None:
+                where_parts.append("t.store_id = %s")
+                params.append(store_id)
+            if only_today:
+                where_parts.append("t.expiry_date = CURRENT_DATE")
+
+            if where_parts:
+                query += " WHERE " + " AND ".join(where_parts)
+
+            cursor.execute(query, params)
+            return int(cursor.fetchone()[0] or 0)
+
+    def count_nearby_offers_by_category_grouped(
+        self,
+        latitude: float,
+        longitude: float,
+        category: str | list[str] | None = None,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+    ) -> dict[str, int]:
+        """Count nearby offers grouped by category."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            distance_expr = (
+                "6371 * 2 * ASIN(SQRT("
+                "POWER(SIN(RADIANS(%s - s.latitude) / 2), 2) + "
+                "COS(RADIANS(s.latitude)) * COS(RADIANS(%s)) * "
+                "POWER(SIN(RADIANS(%s - s.longitude) / 2), 2)"
+                "))"
+            )
+            query = f"""
+                SELECT COALESCE(t.category, 'other') AS category, COUNT(*)
+                FROM (
+                    SELECT o.category, o.discount_price, o.original_price, o.store_id, o.expiry_date,
+                           s.category as store_category,
+                           {distance_expr} as distance_km
+                    FROM offers o
+                    JOIN stores s ON o.store_id = s.store_id
+                    WHERE o.status = 'active'
+                      AND COALESCE(o.stock_quantity, o.quantity) > 0
+                      AND (s.status = 'approved' OR s.status = 'active')
+                      AND (o.expiry_date IS NULL OR o.expiry_date >= CURRENT_DATE)
+                      AND s.latitude IS NOT NULL
+                      AND s.longitude IS NOT NULL
+                ) as t
+            """
+            params: list[Any] = [latitude, latitude, longitude]
+            where_parts: list[str] = []
+
+            if max_distance_km is not None:
+                where_parts.append("t.distance_km <= %s")
+                params.append(max_distance_km)
+            categories = self._normalize_category_filter(category)
+            if categories:
+                if len(categories) == 1:
+                    where_parts.append("t.category = %s")
+                    params.append(categories[0])
+                else:
+                    where_parts.append("t.category = ANY(%s)")
+                    params.append(categories)
+            if business_type:
+                where_parts.append("t.store_category = %s")
+                params.append(business_type)
+            if min_price is not None:
+                where_parts.append("t.discount_price >= %s")
+                params.append(min_price)
+            if max_price is not None:
+                where_parts.append("t.discount_price <= %s")
+                params.append(max_price)
+            if min_discount is not None:
+                where_parts.append(
+                    "t.original_price > 0"
+                    " AND (1.0 - t.discount_price::numeric / t.original_price::numeric) * 100 >= %s"
+                )
+                params.append(min_discount)
+            if store_id is not None:
+                where_parts.append("t.store_id = %s")
+                params.append(store_id)
+            if only_today:
+                where_parts.append("t.expiry_date = CURRENT_DATE")
+
+            if where_parts:
+                query += " WHERE " + " AND ".join(where_parts)
+
+            query += " GROUP BY COALESCE(t.category, 'other')"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return {row[0]: int(row[1]) for row in rows}
 
     def get_offers_by_store(self, store_id: int, include_all: bool = False):
         """

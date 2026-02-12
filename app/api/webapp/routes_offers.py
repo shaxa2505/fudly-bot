@@ -246,6 +246,13 @@ async def get_categories(
     city: str | None = Query(None, description="City to filter by"),
     region: str | None = Query(None, description="Region filter"),
     district: str | None = Query(None, description="District filter"),
+    lat: float | None = Query(None, description="Latitude for nearby category counts"),
+    lon: float | None = Query(None, description="Longitude for nearby category counts"),
+    latitude: float | None = Query(None, description="Latitude (alias)"),
+    longitude: float | None = Query(None, description="Longitude (alias)"),
+    max_distance_km: float | None = Query(
+        None, ge=0, le=100, description="Max distance in km for nearby category counts"
+    ),
     db=Depends(get_db),
 ):
     """Get list of product categories with counts."""
@@ -253,10 +260,14 @@ async def get_categories(
     normalized_city = normalize_city(city) if city else None
     normalized_region = normalize_city(region) if region else None
     normalized_district = normalize_city(district) if district else None
+    lat_val = lat if lat is not None else latitude
+    lon_val = lon if lon is not None else longitude
+    has_precise_location = lat_val is not None and lon_val is not None
+    nearby_radius_steps = build_nearby_radius_steps(max_distance_km)
     cache_ttl = _get_cache_ttl("WEBAPP_CACHE_CATEGORIES_TTL", 60)
     cache_key = None
     cache = None
-    if cache_ttl > 0:
+    if cache_ttl > 0 and not has_precise_location:
         cache = get_cache_service(os.getenv("REDIS_URL"))
         cache_key = (
             f"webapp:categories:{normalized_city or ''}:{normalized_region or ''}:{normalized_district or ''}"
@@ -264,6 +275,20 @@ async def get_categories(
         cached = await cache.get(cache_key)
         if cached is not None:
             return cached
+
+    def _count_map_to_response(counts_map: dict[str, int]) -> list[CategoryResponse]:
+        total_count = sum(int(value or 0) for value in counts_map.values())
+        response: list[CategoryResponse] = []
+        for cat in CATEGORIES:
+            if cat["id"] == "all":
+                count = total_count
+            else:
+                category_filter = expand_category_filter(cat["id"]) or []
+                count = sum(int(counts_map.get(item, 0) or 0) for item in category_filter)
+            response.append(
+                CategoryResponse(id=cat["id"], name=cat["name"], emoji=cat["emoji"], count=count)
+            )
+        return response
 
     async def _count_for_scope(
         category_filter: list[str] | None,
@@ -320,6 +345,27 @@ async def get_categories(
             )
         return 0
 
+    if has_precise_location and hasattr(db, "count_nearby_offers_by_category_grouped"):
+        for radius_km in nearby_radius_steps:
+            try:
+                nearby_counts = (
+                    await _db_call(
+                        db,
+                        "count_nearby_offers_by_category_grouped",
+                        latitude=lat_val,
+                        longitude=lon_val,
+                        max_distance_km=radius_km,
+                    )
+                ) or {}
+            except Exception:  # pragma: no cover - defensive
+                nearby_counts = {}
+
+            if sum(int(value or 0) for value in nearby_counts.values()) > 0:
+                result = _count_map_to_response(nearby_counts)
+                if cache and cache_key and cache_ttl > 0:
+                    await cache.set(cache_key, result, ttl=cache_ttl)
+                return result
+
     scopes: list[tuple[str | None, str | None, str | None]] = []
     if normalized_district:
         scopes.append((None, normalized_region, normalized_district))
@@ -334,7 +380,6 @@ async def get_categories(
 
     if hasattr(db, "count_offers_by_category_grouped"):
         counts_map: dict[str, int] = {}
-        total_count = 0
         for city_scope, region_scope, district_scope in scopes:
             try:
                 counts_map = (
@@ -348,19 +393,10 @@ async def get_categories(
                 ) or {}
             except Exception:  # pragma: no cover - defensive
                 counts_map = {}
-            total_count = sum(counts_map.values()) if counts_map else 0
-            if total_count:
+            if sum(int(value or 0) for value in counts_map.values()) > 0:
                 break
 
-        for cat in CATEGORIES:
-            if cat["id"] == "all":
-                count = total_count
-            else:
-                category_filter = expand_category_filter(cat["id"]) or []
-                count = sum(counts_map.get(item, 0) for item in category_filter)
-            result.append(
-                CategoryResponse(id=cat["id"], name=cat["name"], emoji=cat["emoji"], count=count)
-            )
+        result = _count_map_to_response(counts_map)
     else:
         for cat in CATEGORIES:
             count = 0
@@ -438,6 +474,7 @@ async def get_offers(
         location_strategy: str | None = None
         used_radius_km: float | None = None
         used_fallback = False
+        selected_scope_for_count: tuple[str | None, str | None, str | None] | None = None
 
         cache_ttl = _get_cache_ttl(
             "WEBAPP_CACHE_SEARCH_TTL" if search else "WEBAPP_CACHE_OFFERS_TTL",
@@ -663,6 +700,7 @@ async def get_offers(
                 raw_offers = await _fetch_scoped_offers(*scope)
                 if raw_offers:
                     scoped_found = True
+                    selected_scope_for_count = scope
                     location_strategy = "scope"
                     break
 
@@ -779,26 +817,48 @@ async def get_offers(
 
         if include_meta:
             total: int | None = None
-            if (
-                not store_id
-                and not search
-                and location_strategy not in {"nearby", "scope"}
-                and hasattr(db, "count_offers_by_filters")
-            ):
-                total = int(
-                    (await _db_call(
-                        db,
-                        "count_offers_by_filters",
-                        city=normalized_city,
-                        region=region,
-                        district=district,
-                        category=category_filter,
-                        min_price=storage_min_price,
-                        max_price=storage_max_price,
-                        min_discount=min_discount,
-                    ))
-                    or 0
-                )
+            if not store_id and not search:
+                if (
+                    location_strategy == "nearby"
+                    and lat_val is not None
+                    and lon_val is not None
+                    and used_radius_km is not None
+                    and hasattr(db, "count_nearby_offers")
+                ):
+                    total = int(
+                        (await _db_call(
+                            db,
+                            "count_nearby_offers",
+                            latitude=lat_val,
+                            longitude=lon_val,
+                            max_distance_km=used_radius_km,
+                            category=category_filter,
+                            min_price=storage_min_price,
+                            max_price=storage_max_price,
+                            min_discount=min_discount,
+                        ))
+                        or 0
+                    )
+                elif location_strategy != "nearby" and hasattr(db, "count_offers_by_filters"):
+                    count_city = normalized_city
+                    count_region = region
+                    count_district = district
+                    if location_strategy == "scope" and selected_scope_for_count is not None:
+                        count_city, count_region, count_district = selected_scope_for_count
+                    total = int(
+                        (await _db_call(
+                            db,
+                            "count_offers_by_filters",
+                            city=count_city,
+                            region=count_region,
+                            district=count_district,
+                            category=category_filter,
+                            min_price=storage_min_price,
+                            max_price=storage_max_price,
+                            min_discount=min_discount,
+                        ))
+                        or 0
+                    )
             if total == 0 and offers:
                 total = None
             has_more = (

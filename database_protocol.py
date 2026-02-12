@@ -364,6 +364,36 @@ class DatabaseProtocol(Protocol):
     ) -> list[dict]:
         ...
 
+    def count_nearby_offers(
+        self,
+        latitude: float,
+        longitude: float,
+        category: str | list[str] | None = None,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+    ) -> int:
+        ...
+
+    def count_nearby_offers_by_category_grouped(
+        self,
+        latitude: float,
+        longitude: float,
+        category: str | list[str] | None = None,
+        business_type: str | None = None,
+        max_distance_km: float | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        min_discount: float | None = None,
+        store_id: int | None = None,
+        only_today: bool = False,
+    ) -> dict[str, int]:
+        ...
+
     def get_offer(self, offer_id: int) -> tuple[Any, ...] | None:
         ...
 

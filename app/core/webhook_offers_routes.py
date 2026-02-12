@@ -81,6 +81,7 @@ def build_offer_store_handlers(bot: Any, db: Any):
             location_strategy: str | None = None
             used_radius_km: float | None = None
             used_fallback = False
+            selected_scope_for_count: tuple[str | None, str | None, str | None] | None = None
 
             if store_id:
                 if hasattr(db, "get_store_offers"):
@@ -257,6 +258,7 @@ def build_offer_store_handlers(bot: Any, db: Any):
                     raw_offers = _fetch_scoped_offers(*scope)
                     if raw_offers:
                         scoped_found = True
+                        selected_scope_for_count = scope
                         location_strategy = "scope"
                         break
 
@@ -280,11 +282,54 @@ def build_offer_store_handlers(bot: Any, db: Any):
 
             logger.info(f"Returning {len(offers)} offers")
             if include_meta:
+                total = None
+                if not store_id and not search:
+                    if (
+                        location_strategy == "nearby"
+                        and lat is not None
+                        and lon is not None
+                        and used_radius_km is not None
+                        and hasattr(db, "count_nearby_offers")
+                    ):
+                        total = int(
+                            db.count_nearby_offers(
+                                latitude=lat,
+                                longitude=lon,
+                                max_distance_km=used_radius_km,
+                                category=category_filter,
+                                min_price=min_price,
+                                max_price=max_price,
+                                min_discount=min_discount,
+                            )
+                            or 0
+                        )
+                    elif location_strategy != "nearby" and hasattr(db, "count_offers_by_filters"):
+                        count_city = city
+                        count_region = region
+                        count_district = district
+                        if location_strategy == "scope" and selected_scope_for_count is not None:
+                            count_city, count_region, count_district = selected_scope_for_count
+                        total = int(
+                            db.count_offers_by_filters(
+                                city=count_city,
+                                region=count_region,
+                                district=count_district,
+                                category=category_filter,
+                                min_price=min_price,
+                                max_price=max_price,
+                                min_discount=min_discount,
+                            )
+                            or 0
+                        )
+                    if total is not None and total == 0 and offers:
+                        total = None
                 has_more = len(offers) == limit
+                if total is not None:
+                    has_more = len(offers) > 0 and (offset + len(offers) < total)
                 next_offset = offset + len(offers) if has_more else None
                 payload = {
                     "items": offers,
-                    "total": None,
+                    "total": total,
                     "offset": offset,
                     "limit": limit,
                     "has_more": has_more,

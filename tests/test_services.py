@@ -53,6 +53,7 @@ class TestOfferService:
         ]
         db.count_hot_offers.return_value = 1
         db.count_offers_by_filters.return_value = 1
+        db.count_nearby_offers.return_value = 1
         return db
 
     @pytest.fixture
@@ -140,6 +141,17 @@ class TestOfferService:
         assert result.items[0].id == 2
         mock_db.get_hot_offers.assert_not_called()
         mock_db.count_offers_by_filters.assert_not_called()
+        mock_db.count_nearby_offers.assert_called_once_with(
+            latitude=41.3,
+            longitude=69.2,
+            max_distance_km=3.0,
+            category=None,
+            min_price=None,
+            max_price=None,
+            min_discount=None,
+            store_id=None,
+            only_today=False,
+        )
 
     def test_list_hot_offers_expands_radius_then_falls_back_to_scoped(
         self, service: OfferService, mock_db: MagicMock

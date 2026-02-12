@@ -408,6 +408,10 @@ function HomePage() {
         if (location.district) {
           params.district = location.district
         }
+        if (location.coordinates?.lat != null && location.coordinates?.lon != null) {
+          params.lat = location.coordinates.lat
+          params.lon = location.coordinates.lon
+        }
         const data = await api.getCategories(params)
         if (!isActive) return
         const counts = {}
@@ -434,7 +438,14 @@ function HomePage() {
     return () => {
       isActive = false
     }
-  }, [categoriesReady, cityForApi, location.region, location.district])
+  }, [
+    categoriesReady,
+    cityForApi,
+    location.region,
+    location.district,
+    location.coordinates?.lat,
+    location.coordinates?.lon,
+  ])
   // Load offers - сначала по городу, если пусто - из всех городов
   const loadOffers = useCallback(async (reset = false, options = {}) => {
     const { searchOverride, force = false } = options

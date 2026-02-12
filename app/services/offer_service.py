@@ -121,6 +121,7 @@ class OfferService:
         raw_offers: list[Any] = []
         used_scope = (None, None, None)
         used_nearby_strategy = False
+        used_radius_km: float | None = None
         has_precise_location = latitude is not None and longitude is not None
 
         if has_precise_location and hasattr(self._db, "get_nearby_offers"):
@@ -147,6 +148,7 @@ class OfferService:
                     raw_offers = list(raw)
                 if raw_offers:
                     used_nearby_strategy = True
+                    used_radius_km = radius_km
                     break
 
         if not raw_offers:
@@ -181,7 +183,27 @@ class OfferService:
         total = 0
         if raw_offers:
             if used_nearby_strategy:
-                total = len(raw_offers)
+                if (
+                    has_precise_location
+                    and used_radius_km is not None
+                    and hasattr(self._db, "count_nearby_offers")
+                ):
+                    total = int(
+                        self._db.count_nearby_offers(
+                            latitude=latitude,
+                            longitude=longitude,
+                            max_distance_km=used_radius_km,
+                            category=category,
+                            min_price=min_price,
+                            max_price=max_price,
+                            min_discount=min_discount,
+                            store_id=store_id,
+                            only_today=only_today,
+                        )
+                        or 0
+                    )
+                if total == 0:
+                    total = len(raw_offers)
             elif hasattr(self._db, "count_offers_by_filters"):
                 total = int(
                     self._db.count_offers_by_filters(

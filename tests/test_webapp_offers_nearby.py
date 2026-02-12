@@ -60,6 +60,41 @@ class DummyOffersDb:
             return list(self._nearby_by_radius.get(rounded, []))
         return list(self._nearby_offers)
 
+    async def count_offers_by_filters(
+        self,
+        city=None,
+        region=None,
+        district=None,
+        category=None,
+        min_price=None,
+        max_price=None,
+        min_discount=None,
+        store_id=None,
+        only_today=False,
+    ):
+        return len(self._hot_offers)
+
+
+class DummyOffersDbWithNearbyCount(DummyOffersDb):
+    def __init__(self, hot_offers, nearby_offers, nearby_total, nearby_by_radius=None):
+        super().__init__(hot_offers, nearby_offers, nearby_by_radius=nearby_by_radius)
+        self._nearby_total = nearby_total
+
+    async def count_nearby_offers(
+        self,
+        latitude,
+        longitude,
+        category=None,
+        business_type=None,
+        max_distance_km=None,
+        min_price=None,
+        max_price=None,
+        min_discount=None,
+        store_id=None,
+        only_today=False,
+    ):
+        return self._nearby_total
+
 
 def _sample_offer(offer_id):
     return {
@@ -185,6 +220,7 @@ async def test_meta_reports_nearby_strategy_and_radius():
     assert result.location_strategy == "nearby"
     assert result.used_radius_km == 7.0
     assert result.used_fallback is False
+    assert result.total is None
 
 
 @pytest.mark.asyncio
@@ -213,3 +249,51 @@ async def test_meta_reports_scope_fallback_when_nearby_empty():
     assert result.location_strategy == "scope"
     assert result.used_radius_km is None
     assert result.used_fallback is True
+    assert result.total == 1
+
+
+@pytest.mark.asyncio
+async def test_meta_reports_scope_total_without_coordinates():
+    db = DummyOffersDb(hot_offers=[_sample_offer(1)], nearby_offers=[])
+    get_offers = _get_offers()
+    result = await _call_offers(
+        get_offers,
+        db,
+        city="Tashkent",
+        include_meta=True,
+    )
+
+    assert [item.id for item in result.items] == [1]
+    assert result.location_strategy == "scope"
+    assert result.used_fallback is False
+    assert result.total == 1
+
+
+@pytest.mark.asyncio
+async def test_meta_reports_nearby_total_when_counter_supported():
+    db = DummyOffersDbWithNearbyCount(
+        hot_offers=[],
+        nearby_offers=[],
+        nearby_total=3,
+        nearby_by_radius={
+            3.0: [],
+            7.0: [_sample_offer(2)],
+        },
+    )
+    get_offers = _get_offers()
+    result = await _call_offers(
+        get_offers,
+        db,
+        city="Tashkent",
+        lat=41.3,
+        lon=69.2,
+        include_meta=True,
+        limit=1,
+    )
+
+    assert [item.id for item in result.items] == [2]
+    assert result.location_strategy == "nearby"
+    assert result.used_radius_km == 7.0
+    assert result.total == 3
+    assert result.has_more is True
+    assert result.next_offset == 1

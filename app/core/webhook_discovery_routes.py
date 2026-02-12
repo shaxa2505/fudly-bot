@@ -5,6 +5,7 @@ from typing import Any
 
 from aiohttp import web
 
+from app.core.location_search import build_nearby_radius_steps
 from app.core.utils import normalize_city
 from app.core.webhook_api_utils import add_cors_headers
 from app.core.webhook_helpers import API_CATEGORIES, expand_category_filter, get_offer_value
@@ -14,6 +15,14 @@ from logging_config import logger
 def build_discovery_handlers(db: Any):
     async def api_categories(request: web.Request) -> web.Response:
         """GET /api/v1/categories - List categories."""
+        def _parse_float(value: str | None) -> float | None:
+            if value is None or value == "":
+                return None
+            try:
+                return float(value)
+            except ValueError:
+                return None
+
         city = request.query.get("city", "")
         city = city.strip() if isinstance(city, str) else city
         city = city or None
@@ -23,10 +32,32 @@ def build_discovery_handlers(db: Any):
         district = request.query.get("district", "")
         district = district.strip() if isinstance(district, str) else district
         district = district or None
+        lat = _parse_float(request.query.get("lat") or request.query.get("latitude"))
+        lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
+        max_distance_km = _parse_float(request.query.get("max_distance_km"))
         normalized_city = normalize_city(city) if city else None
         normalized_region = normalize_city(region) if region else None
         normalized_district = normalize_city(district) if district else None
-        result = []
+        nearby_radius_steps = build_nearby_radius_steps(max_distance_km)
+
+        def _map_counts_to_payload(counts_map: dict[str, int]) -> list[dict[str, int | str]]:
+            total_count = sum(int(value or 0) for value in counts_map.values())
+            payload: list[dict[str, int | str]] = []
+            for cat in API_CATEGORIES:
+                if cat["id"] == "all":
+                    count = total_count
+                else:
+                    category_filter = expand_category_filter(cat["id"]) or []
+                    count = sum(int(counts_map.get(item, 0) or 0) for item in category_filter)
+                payload.append(
+                    {
+                        "id": cat["id"],
+                        "name": cat["name"],
+                        "emoji": cat["emoji"],
+                        "count": count,
+                    }
+                )
+            return payload
 
         def _count_for_scope(
             category_filter: list[str] | None,
@@ -42,6 +73,7 @@ def build_discovery_handlers(db: Any):
                         district=district_scope,
                         category=category_filter,
                     )
+                    or 0
                 )
             if category_filter:
                 if hasattr(db, "get_offers_by_city_and_category"):
@@ -74,6 +106,27 @@ def build_discovery_handlers(db: Any):
                 )
             return 0
 
+        if (
+            lat is not None
+            and lon is not None
+            and hasattr(db, "count_nearby_offers_by_category_grouped")
+        ):
+            for radius_km in nearby_radius_steps:
+                try:
+                    nearby_counts = (
+                        db.count_nearby_offers_by_category_grouped(
+                            latitude=lat,
+                            longitude=lon,
+                            max_distance_km=radius_km,
+                        )
+                        or {}
+                    )
+                except Exception:
+                    nearby_counts = {}
+
+                if sum(int(value or 0) for value in nearby_counts.values()) > 0:
+                    return add_cors_headers(web.json_response(_map_counts_to_payload(nearby_counts)))
+
         scopes: list[tuple[str | None, str | None, str | None]] = []
         if normalized_district:
             scopes.append((None, normalized_region, normalized_district))
@@ -86,30 +139,49 @@ def build_discovery_handlers(db: Any):
         if not scopes:
             scopes.append((None, None, None))
 
-        for cat in API_CATEGORIES:
-            count = 0
-            category_filter = expand_category_filter(cat["id"])
-            try:
-                for city_scope, region_scope, district_scope in scopes:
-                    count = _count_for_scope(
-                        category_filter if cat["id"] != "all" else None,
-                        city_scope,
-                        region_scope,
-                        district_scope,
+        result: list[dict[str, int | str]] = []
+        if hasattr(db, "count_offers_by_category_grouped"):
+            counts_map: dict[str, int] = {}
+            for city_scope, region_scope, district_scope in scopes:
+                try:
+                    counts_map = (
+                        db.count_offers_by_category_grouped(
+                            city=city_scope,
+                            region=region_scope,
+                            district=district_scope,
+                        )
+                        or {}
                     )
-                    if count:
-                        break
-            except Exception:
-                pass
+                except Exception:
+                    counts_map = {}
+                if sum(int(value or 0) for value in counts_map.values()) > 0:
+                    break
+            result = _map_counts_to_payload(counts_map)
+        else:
+            for cat in API_CATEGORIES:
+                count = 0
+                category_filter = expand_category_filter(cat["id"])
+                try:
+                    for city_scope, region_scope, district_scope in scopes:
+                        count = _count_for_scope(
+                            category_filter if cat["id"] != "all" else None,
+                            city_scope,
+                            region_scope,
+                            district_scope,
+                        )
+                        if count:
+                            break
+                except Exception:
+                    pass
 
-            result.append(
-                {
-                    "id": cat["id"],
-                    "name": cat["name"],
-                    "emoji": cat["emoji"],
-                    "count": count,
-                }
-            )
+                result.append(
+                    {
+                        "id": cat["id"],
+                        "name": cat["name"],
+                        "emoji": cat["emoji"],
+                        "count": count,
+                    }
+                )
 
         return add_cors_headers(web.json_response(result))
 
