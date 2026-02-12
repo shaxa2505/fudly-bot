@@ -1,0 +1,88 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e6]:
+  - generic:
+    - generic:
+      - generic:
+        - img
+      - generic: Yangilash uchun torting
+  - banner [ref=e7]:
+    - generic [ref=e8]:
+      - heading "Profil" [level=1] [ref=e11]
+      - button "Tahrirlash" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+  - region "Profil" [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e19]: G
+      - generic "Tasdiqlangan" [ref=e20]:
+        - img [ref=e21]
+    - heading "Guest" [level=2] [ref=e24]
+    - generic [ref=e25]: "@guest"
+    - generic [ref=e26]:
+      - img [ref=e28]
+      - generic [ref=e31]:
+        - strong [ref=e32]: 0ta
+        - text: ovqat qutqarildi
+    - generic [ref=e33]:
+      - generic [ref=e34]: "+998901234567"
+      - generic [ref=e35]: Toshkent, O'zbekiston
+  - button "Bildirishnomalar O'chirilgan" [ref=e37] [cursor=pointer]:
+    - generic [ref=e38]:
+      - img [ref=e40]
+      - generic [ref=e43]:
+        - generic [ref=e44]: Bildirishnomalar
+        - generic [ref=e45]: O'chirilgan
+    - img [ref=e46]
+  - generic [ref=e48]:
+    - heading "Sozlamalar" [level=3] [ref=e49]
+    - generic [ref=e50]:
+      - button "To'lov usullari" [ref=e51] [cursor=pointer]:
+        - generic [ref=e52]:
+          - img [ref=e54]
+          - generic [ref=e56]: To'lov usullari
+        - img [ref=e58]
+      - button "Manzillarim" [ref=e60] [cursor=pointer]:
+        - generic [ref=e61]:
+          - img [ref=e63]
+          - generic [ref=e66]: Manzillarim
+        - img [ref=e68]
+      - button "Ilova tili O'zbekcha" [ref=e70] [cursor=pointer]:
+        - generic [ref=e71]:
+          - img [ref=e73]
+          - generic [ref=e76]: Ilova tili
+        - generic [ref=e77]:
+          - generic [ref=e78]: O'zbekcha
+          - img [ref=e79]
+      - button "Qo'llab-quvvatlash" [ref=e81] [cursor=pointer]:
+        - generic [ref=e82]:
+          - img [ref=e84]
+          - generic [ref=e91]: Qo'llab-quvvatlash
+        - img [ref=e93]
+  - generic [ref=e95]:
+    - heading "Xavfli amallar" [level=3] [ref=e96]
+    - paragraph [ref=e97]: Savatdagi barcha mahsulotlar o'chiriladi. Bu amalni qaytarib bo'lmaydi.
+    - button "Savatni tozalash" [ref=e98] [cursor=pointer]
+  - generic [ref=e99]:
+    - button "Chiqish" [ref=e100] [cursor=pointer]:
+      - img [ref=e101]
+      - text: Chiqish
+    - paragraph [ref=e104]: Versiya 2.4.0
+  - navigation [ref=e105]:
+    - generic [ref=e106]:
+      - button "Asosiy" [ref=e107] [cursor=pointer]:
+        - img [ref=e110]
+        - generic [ref=e113]: Asosiy
+      - button "Do'konlar" [ref=e114] [cursor=pointer]:
+        - img [ref=e117]
+        - generic [ref=e120]: Do'konlar
+      - button "Savat" [ref=e121] [cursor=pointer]:
+        - img [ref=e124]
+        - generic [ref=e128]: Savat
+      - button "Buyurtmalar" [ref=e129] [cursor=pointer]:
+        - img [ref=e132]
+        - generic [ref=e136]: Buyurtmalar
+      - button "Profil" [ref=e137] [cursor=pointer]:
+        - img [ref=e140]
+        - generic [ref=e143]: Profil
+```

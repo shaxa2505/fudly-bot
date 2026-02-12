@@ -1,0 +1,109 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e6]:
+  - banner [ref=e7]:
+    - heading "Savat" [level=1] [ref=e11]
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - paragraph [ref=e17]: To'lov kutilmoqda
+          - paragraph [ref=e18]: "Buyurtma #777 - 1 dona - 5 000 so'm"
+        - generic [ref=e19]: CLICK
+      - generic [ref=e20]:
+        - button "To'lovni davom ettirish" [ref=e21] [cursor=pointer]
+        - button "Savatni tiklash" [ref=e22] [cursor=pointer]
+    - generic [ref=e25]:
+      - img "Non" [ref=e27]
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - heading "Non" [level=3] [ref=e30]
+          - button "Non ni savatdan o'chirish" [ref=e31] [cursor=pointer]:
+            - img [ref=e32]
+        - paragraph [ref=e35]: Do'kon
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e38]: 5 000
+            - generic [ref=e39]: 10 000
+          - generic [ref=e40]:
+            - button "Non miqdorini kamaytirish" [ref=e41] [cursor=pointer]: "-"
+            - generic [ref=e42]: "1"
+            - button "Non miqdorini oshirish" [ref=e43] [cursor=pointer]: +
+    - generic [ref=e44]:
+      - heading "Tavsiya etamiz" [level=3] [ref=e45]
+      - article [ref=e47]:
+        - img "Kefir 1L" [ref=e49]
+        - paragraph [ref=e50]: Kefir 1L
+        - generic [ref=e51]:
+          - generic [ref=e52]: 8 000
+          - button "Kefir 1L savatga qo'shish" [ref=e53] [cursor=pointer]:
+            - img [ref=e54]
+  - generic [ref=e56]:
+    - heading "Buyurtmani rasmiylashtirish" [level=2] [ref=e58]
+    - status [ref=e59]:
+      - generic [ref=e60]: To'lov yakunlanmagan
+      - generic [ref=e61]: "Buyurtma #777 • 5 000 so'm"
+      - paragraph [ref=e62]: Oldingi buyurtma uchun to'lov kutilmoqda. Xohlasangiz uni davom ettiring.
+      - button "To'lovni davom ettirish" [ref=e64] [cursor=pointer]
+    - generic [ref=e66]:
+      - generic [ref=e67]:
+        - heading "Buyurtma turi" [level=3] [ref=e68]
+        - generic [ref=e69]:
+          - button "O'zi olib ketish Do'kondan olib ketasiz" [ref=e70] [cursor=pointer]:
+            - generic [ref=e72]: O'zi olib ketish
+            - generic [ref=e73]: Do'kondan olib ketasiz
+          - button "Yetkazib berish Mavjud emas" [disabled] [ref=e74]:
+            - generic [ref=e76]: Yetkazib berish
+            - generic [ref=e77]: Mavjud emas
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - heading "Yetkazib berish manzili" [level=3] [ref=e80]
+          - button "Xaritada o'zgartirish" [disabled] [ref=e81] [cursor=pointer]
+        - generic [ref=e83]:
+          - textbox "Manzilni kiriting" [disabled] [ref=e84]: Yunusobod
+          - generic [ref=e85]:
+            - generic [ref=e86]:
+              - generic [ref=e87]: Kiraverish
+              - textbox "Kiraverish" [disabled] [ref=e88]:
+                - /placeholder: "-"
+            - generic [ref=e89]:
+              - generic [ref=e90]: Qavat
+              - textbox "Qavat" [disabled] [ref=e91]:
+                - /placeholder: "-"
+            - generic [ref=e92]:
+              - generic [ref=e93]: Xonadon
+              - textbox "Xonadon" [disabled] [ref=e94]:
+                - /placeholder: "-"
+        - 'textbox "Kuryer uchun izoh (masalan: domofon ishlamayapti)" [ref=e95]'
+      - generic [ref=e96]:
+        - heading "To'lov turi" [level=3] [ref=e97]
+        - generic [ref=e98]:
+          - button "Click Click" [disabled] [ref=e99]:
+            - generic [ref=e100]:
+              - img "Click" [ref=e102]
+              - generic [ref=e103]: Click
+          - button "Naqd pul" [ref=e105] [cursor=pointer]:
+            - generic [ref=e106]:
+              - img [ref=e108]
+              - generic [ref=e111]: Naqd pul
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - heading "Sizning buyurtmangiz" [level=3] [ref=e115]
+          - button "Sizning buyurtmangiz" [ref=e116] [cursor=pointer]:
+            - generic [ref=e117]: 1 dona
+            - img [ref=e118]
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e122]: Mahsulotlar
+            - generic [ref=e123]: 5 000 so'm
+          - generic [ref=e124]:
+            - generic [ref=e125]: Xizmat haqi
+            - generic [ref=e126]: 0 so'm
+          - generic [ref=e127]:
+            - generic [ref=e128]: Jami
+            - generic [ref=e129]: 5 000 so'm
+    - button "Buyurtmani tasdiqlash 5 000 so'm" [disabled] [ref=e131] [cursor=pointer]:
+      - generic [ref=e132]: Buyurtmani tasdiqlash
+      - generic [ref=e133]: 5 000 so'm
+```

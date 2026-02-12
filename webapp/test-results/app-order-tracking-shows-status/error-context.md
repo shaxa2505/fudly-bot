@@ -1,0 +1,69 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e6]:
+  - banner [ref=e7]:
+    - button "Orqaga" [ref=e8] [cursor=pointer]:
+      - img [ref=e9]
+    - generic [ref=e11]:
+      - generic [ref=e12]: Buyurtma tasdiqlash
+      - generic [ref=e13]: "ID #555"
+    - button "Ko'proq" [ref=e14] [cursor=pointer]:
+      - img [ref=e15]
+  - main [ref=e19]:
+    - generic [ref=e20]:
+      - heading "Buyurtma tayyorlanmoqda" [level=1] [ref=e21]
+      - paragraph [ref=e22]: Buyurtmani vaqtida olib keting
+      - generic [ref=e26]:
+        - generic [ref=e29]: Tasdiqlandi
+        - generic [ref=e32]: Tayyorlanmoqda
+        - generic [ref=e35]: Olib ketish
+        - generic [ref=e38]: Berildi
+      - generic [ref=e39]:
+        - generic [ref=e40]: Tasdiqlangan
+        - generic [ref=e41]: Olib ketish
+    - generic [ref=e42]:
+      - heading "Buyurtma holati" [level=3] [ref=e45]
+      - generic [ref=e47]:
+        - generic [ref=e49]:
+          - generic [ref=e50]: Tasdiq kutilmoqda
+          - generic [ref=e51]: M02 12 23:37
+        - generic [ref=e52]: Yaratildi
+    - generic [ref=e53]:
+      - generic [ref=e55]:
+        - heading "Lavka" [level=2] [ref=e56]
+        - paragraph [ref=e57]: Manzil ko'rsatilmagan
+      - generic [ref=e59]: Manzil xaritasi
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - heading "Tanlanganlar" [level=3] [ref=e63]
+        - generic [ref=e64]: 2 ta
+      - generic [ref=e66]:
+        - generic [ref=e68]: "N"
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - paragraph [ref=e71]: Non
+            - strong [ref=e72]: 10,000 UZS
+          - generic [ref=e73]: 2 ta
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]: Mahsulotlar
+        - strong [ref=e77]: 0 UZS
+      - generic [ref=e78]:
+        - generic [ref=e79]: Jami to'lov
+        - strong [ref=e80]: 10,000 UZS
+      - generic [ref=e81]:
+        - generic [ref=e82]: To'lov usuli
+        - strong [ref=e83]: "---"
+    - button "Qoidalar va qo'llab-quvvatlash" [ref=e85] [cursor=pointer]
+  - generic [ref=e86]:
+    - generic [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]: Olib ketish kodi
+        - strong [ref=e90]: T-555
+      - button "QR kod" [ref=e91] [cursor=pointer]:
+        - img [ref=e92]
+    - generic [ref=e98]:
+      - button "Yo'nalish" [ref=e99] [cursor=pointer]
+      - button "Chek" [ref=e100] [cursor=pointer]
+```
