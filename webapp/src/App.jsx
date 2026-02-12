@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { FavoritesProvider } from './context/FavoritesContext'
 import { ToastProvider } from './context/ToastContext'
-import api, { saveTelegramInitData } from './api/client'
+import api, { clearTelegramInitData, saveTelegramInitData } from './api/client'
 import { setStoredUser } from './utils/auth'
 import { getSavedLocation, saveLocation, buildLocationFromReverseGeocode } from './utils/cityUtils'
 import { getPreferredLocation } from './utils/geolocation'
@@ -27,6 +27,31 @@ const GEO_ATTEMPT_KEY = 'fudly_geo_attempt_ts'
 const GEO_STATUS_KEY = 'fudly_geo_status'
 const GEO_COOLDOWN_MS = 24 * 60 * 60 * 1000
 const GEO_ACCURACY_METERS = 200
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const parseUserFromInitData = (initData) => {
+  if (!initData || typeof initData !== 'string') return null
+  try {
+    const params = new URLSearchParams(initData)
+    const rawUser = params.get('user')
+    if (!rawUser) return null
+    const parsed = JSON.parse(rawUser)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+const waitForTelegramWebApp = async (timeoutMs = 3000, stepMs = 100) => {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    const tg = window.Telegram?.WebApp
+    if (tg) return tg
+    await wait(stepMs)
+  }
+  return window.Telegram?.WebApp || null
+}
 
 // Main app content with routing
 function AppContent() {
@@ -258,8 +283,8 @@ function AppContent() {
   }, [])
 
   const initializeApp = async () => {
-    // Initialize Telegram WebApp immediately
-    const tg = window.Telegram?.WebApp
+    // Wait briefly to avoid race when Telegram script/object is injected later.
+    const tg = await waitForTelegramWebApp()
 
     if (tg) {
       // Prevent swipe-to-close in Telegram webview (iOS) and signal readiness early.
@@ -281,12 +306,12 @@ function AppContent() {
       document.documentElement.style.setProperty('--tg-theme-button-color', tg.themeParams.button_color || '#3A5A40')
 
       // Get user from Telegram
-      const tgUser = tg.initDataUnsafe?.user
+      const tgUser = tg.initDataUnsafe?.user || parseUserFromInitData(tg.initData)
       if (tg.initData) {
-        saveTelegramInitData(tg.initData)
-        if (tgUser?.id) {
-          saveTelegramInitData(tg.initData, tgUser.id)
-        }
+        saveTelegramInitData(tg.initData, tgUser?.id)
+      } else {
+        // Avoid stale auth context when Telegram initData isn't available.
+        clearTelegramInitData()
       }
       if (tgUser) {
         const userData = {

@@ -24,6 +24,19 @@ import './YanaPage.css'
 
 const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
 
+const parseUserFromInitData = (initData) => {
+  if (!initData || typeof initData !== 'string') return null
+  try {
+    const params = new URLSearchParams(initData)
+    const rawUser = params.get('user')
+    if (!rawUser) return null
+    const parsed = JSON.parse(rawUser)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 const toText = (value, fallback = '') => {
   if (value == null) return fallback
   if (typeof value === 'string') return value
@@ -56,7 +69,10 @@ function YanaPage({ user }) {
   const lang = getUserLanguage()
 
   const cachedUser = getCurrentUser()
-  const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user
+  const telegramWebApp = window.Telegram?.WebApp
+  const telegramUser =
+    telegramWebApp?.initDataUnsafe?.user ||
+    parseUserFromInitData(telegramWebApp?.initData)
   const resolvedPhone = toText(
     user?.phone ||
       cachedUser?.phone ||

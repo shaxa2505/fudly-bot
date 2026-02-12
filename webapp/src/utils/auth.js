@@ -7,9 +7,25 @@ import { readStorageItem, writeStorageItem, removeStorageItem } from './storage'
 const USER_KEY = 'fudly_user'
 const PHONE_KEY = 'fudly_phone'
 
+const parseUserFromInitData = (initData) => {
+  if (!initData || typeof initData !== 'string') return null
+  try {
+    const params = new URLSearchParams(initData)
+    const rawUser = params.get('user')
+    if (!rawUser) return null
+    const parsed = JSON.parse(rawUser)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
 const resolveUserId = (explicitId = null) => {
   if (explicitId != null) return explicitId
-  const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user
+  const telegramWebApp = window.Telegram?.WebApp
+  const telegramUser =
+    telegramWebApp?.initDataUnsafe?.user ||
+    parseUserFromInitData(telegramWebApp?.initData)
   if (telegramUser?.id) return telegramUser.id
   const storedId = readStorageItem('fudly_last_user_id')
   return storedId || null
@@ -169,7 +185,10 @@ export const getCurrentUser = () => {
  */
 export const getUserId = () => {
   // Try Telegram first
-  const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user
+  const telegramWebApp = window.Telegram?.WebApp
+  const telegramUser =
+    telegramWebApp?.initDataUnsafe?.user ||
+    parseUserFromInitData(telegramWebApp?.initData)
   if (telegramUser?.id) {
     return telegramUser.id
   }
