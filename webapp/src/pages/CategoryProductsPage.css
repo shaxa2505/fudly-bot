@@ -52,7 +52,7 @@
 
 /* Search Section */
 .category-search-section {
-  padding: var(--spacing-lg) var(--page-padding-x);
+  padding: 8px var(--page-padding-x) var(--spacing-lg);
   background: var(--color-bg-primary);
 }
 

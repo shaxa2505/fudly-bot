@@ -34,7 +34,7 @@
 
 /* Search Section */
 .explore-search-section {
-  padding: var(--spacing-xl) var(--page-padding-x) var(--spacing-lg);
+  padding: 8px var(--page-padding-x) var(--spacing-lg);
 }
 
 .explore-search-box {
