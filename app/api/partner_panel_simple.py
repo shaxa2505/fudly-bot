@@ -11,7 +11,7 @@ import re
 import urllib.parse
 from datetime import datetime, timedelta, time as dt_time
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import pytz
 from fastapi import (
