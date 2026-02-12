@@ -119,7 +119,6 @@ function HomePage() {
   const searchResultsRequestRef = useRef(0)
   const categoriesScrollRef = useRef(null)
   const categoryTabRefs = useRef(new Map())
-  const activeCategoryRef = useRef(activeCategory)
   const manualSearchRef = useRef(0)
   const latestRequestRef = useRef(0)
   const queuedResetRef = useRef(null)
@@ -285,10 +284,6 @@ function HomePage() {
   }, [navigate])
 
   useEffect(() => {
-    activeCategoryRef.current = activeCategory
-  }, [activeCategory])
-
-  useEffect(() => {
     setActiveCategory(selectedCategory)
   }, [selectedCategory])
 
@@ -309,16 +304,6 @@ function HomePage() {
       })
     })
   }, [offers.length])
-
-  const handleOffersRange = useCallback((range) => {
-    if (selectedCategory !== 'all' || searchQuery.trim()) return
-    const firstVisible = offers[range.startIndex]
-    if (!firstVisible) return
-    const nextCategory = normalizeCategoryId(firstVisible.category || 'all')
-    if (nextCategory !== activeCategoryRef.current) {
-      setActiveCategory(nextCategory)
-    }
-  }, [selectedCategory, searchQuery, offers])
 
   useEffect(() => {
     const container = categoriesScrollRef.current
@@ -1336,7 +1321,6 @@ function HomePage() {
               loadOffers(false)
             }
           }}
-          rangeChanged={handleOffersRange}
           itemKey={(index, offer) => (
             offer.id || offer.offer_id || `${offer.store_id || 'store'}-${offer.title || 'offer'}-${index}`
           )}

@@ -30,7 +30,8 @@ from fastapi import (
 from app.core.async_db import AsyncDBProxy
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
-from app.core.utils import calc_discount_percent, normalize_city
+from app.core.utils import normalize_city
+from app.domain.offer_rules import MIN_OFFER_DISCOUNT_MESSAGE, validate_offer_prices
 from database_pg_module.mixins.offers import canonicalize_geo_slug
 from app.api.websocket_manager import get_connection_manager
 from app.services.stats import PartnerTotals, Period, get_partner_stats
@@ -209,8 +210,6 @@ def _to_sums(price_in_kopeks: int | float | None) -> int:
 
 
 DEFAULT_WORKING_HOURS = "08:00 - 23:00"
-MIN_DISCOUNT_PERCENT = 20
-
 
 def _parse_time_value(value: object) -> dt_time | None:
     if not value:
@@ -692,17 +691,13 @@ async def create_product(
     if discount_price is None:
         raise HTTPException(status_code=400, detail="discount_price is required")
 
-    if original_price <= 0 or discount_price <= 0:
-        raise HTTPException(status_code=400, detail="Prices must be greater than zero")
-    if discount_price >= original_price:
-        raise HTTPException(
-            status_code=400, detail="discount_price must be less than original_price"
-        )
-    discount_percent = calc_discount_percent(original_price, discount_price)
-    if discount_percent < MIN_DISCOUNT_PERCENT:
-        raise HTTPException(
-            status_code=400, detail=f"Minimum discount is {MIN_DISCOUNT_PERCENT}%"
-        )
+    try:
+        validate_offer_prices(original_price, discount_price, require_both=True)
+    except ValueError as exc:
+        message = str(exc)
+        if "Минимальная скидка" in message:
+            message = MIN_OFFER_DISCOUNT_MESSAGE
+        raise HTTPException(status_code=400, detail=message) from exc
 
     # Normalize prices from UI input
     original_price = _to_kopeks(original_price)
@@ -852,21 +847,19 @@ async def update_product(
         status = payload.get("status")
 
     if original_price is not None or discount_price is not None:
-        current_original = original_price if original_price is not None else offer.get("original_price")
-        current_discount = discount_price if discount_price is not None else offer.get("discount_price")
-        if current_original is None or current_discount is None:
-            raise HTTPException(status_code=400, detail="Missing price values")
-        if current_original <= 0 or current_discount <= 0:
-            raise HTTPException(status_code=400, detail="Prices must be greater than zero")
-        if current_discount >= current_original:
-            raise HTTPException(
-                status_code=400, detail="discount_price must be less than original_price"
-            )
-        discount_percent = calc_discount_percent(current_original, current_discount)
-        if discount_percent < MIN_DISCOUNT_PERCENT:
-            raise HTTPException(
-                status_code=400, detail=f"Minimum discount is {MIN_DISCOUNT_PERCENT}%"
-            )
+        current_original = (
+            original_price if original_price is not None else offer.get("original_price")
+        )
+        current_discount = (
+            discount_price if discount_price is not None else offer.get("discount_price")
+        )
+        try:
+            validate_offer_prices(current_original, current_discount, require_both=True)
+        except ValueError as exc:
+            message = str(exc)
+            if "Минимальная скидка" in message:
+                message = MIN_OFFER_DISCOUNT_MESSAGE
+            raise HTTPException(status_code=400, detail=message) from exc
 
     # Normalize prices from UI input
     if original_price is not None:
@@ -874,9 +867,8 @@ async def update_product(
     if discount_price is not None:
         discount_price = _to_kopeks(discount_price)
 
-    # Build update dynamically for partial updates
-    update_fields = []
-    update_values = []
+    parsed_from_iso: str | None = None
+    parsed_until_iso: str | None = None
 
     if available_from is not None or available_until is not None:
         current_from = available_from if available_from is not None else offer.get("available_from")
@@ -887,82 +879,73 @@ async def update_product(
             raise HTTPException(
                 status_code=400, detail="Invalid available_from/available_until values"
             )
-        update_fields.append("available_from = %s")
-        update_values.append(parsed_from.isoformat())
-        update_fields.append("available_until = %s")
-        update_values.append(parsed_until.isoformat())
-
-    if title is not None:
-        update_fields.append("title = %s")
-        update_values.append(title)
-
-    if category is not None:
-        update_fields.append("category = %s")
-        update_values.append(category)
-
-    if original_price is not None:
-        update_fields.append("original_price = %s")
-        update_values.append(original_price if original_price > 0 else None)
-
-    if discount_price is not None:
-        update_fields.append("discount_price = %s")
-        update_values.append(discount_price)
+        parsed_from_iso = parsed_from.isoformat()
+        parsed_until_iso = parsed_until.isoformat()
 
     if quantity is not None:
-        update_fields.append("quantity = %s")
-        update_values.append(quantity)
         # Auto-update status based on quantity (sync with frontend)
         if quantity <= 0 and status is None:
-            update_fields.append("status = %s")
-            update_values.append("out_of_stock")
+            status = "out_of_stock"
         elif quantity > 0 and status is None:
             # Restore to active if was out_of_stock
             current_offer = await db.get_offer(product_id)
             if current_offer and current_offer.get("status") == "out_of_stock":
-                update_fields.append("status = %s")
-                update_values.append("active")
+                status = "active"
 
-    if stock_quantity is not None:
-        update_fields.append("stock_quantity = %s")
-        update_values.append(stock_quantity)
-        # Sync quantity field if not explicitly set
-        if quantity is None:
-            update_fields.append("quantity = %s")
-            update_values.append(stock_quantity)
-
-    if unit is not None:
-        update_fields.append("unit = %s")
-        update_values.append(unit)
-
+    expiry_iso: str | None = None
     if expiry_date is not None:
-        expiry = None
         if expiry_date:
             try:
-                expiry = datetime.fromisoformat(expiry_date).date().isoformat()
+                expiry_iso = datetime.fromisoformat(expiry_date).date().isoformat()
             except ValueError:
-                pass
-        update_fields.append("expiry_date = %s")
-        update_values.append(expiry)
+                raise HTTPException(status_code=400, detail="Invalid expiry_date format")
 
-    if description is not None:
-        update_fields.append("description = %s")
-        update_values.append(description)
-
-    if photo_id is not None:
-        update_fields.append("photo_id = %s")
-        update_values.append(photo_id)
-
-    if status is not None:
-        update_fields.append("status = %s")
-        update_values.append(status)
-
-    if not update_fields:
+    has_updates = any(
+        value is not None
+        for value in (
+            title,
+            category,
+            original_price,
+            discount_price,
+            quantity,
+            stock_quantity,
+            unit,
+            description,
+            photo_id,
+            status,
+            parsed_from_iso,
+            parsed_until_iso,
+            expiry_date,
+        )
+    )
+    if not has_updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    # Execute update
-    query = f"UPDATE offers SET {', '.join(update_fields)} WHERE offer_id = %s"
-    update_values.append(product_id)
-    await db.execute(query, tuple(update_values))
+    try:
+        updated = await db.update_offer(
+            offer_id=product_id,
+            title=title,
+            description=description,
+            original_price=original_price,
+            discount_price=discount_price,
+            quantity=quantity,
+            available_from=parsed_from_iso,
+            available_until=parsed_until_iso,
+            expiry_date=expiry_iso if expiry_date is not None else None,
+            unit=unit,
+            category=category,
+            stock_quantity=stock_quantity,
+            status=status,
+            photo_id=photo_id,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if "Минимальная скидка" in message:
+            message = MIN_OFFER_DISCOUNT_MESSAGE
+        raise HTTPException(status_code=400, detail=message) from exc
+
+    if not updated:
+        raise HTTPException(status_code=400, detail="No fields to update")
 
     return {"offer_id": product_id, "status": "updated"}
 

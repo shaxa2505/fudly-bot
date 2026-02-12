@@ -1,4 +1,4 @@
-"""
+﻿"""
 Offer-related database operations.
 """
 from __future__ import annotations
@@ -8,7 +8,7 @@ from typing import Any
 
 from psycopg.rows import dict_row
 
-from app.core.utils import calc_discount_percent
+from app.domain.offer_rules import validate_offer_prices
 
 try:
     from logging_config import logger
@@ -17,81 +17,80 @@ except ImportError:
 
     logger = logging.getLogger(__name__)
 
-MIN_DISCOUNT_PERCENT = 20
 
-# Маппинг городов: латиница <-> кириллица
+# РњР°РїРїРёРЅРі РіРѕСЂРѕРґРѕРІ: Р»Р°С‚РёРЅРёС†Р° <-> РєРёСЂРёР»Р»РёС†Р°
 CITY_TRANSLITERATION = {
-    "toshkent": ["Ташкент", "Tashkent"],
-    "tashkent": ["Ташкент", "Toshkent"],
-    "samarqand": ["Самарканд", "Samarkand", "Самаркандская"],
-    "samarkand": ["Самарканд", "Samarqand"],
-    "buxoro": ["Бухара", "Bukhara", "Бухарская"],
-    "bukhara": ["Бухара", "Buxoro"],
-    "farg'ona": ["Фергана", "Fergana", "Ферганская"],
-    "fergana": ["Фергана", "Farg'ona"],
-    "andijon": ["Андижан", "Andijan", "Андижанская"],
-    "andijan": ["Андижан", "Andijon"],
-    "namangan": ["Наманган", "Наманганская"],
-    "navoiy": ["Навои", "Navoi", "Навоийская"],
-    "navoi": ["Навои", "Navoiy"],
-    "qarshi": ["Карши", "Karshi"],
-    "karshi": ["Карши", "Qarshi"],
-    "nukus": ["Нукус"],
-    "urganch": ["Ургенч", "Urgench"],
-    "urgench": ["Ургенч", "Urganch"],
-    "jizzax": ["Джизак", "Jizzakh", "Джизакская"],
-    "jizzakh": ["Джизак", "Jizzax"],
-    "termiz": ["Термез", "Termez"],
-    "termez": ["Термез", "Termiz"],
-    "guliston": ["Гулистан", "Gulistan"],
-    "gulistan": ["Гулистан", "Guliston"],
-    "chirchiq": ["Чирчик", "Chirchik"],
-    "chirchik": ["Чирчик", "Chirchiq"],
-    "kattaqo'rg'on": ["Каттакурган", "Kattakurgan", "Kattaqurgan", "Каттақўргон"],
-    "kattakurgan": ["Каттакурган", "Kattaqo'rg'on", "Kattaqurgan", "Каттақўргон"],
-    "kattaqurgan": ["Каттакурган", "Kattaqo'rg'on", "Kattakurgan", "Каттақўргон"],
-    "olmaliq": ["Алмалык", "Olmaliq"],
-    "angren": ["Ангрен"],
-    "bekobod": ["Бекабад", "Bekabad"],
-    "shahrisabz": ["Шахрисабз"],
-    "marg'ilon": ["Маргилан", "Margilan"],
-    "margilan": ["Маргилан", "Marg'ilon"],
-    "qo'qon": ["Коканд", "Kokand"],
-    "kokand": ["Коканд", "Qo'qon"],
-    "xiva": ["Хива", "Khiva"],
-    "khiva": ["Хива", "Xiva"],
-    "qashqadaryo": ["Кашкадарья", "Kashkadarya", "Кашкадарьинская"],
-    "sirdaryo": ["Сырдарья", "Сырдарьинская"],
-    "surxondaryo": ["Сурхандарья", "Сурхандарьинская"],
-    "xorazm": ["Хорезм", "Хорезмская"],
-    "qoraqalpog'iston": ["Каракалпакстан", "Karakalpakstan", "Каракалпакская"],
-    "ташкент": ["Toshkent", "Tashkent"],
-    "самарканд": ["Samarqand", "Samarkand"],
-    "бухара": ["Buxoro", "Bukhara"],
-    "фергана": ["Farg'ona", "Fergana"],
-    "андижан": ["Andijon", "Andijan"],
-    "наманган": ["Namangan"],
-    "навои": ["Navoiy", "Navoi"],
-    "карши": ["Qarshi", "Karshi"],
-    "нукус": ["Nukus"],
-    "ургенч": ["Urganch", "Urgench"],
-    "джизак": ["Jizzax", "Jizzakh"],
-    "термез": ["Termiz", "Termez"],
-    "гулистан": ["Guliston", "Gulistan"],
-    "чирчик": ["Chirchiq", "Chirchik"],
-    "каттакурган": ["Kattaqo'rg'on", "Kattakurgan", "Kattaqurgan", "Каттақўргон"],
-    "алмалык": ["Olmaliq"],
-    "ангрен": ["Angren"],
-    "бекабад": ["Bekobod", "Bekabad"],
-    "шахрисабз": ["Shahrisabz"],
-    "маргилан": ["Marg'ilon", "Margilan"],
-    "коканд": ["Qo'qon", "Kokand"],
-    "хива": ["Xiva", "Khiva"],
+    "toshkent": ["РўР°С€РєРµРЅС‚", "Tashkent"],
+    "tashkent": ["РўР°С€РєРµРЅС‚", "Toshkent"],
+    "samarqand": ["РЎР°РјР°СЂРєР°РЅРґ", "Samarkand", "РЎР°РјР°СЂРєР°РЅРґСЃРєР°СЏ"],
+    "samarkand": ["РЎР°РјР°СЂРєР°РЅРґ", "Samarqand"],
+    "buxoro": ["Р‘СѓС…Р°СЂР°", "Bukhara", "Р‘СѓС…Р°СЂСЃРєР°СЏ"],
+    "bukhara": ["Р‘СѓС…Р°СЂР°", "Buxoro"],
+    "farg'ona": ["Р¤РµСЂРіР°РЅР°", "Fergana", "Р¤РµСЂРіР°РЅСЃРєР°СЏ"],
+    "fergana": ["Р¤РµСЂРіР°РЅР°", "Farg'ona"],
+    "andijon": ["РђРЅРґРёР¶Р°РЅ", "Andijan", "РђРЅРґРёР¶Р°РЅСЃРєР°СЏ"],
+    "andijan": ["РђРЅРґРёР¶Р°РЅ", "Andijon"],
+    "namangan": ["РќР°РјР°РЅРіР°РЅ", "РќР°РјР°РЅРіР°РЅСЃРєР°СЏ"],
+    "navoiy": ["РќР°РІРѕРё", "Navoi", "РќР°РІРѕРёР№СЃРєР°СЏ"],
+    "navoi": ["РќР°РІРѕРё", "Navoiy"],
+    "qarshi": ["РљР°СЂС€Рё", "Karshi"],
+    "karshi": ["РљР°СЂС€Рё", "Qarshi"],
+    "nukus": ["РќСѓРєСѓСЃ"],
+    "urganch": ["РЈСЂРіРµРЅС‡", "Urgench"],
+    "urgench": ["РЈСЂРіРµРЅС‡", "Urganch"],
+    "jizzax": ["Р”Р¶РёР·Р°Рє", "Jizzakh", "Р”Р¶РёР·Р°РєСЃРєР°СЏ"],
+    "jizzakh": ["Р”Р¶РёР·Р°Рє", "Jizzax"],
+    "termiz": ["РўРµСЂРјРµР·", "Termez"],
+    "termez": ["РўРµСЂРјРµР·", "Termiz"],
+    "guliston": ["Р“СѓР»РёСЃС‚Р°РЅ", "Gulistan"],
+    "gulistan": ["Р“СѓР»РёСЃС‚Р°РЅ", "Guliston"],
+    "chirchiq": ["Р§РёСЂС‡РёРє", "Chirchik"],
+    "chirchik": ["Р§РёСЂС‡РёРє", "Chirchiq"],
+    "kattaqo'rg'on": ["РљР°С‚С‚Р°РєСѓСЂРіР°РЅ", "Kattakurgan", "Kattaqurgan", "РљР°С‚С‚Р°Т›СћСЂРіРѕРЅ"],
+    "kattakurgan": ["РљР°С‚С‚Р°РєСѓСЂРіР°РЅ", "Kattaqo'rg'on", "Kattaqurgan", "РљР°С‚С‚Р°Т›СћСЂРіРѕРЅ"],
+    "kattaqurgan": ["РљР°С‚С‚Р°РєСѓСЂРіР°РЅ", "Kattaqo'rg'on", "Kattakurgan", "РљР°С‚С‚Р°Т›СћСЂРіРѕРЅ"],
+    "olmaliq": ["РђР»РјР°Р»С‹Рє", "Olmaliq"],
+    "angren": ["РђРЅРіСЂРµРЅ"],
+    "bekobod": ["Р‘РµРєР°Р±Р°Рґ", "Bekabad"],
+    "shahrisabz": ["РЁР°С…СЂРёСЃР°Р±Р·"],
+    "marg'ilon": ["РњР°СЂРіРёР»Р°РЅ", "Margilan"],
+    "margilan": ["РњР°СЂРіРёР»Р°РЅ", "Marg'ilon"],
+    "qo'qon": ["РљРѕРєР°РЅРґ", "Kokand"],
+    "kokand": ["РљРѕРєР°РЅРґ", "Qo'qon"],
+    "xiva": ["РҐРёРІР°", "Khiva"],
+    "khiva": ["РҐРёРІР°", "Xiva"],
+    "qashqadaryo": ["РљР°С€РєР°РґР°СЂСЊСЏ", "Kashkadarya", "РљР°С€РєР°РґР°СЂСЊРёРЅСЃРєР°СЏ"],
+    "sirdaryo": ["РЎС‹СЂРґР°СЂСЊСЏ", "РЎС‹СЂРґР°СЂСЊРёРЅСЃРєР°СЏ"],
+    "surxondaryo": ["РЎСѓСЂС…Р°РЅРґР°СЂСЊСЏ", "РЎСѓСЂС…Р°РЅРґР°СЂСЊРёРЅСЃРєР°СЏ"],
+    "xorazm": ["РҐРѕСЂРµР·Рј", "РҐРѕСЂРµР·РјСЃРєР°СЏ"],
+    "qoraqalpog'iston": ["РљР°СЂР°РєР°Р»РїР°РєСЃС‚Р°РЅ", "Karakalpakstan", "РљР°СЂР°РєР°Р»РїР°РєСЃРєР°СЏ"],
+    "С‚Р°С€РєРµРЅС‚": ["Toshkent", "Tashkent"],
+    "СЃР°РјР°СЂРєР°РЅРґ": ["Samarqand", "Samarkand"],
+    "Р±СѓС…Р°СЂР°": ["Buxoro", "Bukhara"],
+    "С„РµСЂРіР°РЅР°": ["Farg'ona", "Fergana"],
+    "Р°РЅРґРёР¶Р°РЅ": ["Andijon", "Andijan"],
+    "РЅР°РјР°РЅРіР°РЅ": ["Namangan"],
+    "РЅР°РІРѕРё": ["Navoiy", "Navoi"],
+    "РєР°СЂС€Рё": ["Qarshi", "Karshi"],
+    "РЅСѓРєСѓСЃ": ["Nukus"],
+    "СѓСЂРіРµРЅС‡": ["Urganch", "Urgench"],
+    "РґР¶РёР·Р°Рє": ["Jizzax", "Jizzakh"],
+    "С‚РµСЂРјРµР·": ["Termiz", "Termez"],
+    "РіСѓР»РёСЃС‚Р°РЅ": ["Guliston", "Gulistan"],
+    "С‡РёСЂС‡РёРє": ["Chirchiq", "Chirchik"],
+    "РєР°С‚С‚Р°РєСѓСЂРіР°РЅ": ["Kattaqo'rg'on", "Kattakurgan", "Kattaqurgan", "РљР°С‚С‚Р°Т›СћСЂРіРѕРЅ"],
+    "Р°Р»РјР°Р»С‹Рє": ["Olmaliq"],
+    "Р°РЅРіСЂРµРЅ": ["Angren"],
+    "Р±РµРєР°Р±Р°Рґ": ["Bekobod", "Bekabad"],
+    "С€Р°С…СЂРёСЃР°Р±Р·": ["Shahrisabz"],
+    "РјР°СЂРіРёР»Р°РЅ": ["Marg'ilon", "Margilan"],
+    "РєРѕРєР°РЅРґ": ["Qo'qon", "Kokand"],
+    "С…РёРІР°": ["Xiva", "Khiva"],
 }
 
 _CITY_SUFFIX_RE = re.compile(
     r"\s+(?:shahri|shahar|shahr|tumani|tuman|viloyati|viloyat|region|district|province|oblast|oblasti"
-    r"|город|район|область|шахри|шахар|тумани|туман|вилояти)\b",
+    r"|РіРѕСЂРѕРґ|СЂР°Р№РѕРЅ|РѕР±Р»Р°СЃС‚СЊ|С€Р°С…СЂРё|С€Р°С…Р°СЂ|С‚СѓРјР°РЅРё|С‚СѓРјР°РЅ|РІРёР»РѕСЏС‚Рё)\b",
     re.IGNORECASE,
 )
 
@@ -158,11 +157,11 @@ class OfferMixin:
         city_lower = self._normalize_city_label(city)
         variants = {city_lower}
 
-        # Добавляем варианты из маппинга
+        # Р”РѕР±Р°РІР»СЏРµРј РІР°СЂРёР°РЅС‚С‹ РёР· РјР°РїРїРёРЅРіР°
         if city_lower in CITY_TRANSLITERATION:
             variants.update(CITY_TRANSLITERATION[city_lower])
 
-        # Проверяем обратный маппинг
+        # РџСЂРѕРІРµСЂСЏРµРј РѕР±СЂР°С‚РЅС‹Р№ РјР°РїРїРёРЅРі
         for key, values in CITY_TRANSLITERATION.items():
             if city_lower in [v.lower() for v in values]:
                 variants.add(key)
@@ -325,15 +324,7 @@ class OfferMixin:
             # Support legacy/new partner panel which may send `stock_quantity`.
             final_quantity = stock_quantity if stock_quantity is not None else quantity
 
-            if original_price is None or discount_price is None:
-                raise ValueError("Discount price is required")
-            if original_price <= 0 or discount_price <= 0:
-                raise ValueError("Prices must be greater than zero")
-            if discount_price >= original_price:
-                raise ValueError("Discount price must be less than original price")
-            discount_percent = calc_discount_percent(original_price, discount_price)
-            if discount_percent < MIN_DISCOUNT_PERCENT:
-                raise ValueError(f"Minimum discount is {MIN_DISCOUNT_PERCENT}%")
+            validate_offer_prices(original_price, discount_price, require_both=True)
 
             cursor.execute(
                 """
@@ -365,6 +356,95 @@ class OfferMixin:
             offer_id = result[0]
             logger.info(f"Offer {offer_id} added to store {store_id}")
             return offer_id
+
+    def update_offer(
+        self,
+        offer_id: int,
+        title: str | None = None,
+        description: str | None = None,
+        original_price: int | None = None,
+        discount_price: int | None = None,
+        quantity: float | None = None,
+        available_from: str | None = None,
+        available_until: str | None = None,
+        expiry_date: str | None = None,
+        photo: str | None = None,
+        unit: str | None = None,
+        category: str | None = None,
+        stock_quantity: float | None = None,
+        status: str | None = None,
+        photo_id: str | None = None,
+    ) -> bool:
+        """Update offer with strict pricing guard shared with create flow."""
+        existing = self.get_offer(offer_id)
+        if not existing:
+            raise ValueError("Offer not found")
+
+        resolved_original = (
+            original_price if original_price is not None else existing.get("original_price")
+        )
+        resolved_discount = (
+            discount_price if discount_price is not None else existing.get("discount_price")
+        )
+        validate_offer_prices(resolved_original, resolved_discount, require_both=True)
+
+        update_fields: list[str] = []
+        params: list[Any] = []
+
+        if title is not None:
+            update_fields.append("title = %s")
+            params.append(title)
+        if description is not None:
+            update_fields.append("description = %s")
+            params.append(description)
+        if original_price is not None:
+            update_fields.append("original_price = %s")
+            params.append(original_price)
+        if discount_price is not None:
+            update_fields.append("discount_price = %s")
+            params.append(discount_price)
+        if quantity is not None:
+            update_fields.append("quantity = %s")
+            params.append(quantity)
+        if stock_quantity is not None:
+            update_fields.append("stock_quantity = %s")
+            params.append(stock_quantity)
+            if quantity is None:
+                update_fields.append("quantity = %s")
+                params.append(stock_quantity)
+        if available_from is not None:
+            update_fields.append("available_from = %s")
+            params.append(available_from)
+        if available_until is not None:
+            update_fields.append("available_until = %s")
+            params.append(available_until)
+        if expiry_date is not None:
+            update_fields.append("expiry_date = %s")
+            params.append(expiry_date)
+
+        resolved_photo = photo_id if photo_id is not None else photo
+        if resolved_photo is not None:
+            update_fields.append("photo_id = %s")
+            params.append(resolved_photo)
+        if unit is not None:
+            update_fields.append("unit = %s")
+            params.append(unit)
+        if category is not None:
+            update_fields.append("category = %s")
+            params.append(category)
+        if status is not None:
+            update_fields.append("status = %s")
+            params.append(status)
+
+        if not update_fields:
+            return False
+
+        params.append(offer_id)
+        query = f"UPDATE offers SET {', '.join(update_fields)} WHERE offer_id = %s"
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+        return True
 
     def get_offer(self, offer_id: int):
         """Get offer by ID."""
@@ -1398,3 +1478,4 @@ class OfferMixin:
             if expired:
                 logger.info(f"Marked {len(expired)} offers as expired")
             return len(expired)
+

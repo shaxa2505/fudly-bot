@@ -48,6 +48,7 @@ from app.core.units import calc_total_price
 from app.core.notifications import Notification, NotificationType, get_notification_service
 from app.integrations.payment_service import get_payment_service
 from app.domain.order import OrderStatus, PaymentStatus
+from app.domain.order_fsm import TERMINAL_STATUSES, validate_order_transition
 from app.domain.order_labels import status_label
 from app.services.notification_builder import NotificationBuilder
 from app.services.notification_unified import build_unified_order_payload
@@ -784,6 +785,7 @@ class UnifiedOrderService:
     def __init__(self, db: Any, bot: Bot):
         self.db = db
         self.bot = bot
+        self._last_status_error: str | None = None
         self.telegram_order_notifications = os.getenv(
             "ORDER_TELEGRAM_NOTIFICATIONS", "false"
         ).strip().lower() in {"1", "true", "yes", "y"}
@@ -793,6 +795,34 @@ class UnifiedOrderService:
             "yes",
             "y",
         }
+
+    def get_last_status_error(self) -> str | None:
+        """Return reason from the last rejected status transition."""
+        return self._last_status_error
+
+    def validate_transition(
+        self,
+        *,
+        current_status: str | None,
+        target_status: str,
+        order_type: str | None,
+        payment_status: str | None,
+        payment_method: str | None,
+        payment_proof_photo_id: str | None,
+    ) -> tuple[bool, str | None]:
+        """Validate a status transition against terminal/payment/type/FSM guards."""
+        result = validate_order_transition(
+            current_status=current_status,
+            target_status=target_status,
+            order_type=order_type,
+            payment_method=payment_method,
+            payment_status=payment_status,
+            payment_proof_photo_id=payment_proof_photo_id,
+        )
+        if not result.allowed:
+            self._last_status_error = result.reason or "Status transition not allowed"
+            return False, self._last_status_error
+        return True, None
 
     async def _flag_refund_required(
         self,

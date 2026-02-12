@@ -414,6 +414,26 @@ class DatabaseProtocol(Protocol):
         """Get all offers for a store as list of dicts."""
         ...
 
+    def update_offer(
+        self,
+        offer_id: int,
+        title: str | None = None,
+        description: str | None = None,
+        original_price: float | None = None,
+        discount_price: float | None = None,
+        quantity: float | None = None,
+        available_from: str | None = None,
+        available_until: str | None = None,
+        expiry_date: str | None = None,
+        photo: str | None = None,
+        unit: str | None = None,
+        category: str | None = None,
+        stock_quantity: float | None = None,
+        status: str | None = None,
+        photo_id: str | None = None,
+    ) -> bool:
+        ...
+
     def update_offer_quantity(self, offer_id: int, new_quantity: int) -> None:
         ...
 

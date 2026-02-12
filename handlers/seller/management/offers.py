@@ -10,8 +10,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.domain.offer_rules import (
+    DISCOUNT_MUST_BE_LOWER_MESSAGE,
+    INVALID_OFFER_PRICE_MESSAGE,
+    MIN_OFFER_DISCOUNT_MESSAGE,
+    MIN_OFFER_DISCOUNT_PERCENT,
+    validate_offer_prices,
+)
 from app.keyboards import main_menu_seller
-from app.core.utils import calc_discount_percent
 from handlers.common.states import EditOffer
 from handlers.common.utils import is_main_menu_button
 from localization import get_text
@@ -35,7 +41,7 @@ from .utils import (
 
 router = Router()
 
-MIN_DISCOUNT_PERCENT = 20
+MIN_DISCOUNT_PERCENT = MIN_OFFER_DISCOUNT_PERCENT
 
 ITEMS_PER_PAGE = 5
 MAX_PAGES = 50
@@ -1444,23 +1450,25 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
             else:
                 original_price, discount_price = numbers
 
-            if original_price <= 0 or discount_price <= 0:
-                await message.answer(get_text(lang, "error_price_gt_zero"))
-                return
-            if discount_price >= original_price:
-                await message.answer(get_text(lang, "error_discount_less_than_original"))
-                return
-            discount_percent = calc_discount_percent(original_price, discount_price)
-            if discount_percent < MIN_DISCOUNT_PERCENT:
+        try:
+            validate_offer_prices(original_price, discount_price, require_both=True)
+        except ValueError as exc:
+            message_text = str(exc)
+            if message_text == MIN_OFFER_DISCOUNT_MESSAGE:
                 await message.answer(get_text(lang, "error_min_discount"))
-                return
+            elif message_text == DISCOUNT_MUST_BE_LOWER_MESSAGE:
+                await message.answer(get_text(lang, "error_discount_less_than_original"))
+            elif message_text == INVALID_OFFER_PRICE_MESSAGE:
+                await message.answer(get_text(lang, "error_price_gt_zero"))
+            else:
+                await message.answer(message_text)
+            return
 
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE offers SET original_price = %s, discount_price = %s WHERE offer_id = %s",
-                (original_price, discount_price, offer_id),
-            )
+        db.update_offer(
+            offer_id=offer_id,
+            original_price=original_price,
+            discount_price=discount_price,
+        )
     elif edit_field == "quantity":
         numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text or "")
         if len(numbers) != 1:

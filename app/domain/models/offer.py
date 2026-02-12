@@ -1,4 +1,4 @@
-"""
+﻿"""
 Pydantic models for offer (product) data validation.
 
 These models enforce consistent data format across bot and Partner Panel:
@@ -11,53 +11,53 @@ from datetime import date, datetime, time
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.domain.offer_rules import validate_offer_prices
+
 
 class OfferCreate(BaseModel):
     """Model for creating a new offer."""
     
-    store_id: int = Field(..., gt=0, description="ID магазина")
-    title: str = Field(..., min_length=1, max_length=255, description="Название товара")
-    description: Optional[str] = Field(None, max_length=2000, description="Описание товара")
+    store_id: int = Field(..., gt=0, description="ID РјР°РіР°Р·РёРЅР°")
+    title: str = Field(..., min_length=1, max_length=255, description="РќР°Р·РІР°РЅРёРµ С‚РѕРІР°СЂР°")
+    description: Optional[str] = Field(None, max_length=2000, description="РћРїРёСЃР°РЅРёРµ С‚РѕРІР°СЂР°")
     
     # Prices in SUMS - stored as INTEGER
-    original_price: int = Field(..., ge=0, description="Оригинальная цена в копейках")
-    discount_price: int = Field(..., ge=0, description="Цена со скидкой в копейках")
+    original_price: int = Field(..., gt=0, description="РћСЂРёРіРёРЅР°Р»СЊРЅР°СЏ С†РµРЅР° РІ РєРѕРїРµР№РєР°С…")
+    discount_price: int = Field(..., gt=0, description="Р¦РµРЅР° СЃРѕ СЃРєРёРґРєРѕР№ РІ РєРѕРїРµР№РєР°С…")
     
-    quantity: float = Field(default=1, gt=0, description="Количество")
-    unit: str = Field(default="piece", max_length=20, description="Единица измерения")
-    category: str = Field(default="other", max_length=50, description="Категория")
+    quantity: float = Field(default=1, gt=0, description="РљРѕР»РёС‡РµСЃС‚РІРѕ")
+    unit: str = Field(default="piece", max_length=20, description="Р•РґРёРЅРёС†Р° РёР·РјРµСЂРµРЅРёСЏ")
+    category: str = Field(default="other", max_length=50, description="РљР°С‚РµРіРѕСЂРёСЏ")
     
     # Proper time types (not strings)
-    available_from: time = Field(..., description="Доступно с (время)")
-    available_until: time = Field(..., description="Доступно до (время)")
-    expiry_date: date = Field(..., description="Срок годности (дата)")
+    available_from: time = Field(..., description="Р”РѕСЃС‚СѓРїРЅРѕ СЃ (РІСЂРµРјСЏ)")
+    available_until: time = Field(..., description="Р”РѕСЃС‚СѓРїРЅРѕ РґРѕ (РІСЂРµРјСЏ)")
+    expiry_date: date = Field(..., description="РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё (РґР°С‚Р°)")
     
     # Photo as Telegram file_id (consistent naming)
-    photo_id: Optional[str] = Field(None, max_length=255, description="Telegram file_id фото")
+    photo_id: Optional[str] = Field(None, max_length=255, description="Telegram file_id С„РѕС‚Рѕ")
     
     status: str = Field(default="active", pattern="^(active|inactive|out_of_stock|sold_out)$")
     
-    @field_validator('discount_price')
-    @classmethod
-    def discount_must_be_less_than_original(cls, v: int, info) -> int:
-        """Validate that discount price is not higher than original price."""
-        if 'original_price' in info.data and v > info.data['original_price']:
-            raise ValueError('Цена со скидкой не может быть больше оригинальной цены')
-        return v
+    @model_validator(mode='after')
+    def validate_prices(self):
+        """Validate pricing rules (strict min discount, no silent rounding)."""
+        validate_offer_prices(self.original_price, self.discount_price, require_both=True)
+        return self
     
     @field_validator('expiry_date')
     @classmethod
     def expiry_must_be_future(cls, v: date) -> date:
         """Validate that expiry date is in the future."""
         if v < date.today():
-            raise ValueError('Срок годности не может быть в прошлом')
+            raise ValueError('РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РІ РїСЂРѕС€Р»РѕРј')
         return v
     
     @model_validator(mode='after')
     def validate_time_order(self):
         """Validate time window (allow overnight ranges)."""
         if self.available_from == self.available_until:
-            raise ValueError('Время начала и окончания не должны совпадать')
+            raise ValueError('Р’СЂРµРјСЏ РЅР°С‡Р°Р»Р° Рё РѕРєРѕРЅС‡Р°РЅРёСЏ РЅРµ РґРѕР»Р¶РЅС‹ СЃРѕРІРїР°РґР°С‚СЊ')
         return self
     
     @field_validator('available_from', 'available_until', mode='before')
@@ -89,7 +89,7 @@ class OfferCreate(BaseModel):
             except (ValueError, IndexError):
                 pass
         
-        raise ValueError(f'Неверный формат времени: {v}. Используйте HH:MM')
+        raise ValueError(f'РќРµРІРµСЂРЅС‹Р№ С„РѕСЂРјР°С‚ РІСЂРµРјРµРЅРё: {v}. РСЃРїРѕР»СЊР·СѓР№С‚Рµ HH:MM')
     
     @field_validator('expiry_date', mode='before')
     @classmethod
@@ -124,7 +124,7 @@ class OfferCreate(BaseModel):
                 except ValueError:
                     pass
         
-        raise ValueError(f'Неверный формат даты: {v}. Используйте YYYY-MM-DD или DD.MM.YYYY')
+        raise ValueError(f'РќРµРІРµСЂРЅС‹Р№ С„РѕСЂРјР°С‚ РґР°С‚С‹: {v}. РСЃРїРѕР»СЊР·СѓР№С‚Рµ YYYY-MM-DD РёР»Рё DD.MM.YYYY')
 
 
 class OfferUpdate(BaseModel):
@@ -133,8 +133,8 @@ class OfferUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=2000)
     
-    original_price: Optional[int] = Field(None, ge=0)
-    discount_price: Optional[int] = Field(None, ge=0)
+    original_price: Optional[int] = Field(None, gt=0)
+    discount_price: Optional[int] = Field(None, gt=0)
     
     quantity: Optional[float] = Field(None, gt=0)
     unit: Optional[str] = Field(None, max_length=20)
@@ -147,22 +147,19 @@ class OfferUpdate(BaseModel):
     photo_id: Optional[str] = Field(None, max_length=255)
     status: Optional[str] = Field(None, pattern="^(active|inactive|out_of_stock|sold_out)$")
     
-    @field_validator('discount_price')
-    @classmethod
-    def discount_must_be_less_than_original(cls, v: Optional[int], info) -> Optional[int]:
-        """Validate discount price if both prices are provided."""
-        if v is not None and 'original_price' in info.data:
-            original = info.data['original_price']
-            if original is not None and v > original:
-                raise ValueError('Цена со скидкой не может быть больше оригинальной цены')
-        return v
+    @model_validator(mode='after')
+    def validate_prices(self):
+        """Validate pricing if both prices are present in the payload."""
+        if self.original_price is not None and self.discount_price is not None:
+            validate_offer_prices(self.original_price, self.discount_price, require_both=True)
+        return self
     
     @field_validator('expiry_date')
     @classmethod
     def expiry_must_be_future(cls, v: Optional[date]) -> Optional[date]:
         """Validate expiry date if provided."""
         if v is not None and v < date.today():
-            raise ValueError('Срок годности не может быть в прошлом')
+            raise ValueError('РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё РЅРµ РјРѕР¶РµС‚ Р±С‹С‚СЊ РІ РїСЂРѕС€Р»РѕРј')
         return v
     
     # Reuse the same flexible parsers from OfferCreate
@@ -190,8 +187,8 @@ class OfferResponse(BaseModel):
     description: Optional[str]
     
     # Return prices in sums for display
-    original_price: float = Field(..., description="Оригинальная цена в рублях")
-    discount_price: float = Field(..., description="Цена со скидкой в рублях")
+    original_price: float = Field(..., description="РћСЂРёРіРёРЅР°Р»СЊРЅР°СЏ С†РµРЅР° РІ СЂСѓР±Р»СЏС…")
+    discount_price: float = Field(..., description="Р¦РµРЅР° СЃРѕ СЃРєРёРґРєРѕР№ РІ СЂСѓР±Р»СЏС…")
     
     quantity: float
     unit: str
@@ -218,3 +215,4 @@ class OfferResponse(BaseModel):
     
     class Config:
         from_attributes = True  # Allow creating from ORM objects
+
