@@ -160,17 +160,23 @@ function AppContent() {
     }
 
     updateSafeArea()
+    applyTelegramChromeColors(tg)
     root.style.setProperty('--tg-cap-gap', isMobile ? '8px' : '0px')
 
-    const handleViewportChange = () => updateSafeArea()
+    const handleViewportChange = () => {
+      updateSafeArea()
+      applyTelegramChromeColors(tg)
+    }
     tg.onEvent?.('viewportChanged', handleViewportChange)
     tg.onEvent?.('safeAreaChanged', handleViewportChange)
     tg.onEvent?.('contentSafeAreaChanged', handleViewportChange)
+    tg.onEvent?.('themeChanged', handleViewportChange)
 
     return () => {
       tg.offEvent?.('viewportChanged', handleViewportChange)
       tg.offEvent?.('safeAreaChanged', handleViewportChange)
       tg.offEvent?.('contentSafeAreaChanged', handleViewportChange)
+      tg.offEvent?.('themeChanged', handleViewportChange)
     }
   }, [])
 
