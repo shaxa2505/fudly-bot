@@ -812,12 +812,12 @@
 }
 
 .categories-nav-section {
-  margin: 0 0 32px;
+  margin: 0 0 14px;
 }
 
 .categories-header {
   padding: 0 var(--page-padding-x);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .categories-header h3 {
@@ -837,7 +837,7 @@
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
-  padding: 0 var(--page-padding-x) 10px;
+  padding: 0 var(--page-padding-x) 6px;
   scroll-padding-inline: var(--page-padding-x);
 }
 
