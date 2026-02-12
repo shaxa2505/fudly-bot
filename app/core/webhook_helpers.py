@@ -222,6 +222,87 @@ CATEGORY_ALIASES = {
     "sweets": ["sweets", "snacks"],
 }
 
+# Keep in sync with app/api/webapp/routes_offers.py
+CATEGORY_SYNONYMS: dict[str, set[str]] = {
+    "dairy": {
+        "dairy",
+        "sut",
+        "sut mahsulotlari",
+        "молочные",
+        "молочные продукты",
+    },
+    "bakery": {
+        "bakery",
+        "non",
+        "pishiriq",
+        "выпечка",
+        "хлеб",
+    },
+    "meat": {
+        "meat",
+        "go'sht",
+        "go'sht mahsulotlari",
+        "мясные",
+        "мясо",
+        "мясо и рыба",
+        "рыба",
+        "baliq",
+    },
+    "fruits": {
+        "fruits",
+        "meva",
+        "mevalar",
+        "фрукты",
+    },
+    "vegetables": {
+        "vegetables",
+        "sabzavot",
+        "sabzavotlar",
+        "овощи",
+    },
+    "drinks": {
+        "drinks",
+        "ichimlik",
+        "ichimliklar",
+        "напитки",
+    },
+    "sweets": {
+        "sweets",
+        "snacks",
+        "сладости",
+        "снеки",
+        "shirinliklar",
+        "gaz. ovqatlar",
+        "gaz ovqatlar",
+    },
+    "frozen": {
+        "frozen",
+        "muzlatilgan",
+        "замороженное",
+        "заморозка",
+    },
+    "other": {
+        "other",
+        "boshqa",
+        "другое",
+        "ready_food",
+        "tayyor ovqat",
+        "готовая еда",
+        "cheese",
+        "pishloq",
+        "сыры",
+    },
+}
+
+_CATEGORY_CANONICAL: dict[str, str] = {}
+for key, values in CATEGORY_SYNONYMS.items():
+    for value in values:
+        _CATEGORY_CANONICAL[value] = key
+    _CATEGORY_CANONICAL[key] = key
+for key, aliases in CATEGORY_ALIASES.items():
+    for alias in aliases:
+        _CATEGORY_CANONICAL.setdefault(alias, key)
+
 
 def expand_category_filter(category: str | None) -> list[str] | None:
     if not category:
@@ -229,4 +310,10 @@ def expand_category_filter(category: str | None) -> list[str] | None:
     normalized = str(category).strip().lower()
     if not normalized or normalized == "all":
         return None
-    return CATEGORY_ALIASES.get(normalized, [normalized])
+    canonical = _CATEGORY_CANONICAL.get(normalized, normalized)
+    values: set[str] = {canonical, normalized}
+    values.update(CATEGORY_SYNONYMS.get(canonical, set()))
+    for alias in CATEGORY_ALIASES.get(canonical, []):
+        values.add(alias)
+        values.update(CATEGORY_SYNONYMS.get(alias, set()))
+    return sorted(values)
