@@ -1,0 +1,4377 @@
+        // Global error handler for debugging
+        window.addEventListener('error', (e) => {
+            console.error('🔴 Global error:', e.error || e.message);
+        });
+
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('🔴 Unhandled promise rejection:', e.reason);
+        });
+
+        // ============================================
+        // GLOBALS & STATE
+        // ============================================
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            try {
+                tg.ready();
+                tg.expand();
+            } catch (e) {}
+        }
+        const API_BASE = window.PARTNER_API_BASE ||
+            document.querySelector('meta[name="api-base"]')?.getAttribute('content') ||
+            window.location.origin;
+
+        function resolvePhotoUrl(value) {
+            if (value == null) return '';
+            const raw = String(value).trim();
+            if (!raw) return '';
+            const lowered = raw.toLowerCase();
+            if (lowered === 'null' || lowered === 'undefined' || lowered === 'none' || lowered === 'nan') {
+                return '';
+            }
+            if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+            if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+            if (raw.startsWith('/')) return new URL(raw, API_BASE).toString();
+            if (raw.startsWith('api/') || raw.startsWith('photo/')) {
+                return new URL(`/${raw}`, API_BASE).toString();
+            }
+            return `${API_BASE}/api/partner/photo/${encodeURIComponent(raw)}`;
+        }
+
+        function extractPhotoId(value) {
+            if (value == null) return '';
+            const raw = String(value).trim();
+            if (!raw) return '';
+            const match = raw.match(/\/photo\/([^/?#]+)/);
+            if (match) {
+                try {
+                    return decodeURIComponent(match[1]);
+                } catch (e) {
+                    return match[1];
+                }
+            }
+            return '';
+        }
+
+        const state = {
+            currentView: 'dashboard',
+            store: null,
+            products: [],
+            orders: [],
+            stats: null,
+            loading: false
+        };
+        const DEFAULT_WORKING_HOURS = '08:00 - 23:00';
+        window.allProducts = window.allProducts || [];
+
+        function syncAllProducts(nextProducts) {
+            const safeProducts = Array.isArray(nextProducts) ? nextProducts : [];
+            window.allProducts = safeProducts;
+            return safeProducts;
+        }
+
+        function getPhotoUploadPlaceholder() {
+            return `
+                <div class="photo-upload-icon">
+                    <i data-lucide="image"></i>
+                </div>
+                <div class="photo-upload-title">Загрузить фото</div>
+                <div class="photo-upload-subtitle">PNG/JPG до 5 МБ</div>
+            `;
+        }
+
+        // ============================================
+        // PRODUCT MODAL (defined early for use in rendered HTML)
+        // ============================================
+        function openProductModal(productId = null) {
+            console.log('🔵 openProductModal called, productId:', productId);
+            haptic('light');
+            const product = productId ? state.products.find(p => p.id === productId) : null;
+            const isEdit = Boolean(product);
+            const today = new Date().toISOString().split('T')[0];
+            const defaultExpiry = product?.expiry_date
+                ? product.expiry_date.split('T')[0]
+                : new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+            const defaultStock = product?.stock_quantity ?? product?.stock ?? product?.quantity ?? 10;
+            const storeHours = parseWorkingHours(state.store?.working_hours) || parseWorkingHours(DEFAULT_WORKING_HOURS);
+            const defaultAvailableFrom = normalizeTimeValue(product?.available_from) || storeHours?.start || '08:00';
+            const defaultAvailableUntil = normalizeTimeValue(product?.available_until) || storeHours?.end || '23:00';
+            const originalPriceValue = product?.original_price ? Math.round(product.original_price) : '';
+            const discountPriceValue = product?.price
+                ? Math.round(product.price)
+                : product?.discount_price
+                    ? Math.round(product.discount_price)
+                    : '';
+            const explicitDiscount = product?.discount != null ? parseInt(product.discount, 10) : NaN;
+            const computedDiscount = originalPriceValue && discountPriceValue
+                ? Math.round((1 - discountPriceValue / originalPriceValue) * 100)
+                : 0;
+            const discountPercentValue = Number.isFinite(explicitDiscount) ? explicitDiscount : computedDiscount;
+            const productPhotoUrl = product
+                ? resolvePhotoUrl(product.photo_url || product.photo_id || product.image || '')
+                : '';
+            const hasProductPhoto = Boolean(productPhotoUrl);
+            console.log('🔵 Creating modal, isEdit:', isEdit);
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-lg">
+                    <div class="modal-header">
+                        <h3>${isEdit ? 'Редактировать товар' : 'Добавить товар'}</h3>
+                        <button class="btn-icon ripple" onclick="closeStoreProfileModal(this.closest('.modal-overlay'))">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form id="productForm" onsubmit="saveProduct(event, ${productId ?? 'null'})">
+                        <div class="modal-body">
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <div class="form-section-icon">
+                                        <i data-lucide="image" class="icon-18"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="form-section-title">Фото товара</h4>
+                                        <p class="form-section-subtitle">Опционально, но повышает продажи</p>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="photo_id" value="${product?.photo_id || ''}">
+                                <input type="file" id="photoFile" accept="image/*" class="file-input-hidden" onchange="handlePhotoUpload(this, event)">
+                                <div class="photo-upload-card photo-upload-area ${hasProductPhoto ? 'has-photo' : ''}" onclick="document.getElementById('photoFile').click()">
+                                    ${hasProductPhoto ? `
+                                        <div class="photo-preview">
+                                            <img src="${productPhotoUrl}" alt="Preview">
+                                            <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto(event)">
+                                                <i data-lucide="x" class="icon-16"></i>
+                                            </button>
+                                        </div>
+                                    ` : getPhotoUploadPlaceholder()}
+                                </div>
+                                <div class="smart-hint info">
+                                    <div class="smart-hint-icon">
+                                        <i data-lucide="lightbulb" class="icon-18"></i>
+                                    </div>
+                                    <div class="smart-hint-text">Фото повышает доверие и продажи, но можно добавить позже.</div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                   <div class="form-section-icon">
+                                        <i data-lucide="file-text" class="icon-18"></i>
+                                   </div>
+                                    <div>
+                                        <h4 class="form-section-title">Информация о товаре</h4>
+                                        <p class="form-section-subtitle">Название, категория, описание</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>Название *</label>
+                                        <input type="text" name="name" id="productName" value="${product?.name || ''}" required
+                                               class="search-input" minlength="3" maxlength="100"
+                                               oninput="validateField(this)" placeholder="Например: Хлеб, 450г">
+                                        <div class="form-error hidden">Введите название (мин. 3 символа)</div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Категория *</label>
+                                        <select name="category" id="productCategory" required class="search-input" onchange="validateField(this)">
+
+                                            <option value="">Выберите категорию</option>
+                                            <option value="bakery" ${product?.category === 'bakery' ? 'selected' : ''}>Выпечка</option>
+                                            <option value="dairy" ${product?.category === 'dairy' ? 'selected' : ''}>Молочные продукты</option>
+                                            <option value="meat" ${product?.category === 'meat' ? 'selected' : ''}>Мясо и рыба</option>
+                                            <option value="fruits" ${product?.category === 'fruits' ? 'selected' : ''}>Фрукты</option>
+                                            <option value="vegetables" ${product?.category === 'vegetables' ? 'selected' : ''}>Овощи</option>
+                                            <option value="drinks" ${product?.category === 'drinks' ? 'selected' : ''}>Напитки</option>
+                                            <option value="sweets" ${product?.category === 'sweets' ? 'selected' : ''}>Сладости</option>
+                                            <option value="frozen" ${product?.category === 'frozen' ? 'selected' : ''}>Заморозка</option>
+                                            <option value="other" ${!product?.category || product?.category === 'other' ? 'selected' : ''}>Другое</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Описание</label>
+                                    <textarea name="description" rows="3" class="search-input" maxlength="500"
+                                              oninput="updateCharCounter(this)" placeholder="Коротко о продукте">${product?.description || ''}</textarea>
+                                    <div class="char-counter">${product?.description?.length || 0}/500</div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                   <div class="form-section-icon">
+                                        <i data-lucide="tag" class="icon-18"></i>
+                                   </div>
+                                    <div>
+                                        <h4 class="form-section-title">Цена и скидка</h4>
+                                        <p class="form-section-subtitle">Цена и скидка по желанию</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>Цена для клиента *</label>
+                                        <input type="number" name="discount_price" id="discountPrice"
+                                               value="${discountPriceValue}" min="1" step="1" required inputmode="numeric"
+                                               class="search-input price-main-input"
+                                               oninput="calculateFinalPrice('price'); validateField(this)" placeholder="10500">
+                                        <div class="form-error hidden">Введите цену больше 0</div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Цена без скидки</label>
+                                        <input type="number" name="original_price" id="originalPrice"
+                                               value="${originalPriceValue}" min="1" step="1" inputmode="numeric"
+                                               class="search-input" oninput="handleOriginalPriceInput(); validateField(this)" placeholder="15000">
+                                        <div class="form-error hidden">Цена должна быть > 0</div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Скидка (%)</label>
+                                    <input type="number" name="discount" id="discountPercent" value="${discountPercentValue || 0}"
+                                           min="0" max="90" class="search-input" inputmode="numeric"
+                                           oninput="calculateFinalPrice('percent'); validateField(this)" placeholder="30">
+                                </div>
+
+                                <div class="smart-hint info">
+                                    <div class="smart-hint-icon">
+                                        <i data-lucide="lightbulb" class="icon-18"></i>
+                                    </div>
+                                    <div class="smart-hint-text">Можно указать только цену для клиента — скидка будет 0%.</div>
+                                </div>
+
+                                <div class="price-preview-card hidden" id="pricePreview">
+                                    <div class="price-preview-row">
+                                        <span class="price-preview-label">Цена:</span>
+                                        <span id="priceOriginal" class="price-preview-value original">?</span>
+                                    </div>
+                                    <div class="price-preview-row">
+                                        <span class="price-preview-label price-preview-label-strong">Итог:</span>
+                                        <span id="priceFinal" class="price-preview-value final">?</span>
+                                    </div>
+                                    <div class="price-preview-savings">
+        <span class="price-preview-savings-label">Экономия</span>
+                                        <span id="priceSavings" class="price-preview-savings-value">?</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                   <div class="form-section-icon">
+                                        <i data-lucide="package" class="icon-18"></i>
+                                   </div>
+                                    <div>
+                                        <h4 class="form-section-title">Наличие и срок</h4>
+                                        <p class="form-section-subtitle">Остаток и срок годности</p>
+                                    </div>
+                                </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>Единица *</label>
+                                        <select name="unit" required class="search-input">
+
+                                            <option value="шт" ${product?.unit === 'шт' ? 'selected' : ''}>Штуки (шт)</option>
+                                            <option value="кг" ${product?.unit === 'кг' ? 'selected' : ''}>Килограммы (кг)</option>
+                                            <option value="л" ${product?.unit === 'л' ? 'selected' : ''}>Литры (л)</option>
+                                            <option value="уп" ${product?.unit === 'уп' ? 'selected' : ''}>Упаковки (уп)</option>
+                                            <option value="г" ${product?.unit === 'г' ? 'selected' : ''}>Граммы (г)</option>
+                                            <option value="мл" ${product?.unit === 'мл' ? 'selected' : ''}>Миллилитры (мл)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Количество *</label>
+                                        <div class="quantity-controls">
+                                            <button type="button" class="quantity-btn" onclick="changeQuantity(-1)">−</button>
+                                            <input type="number" name="stock_quantity" id="stockQuantity"
+                                                   value="${defaultStock}"
+                                                   min="0" max="9999" required inputmode="numeric"
+                                                   class="search-input quantity-input" oninput="validateField(this)">
+                                            <button type="button" class="quantity-btn" onclick="changeQuantity(1)">+</button>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-sm mt-sm">
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(5)">5</button>
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(10)">10</button>
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(20)">20</button>
+                                            <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setQuantity(50)">50</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>Доступно с *</label>
+                                        <input type="time" name="available_from" id="availableFrom"
+                                               value="${defaultAvailableFrom}"
+                                               required class="search-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Доступно до *</label>
+                                        <input type="time" name="available_until" id="availableUntil"
+                                               value="${defaultAvailableUntil}"
+                                               required class="search-input">
+                                    </div>
+                                </div>
+                                <div class="form-hint text-muted">По умолчанию берём режим работы магазина.</div>
+
+                                <div class="form-group">
+                                    <label>Срок годности *</label>
+                                    <input type="date" name="expiry_date" id="expiryDate"
+                                           value="${defaultExpiry}"
+                                           min="${today}" required class="search-input" oninput="validateField(this)">
+                                    <div class="d-flex flex-wrap gap-sm mt-sm">
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(0)">Сегодня</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(1)">Завтра</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(2)">2 дня</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(3)">3 дня</button>
+                                        <button type="button" class="btn btn-sm btn-ghost flex-1" onclick="setExpiry(7)">7 дней</button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="is_available" ${product?.is_available !== false ? 'checked' : ''}>
+                                        <span>Доступен для продажи</span>
+                                    </label>
+                                </div>
+                                <div class="smart-hint warning">
+                                    <div class="smart-hint-icon">
+                                        <i data-lucide="alert-triangle" class="icon-18"></i>
+                                    </div>
+                                    <div class="smart-hint-text">Если количество = 0, товар не будет показан клиентам.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">
+                                <i data-lucide="check" class="icon-16"></i>
+                                ${isEdit ? 'Сохранить' : 'Добавить'}
+                            </button>
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
+                                Отмена
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            console.log('🔵 Appending modal to body');
+
+            // Блокируем скролл фона
+            const scrollY = window.scrollY;
+            document.body.style.overflow = 'hidden';
+            document.body.style.touchAction = 'none';
+            document.body.dataset.scrollY = scrollY;
+
+            document.body.appendChild(modal);
+            console.log('🔵 Modal appended, initializing Lucide icons');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            calculateFinalPrice('percent');
+            setTimeout(() => modal.querySelector('input[name="name"]').focus(), 80);
+
+            // Функция закрытия модалки
+            const closeModal = () => {
+                haptic('light');
+                // Восстанавливаем скролл
+                document.body.style.overflow = '';
+                document.body.style.touchAction = '';
+                const scrollY = document.body.dataset.scrollY;
+                if (scrollY) {
+                    window.scrollTo(0, parseInt(scrollY));
+                }
+                delete document.body.dataset.scrollY;
+                modal.remove();
+            };
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+
+            // Обработка кнопки закрытия
+            const closeBtn = modal.querySelector('.btn-icon');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', closeModal);
+            }
+
+            // Обработка кнопки отмены
+            const cancelBtn = modal.querySelector('button[type="button"].btn-secondary');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', closeModal);
+            }
+        }
+
+        function editProduct(productId) {
+            openProductModal(productId);
+        }
+
+        // ============================================
+        // AUTH & API
+        // ============================================
+        function isLocalhost() {
+            return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        }
+
+        const AUTH_MAX_AGE_SECONDS = Number(window.PARTNER_AUTH_MAX_AGE_SECONDS || 86400);
+
+        function parseAuthDate(raw) {
+            if (!raw) return null;
+            const ts = Number(raw);
+            return Number.isFinite(ts) ? ts : null;
+        }
+
+        function isAuthExpired(authTs) {
+            if (!authTs) return false;
+            const age = Math.floor(Date.now() / 1000) - authTs;
+            return age > AUTH_MAX_AGE_SECONDS || age < -300;
+        }
+
+        function buildInitDataFromUnsafe(unsafeData) {
+            if (!unsafeData || !unsafeData.hash) return '';
+            try {
+                const params = new URLSearchParams();
+                Object.entries(unsafeData).forEach(([key, value]) => {
+                    if (value == null) return;
+                    if (typeof value === 'object') {
+                        params.append(key, JSON.stringify(value));
+                    } else {
+                        params.append(key, String(value));
+                    }
+                });
+                return params.toString();
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function extractUserIdFromInitData(initData) {
+            if (!initData) return null;
+            try {
+                const params = new URLSearchParams(initData);
+                const userRaw = params.get('user');
+                if (userRaw) {
+                    const user = JSON.parse(userRaw);
+                    if (user?.id) return String(user.id);
+                }
+                const directUserId = params.get('user_id') || params.get('id');
+                return directUserId ? String(directUserId) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function extractAuthDate(initData) {
+            if (!initData) return null;
+            try {
+                const params = new URLSearchParams(initData);
+                return parseAuthDate(params.get('auth_date'));
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function getAuth() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlUserId = urlParams.get('uid');
+            const urlAuthDate = urlParams.get('auth_date');
+            const urlSig = urlParams.get('sig');
+
+            let finalData = '';
+            let source = 'none';
+
+            if (tg?.initData && tg.initData.length > 0) {
+                finalData = tg.initData;
+                source = 'sdk';
+            } else if (tg?.initDataUnsafe?.hash) {
+                finalData = buildInitDataFromUnsafe(tg.initDataUnsafe);
+                source = 'unsafe';
+            } else if (window.location.hash.slice(1) && window.location.hash.slice(1).includes('user=')) {
+                finalData = window.location.hash.slice(1);
+                source = 'hash';
+            }
+
+            const tgUser = tg?.initDataUnsafe?.user;
+            const tgUserId = tgUser?.id ? String(tgUser.id) : '';
+            const resolvedUserId = tgUserId || (urlUserId ? String(urlUserId) : '');
+            let authExpired = false;
+
+            if (finalData && tgUserId) {
+                const initDataUserId = extractUserIdFromInitData(finalData);
+                if (initDataUserId && initDataUserId !== tgUserId) {
+                    finalData = '';
+                    source = 'mismatch';
+                }
+            }
+
+            const initAuthTs = extractAuthDate(finalData);
+            const urlAuthTs = parseAuthDate(urlAuthDate);
+
+            if (isAuthExpired(initAuthTs)) {
+                authExpired = true;
+                finalData = '';
+            }
+
+            const urlAuthExpired = isAuthExpired(urlAuthTs);
+
+            const userId = resolvedUserId || 'none';
+
+            return {
+                data: finalData,
+                userId,
+                urlUserId,
+                urlAuthDate: urlAuthExpired ? null : urlAuthDate,
+                urlSig: urlAuthExpired ? null : urlSig,
+                source,
+                authExpired: authExpired || urlAuthExpired
+            };
+        }
+
+        async function apiFetch(endpoint, options = {}) {
+            const { data: initData, urlUserId, urlAuthDate, urlSig, authExpired } = getAuth();
+
+            if (authExpired) {
+                throw new Error('Session expired. Please reopen this panel from the Telegram bot.');
+            }
+
+            console.log('🔐 apiFetch auth info:', {
+                hasInitData: !!initData,
+                urlUserId,
+                endpoint,
+                API_BASE
+            });
+
+            // Determine authorization header
+            let authHeader = '';
+            if (initData) {
+                authHeader = `tma ${initData}`;
+            } else if (urlUserId && urlAuthDate && urlSig) {
+                authHeader = `tma uid=${urlUserId}&auth_date=${urlAuthDate}&sig=${urlSig}`;
+            } else if (isLocalhost() && urlUserId) {
+                // Local development fallback ONLY (backend must also be in dev mode)
+                authHeader = `tma uid=${urlUserId}`;
+            } else {
+                console.error('❌ Missing authorization data:', { initData, urlUserId });
+                throw new Error('Missing Telegram authorization. Please open this panel from the Telegram bot.');
+            }
+
+            const headers = { 'Authorization': authHeader, ...options.headers };
+            const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+            if (!isFormData && !headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+
+            try {
+                console.log(`📡 Fetching ${endpoint}...`);
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    ...options,
+                    headers
+                });
+
+                console.log(`📡 Response ${endpoint}: ${response.status}`);
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+                    console.error(`❌ API Error ${endpoint}:`, err);
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log(`✅ Success ${endpoint}`, data);
+                return data;
+            } catch (error) {
+                console.error(`❌ Fetch error ${endpoint}:`, error);
+                throw error;
+            }
+        }
+
+        // ============================================
+        // ORDER HELPERS
+        // ============================================
+        function normalizeOrderStatus(rawStatus) {
+            if (!rawStatus) return '';
+            const status = String(rawStatus).trim().toLowerCase();
+            if (status === 'confirmed') return 'preparing';
+            return status;
+        }
+
+        function normalizeOrderRecord(order) {
+            if (!order || typeof order !== 'object') return order;
+            const rawStatus = order.order_status ?? order.status ?? '';
+            const normalizedStatus = normalizeOrderStatus(rawStatus);
+            if (!normalizedStatus) return order;
+            return {
+                ...order,
+                status: normalizedStatus,
+                order_status: normalizedStatus
+            };
+        }
+
+        function normalizeOrders(list) {
+            return Array.isArray(list) ? list.map(normalizeOrderRecord) : [];
+        }
+
+        function getOrderStatus(order) {
+            return normalizeOrderStatus(order?.order_status || order?.status || '');
+        }
+
+        // ============================================
+        // UI HELPERS
+        // ============================================
+        // HAPTIC FEEDBACK
+        // ============================================
+        function haptic(type = 'light') {
+            if (window.Telegram?.WebApp?.HapticFeedback) {
+                switch(type) {
+                    case 'light':
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                        break;
+                    case 'medium':
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+                        break;
+                    case 'heavy':
+                        window.Telegram.WebApp.HapticFeedback.impactOccurred('heavy');
+                        break;
+                    case 'success':
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        break;
+                    case 'error':
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+                        break;
+                    case 'warning':
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('warning');
+                        break;
+                    case 'selection':
+                        window.Telegram.WebApp.HapticFeedback.selectionChanged();
+                        break;
+                }
+            }
+        }
+
+        function toast(message, type = 'info', options = {}) {
+            haptic(type === 'success' ? 'success' : type === 'error' ? 'error' : 'light');
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type} slide-up`;
+
+            const icon = document.createElement('span');
+            icon.style.fontSize = '20px';
+            icon.textContent = type === 'success' ? '✓' : type === 'error' ? '✕' : type === 'warning' ? '⚠' : 'ℹ';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.style.flex = '1';
+
+            const text = document.createElement('span');
+            text.textContent = message;
+            contentDiv.appendChild(text);
+
+            // Add description if provided
+            if (options.description) {
+                const desc = document.createElement('div');
+                desc.style.fontSize = '13px';
+                desc.style.opacity = '0.8';
+                desc.style.marginTop = '4px';
+                desc.textContent = options.description;
+                contentDiv.appendChild(desc);
+            }
+
+            toast.appendChild(icon);
+            toast.appendChild(contentDiv);
+
+            // Add action button if provided
+            if (options.action && options.actionLabel) {
+                const actionBtn = document.createElement('button');
+                actionBtn.textContent = options.actionLabel;
+                actionBtn.className = 'toast-action';
+                actionBtn.onclick = () => {
+                    options.action();
+                    toast.remove();
+                };
+                toast.appendChild(actionBtn);
+            }
+
+            document.body.appendChild(toast);
+
+            const duration = options.duration || 3000;
+            setTimeout(() => {
+                toast.style.animation = 'toastOut 0.3s ease-out forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        function updateHeaderStatus(isOpen) {
+            const statusText = document.getElementById('storeStatusText');
+            const statusDot = document.getElementById('storeStatusDot');
+            if (!statusText || !statusDot) return;
+            const open = Boolean(isOpen);
+            statusText.textContent = open ? 'Открыто' : 'Закрыто';
+            statusDot.classList.toggle('closed', !open);
+        }
+
+        function showLoading(type = 'default') {
+            const loaders = {
+                default: `<div class="loading fade-in"><div class="spinner"></div></div>`,
+                dashboard: `
+                    <div class="container fade-in">
+                        <div class="stats-grid">
+                            ${[1,2,3,4].map(() => `
+                                <div class="stat-card skeleton">
+                                    <div class="skeleton-line w-60p h-20 mb-12"></div>
+                                    <div class="skeleton-line w-40p h-32"></div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="skeleton-line w-200 h-24 mt-xl mb-md"></div>
+                        ${[1,2,3].map(() => `<div class="skeleton skeleton-block tall-100"></div>`).join('')}
+                    </div>
+                `,
+                products: `
+                    <div class="container fade-in">
+                        <div class="products-grid">
+                            ${[1,2,3,4,5,6].map(() => `
+                                <div class="product-card skeleton">
+                                    <div class="skeleton skeleton-block tall-240"></div>
+                                    <div class="skeleton-pad">
+                                        <div class="skeleton-line w-70p h-20 mb-sm"></div>
+                                        <div class="skeleton-line w-100p h-16 mb-12"></div>
+                                        <div class="skeleton-line w-40p h-24"></div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `,
+                stats: `
+                    <div class="container fade-in">
+                        <div class="skeleton skeleton-block tall-300"></div>
+                        <div class="stats-grid">
+                            ${[1,2,3,4].map(() => `
+                                <div class="stat-card skeleton">
+                                    <div class="skeleton-line w-60p h-18 mb-10"></div>
+                                    <div class="skeleton-line w-50p h-28"></div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `,
+                settings: `
+                    <div class="container fade-in">
+                        ${[1,2,3,4,5].map(() => `
+                            <div class="skeleton skeleton-block tall-72"></div>
+                        `).join('')}
+                    </div>
+                `
+            };
+            document.querySelector('.content').innerHTML = loaders[type] || loaders.default;
+        }
+
+        // ============================================
+        // VIEW SWITCHING
+        // ============================================
+        function setActiveNav(view) {
+            document.querySelectorAll('.nav-item').forEach((item) => {
+                item.classList.toggle('active', item.dataset.view === view);
+            });
+        }
+
+        function switchView(view) {
+            console.log(`📍 Switching to view: ${view}`);
+            haptic('selection');
+            state.currentView = view;
+
+            // Update nav active state
+            setActiveNav(view);
+
+            // Smooth transition
+            const content = document.querySelector('.content');
+            content.classList.add('fade-out');
+
+            setTimeout(() => {
+                content.classList.remove('fade-out');
+
+                // Load view
+                switch(view) {
+                    case 'dashboard':
+                        loadDashboard();
+                        break;
+                    case 'orders':
+                        loadOrders();
+                        break;
+                    case 'products':
+                        loadProducts();
+                        break;
+                    case 'stats':
+                        loadStats();
+                        break;
+                    case 'settings':
+                        loadSettings();
+                        break;
+                }
+
+                // Scroll to top smoothly
+                content.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 150);
+        }
+
+        // ============================================
+        // DASHBOARD
+        // ============================================
+        async function loadDashboard() {
+            showLoading('dashboard');
+
+            try {
+                const [store, orders, products] = await Promise.all([
+                    apiFetch('/api/partner/store'),
+                    apiFetch('/api/partner/orders'),
+                    apiFetch('/api/partner/products')
+                ]);
+
+                state.store = store;
+                state.orders = normalizeOrders(orders);
+                state.products = normalizeProducts(products);
+                syncAllProducts(state.products);
+                updateNotificationBadge();
+
+                // Connect WebSocket after store info is loaded
+                if (!websocket && store.store_id) {
+                    connectWebSocket();
+                }
+
+                renderDashboard();
+            } catch (error) {
+                console.error('❌ Dashboard load error:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    API_BASE
+                });
+                toast(`Ошибка загрузки данных: ${error.message}`, 'error');
+            }
+        }
+
+        function renderDashboard() {
+            // Update store name in header
+            if (state.store?.name) {
+                document.getElementById('storeName').textContent = state.store.name;
+            }
+            updateHeaderStatus(state.store?.is_open);
+
+            const activeOrders = state.orders.filter(o =>
+                !['completed', 'cancelled', 'rejected'].includes(getOrderStatus(o))
+            );
+            const newOrders = activeOrders.filter(o => getOrderStatus(o) === 'new');
+            const preparingOrders = activeOrders.filter(o =>
+                ['preparing', 'ready'].includes(getOrderStatus(o))
+            );
+
+            const todayRevenue = state.orders
+                .filter(o => getOrderStatus(o) === 'completed' && isToday(o.created_at))
+                .reduce((sum, o) => sum + (o.price || 0), 0);
+
+            const yesterdayRevenue = state.orders
+                .filter(o => getOrderStatus(o) === 'completed' && isYesterday(o.created_at))
+                .reduce((sum, o) => sum + (o.price || 0), 0);
+
+            const revenueTrend = yesterdayRevenue ? ((todayRevenue - yesterdayRevenue) / yesterdayRevenue * 100).toFixed(0) : 0;
+
+            const currentHour = new Date().getHours();
+            const greeting = currentHour < 12 ? 'Доброе утро' : currentHour < 18 ? 'Добрый день' : 'Добрый вечер';
+            const currentDate = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+            // Smart insights
+            const dailyGoal = 11000;
+            const goalProgress = (todayRevenue / dailyGoal * 100).toFixed(0);
+            const lowStockProducts = state.products.filter(p => p.stock_quantity < 5 && p.stock_quantity > 0);
+            const outOfStockProducts = state.products.filter(p => p.stock_quantity === 0);
+
+            // Peak hours logic (11-14, 18-21)
+            const isPeakHour = (currentHour >= 11 && currentHour < 14) || (currentHour >= 18 && currentHour < 21);
+            const hoursUntilPeak = currentHour < 11 ? 11 - currentHour : currentHour < 18 ? 18 - currentHour : null;
+
+            document.querySelector('.content').innerHTML = `
+                <div class="container dashboard-shell">
+                    <section class="hero-panel rise-in">
+                        <div class="hero-row">
+                            <div class="hero-copy">
+                                <div class="hero-date">${currentDate}</div>
+                                <h2 class="hero-title">${greeting}!</h2>
+                                <div class="hero-store">
+                                    <span class="hero-store-name">${state.store?.name || '\u0412\u0430\u0448 \u043c\u0430\u0433\u0430\u0437\u0438\u043d'}</span>
+                                    <span class="hero-store-tag">Панель партнёра</span>
+                                </div>
+                            </div>
+                            <div class="hero-controls">
+                                <button class="status-toggle ${state.store?.is_open ? 'open' : 'closed'}" onclick="toggleStoreStatus()">
+                                    <span class="status-indicator"></span>
+                                    ${state.store?.is_open ? '\u041e\u0442\u043a\u0440\u044b\u0442\u043e' : '\u0417\u0430\u043a\u0440\u044b\u0442\u043e'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="hero-chips">
+                            <div class="hero-chip">
+                                <span class="chip-label">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</span>
+                                <span class="chip-value">${activeOrders.length}</span>
+                            </div>
+                            <div class="hero-chip">
+                                <span class="chip-label">\u041d\u043e\u0432\u044b\u0435</span>
+                                <span class="chip-value">${newOrders.length}</span>
+                            </div>
+                            <div class="hero-chip">
+                                <span class="chip-label">\u0422\u043e\u0432\u0430\u0440\u044b</span>
+                                <span class="chip-value">${state.products.length}</span>
+                            </div>
+                        </div>
+
+                        <div class="hero-insights">
+                            ${hoursUntilPeak && hoursUntilPeak <= 2 ? `
+                                <div class="insight-card">
+                                    <div class="insight-icon">!</div>
+                                    <div>
+                                        <div class="insight-title">\u041f\u0438\u043a \u0441\u043f\u0440\u043e\u0441\u0430 \u0447\u0435\u0440\u0435\u0437 ${hoursUntilPeak}\u0447</div>
+                                        <div class="insight-text">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 \u0432\u0438\u0442\u0440\u0438\u043d\u0443 \u0438 \u043f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u0433\u043e\u0442\u043e\u0432\u043d\u043e\u0441\u0442\u044c \u043f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0445 \u043f\u043e\u0437\u0438\u0446\u0438\u0439</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${outOfStockProducts.length > 0 ? `
+                                <div class="insight-card warning">
+                                    <div class="insight-icon">!</div>
+                                    <div>
+                                        <div class="insight-title">\u0417\u0430\u043a\u043e\u043d\u0447\u0438\u043b\u0438\u0441\u044c \u043f\u043e\u0437\u0438\u0446\u0438\u0438 (${outOfStockProducts.length})</div>
+                                        <div class="insight-text">${outOfStockProducts[0]?.name || '\u0422\u043e\u0432\u0430\u0440'} \u0438 \u0435\u0449\u0435 ${outOfStockProducts.length - 1}</div>
+                                    </div>
+                                </div>
+                            ` : lowStockProducts.length > 0 ? `
+                                <div class="insight-card warning">
+                                    <div class="insight-icon">!</div>
+                                    <div>
+                                        <div class="insight-title">\u041d\u0438\u0437\u043a\u0438\u0439 \u043e\u0441\u0442\u0430\u0442\u043e\u043a (${lowStockProducts.length})</div>
+                                        <div class="insight-text">${lowStockProducts.map(p => p.name).join(', ')}</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${goalProgress < 100 && todayRevenue > 0 ? `
+                                <div class="insight-card">
+                                    <div>
+                                        <div class="goal-header">
+                                            <span class="goal-label">\u0426\u0435\u043b\u044c \u0434\u043d\u044f</span>
+                                            <span class="goal-values">${formatPrice(todayRevenue)} / ${formatPrice(dailyGoal)}</span>
+                                        </div>
+                                        <div class="goal-bar">
+                                            <div class="goal-fill" style="width: ${Math.min(goalProgress, 100)}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : goalProgress >= 100 ? `
+                                <div class="insight-card success">
+                                    <div class="insight-icon">OK</div>
+                                    <div>
+                                        <div class="insight-title">\u0426\u0435\u043b\u044c \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0430</div>
+                                        <div class="insight-text">\u041e\u0442\u043b\u0438\u0447\u043d\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 - ${formatPrice(dailyGoal)}</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </section>
+
+                    <div class="action-tiles rise-in" style="--delay: 80ms;">
+                        <button class="action-tile primary" onclick="openProductModal()">
+                            <span class="action-icon"><i data-lucide="plus"></i></span>
+                            <span>
+                                <span class="action-title">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u043e\u0432\u0430\u0440</span>
+                                <span class="action-subtitle">\u0411\u044b\u0441\u0442\u0440\u043e \u0441\u043e\u0437\u0434\u0430\u0442\u044c \u043d\u043e\u0432\u044b\u0439 \u043e\u0444\u0444\u0435\u0440</span>
+                            </span>
+                        </button>
+                        <button class="action-tile" onclick="switchView('orders')">
+                            <span class="action-icon"><i data-lucide="sparkles"></i></span>
+                            <span>
+                                <span class="action-title">\u0421\u043c\u043e\u0442\u0440\u0435\u0442\u044c \u0437\u0430\u043a\u0430\u0437\u044b</span>
+                                <span class="action-subtitle">\u041f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c \u0432\u0445\u043e\u0434\u044f\u0449\u0438\u0435 \u0437\u0430\u043f\u0440\u043e\u0441\u044b</span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <section class="kpi-grid rise-in" style="--delay: 130ms;">
+                        <div class="kpi-card kpi-primary">
+                            ${revenueTrend != 0 ? `<span class="stat-trend ${revenueTrend > 0 ? 'up' : 'down'}">
+                                <i data-lucide="${revenueTrend > 0 ? 'trending-up' : 'trending-down'}"></i>
+                                ${Math.abs(revenueTrend)}%
+                            </span>` : ''}
+                            ${todayRevenue > 0 ? `
+                                <div class="kpi-value">${formatPrice(todayRevenue)}</div>
+                                <div class="kpi-label">\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u0441\u0435\u0433\u043e\u0434\u043d\u044f</div>
+                            ` : `
+                                <div class="kpi-value empty-revenue">\u041d\u0435\u0442 \u043f\u0440\u043e\u0434\u0430\u0436 \u0437\u0430 \u0441\u0435\u0433\u043e\u0434\u043d\u044f</div>
+                                <div class="kpi-hint">\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0430\u043a\u0446\u0438\u0438, \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0435\u043b\u0438\u0447\u0438\u0442\u044c \u0441\u043f\u0440\u043e\u0441</div>
+                            `}
+                        </div>
+
+                        <div class="kpi-card tone-success">
+                            <div class="kpi-value">${activeOrders.length}</div>
+                            <div class="kpi-label">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0437\u0430\u043a\u0430\u0437\u044b</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-value">${state.products.length}</div>
+                            <div class="kpi-label">\u0422\u043e\u0432\u0430\u0440\u044b \u0432 \u043f\u0440\u043e\u0434\u0430\u0436\u0435</div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-value">4.8</div>
+                            <div class="kpi-label">\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0440\u0435\u0439\u0442\u0438\u043d\u0433</div>
+                        </div>
+                    </section>
+
+                    ${newOrders.length > 0 ? `
+                        <section class="priority-stack rise-in" style="--delay: 180ms;">
+                            ${newOrders.map(order => `
+                                <div class="priority-card" onclick="viewOrderDetails(${order.order_id || order.id})">
+                                    <div class="priority-header">
+                                        <h3 class="priority-title">\u041d\u043e\u0432\u044b\u0439 \u0437\u0430\u043a\u0430\u0437 #${order.order_id || order.id}</h3>
+                                        <span class="priority-time">${formatTime(order.created_at)}</span>
+                                    </div>
+                                    <div class="priority-meta">
+                                        ${getOrderType(order) === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430'} - ${formatPrice(order.price)}
+                                    </div>
+                                    <div class="priority-actions" onclick="event.stopPropagation()">
+                                        <button class="btn btn-success" onclick="updateOrderStatus(${order.order_id || order.id}, 'preparing')">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
+                                        <button class="btn btn-outline" onclick="cancelOrder(${order.order_id || order.id})">\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </section>
+                    ` : ''}
+
+                    <section class="section dashboard-section rise-in" style="--delay: 220ms;">
+                        <div class="section-header">
+                            <div>
+                                <h2 class="section-title">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 \u0437\u0430\u043a\u0430\u0437\u044b</h2>
+                                <p class="section-subtitle">\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u043e\u0431\u0437\u043e\u0440 \u0438 \u0431\u044b\u0441\u0442\u0440\u044b\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f</p>
+                            </div>
+                            <button class="btn btn-sm btn-outline" onclick="switchView('orders')">\u0412\u0441\u0435 \u0437\u0430\u043a\u0430\u0437\u044b</button>
+                        </div>
+
+                        ${activeOrders.length > 0 ? `
+                            ${newOrders.length > 0 ? `
+                                <div class="order-section" id="newOrdersSection">
+                                    <div class="order-section-header" onclick="toggleOrderSection('newOrdersSection')">
+                                        <h3 class="order-section-title">
+                                            \u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438
+                                            <span class="order-section-badge">${newOrders.length}</span>
+                                        </h3>
+                                        <div class="order-section-toggle">
+                                            <i data-lucide="chevron-down"></i>
+                                        </div>
+                                    </div>
+                                    <div class="order-section-content">
+                                        <div class="orders-list">
+                                            ${newOrders.map(order => renderOrderCard(order)).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${preparingOrders.length > 0 ? `
+                                <div class="order-section collapsed" id="preparingOrdersSection">
+                                    <div class="order-section-header" onclick="toggleOrderSection('preparingOrdersSection')">
+                                        <h3 class="order-section-title">
+                                            \u0412 \u0440\u0430\u0431\u043e\u0442\u0435
+                                            <span class="order-section-badge muted">${preparingOrders.length}</span>
+                                        </h3>
+                                        <div class="order-section-toggle">
+                                            <i data-lucide="chevron-down"></i>
+                                        </div>
+                                    </div>
+                                    <div class="order-section-content">
+                                        <div class="orders-list">
+                                            ${preparingOrders.map(order => renderOrderCard(order)).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        ` : `
+                            <div class="empty-state">
+                                <div class="empty-icon">
+                                    <i data-lucide="inbox" class="icon-muted"></i>
+                                </div>
+                                <p class="empty-title">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0437\u0430\u043a\u0430\u0437\u043e\u0432</p>
+                                <p class="empty-subtitle">\u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c</p>
+                            </div>
+                        `}
+                    </section>
+                </div>
+            `;
+
+            // Initialize Lucide icons
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (typeof window.initUXImprovements === 'function') {
+                window.initUXImprovements();
+            }
+        }
+
+        function renderOrderCard(order) {
+            const orderId = order.order_id || order.id;
+            const orderType = getOrderType(order);
+            const status = getOrderStatus(order) || 'pending';
+            return `
+                <div class="order-card ripple" data-order-id="${orderId}" data-status="${status}" onclick="haptic('light'); viewOrderDetails(${orderId})">
+                    <div class="order-header">
+                        <div class="order-id">#${orderId || '?'}</div>
+                        <div class="order-status status-${status}">${getStatusText(status, orderType)}</div>
+                    </div>
+                    <div class="order-meta">
+                        <span class="order-type">
+                            <i data-lucide="${orderType === 'pickup' ? 'shopping-bag' : 'truck'}" class="icon-16"></i>
+                            ${orderType === 'pickup' ? 'Самовывоз' : 'Доставка'}
+                        </span>
+                    </div>
+                    <div class="order-footer">
+                        <div class="order-time">${formatTime(order.created_at)}</div>
+                        <div class="order-total">${formatPrice(order.price)}</div>
+                    </div>
+                    ${status === 'new' || status === 'pending' ? `
+                        <div class="order-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-sm btn-success ripple" onclick="updateOrderStatus(${orderId}, 'preparing')">Принять</button>
+                            <button class="btn btn-sm btn-danger ripple" onclick="openCancelModal(${orderId})">Отменить</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function toggleOrderSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section) {
+                section.classList.toggle('collapsed');
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        // ============================================
+        // ORDERS
+        // ============================================
+        async function loadOrders() {
+            showLoading();
+            try {
+                const orders = await apiFetch('/api/partner/orders');
+                state.orders = normalizeOrders(orders);
+                renderOrders();
+                updateNotificationBadge(); // Update badge with new orders count
+            } catch (error) {
+                console.error('Orders load error:', error);
+                const message = error?.message || '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437\u044b';
+                document.querySelector('.content').innerHTML = `
+                    <div class="container empty-state">
+                        <div class="empty-icon">
+                            <i data-lucide="alert-triangle" class="icon-muted"></i>
+                        </div>
+                        <p class="empty-title">\u0417\u0430\u043a\u0430\u0437\u044b \u0432\u0440\u0435\u043c\u0435\u043d\u043d\u043e \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b</p>
+                        <p class="empty-subtitle">${message}</p>
+                        <button class="btn btn-primary" onclick="loadOrders()">\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c</button>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u0437\u0430\u043a\u0430\u0437\u043e\u0432', 'error', { description: message });
+            }
+        }
+
+        function renderOrders() {
+            const list = Array.isArray(state.orders) ? state.orders : [];
+            const getStatus = (o) => getOrderStatus(o);
+            const activeOrders = list.filter(o => ['pending', 'new', 'preparing'].includes(getStatus(o)));
+            const readyOrders = list.filter(o => getStatus(o) === 'ready');
+            const deliveringOrders = list.filter(o => getStatus(o) === 'delivering');
+            const problemOrders = getProblemOrders(list);
+            const historyOrders = list.filter(o => ['completed', 'cancelled', 'rejected'].includes(getStatus(o)));
+
+            document.querySelector('.content').innerHTML = `
+                <div class=\"container orders-shell ops\">
+                    <div class=\"orders-header ops-header\">
+                        <div>
+                            <h2 class=\"orders-title with-icon\">
+                                <i data-lucide=\"clipboard-list\" class=\"icon-18\"></i>
+                                \u0417\u0430\u043a\u0430\u0437\u044b
+                            </h2>
+                            <p class=\"orders-subtitle\">\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c\u0438</p>
+                        </div>
+                        <button class=\"btn btn-sm btn-outline\" onclick=\"loadOrders()\">\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>
+                    </div>
+
+                    <div class=\"orders-summary\">
+                        <div class=\"summary-item\"><span>\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435</span><b>${activeOrders.length}</b></div>
+                        <div class=\"summary-item\"><span>\u041a \u0432\u044b\u0434\u0430\u0447\u0435</span><b>${readyOrders.length}</b></div>
+                        <div class=\"summary-item\"><span>\u0412 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0435</span><b>${deliveringOrders.length}</b></div>
+                        <div class=\"summary-item\"><span>\u041f\u0440\u043e\u0431\u043b\u0435\u043c\u043d\u044b\u0435</span><b>${problemOrders.length}</b></div>
+                    </div>
+
+                    <div class=\"tabs ops-tabs\">
+                        <button class=\"tab active\" data-status=\"active\" onclick=\"filterOrderTab('active')\">
+                            \u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0435 <span class=\"badge\">${activeOrders.length}</span>
+                        </button>
+                        <button class=\"tab\" data-status=\"ready\" onclick=\"filterOrderTab('ready')\">
+                            \u041a \u0432\u044b\u0434\u0430\u0447\u0435 <span class=\"badge\">${readyOrders.length}</span>
+                        </button>
+                        <button class=\"tab\" data-status=\"delivering\" onclick=\"filterOrderTab('delivering')\">
+                            \u0412 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0435 <span class=\"badge\">${deliveringOrders.length}</span>
+                        </button>
+                        <button class=\"tab\" data-status=\"problem\" onclick=\"filterOrderTab('problem')\">
+                            \u041f\u0440\u043e\u0431\u043b\u0435\u043c\u043d\u044b\u0435 <span class=\"badge\">${problemOrders.length}</span>
+                        </button>
+                        <button class=\"tab\" data-status=\"history\" onclick=\"filterOrderTab('history')\">
+                            \u0418\u0441\u0442\u043e\u0440\u0438\u044f <span class=\"badge\">${historyOrders.length}</span>
+                        </button>
+                    </div>
+
+                    <div id=\"ordersContainer\" class=\"orders-panel\">
+                        ${renderOrdersList(activeOrders)}
+                    </div>
+                </div>
+            `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+
+        function groupOrdersByStatus(orders) {
+            const list = Array.isArray(orders) ? orders : [];
+            const getStatus = (o) => getOrderStatus(o);
+            return {
+                active: list.filter(o => ['pending', 'new', 'preparing', 'ready', 'delivering'].includes(getStatus(o))),
+                completed: list.filter(o => getStatus(o) === 'completed'),
+                cancelled: list.filter(o => ['cancelled', 'rejected'].includes(getStatus(o)))
+            };
+        }
+
+
+        function getProblemOrders(orders) {
+            const list = Array.isArray(orders) ? orders : [];
+            return list.filter((order) => {
+                const status = getOrderStatus(order);
+                const paymentStatus = order.payment_status || '';
+                if (['cancelled', 'rejected'].includes(status)) return true;
+                if (['awaiting_proof', 'proof_submitted', 'rejected'].includes(paymentStatus)) return true;
+                return false;
+            });
+        }
+
+        function copyPickupCode(code) {
+            if (!code) return;
+            const notify = () => toast('\u041a\u043e\u0434 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d', 'success');
+            if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(code).then(notify).catch(() => {
+                    window.prompt('Copy', code);
+                });
+                return;
+            }
+            try {
+                window.prompt('Copy', code);
+                notify();
+            } catch {
+                // no-op
+            }
+        }
+
+        function renderOrdersList(orders) {
+            if (!orders.length) {
+                return `
+                    <div class=\"empty-state\">
+                        <div class=\"empty-icon\">
+                            <i data-lucide=\"package-x\"></i>
+                        </div>
+                        <p class=\"empty-title\">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u0437\u0430\u043a\u0430\u0437\u043e\u0432</p>
+                        <p class=\"empty-subtitle\">\u041d\u043e\u0432\u044b\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f \u0437\u0434\u0435\u0441\u044c, \u043a\u043e\u0433\u0434\u0430 \u043a\u043b\u0438\u0435\u043d\u0442 \u043e\u0444\u043e\u0440\u043c\u0438\u0442 \u0437\u0430\u043a\u0430\u0437</p>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class=\"order-list ops-list\">
+                    ${orders.map(order => {
+                        const orderId = order.order_id || order.id;
+                        const status = getOrderStatus(order) || 'pending';
+                        const items = Array.isArray(order.items) ? order.items : [];
+                        const mainItem = items[0];
+                        const title = (mainItem && mainItem.title) || order.offer_title || '\u0422\u043e\u0432\u0430\u0440';
+                        const extraItems = items.length > 1 ? items.length - 1 : 0;
+                        const displayTitle = extraItems > 0 ? `${title} + \u0435\u0449\u0435 ${extraItems}` : title;
+                        const qty = (mainItem && mainItem.quantity) || order.quantity || 1;
+                        const pickupCode = order.pickup_code || order.booking_code || '';
+                        const orderType = getOrderType(order);
+                        const statusText = getStatusText(status, orderType);
+                        const sla = getSlaInfo(status, order.created_at);
+                        const paymentStatus = order.payment_status || '';
+                        const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
+                        const paymentTone = getPaymentStatusTone(paymentStatus);
+                        const orderTypeLabel = orderType === 'delivery' ? '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430' : '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437';
+                        const orderTypeClass = orderType === 'delivery' ? 'type-delivery' : 'type-pickup';
+
+                        let action = null;
+                        if (status === 'pending' || status === 'new') {
+                            action = { label: 'Принять', next: 'preparing' };
+                        } else if (status === 'preparing') {
+                            action = {
+                                label: orderType === 'delivery'
+                                    ? 'Готово, ждать курьера'
+                                    : 'Готово к выдаче',
+                                next: 'ready'
+                            };
+                        } else if (status === 'ready') {
+                            action = orderType === 'delivery'
+                                ? { label: 'Передать курьеру', next: 'delivering' }
+                                : { label: 'Выдать', next: 'completed' };
+                        } else if (status === 'delivering') {
+                            action = { label: 'Доставлен', next: 'completed' };
+                        }
+
+                        return `
+                        <article class=\"order-row status-${status}\" onclick=\"viewOrderDetails(${orderId})\">
+                            <div class=\"order-row-main\">
+                                <div class=\"order-row-top\">
+                                    <span class=\"order-row-id\">#${orderId || '?'} </span>
+                                    <span class=\"order-status-pill status-${status}\">${statusText}</span>
+                                    ${sla.label ? `<span class=\"order-sla ${sla.tone}\">SLA ${sla.label}</span>` : ''}
+                                    <span class=\"order-time\">${formatTime(order.created_at)}</span>
+                                </div>
+                                <div class=\"order-row-title\">${displayTitle}${qty > 1 && extraItems === 0 ? ` x ${qty}` : ''}</div>
+                                <div class=\"order-row-meta\">
+                                    <span class=\"meta-chip ${orderTypeClass}\">${orderTypeLabel}</span>
+                                    ${pickupCode ? `<button class=\"code-pill\" onclick=\"event.stopPropagation(); copyPickupCode('${pickupCode}')\">${pickupCode}</button>` : ''}
+                                    ${paymentText && paymentStatus !== 'not_required' ? `<span class=\"meta-chip payment ${paymentTone}\">${paymentText}</span>` : ''}
+                                    ${order.customer_name ? `<span class=\"meta-chip\">${order.customer_name}</span>` : ''}
+                                    ${order.delivery_address ? `<span class=\"meta-chip muted\">${order.delivery_address}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class=\"order-row-side\">
+                                <div class=\"order-amount\">${formatPrice(order.price)}</div>
+                                ${action ? `
+                                    <button class=\"order-action-btn\" onclick=\"event.stopPropagation(); handleStatusUpdate(${orderId}, '${action.next}', this)\">${action.label}</button>
+                                ` : ''}
+                            </div>
+                        </article>
+                    `}).join('')}
+                </div>
+            `;
+        }
+
+
+        function filterOrderTab(status) {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.status === status);
+            });
+
+            const list = Array.isArray(state.orders) ? state.orders : [];
+            const getStatus = (o) => getOrderStatus(o);
+            const activeOrders = list.filter(o => ['pending', 'new', 'preparing'].includes(getStatus(o)));
+            const readyOrders = list.filter(o => getStatus(o) === 'ready');
+            const deliveringOrders = list.filter(o => getStatus(o) === 'delivering');
+            const problemOrders = getProblemOrders(list);
+            const historyOrders = list.filter(o => ['completed', 'cancelled', 'rejected'].includes(getStatus(o)));
+
+            const ordersMap = {
+                'active': activeOrders,
+                'ready': readyOrders,
+                'delivering': deliveringOrders,
+                'problem': problemOrders,
+                'history': historyOrders
+            };
+
+            document.getElementById('ordersContainer').innerHTML = renderOrdersList(ordersMap[status] || []);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        async function viewOrderDetails(orderId) {
+            const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+            if (!order) return;
+
+            const oid = order.order_id || order.id;
+            const status = getOrderStatus(order) || 'pending';
+            const pickupCode = order.pickup_code || order.booking_code;
+            const items = Array.isArray(order.items) ? order.items : [];
+            const orderTitle = order.offer_title || '\u0422\u043e\u0432\u0430\u0440';
+            const qty = order.quantity || 1;
+            const paymentStatus = order.payment_status || '';
+            const paymentText = getPaymentStatusText(paymentStatus, order.payment_method);
+            const proofUrl = resolvePhotoUrl(order.payment_proof_url || order.payment_proof || '');
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class=\"modal-content modal-md\">
+                    <div class=\"modal-header\">
+                        <h3>\u0417\u0430\u043a\u0430\u0437 #${oid}</h3>
+                        <button class=\"btn-icon\" onclick=\"this.closest('.modal-overlay').remove()\">
+                            <i data-lucide=\"x\"></i>
+                        </button>
+                    </div>
+                    <div class=\"modal-body\">
+                        <div class=\"order-status status-${status} modal-status\">
+                            ${getStatusText(status, getOrderType(order))}
+                        </div>
+
+                        ${pickupCode ? `
+                        <div class=\"order-detail-section\">
+                            <h4>\u041a\u043e\u0434 \u0432\u044b\u0434\u0430\u0447\u0438</h4>
+                            <p><b>${pickupCode}</b></p>
+                        </div>
+                        ` : ''}
+
+                        ${paymentText && paymentStatus !== 'not_required' ? `
+                        <div class=\"order-detail-section\">
+                            <h4>\u041e\u043f\u043b\u0430\u0442\u0430</h4>
+                            <p>${paymentText}</p>
+                            ${proofUrl ? `<img class=\"payment-proof\" src=\"${proofUrl}\" alt=\"proof\" loading=\"lazy\" decoding=\"async\" />` : ''}
+                        </div>
+                        ` : ''}
+
+                        <div class=\"order-detail-section\">
+                            <h4>\u0422\u043e\u0432\u0430\u0440</h4>
+                            <p>${orderTitle} \u00d7 ${qty}</p>
+                        </div>
+
+                        ${items.length > 0 ? `
+                        <div class=\"order-detail-section\">
+                            <h4>\u0421\u043e\u0441\u0442\u0430\u0432 \u0437\u0430\u043a\u0430\u0437\u0430</h4>
+                            <ul class=\"order-items\">
+                                ${items.map((item) => `
+                                    <li class=\"order-item\">
+                                        <span>${item.title || '\u0422\u043e\u0432\u0430\u0440'}</span>
+                                        <span>x ${item.quantity || 1}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        ` : ''}
+
+                        <div class=\"order-detail-section\">
+                            <h4>\u041a\u043b\u0438\u0435\u043d\u0442</h4>
+                            <p>${order.customer_name || '\u041a\u043b\u0438\u0435\u043d\u0442'}</p>
+                            <p>${order.customer_phone || ''}</p>
+                            ${order.customer_phone ? `<a class=\"call-btn\" href=\"tel:${order.customer_phone}\">\u041f\u043e\u0437\u0432\u043e\u043d\u0438\u0442\u044c</a>` : ''}
+                        </div>
+
+                        <div class=\"order-detail-section\">
+                            <h4>\u0422\u0438\u043f \u0437\u0430\u043a\u0430\u0437\u0430</h4>
+                            <p>${order.order_type === 'pickup' ? '\u0421\u0430\u043c\u043e\u0432\u044b\u0432\u043e\u0437' : '\u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430'}</p>
+                            ${order.delivery_address ? `<p>${order.delivery_address}</p>` : ''}
+                        </div>
+
+                        <div class=\"order-detail-section modal-total\">
+                            <div class=\"modal-total-row\">
+                                <span>\u0418\u0442\u043e\u0433\u043e</span>
+                                <span>${formatPrice(order.price)}</span>
+                            </div>
+                        </div>
+
+                        ${status !== 'completed' && status !== 'cancelled' ? `
+                            <div class=\"modal-actions\">
+                                ${status === 'pending' || status === 'new' ? `
+                                    <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'preparing', this)\">\u041f\u0440\u0438\u043d\u044f\u0442\u044c</button>
+                                ` : ''}
+                                ${status === 'preparing' ? `
+                                    <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'ready', this)\">${orderType === 'delivery' ? '\u0413\u043e\u0442\u043e\u0432\u043e, \u0436\u0434\u0430\u0442\u044c \u043a\u0443\u0440\u044c\u0435\u0440\u0430' : '\u0413\u043e\u0442\u043e\u0432\u043e \u043a \u0432\u044b\u0434\u0430\u0447\u0435'}</button>
+                                ` : ''}
+                                ${status === 'ready' ? `
+                                    ${orderType === 'delivery' ? `
+                                        <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'delivering', this)\">\u041f\u0435\u0440\u0435\u0434\u0430\u0442\u044c \u043a\u0443\u0440\u044c\u0435\u0440\u0443</button>
+                                    ` : `
+                                        <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'completed', this)\">\u0412\u044b\u0434\u0430\u0442\u044c</button>
+                                    `}
+                                ` : ''}
+                                ${status === 'delivering' ? `
+                                    <button class=\"btn btn-success ripple\" onclick=\"handleModalStatusUpdate(${oid}, 'completed', this)\">\u0414\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d</button>
+                                ` : ''}
+                                <button class=\"btn btn-danger ripple\" onclick=\"handleModalCancelOrder(${oid}, this)\">\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            const scrollY = window.scrollY;
+            document.body.style.overflow = 'hidden';
+            document.body.style.touchAction = 'none';
+            document.body.dataset.scrollY = scrollY;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            const closeOrderModal = () => {
+                document.body.style.overflow = '';
+                document.body.style.touchAction = '';
+                const scrollPos = document.body.dataset.scrollY;
+                if (scrollPos) {
+                    window.scrollTo(0, parseInt(scrollPos));
+                }
+                delete document.body.dataset.scrollY;
+                modal.remove();
+            };
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeOrderModal();
+                }
+            });
+        }
+
+
+        async function updateOrderStatus(orderId, newStatus, courierPhone = '') {
+            let order = null;
+            let oldStatus = null;
+
+            try {
+                haptic('medium');
+
+                // Optimistic UI update
+                order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                oldStatus = order?.status;
+
+                if (order) {
+                    order.status = newStatus;
+
+                    // Update UI immediately
+                    const orderCard = document.querySelector(`[data-order-id="${orderId}"]`);
+                    if (orderCard) {
+                        orderCard.classList.add('optimistic-update');
+                        orderCard.setAttribute('data-status', newStatus);
+
+                        // Update status badge
+                        const statusBadge = orderCard.querySelector('.order-status');
+                        if (statusBadge) {
+                            statusBadge.className = `order-status status-${newStatus}`;
+                            statusBadge.textContent = getStatusText(newStatus, getOrderType(order));
+                        }
+
+                        // Hide action buttons during update
+                        const actions = orderCard.querySelector('.order-actions');
+                        if (actions) actions.style.display = 'none';
+                    }
+                }
+
+                if (newStatus === 'preparing') {
+                    await apiFetch(`/api/partner/orders/${orderId}/confirm`, { method: 'POST' });
+                } else if (newStatus === 'cancelled') {
+                    await apiFetch(`/api/partner/orders/${orderId}/cancel`, {
+                        method: 'POST',
+                        body: JSON.stringify({ reason: 'other', comment: '' })
+                    });
+                } else if (newStatus === 'delivering') {
+                    const phoneValue = String(courierPhone || '').trim();
+                    if (!phoneValue) {
+                        throw new Error('Введите телефон курьера');
+                    }
+                    await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
+                        method: 'POST',
+                        body: JSON.stringify({ courier_phone: phoneValue })
+                    });
+                } else {
+                    await apiFetch(`/api/partner/orders/${orderId}/status?status=${newStatus}`, {
+                        method: 'POST'
+                    });
+                }
+
+                haptic('success');
+                toast('Статус обновлён', 'success');
+
+                // Reload to get fresh data and correct button states
+                if (state.currentView === 'orders') {
+                    setTimeout(() => loadOrders(), 500);
+                }
+                return true;
+            } catch (error) {
+                console.error('Status update error:', error);
+                haptic('error');
+                toast(error?.message || 'Ошибка обновления', 'error');
+
+                // Revert optimistic update
+                if (order && oldStatus) {
+                    order.status = oldStatus;
+                }
+                loadOrders();
+                return false;
+            }
+        }
+
+        async function handleStatusUpdate(orderId, newStatus, button) {
+            if (newStatus === 'delivering') {
+                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                if (order && getOrderType(order) === 'delivery') {
+                    openCourierPhoneModal(orderId);
+                    return;
+                }
+            }
+
+            if (!button) return updateOrderStatus(orderId, newStatus);
+
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="opacity-60">Обновление...</span>';
+
+            try {
+                await updateOrderStatus(orderId, newStatus);
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        function cancelOrder(orderId) {
+            openCancelModal(orderId);
+        }
+
+        // Open cancel order modal with reason selection
+        function openCancelModal(orderId) {
+            haptic('light');
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-sm">
+                    <div class="modal-header">
+                        <h3>Отмена заказа #${orderId}</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="submitCancelOrder(event, ${orderId})">
+                        <div class="modal-body">
+                            <p class="modal-text">
+                                Пожалуйста, укажите причину отмены заказа
+                            </p>
+
+                            <div class="form-group">
+                                <label class="modal-section-label">Причина отмены *</label>
+                                <div class="d-flex flex-column gap-sm">
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="out_of_stock" required>
+                                        <span>Товар закончился</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="cant_fulfill">
+                                        <span>Не успеваем выполнить</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="customer_request">
+                                        <span>По просьбе клиента</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="technical_issue">
+                                        <span>Технические неполадки</span>
+                                    </label>
+                                    <label class="cancel-reason-option">
+                                        <input type="radio" name="cancel_reason" value="other">
+                                        <span>Другая причина</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Комментарий (необязательно)</label>
+                                <textarea name="cancel_comment" rows="3" placeholder="Добавьте дополнительную информацию..."
+                                          class="search-input textarea-resizable" maxlength="200"></textarea>
+                                <div class="form-hint">
+                                    <span id="commentCounter">0/200</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
+                                Назад
+                            </button>
+                            <button type="submit" class="btn btn-danger ripple">
+                                <i data-lucide="x-circle" class="icon-16"></i>
+                                Отменить заказ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            // Character counter for comment
+            const textarea = modal.querySelector('textarea[name="cancel_comment"]');
+            const counter = modal.querySelector('#commentCounter');
+            if (textarea && counter) {
+                textarea.addEventListener('input', () => {
+                    counter.textContent = `${textarea.value.length}/200`;
+                });
+            }
+
+            // Close on overlay click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        // Submit cancel order with reason
+        async function submitCancelOrder(event, orderId) {
+            event.preventDefault();
+            haptic('heavy');
+
+            const formData = new FormData(event.target);
+            const reason = formData.get('cancel_reason');
+            const comment = formData.get('cancel_comment') || '';
+
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="opacity-60">Отмена...</span>';
+
+            try {
+                // Call API with cancel reason
+                await apiFetch(`/api/partner/orders/${orderId}/cancel`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        reason: reason,
+                        comment: comment
+                    })
+                });
+
+                // Update local state
+                const order = state.orders.find(o => (o.order_id || o.id) === orderId);
+                if (order) {
+                    order.status = 'cancelled';
+                    order.cancel_reason = reason;
+                    order.cancel_comment = comment;
+                }
+
+                haptic('success');
+                toast('Заказ отменён', 'success');
+
+                // Close modal
+                event.target.closest('.modal-overlay').remove();
+
+                // Reload orders
+                if (state.currentView === 'orders') {
+                    setTimeout(() => loadOrders(), 500);
+                }
+            } catch (error) {
+                console.error('Cancel order error:', error);
+                haptic('error');
+                toast('Ошибка отмены заказа', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        function openCourierPhoneModal(orderId) {
+            haptic('light');
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-sm">
+                    <div class="modal-header">
+                        <h3>Телефон курьера</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="submitCourierPhone(event, ${orderId})">
+                        <div class="modal-body">
+                            <p class="modal-text">
+                                Укажите номер телефона курьера, чтобы клиент смог связаться.
+                            </p>
+                            <div class="form-group">
+                                <label class="modal-section-label">Телефон курьера *</label>
+                                <input type="tel" name="courier_phone" required
+                                       class="search-input" placeholder="+998 90 123 45 67" maxlength="25">
+                                <div class="form-hint">Минимум 9 цифр</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">
+                                Отмена
+                            </button>
+                            <button type="submit" class="btn btn-primary ripple">
+                                Передать курьеру
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            const input = modal.querySelector('input[name="courier_phone"]');
+            if (input) input.focus();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
+        async function submitCourierPhone(event, orderId) {
+            event.preventDefault();
+            haptic('heavy');
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const phoneRaw = String(formData.get('courier_phone') || '').trim();
+            const digits = phoneRaw.replace(/\D/g, '');
+
+            if (digits.length < 9) {
+                toast('Введите корректный номер телефона', 'error');
+                return;
+            }
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="opacity-60">Отправка...</span>';
+
+            const ok = await updateOrderStatus(orderId, 'delivering', phoneRaw);
+            if (ok) {
+                form.closest('.modal-overlay')?.remove();
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        function handleCancelOrder(orderId) {
+            openCancelModal(orderId);
+        }
+
+        async function handleModalStatusUpdate(orderId, newStatus, button) {
+            const modal = button.closest('.modal-overlay');
+            const originalText = button.innerHTML;
+
+            if (newStatus === 'delivering') {
+                if (modal) modal.remove();
+                openCourierPhoneModal(orderId);
+                return;
+            }
+
+            button.disabled = true;
+            button.innerHTML = '<span class="opacity-60">Обновление...</span>';
+
+            try {
+                await updateOrderStatus(orderId, newStatus);
+                if (modal) modal.remove();
+            } catch (error) {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        function handleModalCancelOrder(orderId, button) {
+            const modal = button.closest('.modal-overlay');
+            if (modal) modal.remove();
+            openCancelModal(orderId);
+        }
+
+
+        // ============================================
+        // PRODUCTS
+        // ============================================
+        function normalizeProducts(products) {
+            if (!Array.isArray(products)) return [];
+
+            return products.map((p) => {
+                const stock = Number(p.stock ?? p.stock_quantity ?? p.quantity ?? 0) || 0;
+                const price = Number(p.price ?? p.discount_price ?? 0) || 0;
+                const originalPrice = Number(p.original_price ?? 0) || 0;
+
+                const discount =
+                    originalPrice > 0 && price > 0
+                        ? Math.max(0, Math.min(99, Math.round((1 - price / originalPrice) * 100)))
+                        : 0;
+
+                const status = p.status || (stock > 0 ? 'active' : 'out_of_stock');
+                const rawPhoto = p.photo_url || p.photo_id || p.image || '';
+                const photoUrl = resolvePhotoUrl(rawPhoto);
+                const photoId = p.photo_id || extractPhotoId(p.photo_url) || extractPhotoId(photoUrl);
+
+                return {
+                    ...p,
+                    stock,
+                    stock_quantity: p.stock_quantity ?? stock,
+                    quantity: p.quantity ?? stock,
+                    price,
+                    discount,
+                    status,
+                    is_available: status === 'active',
+                    photo_url: photoUrl,
+                    photo_id: photoId || '',
+                };
+            });
+        }
+
+
+
+
+function normalizeText(value) {
+    if (value == null) return '';
+    const text = String(value).trim();
+    if (!text) return '';
+    const lower = text.toLowerCase();
+    if (lower === 'none' || lower === 'null' || lower === 'nan' || lower === 'non') {
+        return '';
+    }
+    return text;
+}
+
+function getProductStatusInfo(product) {
+    const stock = Number(product?.stock ?? 0);
+    const status = product?.status;
+    if (status === 'hidden') {
+        return { label: '\u0421\u043a\u0440\u044b\u0442', tone: 'muted' };
+    }
+    if (stock <= 0) {
+        return { label: '\u041d\u0435\u0442 \u0432 \u043d\u0430\u043b\u0438\u0447\u0438\u0438', tone: 'danger' };
+    }
+    if (stock < 5) {
+        return { label: '\u041c\u0430\u043b\u043e', tone: 'warning' };
+    }
+    return { label: '\u0412 \u043d\u0430\u043b\u0438\u0447\u0438\u0438', tone: 'success' };
+}
+
+function getCategoryLabel(category) {
+    const labels = {
+        bakery: '\u0425\u043b\u0435\u0431 \u0438 \u0432\u044b\u043f\u0435\u0447\u043a\u0430',
+        dairy: '\u041c\u043e\u043b\u043e\u0447\u043d\u044b\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b',
+        meat: '\u041c\u044f\u0441\u043e \u0438 \u043f\u0442\u0438\u0446\u0430',
+        fruits: '\u0424\u0440\u0443\u043a\u0442\u044b',
+        vegetables: '\u041e\u0432\u043e\u0449\u0438',
+        drinks: '\u041d\u0430\u043f\u0438\u0442\u043a\u0438',
+        snacks: '\u0421\u043d\u0435\u043a\u0438',
+        sweets: '\u0421\u043b\u0430\u0434\u043e\u0441\u0442\u0438',
+        frozen: '\u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d\u043d\u044b\u0435',
+        other: '\u0414\u0440\u0443\u0433\u043e\u0435'
+    };
+    return labels[category] || '\u0414\u0440\u0443\u0433\u043e\u0435';
+}
+
+function formatShortDate(dateString) {
+    const date = parseDate(dateString);
+    if (!date) return '';
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+}
+
+        async function loadProducts() {
+            showLoading('products');
+            try {
+                const products = await apiFetch('/api/partner/products');
+                state.products = normalizeProducts(products);
+                syncAllProducts(state.products);
+                renderProducts();
+            } catch (error) {
+                toast('Ошибка загрузки товаров', 'error');
+            }
+        }
+
+
+
+
+function renderProducts() {
+    const totalCount = state.products.length;
+    const activeCount = state.products.filter(p => p.is_available && Number(p.stock ?? 0) > 0).length;
+    const lowStockCount = state.products.filter(p => {
+        const stock = Number(p.stock ?? 0);
+        return stock > 0 && stock < 5;
+    }).length;
+    const outOfStockCount = state.products.filter(p => Number(p.stock ?? 0) <= 0).length;
+
+    document.querySelector('.content').innerHTML = `
+        <div class="container">
+            <div class="products-shell">
+                <div class="products-hero">
+                    <div class="products-hero-main">
+                        <div class="products-title-row">
+                            <h2 class="section-title with-icon">
+                                <i data-lucide="package" class="icon-18"></i>
+                                \u0422\u043e\u0432\u0430\u0440\u044b
+                            </h2>
+                            <span class="products-count">${totalCount}</span>
+                        </div>
+                        <p class="section-subtitle">\u041f\u0440\u043e\u0432\u0435\u0440\u044f\u0439\u0442\u0435 \u0430\u0441\u0441\u043e\u0440\u0442\u0438\u043c\u0435\u043d\u0442, \u043e\u0441\u0442\u0430\u0442\u043a\u0438 \u0438 \u0441\u043a\u0438\u0434\u043a\u0438.</p>
+                    </div>
+                    <div class="products-hero-actions">
+                        <button class="btn btn-primary" onclick="openProductModal()">
+                            <i data-lucide="plus" class="icon-18"></i>
+                            \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u043e\u0432\u0430\u0440
+                        </button>
+                    </div>
+                </div>
+
+                <div class="products-kpis">
+                    <div class="product-kpi" data-tone="neutral">
+                        <div class="product-kpi-label">\u0412\u0441\u0435\u0433\u043e</div>
+                        <div class="product-kpi-value">${totalCount}</div>
+                    </div>
+                    <div class="product-kpi" data-tone="success">
+                        <div class="product-kpi-label">\u0412 \u043d\u0430\u043b\u0438\u0447\u0438\u0438</div>
+                        <div class="product-kpi-value">${activeCount}</div>
+                    </div>
+                    <div class="product-kpi" data-tone="warning">
+                        <div class="product-kpi-label">\u041c\u0430\u043b\u043e</div>
+                        <div class="product-kpi-value">${lowStockCount}</div>
+                    </div>
+                    <div class="product-kpi" data-tone="danger">
+                        <div class="product-kpi-label">\u041d\u0435\u0442 \u0432 \u043d\u0430\u043b\u0438\u0447\u0438\u0438</div>
+                        <div class="product-kpi-value">${outOfStockCount}</div>
+                    </div>
+                </div>
+
+                <div class="products-toolbar">
+                    <div class="search-bar">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input id="productSearch" type="text" class="search-input" placeholder="\u041f\u043e\u0438\u0441\u043a \u043f\u043e \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044e \u0438\u043b\u0438 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u044e" oninput="searchProducts(this.value)">
+                    </div>
+                    <div class="filters-bar">
+                        <div class="filters-group">
+                            <select class="filter-select" id="categoryFilter" onchange="filterProducts()">
+                                <option value="">\u0412\u0441\u0435 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u0438</option>
+                                <option value="bakery">\u0425\u043b\u0435\u0431 \u0438 \u0432\u044b\u043f\u0435\u0447\u043a\u0430</option>
+                                <option value="dairy">\u041c\u043e\u043b\u043e\u0447\u043d\u044b\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u044b</option>
+                                <option value="meat">\u041c\u044f\u0441\u043e \u0438 \u043f\u0442\u0438\u0446\u0430</option>
+                                <option value="fruits">\u0424\u0440\u0443\u043a\u0442\u044b</option>
+                                <option value="vegetables">\u041e\u0432\u043e\u0449\u0438</option>
+                                <option value="drinks">\u041d\u0430\u043f\u0438\u0442\u043a\u0438</option>
+                                <option value="snacks">\u0421\u043d\u0435\u043a\u0438</option>
+                                <option value="sweets">\u0421\u043b\u0430\u0434\u043e\u0441\u0442\u0438</option>
+                                <option value="frozen">\u0417\u0430\u043c\u043e\u0440\u043e\u0436\u0435\u043d\u043d\u044b\u0435</option>
+                                <option value="other">\u0414\u0440\u0443\u0433\u043e\u0435</option>
+                            </select>
+                            <select class="filter-select" id="statusFilter" onchange="filterProducts()">
+                                <option value="">\u0412\u0441\u0435 \u0441\u0442\u0430\u0442\u0443\u0441\u044b</option>
+                                <option value="available">\u0412 \u043d\u0430\u043b\u0438\u0447\u0438\u0438</option>
+                                <option value="low-stock">\u041c\u0430\u043b\u043e \u043d\u0430 \u0441\u043a\u043b\u0430\u0434\u0435</option>
+                                <option value="out-of-stock">\u041d\u0435\u0442 \u0432 \u043d\u0430\u043b\u0438\u0447\u0438\u0438</option>
+                                <option value="hidden">\u0421\u043a\u0440\u044b\u0442</option>
+                            </select>
+                            <select class="filter-select" id="discountFilter" onchange="filterProducts()">
+                                <option value="">\u0412\u0441\u0435 \u0441\u043a\u0438\u0434\u043a\u0438</option>
+                                <option value="discount">\u0421\u043e \u0441\u043a\u0438\u0434\u043a\u043e\u0439</option>
+                                <option value="no-discount">\u0411\u0435\u0437 \u0441\u043a\u0438\u0434\u043a\u0438</option>
+                            </select>
+                            <button class="btn-icon-secondary" onclick="resetFilters()" title="\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u0444\u0438\u043b\u044c\u0442\u0440\u044b">
+                                <i data-lucide="x" class="icon-18"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="products-grid" id="productsGrid">
+                    ${state.products.map(product => {
+                        const statusInfo = getProductStatusInfo(product);
+                        const stockValue = Number(product.stock ?? 0);
+                        const unitLabel = product.unit || '\u0448\u0442';
+                        const categoryLabel = getCategoryLabel(product.category);
+                        const expiryLabel = formatShortDate(product.expiry_date);
+                        const nameText = normalizeText(product.name) || '\u0422\u043e\u0432\u0430\u0440';
+                        const descriptionText = normalizeText(product.description) || '\u0411\u0435\u0437 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u044f';
+                        const viewsValue = Number.isFinite(product.views) ? product.views : null;
+                        const originalPrice = Number(product.original_price ?? 0);
+                        const currentPrice = Number(product.price ?? 0);
+                        const showOldPrice = originalPrice > 0 && currentPrice > 0 && originalPrice > currentPrice;
+
+                        return `
+                            <div class="product-card" data-product-id="${product.id}" data-status="${product.status || ''}">
+                                <div class="product-media">
+                                    <div class="product-image">
+                                        ${product.photo_url ? `
+                                            <img src="${product.photo_url}" alt="${nameText}" loading="lazy"
+                                                 onerror="this.parentElement.innerHTML='<div class=\'product-placeholder\'><i data-lucide=\'image\'></i><span>\u041d\u0435\u0442 \u0444\u043e\u0442\u043e</span></div>'; lucide.createIcons();">
+                                        ` : `
+                                            <div class="product-placeholder">
+                                                <i data-lucide="image"></i>
+                                                <span>\u041d\u0435\u0442 \u0444\u043e\u0442\u043e</span>
+                                            </div>
+                                        `}
+                                        <div class="product-status-chip tone-${statusInfo.tone}">${statusInfo.label}</div>
+                                        <div class="product-badges">
+                                            ${product.discount > 0 ? `<span class="product-badge badge-discount">-${product.discount}%</span>` : ''}
+                                            ${stockValue > 0 && stockValue < 5 ? `<span class="product-badge badge-warning">\u041c\u0430\u043b\u043e</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="product-content">
+                                    <div class="product-title-row">
+                                        <div class="product-title-block">
+                                            <h3 class="product-title">${nameText}</h3>
+                                            <p class="product-description">${descriptionText}</p>
+                                        </div>
+                                        <div class="product-price-block">
+                                            ${showOldPrice ? `<div class="product-price-old">${formatPrice(originalPrice)}</div>` : ''}
+                                            <div class="product-price-current">${formatPrice(currentPrice)}</div>
+                                        </div>
+                                    </div>
+                                    <div class="product-meta">
+                                        <span class="meta-chip"><i data-lucide="package"></i>${stockValue} ${unitLabel}</span>
+                                        <span class="meta-chip"><i data-lucide="tag"></i>${categoryLabel}</span>
+                                        ${expiryLabel ? `<span class="meta-chip"><i data-lucide="calendar"></i>${expiryLabel}</span>` : ''}
+                                        ${viewsValue !== null ? `<span class="meta-chip"><i data-lucide="eye"></i>${viewsValue}</span>` : ''}
+                                    </div>
+                                    <div class="product-footer">
+                                        <div class="product-actions">
+                                            <button class="product-action-btn ripple" onclick="editProduct(${product.id})" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c">
+                                                <i data-lucide="edit"></i>
+                                            </button>
+                                            <button class="product-action-btn ripple" onclick="toggleProductAvailability(${product.id})" title="${product.is_available ? '\u0421\u043a\u0440\u044b\u0442\u044c' : '\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c'}">
+                                                <i data-lucide="${product.is_available ? 'eye-off' : 'eye'}"></i>
+                                            </button>
+                                            <button class="product-action-btn ripple" onclick="deleteProduct(${product.id})" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c">
+                                                <i data-lucide="trash-2"></i>
+                                            </button>
+                                        </div>
+                                        <button class="product-cta" onclick="editProduct(${product.id})">
+                                            <i data-lucide="edit"></i>
+                                            <span>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') || `
+                        <div class="empty-state">
+                            <div class="empty-icon"><i data-lucide="package"></i></div>
+                            <p class="empty-title">\u041d\u0435\u0442 \u0442\u043e\u0432\u0430\u0440\u043e\u0432</p>
+                            <p class="empty-text">\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u0442\u043e\u0432\u0430\u0440.</p>
+                            <button class="btn btn-primary" onclick="openProductModal()">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0442\u043e\u0432\u0430\u0440</button>
+                        </div>
+                    `}
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+let lastProductFilterAction = 'filters';
+
+function searchProducts(query) {
+    lastProductFilterAction = 'search';
+    const needle = String(query || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('.product-card');
+    cards.forEach(card => {
+        if (!needle) {
+            card.style.display = '';
+            return;
+        }
+        const title = card.querySelector('.product-title')?.textContent || '';
+        const description = card.querySelector('.product-description')?.textContent || '';
+        const meta = Array.from(card.querySelectorAll('.meta-chip'))
+            .map((chip) => chip.textContent || '')
+            .join(' ');
+        const haystack = `${title} ${description} ${meta}`.toLowerCase();
+        card.style.display = haystack.includes(needle) ? '' : 'none';
+    });
+}
+
+        // Filter products by category, status, discount
+
+function filterProducts() {
+    lastProductFilterAction = 'filters';
+    const categoryFilter = document.getElementById('categoryFilter')?.value || '';
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const discountFilter = document.getElementById('discountFilter')?.value || '';
+
+    const cards = document.querySelectorAll('.product-card');
+    cards.forEach(card => {
+        const productId = parseInt(card.dataset.productId, 10);
+        const product = state.products.find(p => p.id === productId);
+        if (!product) {
+            card.style.display = 'none';
+            return;
+        }
+
+        const stockValue = Number(product.stock ?? 0);
+        const isHidden = product.status === 'hidden';
+        const isOutOfStock = stockValue <= 0;
+        const isLowStock = stockValue > 0 && stockValue < 5;
+        const isAvailable = product.is_available && !isOutOfStock;
+
+        let show = true;
+
+        if (categoryFilter && product.category !== categoryFilter) {
+            show = false;
+        }
+
+        if (statusFilter === 'available' && !isAvailable) {
+            show = false;
+        } else if (statusFilter === 'low-stock' && !isLowStock) {
+            show = false;
+        } else if (statusFilter === 'out-of-stock' && !isOutOfStock) {
+            show = false;
+        } else if (statusFilter === 'hidden' && !isHidden) {
+            show = false;
+        }
+
+        if (discountFilter === 'discount' && (!product.discount || product.discount <= 0)) {
+            show = false;
+        } else if (discountFilter === 'no-discount' && product.discount > 0) {
+            show = false;
+        }
+
+        card.style.display = show ? '' : 'none';
+    });
+
+    haptic('light');
+}
+        // Reset all filters
+
+
+function resetFilters() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const discountFilter = document.getElementById('discountFilter');
+    const searchInput = document.getElementById('productSearch');
+
+    if (categoryFilter) categoryFilter.value = '';
+    if (statusFilter) statusFilter.value = '';
+    if (discountFilter) discountFilter.value = '';
+    if (searchInput) searchInput.value = '';
+
+    const cards = document.querySelectorAll('.product-card');
+    cards.forEach(card => {
+        card.style.display = '';
+    });
+
+    haptic('light');
+    toast('\u0424\u0438\u043b\u044c\u0442\u0440\u044b \u0441\u0431\u0440\u043e\u0448\u0435\u043d\u044b', 'info');
+}
+
+function handlePhotoUpload(input, event) {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                toast('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0438\u0437\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435', 'error');
+                input.value = '';
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                toast('\u041c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 5 \u041c\u0411', 'error');
+                input.value = '';
+                return;
+            }
+
+            const modal = input.closest('.modal-overlay');
+            const uploadArea =
+                modal?.querySelector('.photo-upload-area') || document.querySelector('.photo-upload-area');
+            if (!uploadArea) return;
+            uploadArea.classList.add('has-photo');
+            uploadArea.innerHTML = '<div class="upload-placeholder"><i data-lucide="loader" class="icon-spin"></i><div>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...</div></div>';
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const photoUrl = e.target.result;
+                const photoIdInput =
+                    modal?.querySelector('input[name="photo_id"]') ||
+                    document.querySelector('input[name="photo_id"]');
+                if (photoIdInput) photoIdInput.value = '';
+                uploadArea.innerHTML = `
+                    <div class="photo-preview">
+                        <img src="${photoUrl}" alt="Preview">
+                        <button type="button" class="photo-preview-remove" onclick="event.stopPropagation(); removePhoto(event)">
+                            <i data-lucide="x" class="icon-16"></i>
+                        </button>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removePhoto(event) {
+            const modal = event?.target?.closest('.modal-overlay');
+            const uploadArea =
+                modal?.querySelector('.photo-upload-area') || document.querySelector('.photo-upload-area');
+            if (!uploadArea) return;
+            uploadArea.classList.remove('has-photo');
+            uploadArea.innerHTML = getPhotoUploadPlaceholder();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            const photoIdInput =
+                modal?.querySelector('input[name="photo_id"]') ||
+                document.querySelector('input[name="photo_id"]');
+            if (photoIdInput) photoIdInput.value = '';
+            const fileInput = modal?.querySelector('#photoFile') || document.getElementById('photoFile');
+            if (fileInput) fileInput.value = '';
+        }
+
+        function handleOriginalPriceInput() {
+            const discountPriceInput = document.getElementById('discountPrice');
+            const hasPrice = discountPriceInput && discountPriceInput.value !== '';
+            if (hasPrice) {
+                calculateFinalPrice('price');
+                return;
+            }
+            const discountPercentInput = document.getElementById('discountPercent');
+            const hasPercent = discountPercentInput && discountPercentInput.value !== '';
+            calculateFinalPrice(hasPercent ? 'percent' : 'price');
+        }
+
+        function calculateFinalPrice(source = 'percent') {
+            const originalInput = document.getElementById('originalPrice');
+            const discountPercentInput = document.getElementById('discountPercent');
+            const discountPriceInput = document.getElementById('discountPrice');
+            const preview = document.getElementById('pricePreview');
+            const priceOriginal = document.getElementById('priceOriginal');
+            const priceFinal = document.getElementById('priceFinal');
+            const priceSavings = document.getElementById('priceSavings');
+
+            const original = parseInt(originalInput.value, 10);
+            let percent = parseInt(discountPercentInput.value, 10);
+            let discounted = parseInt(discountPriceInput.value, 10);
+            const originalValue = Number.isFinite(original) ? original : 0;
+
+            if (source === 'percent') {
+                percent = Number.isFinite(percent) ? Math.min(90, Math.max(0, percent)) : 0;
+                discountPercentInput.value = percent;
+                if (originalValue > 0) {
+                    discounted = Math.round(originalValue * (1 - percent / 100));
+                    discountPriceInput.value = discounted || '';
+                }
+            } else {
+                discounted = Number.isFinite(discounted) ? discounted : 0;
+                if (originalValue > 0) {
+                    if (discounted > originalValue) discounted = originalValue;
+                    discountPriceInput.value = discounted || '';
+                    percent = Math.round((1 - discounted / originalValue) * 100);
+                    discountPercentInput.value = Number.isFinite(percent) ? percent : 0;
+                } else {
+                    discountPercentInput.value = 0;
+                }
+            }
+
+            if (originalValue > 0) {
+                preview.classList.remove('hidden');
+                priceOriginal.textContent = formatPrice(originalValue);
+                const finalValue = discounted || originalValue;
+                priceFinal.textContent = formatPrice(finalValue);
+                const savings = Math.max(0, originalValue - finalValue);
+                priceSavings.textContent = `${formatPrice(savings)} (${percent}%)`;
+            } else {
+                preview.classList.add('hidden');
+            }
+        }
+
+        function changeQuantity(delta) {
+            const input = document.getElementById('stockQuantity');
+            const current = parseInt(input.value, 10) || 0;
+            input.value = Math.max(0, current + delta);
+            validateField(input);
+        }
+
+        function setQuantity(value) {
+            const input = document.getElementById('stockQuantity');
+            input.value = value;
+            validateField(input);
+        }
+
+        function setExpiry(days) {
+            const dateInput = document.getElementById('expiryDate');
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            dateInput.value = date.toISOString().split('T')[0];
+            validateField(dateInput);
+        }
+
+        function updateCharCounter(textarea) {
+            const counter = textarea.nextElementSibling;
+            if (counter) counter.textContent = `${textarea.value.length}/500`;
+        }
+
+        function sanitizePriceInput(value) {
+            return String(value || '').replace(/[^\d]/g, '');
+        }
+
+        function validateField(input) {
+            if (!input) return true;
+            const isValid = input.checkValidity();
+            const hasValue = Boolean(input.value && String(input.value).trim());
+            input.classList.toggle('error', !isValid);
+            input.classList.toggle('success', isValid && hasValue);
+            input.setAttribute('aria-invalid', isValid ? 'false' : 'true');
+
+            const wrapper = input.closest('.form-group');
+            const errorEl = wrapper?.querySelector('.form-error');
+            if (errorEl) {
+                errorEl.classList.toggle('hidden', isValid);
+            }
+            return isValid;
+        }
+
+        async function saveProduct(event, productId) {
+            event.preventDefault();
+            haptic('medium');
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
+
+            try {
+                const title = String(formData.get('name') || '').trim();
+                const category = String(formData.get('category') || 'other').trim() || 'other';
+                const description = String(formData.get('description') || '').trim();
+                const unit = String(formData.get('unit') || 'шт').trim();
+                const stockQty = Math.max(0, parseInt(formData.get('stock_quantity'), 10) || 0);
+
+                // Parse prices - remove formatting and ensure proper integer conversion
+                const originalPriceRaw = sanitizePriceInput(formData.get('original_price'));
+                const discountPriceInputRaw = sanitizePriceInput(formData.get('discount_price'));
+                const originalPriceInput = parseInt(originalPriceRaw, 10);
+                const discountPercent = Math.max(0, Math.min(90, parseInt(formData.get('discount'), 10) || 0));
+                const discountPriceInput = parseInt(discountPriceInputRaw, 10);
+                const hasOriginal = Number.isFinite(originalPriceInput) && originalPriceInput > 0;
+                const hasDiscount = Number.isFinite(discountPriceInput) && discountPriceInput > 0;
+
+                const expiryDate = String(formData.get('expiry_date') || '');
+                const availableFrom = normalizeTimeValue(formData.get('available_from'));
+                const availableUntil = normalizeTimeValue(formData.get('available_until'));
+                const isAvailable = formData.get('is_available') === 'on';
+
+                console.log('💰 Saving product with prices:', {
+                    originalPrice: originalPriceInput,
+                    discountPriceInput,
+                    discountPercent
+                });
+
+                if (!title || title.length < 3) throw new Error('Название слишком короткое (мин. 3 символа)');
+                if (!hasOriginal && !hasDiscount) throw new Error('Укажите цену для клиента');
+                if (!availableFrom || !availableUntil) throw new Error('Укажите время доступности');
+                if (!expiryDate) throw new Error('Укажите срок годности');
+
+                const originalPrice = hasOriginal ? originalPriceInput : discountPriceInput;
+                let discountPrice = hasDiscount ? discountPriceInput : originalPrice;
+                if (hasOriginal && !hasDiscount) {
+                    discountPrice = Math.round(originalPrice * (1 - discountPercent / 100));
+                }
+                if (discountPrice > originalPrice) discountPrice = originalPrice;
+
+                let photoId = String(formData.get('photo_id') || '').trim();
+                const fileInput = form.querySelector('#photoFile') || document.getElementById('photoFile');
+                const photoFile = fileInput?.files?.[0] || null;
+
+                if (photoFile) {
+                    try {
+                        const uploadForm = new FormData();
+                        uploadForm.append('photo', photoFile, photoFile.name || 'photo.jpg');
+                        const uploaded = await apiFetch('/api/partner/upload-photo', { method: 'POST', body: uploadForm });
+                        if (!uploaded?.file_id) throw new Error('Не удалось загрузить фото');
+                        photoId = uploaded.file_id;
+                    } catch (uploadError) {
+                        console.error('Photo upload error:', uploadError);
+                        toast('Фото не загрузилось. Сохраняю без фото', 'warning');
+                    }
+                }
+
+                const payload = new FormData();
+                payload.append('title', title);
+                payload.append('category', category);
+                payload.append('original_price', String(originalPrice));  // Pure integer, no formatting
+                payload.append('discount_price', String(discountPrice));  // Pure integer, no formatting
+                payload.append('quantity', String(stockQty));
+                payload.append('stock_quantity', String(stockQty));
+                payload.append('unit', unit);
+                payload.append('available_from', availableFrom);
+                payload.append('available_until', availableUntil);
+                payload.append('expiry_date', expiryDate);
+                if (description) payload.append('description', description);
+                if (photoId) payload.append('photo_id', photoId);
+                if (productId) payload.append('status', stockQty <= 0 ? 'out_of_stock' : (isAvailable ? 'active' : 'hidden'));
+
+                console.log('📤 Sending payload with prices:', {
+                    original_price: originalPrice,
+                    discount_price: discountPrice
+                });
+
+                if (productId) {
+                    await apiFetch(`/api/partner/products/${productId}`, { method: 'PUT', body: payload });
+                    toast('Товар сохранён', 'success');
+                } else {
+                    await apiFetch('/api/partner/products', { method: 'POST', body: payload });
+                    toast('Товар сохранён', 'success');
+                }
+
+                haptic('success');
+                document.querySelector('.modal-overlay')?.remove();
+                await loadProducts();
+            } catch (error) {
+                console.error('Save product error:', error);
+                haptic('error');
+                toast(error?.message || '\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0442\u043e\u0432\u0430\u0440\u0430', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+async function toggleProductAvailability(id) {
+            try {
+                haptic('light');
+
+                const product = state.products.find(p => p.id === id);
+                if (!product) return;
+
+                // Optimistic UI update
+                const newStatus = product.is_available ? 'hidden' : 'active';
+                product.status = newStatus;
+                product.is_available = newStatus === 'active';
+                const card = document.querySelector(`[data-product-id="${id}"]`);
+                if (card) card.classList.add('optimistic-update');
+
+                await apiFetch(`/api/partner/products/${id}/status`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                haptic('success');
+                toast(
+                    product.is_available ? 'Товар доступен' : 'Товар скрыт',
+                    'success'
+                );
+
+                if (state.currentView === 'products') {
+                    loadProducts();
+                }
+            } catch (error) {
+                haptic('error');
+                toast('Ошибка обновления', 'error');
+                loadProducts(); // Revert on error
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Удалить товар?')) return;
+
+            haptic('heavy');
+
+            try {
+                // Optimistic UI - fade out card
+                const card = document.querySelector(`[data-product-id="${id}"]`);
+                if (card) {
+                    card.style.opacity = '0.5';
+                    card.style.pointerEvents = 'none';
+                }
+
+                await apiFetch(`/api/partner/products/${id}`, { method: 'DELETE' });
+
+                state.products = state.products.filter(p => p.id !== id);
+                haptic('success');
+                toast('Товар удален', 'success');
+                loadProducts();
+            } catch (error) {
+                haptic('error');
+                toast('Ошибка удаления товара', 'error');
+                loadProducts(); // Restore on error
+            }
+        }
+
+        // ============================================
+        // STATS
+        // ============================================
+        async function loadStats(options = {}) {
+            const { refresh = false } = options;
+            showLoading('stats');
+
+            try {
+                if (
+                    refresh ||
+                    !Array.isArray(state.orders) ||
+                    !Array.isArray(state.products) ||
+                    (state.orders.length === 0 && state.products.length === 0)
+                ) {
+                    const [orders, products] = await Promise.all([
+                        apiFetch('/api/partner/orders'),
+                        apiFetch('/api/partner/products')
+                    ]);
+                    state.orders = normalizeOrders(orders);
+                    state.products = normalizeProducts(products);
+                    syncAllProducts(state.products);
+                    updateNotificationBadge();
+                }
+
+                // Get stats data
+                const stats = calculateStats();
+                renderStats(stats);
+            } catch (error) {
+                document.querySelector('.content').innerHTML = `
+                    <div class="container">
+                        <div class="error-state">
+                            <div class="error-icon">
+                                <i data-lucide="alert-triangle" class="icon-48"></i>
+                            </div>
+                            <p class="error-title">Ошибка загрузки</p>
+                            <p class="error-text">Не удалось загрузить статистику</p>
+                            <button class="btn btn-primary error-action ripple" onclick="loadStats()">
+                                Повторить
+                            </button>
+                        </div>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        function calculateStats() {
+            // Calculate statistics from orders and products
+            const orders = state.orders || [];
+            const products = state.products || [];
+
+            // Revenue by day (last 7 days)
+            const today = new Date();
+            const last7Days = Array.from({length: 7}, (_, i) => {
+                const date = new Date(today);
+                date.setDate(date.getDate() - (6 - i));
+                return {
+                    date: date,
+                    day: date.toLocaleDateString('ru-RU', { weekday: 'short' }),
+                    revenue: 0,
+                    orders: 0
+                };
+            });
+
+            // Group orders by date
+            orders.forEach(order => {
+                if (getOrderStatus(order) === 'completed') {
+                    const orderDate = parseDate(order.created_at);
+                    if (!orderDate) return;
+                    const dayIndex = last7Days.findIndex(d =>
+                        d.date.toDateString() === orderDate.toDateString()
+                    );
+                    if (dayIndex >= 0) {
+                        last7Days[dayIndex].revenue += Number(order.price) || 0;
+                        last7Days[dayIndex].orders += 1;
+                    }
+                }
+            });
+
+            // Top products (by order count)
+            const productStats = {};
+            orders.forEach(order => {
+                if (order.product_id) {
+                    if (!productStats[order.product_id]) {
+                        const product = products.find(p => p.id === order.product_id);
+                        productStats[order.product_id] = {
+                            name: product?.name || 'Товар',
+                            orders: 0,
+                            revenue: 0
+                        };
+                    }
+                    productStats[order.product_id].orders += 1;
+                    productStats[order.product_id].revenue += Number(order.price) || 0;
+                }
+            });
+
+            const topProducts = Object.values(productStats)
+                .sort((a, b) => b.orders - a.orders)
+                .slice(0, 5);
+
+            // Orders by status
+            const ordersByStatus = {
+                new: orders.filter(o => getOrderStatus(o) === 'new').length,
+                preparing: orders.filter(o => getOrderStatus(o) === 'preparing').length,
+                ready: orders.filter(o => getOrderStatus(o) === 'ready').length,
+                delivering: orders.filter(o => getOrderStatus(o) === 'delivering').length,
+                completed: orders.filter(o => getOrderStatus(o) === 'completed').length,
+                cancelled: orders.filter(o => ['cancelled', 'rejected'].includes(getOrderStatus(o))).length
+            };
+
+            // Peak hours
+            const hourStats = Array(24).fill(0);
+            orders.forEach(order => {
+                const hour = parseDate(order.created_at)?.getHours();
+                if (hour == null) return;
+                hourStats[hour]++;
+            });
+            const peakHour = hourStats.indexOf(Math.max(...hourStats));
+
+            // Total stats
+            const totalRevenue = orders
+                .filter(o => getOrderStatus(o) === 'completed')
+                .reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+
+            const totalOrders = orders.length;
+            const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+            return {
+                last7Days,
+                topProducts,
+                ordersByStatus,
+                peakHour,
+                totalRevenue,
+                totalOrders,
+                avgOrderValue
+            };
+        }
+
+        function renderStats(stats) {
+            const maxRevenue = Math.max(...stats.last7Days.map(d => d.revenue), 1);
+
+            document.querySelector('.content').innerHTML = `
+                <div class="container fade-in">
+                    <div class="section-header">
+                        <div>
+                            <h2 class="section-title with-icon">
+                                <i data-lucide="bar-chart-3" class="icon-18"></i>
+                                Статистика
+                            </h2>
+                            <p class="section-subtitle">Сводка за 7 дней</p>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics -->
+                    <div class="stats-grid mb-xl">
+                        <div class="stat-card primary">
+                            <div class="stat-value">${formatPrice(stats.totalRevenue)}</div>
+                            <div class="stat-label">Всего выручка</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-value">${stats.totalOrders}</div>
+                            <div class="stat-label">Всего заказов</div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="stat-value">${formatPrice(stats.avgOrderValue)}</div>
+                            <div class="stat-label">Средний чек</div>
+                        </div>
+
+                        <div class="stat-card success">
+                            <div class="stat-value">${stats.peakHour}:00</div>
+                            <div class="stat-label">Пик заказов</div>
+                        </div>
+                    </div>
+
+                    <!-- Revenue Chart -->
+                    <div class="dashboard-card mb-lg">
+                        <h3 class="card-title">
+                            <i data-lucide="trending-up" class="card-icon"></i>
+                            Выручка за неделю
+                        </h3>
+                        <div class="chart-container compact">
+                            ${stats.last7Days.map(day => `
+                                <div class="chart-bar-wrapper flex-1">
+                                    <div class="chart-bar-value compact">
+                                        ${day.revenue > 0 ? formatPrice(day.revenue).replace(' сум', '') : '—'}
+                                    </div>
+                                    <div class="chart-bar-container compact">
+                                        <div class="chart-bar" style="
+                                            width: 100%;
+                                            height: ${day.revenue > 0 ? (day.revenue / maxRevenue * 100) : 0}%;
+                                            background: linear-gradient(180deg, #21A038 0%, #1a7f2c 100%);
+                                            border-radius: 6px 6px 0 0;
+                                            min-height: ${day.revenue > 0 ? '4px' : '0'};
+                                            transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                                        "></div>
+                                    </div>
+                                    <div class="chart-bar-label compact">
+                                        ${day.day}
+                                    </div>
+                                    <div class="chart-subnote">
+                                        ${day.orders} зак.
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Top Products -->
+                    ${stats.topProducts.length > 0 ? `
+                        <div class="dashboard-card mb-lg">
+                            <h3 class="card-title">
+                                <i data-lucide="trophy" class="card-icon"></i>
+                                Топ товаров
+                            </h3>
+                            <div class="list">
+                                ${stats.topProducts.map((product, index) => {
+                                    const medalClass = index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : 'default';
+                                    return `
+                                    <div class="list-item ripple spacious">
+                                        <div class="stat-list-row">
+                                            <div class="top-product-medal ${medalClass}">
+                                                ${index + 1}
+                                            </div>
+                                            <div class="flex-1">
+                                                <div class="stat-list-title">
+                                                    ${product.name}
+                                                </div>
+                                                <div class="stat-list-meta">
+                                                    <i data-lucide="package" class="icon-16"></i>
+                                                    <span>${product.orders} ${product.orders === 1 ? 'заказ' : product.orders < 5 ? 'заказа' : 'заказов'}</span>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="stat-list-value">
+                                                    ${formatPrice(product.revenue)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `}).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Orders by Status -->
+                    <div class="dashboard-card">
+                        <h3 class="card-title">
+                            <i data-lucide="activity" class="card-icon"></i>
+                            Заказы по статусам
+                        </h3>
+                        <div class="stats-grid compact">
+                            <div class="status-stat-card new ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon new">
+                                        <i data-lucide="sparkles" class="icon-18"></i>
+                                    </div>
+                                    <div class="status-stat-label">Новые</div>
+                                </div>
+                                <div class="stat-value status-stat-value new">${stats.ordersByStatus.new}</div>
+                            </div>
+                            <div class="status-stat-card preparing ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon preparing">
+                                        <i data-lucide="chef-hat" class="icon-18"></i>
+                                    </div>
+                                    <div class="status-stat-label">В работе</div>
+                                </div>
+                                <div class="stat-value status-stat-value preparing">${stats.ordersByStatus.preparing}</div>
+                            </div>
+                            <div class="status-stat-card ready ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon ready">
+                                        <i data-lucide="check-circle" class="icon-18"></i>
+                                    </div>
+                                    <div class="status-stat-label">Готовы</div>
+                                </div>
+                                <div class="stat-value status-stat-value ready">${stats.ordersByStatus.ready}</div>
+                            </div>
+                            <div class="status-stat-card delivering ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon delivering">
+                                        <i data-lucide="truck" class="icon-18"></i>
+                                    </div>
+                                    <div class="status-stat-label">В доставке</div>
+                                </div>
+                                <div class="stat-value status-stat-value delivering">${stats.ordersByStatus.delivering}</div>
+                            </div>
+                            <div class="status-stat-card completed ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon completed">
+                                        <i data-lucide="check" class="icon-18"></i>
+                                    </div>
+                                    <div class="status-stat-label">Завершены</div>
+                                </div>
+                                <div class="stat-value status-stat-value completed">${stats.ordersByStatus.completed}</div>
+                            </div>
+                            <div class="status-stat-card cancelled ripple">
+                                <div class="status-stat-header">
+                                    <div class="status-stat-icon cancelled">
+                                        <i data-lucide="x-circle" class="icon-18"></i>
+                                    </div>
+                                    <div class="status-stat-label">Отменены</div>
+                                </div>
+                                <div class="stat-value status-stat-value cancelled">${stats.ordersByStatus.cancelled}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        // ============================================
+        // SETTINGS
+        // ============================================
+        async function loadSettings() {
+            showLoading('settings');
+
+            try {
+                // Load fresh store data if needed
+                if (!state.store) {
+                    console.log('🔄 Loading store data...');
+                    state.store = await apiFetch('/api/partner/store');
+                    console.log('✅ Store data loaded:', state.store);
+                }
+
+                const deliveryEnabled = Boolean(state.store?.delivery_enabled);
+                const minOrderAmount = Number(state.store?.min_order_amount ?? state.store?.min_order ?? 0);
+                const deliveryPrice = Number(state.store?.delivery_price ?? state.store?.delivery_cost ?? 0);
+                const latValue = Number(state.store?.latitude);
+                const lonValue = Number(state.store?.longitude);
+                const coordsLabel = (Number.isFinite(latValue) && Number.isFinite(lonValue))
+                    ? `${latValue.toFixed(5)}, ${lonValue.toFixed(5)}`
+                    : 'Не установлена';
+                const workingHoursLabel = formatWorkingHours(state.store?.working_hours);
+                updateHeaderStatus(state.store?.is_open);
+
+                document.querySelector('.content').innerHTML = `
+                    <div class="container fade-in">
+                        <div class="section-header">
+                            <div>
+                                <h2 class="section-title with-icon">
+                                    <i data-lucide="settings" class="icon-18"></i>
+                                    Настройки
+                                </h2>
+                                <p class="section-subtitle">Профиль, доставка и график</p>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card mb-lg">
+                            <h3 class="card-title">
+                                <i data-lucide="store" class="card-icon"></i>
+                                Профиль магазина
+                            </h3>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Название</div>
+                                        <div class="list-subtitle" id="settingsStoreName">${state.store?.name || 'Загрузка...'}</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-ghost ripple" onclick="editStoreProfile()">
+                                    <i data-lucide="edit"></i>
+                                </button>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Адрес</div>
+                                        <div class="list-subtitle">${state.store?.address || 'Не указан'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Геолокация</div>
+                                        <div class="list-subtitle">${coordsLabel}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Область</div>
+                                        <div class="list-subtitle">${state.store?.region || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Район</div>
+                                        <div class="list-subtitle">${state.store?.district || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Телефон</div>
+                                        <div class="list-subtitle">${state.store?.phone || 'Не указан'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Статус</div>
+                                        <div class="list-subtitle">
+                                            <span class="meta-chip ${state.store?.is_open ? 'status-open' : 'status-closed'}">
+                                                ${state.store?.is_open ? 'Открыто' : 'Закрыто'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm ${state.store?.is_open ? 'btn-danger' : 'btn-success'} ripple" onclick="toggleStoreStatus()">
+                                    ${state.store?.is_open ? 'Закрыть' : 'Открыть'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card mb-lg">
+                            <h3 class="card-title">
+                                <i data-lucide="clock" class="card-icon"></i>
+                                Режим работы
+                            </h3>
+                            <div class="list-item">
+                                <div class="list-content">
+                                    <div class="list-info">
+                                        <div class="list-title">Ежедневно</div>
+                                        <div class="list-subtitle">${workingHoursLabel}</div>
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-ghost ripple" onclick="editWorkingHours()">
+                                    <i data-lucide="edit"></i>
+                                </button>
+                            </div>
+                            <div class="form-hint text-muted">По умолчанию используется для новых товаров.</div>
+                        </div>
+
+                        <div class="dashboard-card mb-lg">
+                            <h3 class="card-title">
+                                <i data-lucide="truck" class="card-icon"></i>
+                                Доставка
+                            </h3>
+                            <div class="list-item">
+                                <span class="list-title">Минимальный заказ</span>
+                                <span class="list-value">${formatPrice(state.store?.min_order || 0)}</span>
+                        </div>
+                        <div class="list-item">
+                            <span class="list-title">Стоимость доставки</span>
+                            <span class="list-value">${formatPrice(state.store?.delivery_cost || 0)}</span>
+                        </div>
+                        <button class="btn btn-sm btn-primary mt-12" onclick="toast('Функция в разработке', 'info')" >
+                            Изменить настройки
+                        </button>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <h3 class="card-title">
+                            <i data-lucide="bell" class="card-icon"></i>
+                            Уведомления
+                        </h3>
+                        <div class="list-item">
+                            <span class="list-title">Новые заказы</span>
+                            <button class="btn btn-sm btn-success ripple" onclick="haptic('light'); toast('Уведомления включены', 'success')">
+                                Включено
+                            </button>
+                        </div>
+                        <div class="list-item">
+                            <span class="list-title">Отмены заказов</span>
+                            <button class="btn btn-sm btn-success ripple" onclick="haptic('light'); toast('Уведомления включены', 'success')">
+                                Включено
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            } catch (error) {
+                console.error('❌ Error loading settings:', error);
+                document.querySelector('.content').innerHTML = `
+                    <div class="container">
+                        <div class="error-state">
+                            <div class="error-icon">
+                                <i data-lucide="alert-triangle" class="icon-48"></i>
+                            </div>
+                            <p class="error-title">Ошибка загрузки настроек</p>
+                            <p class="error-text">${error.message || 'Не удалось загрузить настройки'}</p>
+                            <div class="error-details">
+                                <p style="font-size: 12px; color: #666; margin-top: 8px;">
+                                    ${error.stack ? error.stack.split('\n')[0] : ''}
+                                </p>
+                            </div>
+                            <button class="btn btn-primary error-action ripple" onclick="loadSettings()">
+                                Повторить
+                            </button>
+                        </div>
+                    </div>
+                `;
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        function editWorkingHours() {
+            haptic('light');
+            const parsed = parseWorkingHours(state.store?.working_hours) || parseWorkingHours(DEFAULT_WORKING_HOURS) || {
+                start: '08:00',
+                end: '23:00'
+            };
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-sm">
+                    <div class="modal-header">
+                        <h3>Режим работы</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="saveWorkingHours(event)">
+                        <div class="modal-body">
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label>С</label>
+                                    <input type="time" name="working_from" value="${parsed.start}" required class="search-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>До</label>
+                                    <input type="time" name="working_until" value="${parsed.end}" required class="search-input">
+                                </div>
+                            </div>
+                            <div class="form-hint text-muted">Этот график используется по умолчанию для новых товаров.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">Сохранить</button>
+                            <button type="button" class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    haptic('light');
+                    modal.remove();
+                }
+            });
+        }
+
+        async function saveWorkingHours(event) {
+            event.preventDefault();
+            haptic('medium');
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const workingFrom = normalizeTimeValue(formData.get('working_from'));
+            const workingUntil = normalizeTimeValue(formData.get('working_until'));
+
+            if (!workingFrom || !workingUntil) {
+                toast('Укажите время работы', 'error');
+                return;
+            }
+
+            const working_hours = `${workingFrom} - ${workingUntil}`;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
+
+            try {
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
+                    body: JSON.stringify({ working_hours })
+                });
+
+                state.store = { ...state.store, working_hours };
+                haptic('success');
+                toast('Режим работы сохранён', 'success');
+                form.closest('.modal-overlay')?.remove();
+
+                if (state.currentView === 'settings') {
+                    loadSettings();
+                }
+            } catch (error) {
+                haptic('error');
+                toast('Ошибка сохранения режима работы', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        }
+
+        function editStoreProfile() {
+            haptic('light');
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-md">
+                    <div class="modal-header">
+                        <h3>Редактировать профиль</h3>
+                        <button class="btn-icon ripple" onclick="closeStoreProfileModal(this.closest('.modal-overlay'))">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="saveStoreProfile(event)">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Название магазина *</label>
+                                <input type="text" name="name" value="${state.store?.name || ''}" required class="search-input"
+                                       minlength="3" maxlength="50" oninput="validateField(this)">
+                                <div class="form-error hidden">Минимум 3 символа</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Адрес</label>
+                                <input type="text" name="address" value="${state.store?.address || ''}" class="search-input"
+                                       maxlength="200" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Geolokatsiya</label>
+                                <div class="geo-actions">
+                                    <button type="button" class="btn btn-sm btn-secondary ripple" onclick="useStoreCurrentLocation()">
+                                        Моя геолокация
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-ghost ripple" onclick="geocodeStoreAddress()">
+                                        Найти по адресу
+                                    </button>
+                                </div>
+                                <div id="storeLocationMap" class="store-location-map"></div>
+                                <div class="geo-coords">
+                                    <input type="text" name="latitude" value="${state.store?.latitude || ''}" class="search-input" placeholder="Latitude" readonly>
+                                    <input type="text" name="longitude" value="${state.store?.longitude || ''}" class="search-input" placeholder="Longitude" readonly>
+                                </div>
+                                <div class="geo-hint">Нажмите на карту, чтобы поставить точку.</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Viloyat</label>
+                                <input type="text" name="region" value="${state.store?.region || ''}" class="search-input"
+                                       maxlength="100" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Tuman</label>
+                                <input type="text" name="district" value="${state.store?.district || ''}" class="search-input"
+                                       maxlength="100" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Телефон</label>
+                                <input type="tel" name="phone" value="${state.store?.phone || ''}" placeholder="+998 XX XXX XX XX"
+                                       class="search-input" pattern="\+998\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}" oninput="validateField(this)">
+                                <div class="form-error hidden">Некорректный формат</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Описание</label>
+                                <textarea name="description" rows="3" class="search-input" maxlength="300"
+                                          oninput="validateField(this)">${state.store?.description || ''}</textarea>
+                                <div class="form-hint text-muted">0/300</div>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">Сохранить</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeStoreProfileModal(this.closest('.modal-overlay'))">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+            initStoreLocationMap(modal);
+
+            // Setup character counter for description
+            const textarea = modal.querySelector('textarea[name="description"]');
+            const counter = textarea.nextElementSibling;
+            textarea.addEventListener('input', () => {
+                counter.textContent = `${textarea.value.length}/300`;
+            });
+            counter.textContent = `${textarea.value.length}/300`;
+
+            // Auto-focus first input
+            setTimeout(() => modal.querySelector('input[name="name"]').focus(), 100);
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    haptic('light');
+                    closeStoreProfileModal(modal);
+                }
+            });
+        }
+
+        let storeLocationMap = null;
+        let storeLocationMarker = null;
+        let storeLocationModal = null;
+
+        function closeStoreProfileModal(modal) {
+            if (!modal) return;
+            cleanupStoreLocationMap();
+            modal.remove();
+        }
+
+        function initStoreLocationMap(modal) {
+            storeLocationModal = modal;
+            const mapEl = modal.querySelector('#storeLocationMap');
+            if (!mapEl) return;
+            if (typeof L === 'undefined') {
+                mapEl.innerHTML = '<div class="geo-hint">Карта недоступна</div>';
+                return;
+            }
+
+            const latInput = modal.querySelector('input[name="latitude"]');
+            const lonInput = modal.querySelector('input[name="longitude"]');
+            const lat = latInput ? parseFloat(latInput.value) : NaN;
+            const lon = lonInput ? parseFloat(lonInput.value) : NaN;
+            const hasCoords = Number.isFinite(lat) && Number.isFinite(lon);
+
+            const startLat = hasCoords ? lat : 41.3111;
+            const startLon = hasCoords ? lon : 69.2797;
+
+            cleanupStoreLocationMap();
+            storeLocationModal = modal;
+            storeLocationMap = L.map(mapEl, { scrollWheelZoom: false });
+            storeLocationMap.setView([startLat, startLon], hasCoords ? 15 : 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(storeLocationMap);
+
+            storeLocationMap.on('click', (e) => {
+                setStoreLocation(e.latlng.lat, e.latlng.lng, true);
+            });
+
+            if (hasCoords) {
+                storeLocationMarker = L.marker([lat, lon], { draggable: true }).addTo(storeLocationMap);
+                storeLocationMarker.on('dragend', () => {
+                    const pos = storeLocationMarker.getLatLng();
+                    setStoreLocation(pos.lat, pos.lng, false);
+                });
+            }
+
+            setTimeout(() => {
+                if (storeLocationMap) {
+                    storeLocationMap.invalidateSize();
+                }
+            }, 120);
+        }
+
+        function setStoreLocation(lat, lon, moveMap) {
+            if (!storeLocationMap) return;
+            if (!storeLocationMarker) {
+                storeLocationMarker = L.marker([lat, lon], { draggable: true }).addTo(storeLocationMap);
+                storeLocationMarker.on('dragend', () => {
+                    const pos = storeLocationMarker.getLatLng();
+                    setStoreLocation(pos.lat, pos.lng, false);
+                });
+            } else {
+                storeLocationMarker.setLatLng([lat, lon]);
+            }
+
+            if (moveMap) {
+                const zoom = Math.max(storeLocationMap.getZoom(), 15);
+                storeLocationMap.setView([lat, lon], zoom);
+            }
+
+            const latInput = storeLocationModal?.querySelector('input[name="latitude"]');
+            const lonInput = storeLocationModal?.querySelector('input[name="longitude"]');
+            if (latInput) latInput.value = lat.toFixed(6);
+            if (lonInput) lonInput.value = lon.toFixed(6);
+        }
+
+        function useStoreCurrentLocation() {
+            if (!navigator.geolocation) {
+                toast('Геолокация недоступна', 'error');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    setStoreLocation(latitude, longitude, true);
+                    toast('Точка установлена', 'success');
+                },
+                () => {
+                    toast('Не удалось получить геолокацию', 'error');
+                },
+                { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+            );
+        }
+
+        async function geocodeStoreAddress() {
+            const addressInput = storeLocationModal?.querySelector('input[name="address"]');
+            const query = addressInput?.value?.trim();
+            if (!query) {
+                toast('Введите адрес', 'error');
+                return;
+            }
+
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`;
+                const resp = await fetch(url);
+                if (!resp.ok) throw new Error('Geocode failed');
+                const data = await resp.json();
+                if (!data || !data.length) {
+                    toast('Адрес не найден', 'error');
+                    return;
+                }
+                const item = data[0];
+                const lat = parseFloat(item.lat);
+                const lon = parseFloat(item.lon);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                    toast('Адрес не найден', 'error');
+                    return;
+                }
+                setStoreLocation(lat, lon, true);
+                toast('Точка найдена, проверьте карту', 'success');
+            } catch (error) {
+                console.error('Geocode error:', error);
+                toast('Ошибка геокодирования', 'error');
+            }
+        }
+
+        function cleanupStoreLocationMap() {
+            if (storeLocationMap) {
+                storeLocationMap.off();
+                storeLocationMap.remove();
+            }
+            storeLocationMap = null;
+            storeLocationMarker = null;
+            storeLocationModal = null;
+        }
+
+        function editDeliverySettings() {
+            haptic('light');
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay scale-in';
+            modal.innerHTML = `
+                <div class="modal-content modal-md">
+                    <div class="modal-header">
+                        <h3>Настройки доставки</h3>
+                        <button class="btn-icon ripple" onclick="this.closest('.modal-overlay').remove()">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <form onsubmit="saveDeliverySettings(event)">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="delivery_enabled" ${state.store?.delivery_enabled ? 'checked' : ''}>
+                                    <span>Доставка включена</span>
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Минимальный заказ (сум)</label>
+                                <input type="number" name="min_order_amount" value="${state.store?.min_order_amount ?? state.store?.min_order ?? 0}"
+                                       min="0" step="1" class="search-input" oninput="validateField(this)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Стоимость доставки (сум)</label>
+                                <input type="number" name="delivery_price" value="${state.store?.delivery_price ?? state.store?.delivery_cost ?? 0}"
+                                       min="0" step="1" class="search-input" oninput="validateField(this)">
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary ripple">Сохранить</button>
+                            <button type="button" class="btn btn-secondary ripple" onclick="this.closest('.modal-overlay').remove()">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    haptic('light');
+                    modal.remove();
+                }
+            });
+        }
+
+        async function saveDeliverySettings(event) {
+            event.preventDefault();
+            haptic('medium');
+
+            const formData = new FormData(event.target);
+            const deliveryEnabled = formData.get('delivery_enabled') === 'on';
+            const minOrderAmount = parseInt(formData.get('min_order_amount'), 10) || 0;
+            const deliveryPrice = parseInt(formData.get('delivery_price'), 10) || 0;
+
+            try {
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        delivery_enabled: deliveryEnabled,
+                        min_order_amount: minOrderAmount,
+                        delivery_price: deliveryPrice
+                    })
+                });
+
+                state.store = {
+                    ...state.store,
+                    delivery_enabled: deliveryEnabled,
+                    min_order_amount: minOrderAmount,
+                    delivery_price: deliveryPrice,
+                    min_order: minOrderAmount,
+                    delivery_cost: deliveryPrice
+                };
+
+                toast('\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b', 'success');
+                closeStoreProfileModal(document.querySelector('.modal-overlay'));
+                loadSettings();
+            } catch (error) {
+                console.error('Delivery settings error:', error);
+                toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043a', 'error');
+            }
+        }
+
+        async function saveStoreProfile(event) {
+            event.preventDefault();
+            haptic('medium');
+
+            const formData = new FormData(event.target);
+            const data = {
+                name: formData.get('name'),
+                address: formData.get('address'),
+                region: formData.get('region'),
+                district: formData.get('district'),
+                phone: formData.get('phone'),
+                description: formData.get('description')
+            };
+            const latValue = parseFloat(formData.get('latitude'));
+            const lonValue = parseFloat(formData.get('longitude'));
+            if (Number.isFinite(latValue) && Number.isFinite(lonValue)) {
+                data.latitude = latValue;
+                data.longitude = lonValue;
+            }
+
+            // Show loading state
+            const submitBtn = event.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<div class="spinner spinner-small spinner-center"></div>';
+
+            try {
+                await apiFetch('/api/partner/store', {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+
+                // Refresh store data to pick up server-side geocoding
+                state.store = await apiFetch('/api/partner/store');
+                document.getElementById('storeName').textContent = state.store?.name || data.name;
+
+                haptic('success');
+                toast('Профиль обновлен', 'success');
+                document.querySelector('.modal-overlay')?.remove();
+                loadSettings();
+            } catch (error) {
+                haptic('error');
+                toast('Ошибка сохранения', 'error');
+
+                // Restore button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        }
+
+        async function toggleStoreStatus() {
+            try {
+                haptic('medium');
+
+                const newStatus = !state.store?.is_open;
+
+                // Optimistic UI update
+                state.store.is_open = newStatus;
+                updateHeaderStatus(newStatus);
+                if (state.currentView === 'dashboard') {
+                    renderDashboard();
+                }
+
+                const form = new FormData();
+                form.append('is_open', newStatus ? 'true' : 'false');
+                await apiFetch('/api/partner/store/status', {
+                    method: 'PATCH',
+                    body: form
+                });
+
+                haptic('success');
+                toast(newStatus ? 'Магазин открыт' : 'Магазин закрыт', 'success');
+
+                // Refresh store info
+                state.store = await apiFetch('/api/partner/store');
+                document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
+
+                if (state.currentView === 'settings') {
+                    loadSettings();
+                }
+            } catch (error) {
+                haptic('error');
+                toast('Ошибка изменения статуса', 'error');
+                try {
+                    state.store = await apiFetch('/api/partner/store');
+                    updateHeaderStatus(state.store?.is_open);
+                    document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
+                } catch (_) {}
+
+                if (state.currentView === 'dashboard') {
+                    renderDashboard();
+                } else if (state.currentView === 'settings') {
+                    loadSettings();
+                }
+            }
+        }
+
+        // ============================================
+        // SMART UX DATA
+        // ============================================
+        const categoryDefaults = {
+            'bakery': { unit: 'шт', quantity: 10, expiry_days: 1 },
+            'dairy': { unit: 'л', quantity: 20, expiry_days: 5 },
+            'meat': { unit: 'кг', quantity: 5, expiry_days: 3 },
+            'fruits': { unit: 'кг', quantity: 10, expiry_days: 7 },
+            'vegetables': { unit: 'кг', quantity: 10, expiry_days: 7 },
+            'drinks': { unit: 'л', quantity: 24, expiry_days: 90 },
+            'snacks': { unit: 'шт', quantity: 20, expiry_days: 30 },
+            'sweets': { unit: 'шт', quantity: 15, expiry_days: 30 },
+            'frozen': { unit: 'кг', quantity: 5, expiry_days: 180 },
+            'other': { unit: 'шт', quantity: 10, expiry_days: 30 }
+        };
+
+        const popularProducts = {
+            'bakery': ['Хлеб белый', 'Лаваш узбекский', 'Батон', 'Булочка', 'Самса'],
+            'dairy': ['Молоко 3.2%', 'Кефир', 'Сметана 20%', 'Творог', 'Йогурт', 'Айран'],
+            'meat': ['Курица охлажденная', 'Говядина', 'Баранина', 'Колбаса', 'Сосиски'],
+            'fruits': ['Яблоки', 'Бананы', 'Апельсины', 'Мандарины', 'Виноград', 'Груши'],
+            'vegetables': ['Картофель', 'Морковь', 'Лук', 'Помидоры', 'Огурцы', 'Капуста'],
+            'drinks': ['Вода питьевая', 'Сок апельсиновый', 'Coca-Cola', 'Чай черный', 'Кофе'],
+            'snacks': ['Чипсы', 'Сухарики', 'Орехи', 'Шоколад', 'Конфеты'],
+            'sweets': ['Пирожное', 'Печенье', 'Зефир', 'Мармелад', 'Торт'],
+            'frozen': ['Пельмени', 'Мороженое', 'Рыба замороженная', 'Овощи замороженные'],
+            'other': ['Хлопок', 'Бумажные полотенца', 'Мыло', 'Шампунь']
+        };
+
+        // ============================================
+        // HELPERS
+        // ============================================
+        function formatPrice(price) {
+            if (price == null || price === '' || isNaN(price)) {
+                return '0 сум';
+            }
+
+            // Convert to number and round (no decimals for uzbek som)
+            const num = Math.round(Number(price));
+
+            // Format with thousand separators
+            const formatted = num.toLocaleString('ru-RU', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+
+            return `${formatted} сум`;
+        }
+
+        function parseDate(dateString) {
+            if (!dateString) return null;
+            const trimmed = String(dateString).trim();
+            const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed);
+            const normalized = hasTimezone ? trimmed : `${trimmed}Z`;
+            const date = new Date(normalized);
+            return Number.isNaN(date.getTime()) ? null : date;
+        }
+
+        function formatTime(dateString) {
+            const date = parseDate(dateString);
+            if (!date) return '';
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function normalizeTimeValue(value) {
+            if (!value) return '';
+            let raw = String(value).trim();
+            if (!raw) return '';
+            if (raw.includes('T')) {
+                raw = raw.split('T')[1];
+            }
+            const parts = raw.split(':');
+            if (parts.length < 2) return '';
+            const hours = parts[0].padStart(2, '0');
+            const minutes = parts[1].padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        function parseWorkingHours(value) {
+            if (!value) return null;
+            const match = String(value).match(/(\d{1,2}:\d{2}).*(\d{1,2}:\d{2})/);
+            if (!match) return null;
+            const start = normalizeTimeValue(match[1]);
+            const end = normalizeTimeValue(match[2]);
+            if (!start || !end) return null;
+            return { start, end };
+        }
+
+        function formatWorkingHours(value) {
+            const parsed = parseWorkingHours(value);
+            if (parsed) return `${parsed.start} - ${parsed.end}`;
+            return DEFAULT_WORKING_HOURS;
+        }
+
+        function formatElapsed(dateString) {
+            const date = parseDate(dateString);
+            if (!date) return '';
+            const diffMs = Date.now() - date.getTime();
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return '\u0442\u043e\u043b\u044c\u043a\u043e \u0447\u0442\u043e';
+            if (diffMin < 60) return `${diffMin} \u043c\u0438\u043d \u043d\u0430\u0437\u0430\u0434`;
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return `${diffHr} \u0447 \u043d\u0430\u0437\u0430\u0434`;
+            const diffDay = Math.floor(diffHr / 24);
+            return `${diffDay} \u0434 \u043d\u0430\u0437\u0430\u0434`;
+        }
+
+
+        function getSlaInfo(status, createdAt) {
+            const date = parseDate(createdAt);
+            if (!date) return { label: '', tone: '' };
+            const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+            if (minutes < 0) return { label: '', tone: '' };
+
+            const thresholds = {
+                pending: 10,
+                new: 10,
+                preparing: 25,
+                ready: 20,
+                delivering: 40,
+            };
+            const limit = thresholds[status] || 0;
+            if (!limit) return { label: `${minutes} \u043c\u0438\u043d`, tone: 'sla-ok' };
+
+            if (minutes >= limit * 2) {
+                return { label: `${minutes} \u043c\u0438\u043d`, tone: 'sla-bad' };
+            }
+            if (minutes >= limit) {
+                return { label: `${minutes} \u043c\u0438\u043d`, tone: 'sla-warn' };
+            }
+            return { label: `${minutes} \u043c\u0438\u043d`, tone: 'sla-ok' };
+        }
+
+
+        function isToday(dateString) {
+            const date = parseDate(dateString);
+            if (!date) return false;
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        function isYesterday(dateString) {
+            const date = parseDate(dateString);
+            if (!date) return false;
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            return date.toDateString() === yesterday.toDateString();
+        }
+
+        function getOrderType(order) {
+            if (!order) return 'pickup';
+            const type = order.order_type || order.type;
+            if (type === 'delivery') return 'delivery';
+            if (type === 'pickup') return 'pickup';
+            if (order.delivery_address) return 'delivery';
+            return 'pickup';
+        }
+
+        function getStatusText(status, orderType) {
+            const normalizedStatus = normalizeOrderStatus(status);
+            const isDelivery = orderType === 'delivery';
+            const statusMap = {
+                pending: 'Ждёт подтверждения',
+                new: 'Новый',
+                preparing: 'Готовится',
+                ready: isDelivery ? 'Ожидает курьера' : 'Готов к выдаче',
+                delivering: 'В пути',
+                completed: isDelivery ? 'Доставлен' : 'Выдан',
+                cancelled: 'Отменён',
+                rejected: 'Отклонён'
+            };
+            return statusMap[normalizedStatus] || normalizedStatus || status;
+        }
+
+
+        function getPaymentStatusText(paymentStatus, paymentMethod) {
+            if (!paymentStatus) return '';
+            const statusMap = {
+                'not_required': '\u0411\u0435\u0437 \u043e\u043f\u043b\u0430\u0442\u044b',
+                'awaiting_payment': '\u041e\u0436\u0438\u0434\u0430\u0435\u0442 \u043e\u043f\u043b\u0430\u0442\u0443',
+                'awaiting_proof': '\u041d\u0443\u0436\u0435\u043d \u0447\u0435\u043a',
+                'proof_submitted': '\u0427\u0435\u043a \u043d\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0435',
+                'confirmed': '\u041e\u043f\u043b\u0430\u0447\u0435\u043d',
+                'rejected': '\u041e\u043f\u043b\u0430\u0442\u0430 \u043e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u0430'
+            };
+            const label = statusMap[paymentStatus] || paymentStatus;
+            if (paymentMethod && paymentStatus !== 'not_required') {
+                return `${label} (${paymentMethod})`;
+            }
+            return label;
+        }
+
+        function getPaymentStatusTone(paymentStatus) {
+            if (!paymentStatus) return '';
+            if (paymentStatus === 'confirmed' || paymentStatus === 'not_required') return 'payment-ok';
+            if (paymentStatus === 'rejected') return 'payment-bad';
+            return 'payment-warn';
+        }
+
+
+        function refreshAll() {
+            const view = state.currentView;
+            switch(view) {
+                case 'dashboard': loadDashboard(); break;
+                case 'orders': loadOrders(); break;
+                case 'products': loadProducts(); break;
+                case 'stats': loadStats(); break;
+                case 'settings': loadSettings(); break;
+            }
+            toast('Обновлено', 'success');
+        }
+
+        // Pull-to-Refresh
+        let touchStartY = 0;
+        let pullDistance = 0;
+        let isPulling = false;
+        let initialScrollY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            initialScrollY = window.scrollY;
+            isPulling = initialScrollY === 0;
+
+            if (isPulling) {
+                touchStartY = e.touches[0].clientY;
+                pullDistance = 0;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isPulling) return;
+
+            // If user already scrolled the page, don't block native scrolling
+            if (window.scrollY > 0) {
+                isPulling = false;
+                document.body.style.transform = '';
+                return;
+            }
+
+            const currentY = e.touches[0].clientY;
+            pullDistance = currentY - touchStartY;
+
+            if (pullDistance > 0 && pullDistance < 140) {
+                e.preventDefault();
+                document.body.style.transform = `translateY(${pullDistance * 0.5}px)`;
+            } else if (pullDistance <= 0) {
+                isPulling = false;
+                document.body.style.transform = '';
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => {
+            if (isPulling && pullDistance > 80) {
+                refreshAll();
+                if (typeof tg?.HapticFeedback !== 'undefined') {
+                    tg.HapticFeedback.impactOccurred('medium');
+                }
+            }
+            document.body.style.transform = '';
+            isPulling = false;
+            pullDistance = 0;
+            initialScrollY = 0;
+        });
+
+        // ============================================
+        // KEYBOARD NAVIGATION - v22.0
+        // ============================================
+        function setupKeyboardNavigation() {
+            document.addEventListener('keydown', (e) => {
+                // Ignore if typing in input/textarea
+                if (e.target.matches('input, textarea, select')) {
+                    // ESC to blur input
+                    if (e.key === 'Escape') {
+                        e.target.blur();
+                        haptic('light');
+                    }
+                    return;
+                }
+
+                // Close modal with ESC
+                if (e.key === 'Escape') {
+                    const modal = document.querySelector('.modal-overlay');
+                    if (modal) {
+                        modal.remove();
+                        haptic('light');
+                        e.preventDefault();
+                    }
+                }
+
+                // Navigate views with Alt + Number
+                if (e.altKey && !e.ctrlKey && !e.shiftKey) {
+                    switch(e.key) {
+                        case '1':
+                            switchView('dashboard');
+                            e.preventDefault();
+                            break;
+                        case '2':
+                            switchView('products');
+                            e.preventDefault();
+                            break;
+                        case '3':
+                            switchView('stats');
+                            e.preventDefault();
+                            break;
+                        case '4':
+                            switchView('settings');
+                            e.preventDefault();
+                            break;
+                    }
+                }
+
+                // Quick actions with Ctrl/Cmd
+                if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+                    switch(e.key.toLowerCase()) {
+                        case 'n':
+                            // New product
+                            if (state.currentView === 'products') {
+                                openProductModal();
+                                e.preventDefault();
+                            }
+                            break;
+                        case 'f':
+                            // Focus search
+                            const searchInput = document.getElementById('productSearch');
+                            if (searchInput) {
+                                searchInput.focus();
+                                e.preventDefault();
+                            }
+                            break;
+                        case 'r':
+                            // Refresh current view
+                            switch(state.currentView) {
+                                case 'dashboard':
+                                    loadDashboard();
+                                    break;
+                                case 'products':
+                                    loadProducts();
+                                    break;
+                                case 'orders':
+                                    loadOrders();
+                                    break;
+                                case 'stats':
+                                    loadStats();
+                                    break;
+                            }
+                            toast('Обновлено', 'info');
+                            e.preventDefault();
+                            break;
+                    }
+                }
+
+                // Tab navigation enhancement
+                if (e.key === 'Tab') {
+                    // Let default Tab behavior work, but add visual feedback
+                    const focusableElements = document.querySelectorAll(
+                        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    );
+
+                    // Add keyboard-focus class to focused element
+                    setTimeout(() => {
+                        focusableElements.forEach(el => el.classList.remove('keyboard-focus'));
+                        if (document.activeElement) {
+                            document.activeElement.classList.add('keyboard-focus');
+                        }
+                    }, 0);
+                }
+            });
+
+            // Show keyboard shortcuts hint
+            const showKeyboardHints = () => {
+                toast('Горячие клавиши', 'info', {
+                    description: 'Alt+1-4: Навигация | Ctrl+N: Новый товар | Ctrl+F: Поиск | Ctrl+R: Обновить',
+                    duration: 5000
+                });
+            };
+
+            // Show hints on Ctrl+?
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+                    showKeyboardHints();
+                    e.preventDefault();
+                }
+            });
+
+            console.log('⌨️ Keyboard navigation enabled');
+        }
+
+        // ============================================
+        // AUTO-REFRESH & NOTIFICATIONS
+        // ============================================
+        let autoRefreshInterval = null;
+        let websocket = null;
+        let wsReconnectTimeout = null;
+        let wsPingInterval = null;
+
+        async function fetchWsToken() {
+            try {
+                const response = await apiFetch('/api/partner/ws-token', { method: 'POST' });
+                return response?.token || '';
+            } catch (error) {
+                console.warn('⚠️ Failed to fetch WS token:', error);
+                return '';
+            }
+        }
+
+        async function connectWebSocket() {
+            // Skip if no store info yet
+            if (!state.store || !state.store.store_id) {
+                console.log('⏸️ Waiting for store info before connecting WebSocket');
+                return;
+            }
+
+            const storeId = state.store.store_id;
+            const auth = getAuth();
+            const params = new URLSearchParams();
+            params.set('store_id', storeId);
+            if (auth.userId && auth.userId !== 'none') {
+                params.set('user_id', auth.userId);
+            }
+            const wsToken = await fetchWsToken();
+            if (wsToken) {
+                params.set('ws_token', wsToken);
+            }
+            const wsUrl = `${API_BASE.replace(/^http/, 'ws')}/ws/notifications?${params.toString()}`;
+
+            console.log(`🔌 Connecting to WebSocket for store ${storeId}`);
+            console.log(`🔐 WebSocket auth:`, { 
+                hasToken: !!wsToken,
+                userId: auth.userId,
+                storeId 
+            });
+
+            try {
+                websocket = new WebSocket(wsUrl);
+
+                websocket.onopen = () => {
+                    console.log('✅ WebSocket connected');
+                    // Clear reconnect timeout
+                    if (wsReconnectTimeout) {
+                        clearTimeout(wsReconnectTimeout);
+                        wsReconnectTimeout = null;
+                    }
+                    if (wsPingInterval) {
+                        clearInterval(wsPingInterval);
+                    }
+                    wsPingInterval = setInterval(() => {
+                        if (websocket && websocket.readyState === WebSocket.OPEN) {
+                            websocket.send('ping');
+                        }
+                    }, 30000);
+                };
+
+                websocket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('📥 WebSocket message:', data);
+
+                        // Handle authentication errors gracefully
+                        if (data.type === 'error') {
+                            if (data.message === 'Authentication required' || data.message === 'Access denied') {
+                                console.warn('⚠️ WebSocket authentication failed (will use polling instead)');
+                                disconnectWebSocket(); // Stop reconnecting
+                                return;
+                            }
+                        }
+
+                        if (data.type === 'notification' && data.payload?.data) {
+                            const payload = data.payload.data;
+                            if (payload.kind === 'new_order' || payload.order_ids) {
+                                handleNewOrderNotification(payload);
+                            } else if (payload.kind === 'order_status_changed') {
+                                handleOrderStatusChanged({
+                                    order_id: payload.order_id,
+                                    status: payload.status
+                                });
+                            }
+                        } else if (data.type === 'new_order') {
+                            handleNewOrderNotification(data.data);
+                        } else if (data.type === 'order_status_changed') {
+                            handleOrderStatusChanged(data.data);
+                        } else if (data.type === 'order_cancelled') {
+                            handleOrderCancelled(data.data);
+                        } else if (data.type === 'connected') {
+                            console.log('✅ WebSocket connection confirmed');
+                        }
+                    } catch (err) {
+                        console.error('❌ Failed to parse WebSocket message:', err);
+                    }
+                };
+
+                websocket.onerror = (error) => {
+                    console.error('❌ WebSocket error:', error);
+                };
+
+                websocket.onclose = (event) => {
+                    console.log('🔌 WebSocket disconnected', { code: event.code, reason: event.reason });
+                    websocket = null;
+                    if (wsPingInterval) {
+                        clearInterval(wsPingInterval);
+                        wsPingInterval = null;
+                    }
+
+                    // Don't reconnect if authentication failed (code 1008 = policy violation)
+                    if (event.code === 1008 || event.reason?.includes('Authentication')) {
+                        console.warn('⚠️ WebSocket closed due to auth error - not reconnecting');
+                        return;
+                    }
+
+                    // Reconnect after 5 seconds for other errors
+                    wsReconnectTimeout = setTimeout(() => {
+                        console.log('🔄 Reconnecting WebSocket...');
+                        connectWebSocket();
+                    }, 5000);
+                };
+
+            } catch (error) {
+                console.error('❌ Failed to connect WebSocket:', error);
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (websocket) {
+                websocket.close();
+                websocket = null;
+            }
+            if (wsReconnectTimeout) {
+                clearTimeout(wsReconnectTimeout);
+                wsReconnectTimeout = null;
+            }
+            if (wsPingInterval) {
+                clearInterval(wsPingInterval);
+                wsPingInterval = null;
+            }
+        }
+
+        function handleNewOrderNotification(orderData) {
+            console.log('🔔 NEW ORDER:', orderData);
+
+            // Play sound if supported
+            try {
+                if (window.Telegram?.WebApp?.HapticFeedback) {
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }
+            } catch (e) {}
+
+            // Show toast notification
+            toast(`Новый заказ #${orderData.order_ids[0]}`, 'info', {
+                description: `${orderData.customer_name} • ${formatPrice(orderData.total)}`
+            });
+
+            // Reload orders if on orders page
+            if (state.currentView === 'orders') {
+                setTimeout(() => loadOrders(), 500);
+            }
+
+            // Update badge
+            updateNotificationBadge();
+        }
+
+        function handleOrderStatusChanged(data) {
+            console.log('📊 Order status changed:', data);
+
+            // Reload orders if on orders page
+            if (state.currentView === 'orders') {
+                setTimeout(() => loadOrders(), 500);
+            }
+        }
+
+        function handleOrderCancelled(data) {
+            console.log('❌ Order cancelled:', data);
+
+            toast(`Заказ #${data.order_id} отменён`, 'warning');
+
+            // Reload orders if on orders page
+            if (state.currentView === 'orders') {
+                setTimeout(() => loadOrders(), 500);
+            }
+        }
+
+        const AUTO_REFRESH_INTERVAL_MS = 30000;
+        let autoRefreshInFlight = false;
+
+        function canAutoRefresh() {
+            if (document.visibilityState !== 'visible') return false;
+            if (document.querySelector('.modal-overlay')) return false;
+            const active = document.activeElement;
+            if (!active) return true;
+            if (active.matches?.('input, textarea, select')) return false;
+            if (active.isContentEditable) return false;
+            return true;
+        }
+
+        function captureProductFilters() {
+            const searchInput = document.getElementById('productSearch');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const discountFilter = document.getElementById('discountFilter');
+
+            return {
+                search: searchInput ? searchInput.value : '',
+                category: categoryFilter ? categoryFilter.value : '',
+                status: statusFilter ? statusFilter.value : '',
+                discount: discountFilter ? discountFilter.value : '',
+                lastAction: lastProductFilterAction || 'filters'
+            };
+        }
+
+        function restoreProductFilters(snapshot) {
+            if (!snapshot) return;
+            const searchInput = document.getElementById('productSearch');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const discountFilter = document.getElementById('discountFilter');
+
+            if (searchInput) searchInput.value = snapshot.search || '';
+            if (categoryFilter) categoryFilter.value = snapshot.category || '';
+            if (statusFilter) statusFilter.value = snapshot.status || '';
+            if (discountFilter) discountFilter.value = snapshot.discount || '';
+
+            const action = snapshot.lastAction || lastProductFilterAction || 'filters';
+            if (action === 'search') {
+                searchProducts(snapshot.search || '');
+            } else {
+                filterProducts();
+            }
+        }
+
+        function runAutoRefresh() {
+            if (autoRefreshInFlight || !canAutoRefresh()) return;
+
+            autoRefreshInFlight = true;
+            const finalize = () => {
+                autoRefreshInFlight = false;
+            };
+            const run = (promise) => Promise.resolve(promise).finally(finalize);
+
+            switch (state.currentView) {
+                case 'orders':
+                    console.log('🔄 Auto-refreshing orders...');
+                    return run(loadOrders());
+                case 'dashboard':
+                    console.log('🔄 Auto-refreshing dashboard...');
+                    return run(loadDashboard());
+                case 'products': {
+                    console.log('🔄 Auto-refreshing products...');
+                    const snapshot = captureProductFilters();
+                    return Promise.resolve(loadProducts())
+                        .then(() => restoreProductFilters(snapshot))
+                        .finally(finalize);
+                }
+                case 'stats':
+                    console.log('🔄 Auto-refreshing stats...');
+                    return run(loadStats({ refresh: true }));
+                default:
+                    finalize();
+            }
+        }
+
+        function startAutoRefresh() {
+            // Clear existing interval
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+
+            autoRefreshInterval = setInterval(runAutoRefresh, AUTO_REFRESH_INTERVAL_MS);
+
+            console.log(`✅ Auto-refresh started (${AUTO_REFRESH_INTERVAL_MS / 1000}s interval)`);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                console.log('⏹️ Auto-refresh stopped');
+            }
+        }
+
+        function updateNotificationBadge() {
+            const orders = Array.isArray(state.orders) ? state.orders : [];
+
+            // Count new/pending orders
+            const newOrdersCount = orders.filter(o => {
+                const status = getOrderStatus(o);
+                return status === 'pending' || status === 'new';
+            }).length;
+
+            const headerBadge = document.getElementById('notificationCount');
+            const navBadge = document.getElementById('ordersNavBadge');
+            const updateBadge = (badge) => {
+                if (!badge) return;
+                if (newOrdersCount > 0) {
+                    badge.textContent = newOrdersCount;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            };
+            updateBadge(headerBadge);
+            updateBadge(navBadge);
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            console.log('🚀 Initializing Fudly Partner Panel...');
+
+            // Initialize Telegram WebApp
+            if (tg) {
+                tg.ready();
+                tg.expand();
+                console.log('✅ Telegram WebApp initialized');
+            }
+
+            // Setup keyboard navigation
+            setupKeyboardNavigation();
+
+            // Start auto-refresh for orders
+            startAutoRefresh();
+
+            // Connect WebSocket for real-time notifications
+            connectWebSocket();
+
+            // Update store info
+            const { userId } = getAuth();
+            document.getElementById('storeName').textContent = state.store?.name || 'Загрузка...';
+
+            // Initialize icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+
+            // Add haptic feedback to buttons
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn, .nav-item, .icon-btn, .order-action-btn, .product-card, .order-card');
+                if (btn && typeof tg?.HapticFeedback !== 'undefined') {
+                    tg.HapticFeedback.impactOccurred('light');
+                }
+            });
+
+            // Smooth scroll for iOS
+            if ('scrollBehavior' in document.documentElement.style) {
+                document.documentElement.style.scrollBehavior = 'smooth';
+            }
+
+            // Load dashboard
+            loadDashboard();
+
+            console.log('✅ App initialized successfully');
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopAutoRefresh();
+            disconnectWebSocket();
+        });
+
+        // Start app when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    

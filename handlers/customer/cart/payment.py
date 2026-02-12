@@ -115,8 +115,9 @@ def register(router: Router) -> None:
 
         if not result.success or not result.order_ids:
             await state.update_data(cart_payment_in_progress=False)
+            err_msg = (result.error_message or "").strip() if result else ""
             await callback.answer(
-                get_text(lang, "cart_payment_order_failed"),
+                err_msg or get_text(lang, "cart_payment_order_failed"),
                 show_alert=True,
             )
             return
@@ -301,8 +302,9 @@ def register(router: Router) -> None:
 
         if not result.success:
             await state.update_data(cart_payment_in_progress=False)
+            err_msg = (result.error_message or "").strip() if result else ""
             await callback.answer(
-                get_text(lang, "cart_payment_order_failed"),
+                err_msg or get_text(lang, "cart_payment_order_failed"),
                 show_alert=True,
             )
             return

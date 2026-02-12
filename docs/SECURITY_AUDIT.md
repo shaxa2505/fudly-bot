@@ -38,12 +38,12 @@ Impact: Reduces exposure of payment card data to unauthenticated users.
 Recommendation: Consider masking card details in responses.
 Effort: Small (done).
 
-Issue S5 (P2) - CSP hardened for main app (Mitigated).
-Problem: Removed `'unsafe-inline'` from `script-src` outside the partner panel; added `object-src 'none'`, `base-uri`, `form-action`.
-Evidence: `app/api/api_server.py`.
-Impact: Reduced XSS blast radius for the main app; partner panel still allows inline scripts.
-Recommendation: Move partner panel inline scripts into external files and drop `'unsafe-inline'` there too; add SRI for CDN assets.
-Effort: Medium.
+Issue S5 (P2) - CSP hardened; SRI added for partner panel CDN assets (Mitigated).
+Problem: Main app removed `'unsafe-inline'` from `script-src`. Partner panel still needs it due to inline event handlers.
+Evidence: `app/api/api_server.py`, `webapp/partner-panel/app.js`, `webapp/partner-panel/index.html`.
+Impact: Reduced XSS blast radius for the main app; partner panel remains higher risk, but CDN assets are now integrity-checked.
+Recommendation: Refactor partner panel to remove inline `onclick` handlers, then drop `'unsafe-inline'`.
+Effort: Medium to Large.
 
 ## Resolved Or Mitigated In This Pass
 Issue SR1 (P1) - Telegram initData persistence removed; WS uses short-lived tokens.
@@ -54,6 +54,11 @@ Status: Fixed (2026-02-12).
 Issue SR2 (P0) - WebSocket store access check now awaits async DB calls.
 Evidence: `app/core/websocket.py`.
 Impact: Prevents access bypass when DB methods are async.
+Status: Fixed (2026-02-12).
+
+Issue SR3 (P1) - WebSocket auth no longer accepts init_data.
+Evidence: `app/core/websocket.py`.
+Impact: Eliminates query/header init_data leakage risk.
 Status: Fixed (2026-02-12).
 
 ## Scalability Findings

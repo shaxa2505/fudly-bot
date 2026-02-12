@@ -6,6 +6,9 @@
 - API/data fetching: Axios client with custom LRU caching and retry logic. Evidence: `webapp/src/api/client.js:1-24`, `webapp/src/api/client.js:145-190`.
 - Styling: Global CSS + per-component CSS with a design token layer. Evidence: `webapp/src/styles/design-tokens.css:1`, `webapp/src/App.css:1-22`, `webapp/src/index.css:1`.
 - Error handling: Sentry + ErrorBoundary wrapper at root. Evidence: `webapp/src/main.jsx:1-26`, `webapp/src/components/ErrorBoundary.jsx:1`.
+- Telegram WebApp integration: safe-area handling, back button control, fullscreen expand. Evidence: `webapp/src/App.jsx:33-210`.
+- PWA/offline: service worker registration + offline page. Evidence: `webapp/index.html:8-36`, `webapp/public/sw.js:1-220`, `webapp/public/offline.html:1-120`.
+- Maps: Leaflet loaded from CDN for delivery address map in checkout. Evidence: `webapp/src/pages/CartPage.jsx:21-465`.
 
 ## Code Quality
 Issue CQ1 (P1) - Monolithic page logic and duplicated filters.
@@ -28,6 +31,27 @@ Evidence: `webapp/src/styles/design-tokens.css:1-140`, `webapp/src/components/Of
 Impact: Inconsistent visual language and harder theming.
 Recommendation: Replace hard-coded values with CSS variables and lint for hex usage.
 Effort: Medium.
+
+Issue CQ4 (P2) - Location logic is duplicated and inconsistent.
+Problem: Location storage, normalization, and geolocation are split across multiple utilities and hooks with overlapping responsibilities.
+Evidence: `webapp/src/utils/geolocation.js:1-220`, `webapp/src/utils/cityUtils.js:250-350`, `webapp/src/hooks/useUserLocation.js:1-185`, `webapp/src/pages/HomePage.jsx:170-420`, `webapp/src/pages/StoresPage.jsx:96-210`.
+Impact: Higher risk of drift and subtle location bugs across screens.
+Recommendation: Consolidate location into a single service/hook, and keep one source of truth for storage keys and normalization.
+Effort: Medium.
+
+Issue CQ5 (P2) - Oversized page components.
+Problem: Pages like `HomePage` and `CartPage` contain a large amount of mixed UI + data-fetching + side-effect logic.
+Evidence: `webapp/src/pages/HomePage.jsx:1-1500`, `webapp/src/pages/CartPage.jsx:1-3100`.
+Impact: Slower iteration, harder testing, and higher regression risk.
+Recommendation: Split into sections + hooks (`useHomeOffers`, `useCheckout`, `useMapSearch`) and keep data fetching in dedicated hooks.
+Effort: Medium.
+
+Issue CQ6 (P3) - Unused hook with external dependency.
+Problem: `useUserLocation` is not referenced anywhere and calls external Nominatim directly.
+Evidence: `webapp/src/hooks/useUserLocation.js:1-185`, `webapp/src/hooks/useUserLocation.js` (no usages in codebase).
+Impact: Dead code + accidental external dependency maintenance.
+Recommendation: Remove or integrate into the main location flow (prefer API-backed geocode).
+Effort: Small.
 
 ## Performance
 Issue P1 (P0) - Orders list fetches full dataset and polls every 10 seconds.
@@ -58,6 +82,20 @@ Impact: Memory growth and possible crashes during long sessions.
 Recommendation: Limit cache size and store minimal state; adopt LRU or TTL-based eviction.
 Effort: Medium.
 
+Issue P5 (P1) - Stores list fetches the full dataset without pagination.
+Problem: Stores page calls `/stores` without pagination or virtualization.
+Evidence: `webapp/src/pages/StoresPage.jsx:263-300`, `webapp/src/api/client.js:198-210`.
+Impact: Slow render and high payloads as store count grows.
+Recommendation: Add server pagination and virtualize store lists; load store details on demand.
+Effort: Medium to Large.
+
+Issue P6 (P2) - Bundle size is larger than necessary.
+Problem: Terser is configured with `mangle: false`, limiting minification.
+Evidence: `webapp/vite.config.js:24-40`.
+Impact: Larger JS payloads and slower TTI on mobile networks.
+Recommendation: Enable `mangle` in production builds (keep source maps for debugging).
+Effort: Small.
+
 ## Reliability
 Issue R1 (P1) - Error handling is alert-only on category products.
 Problem: Failed loads only show `alert()` and leave the page without an inline recovery state.
@@ -72,6 +110,20 @@ Evidence: `webapp/src/pages/OrdersPage.jsx:483-492`.
 Impact: Mis-taps can cancel orders and UI can temporarily display wrong status.
 Recommendation: Add confirmation/undo, and revert UI on failure.
 Effort: Small to Medium.
+
+Issue R3 (P1) - WebSocket connection lacks reconnection/backoff.
+Problem: Order details WS has no `onclose`/`onerror` handling and does not reconnect.
+Evidence: `webapp/src/pages/OrderDetailsPage.jsx:232-275`.
+Impact: Realtime updates silently stop after transient disconnects.
+Recommendation: Add reconnect with exponential backoff and fallback to polling.
+Effort: Medium.
+
+Issue R4 (P2) - Offline fallback is not guaranteed on first offline load.
+Problem: `/offline.html` is used as a fallback but not pre-cached.
+Evidence: `webapp/public/sw.js:10-25`, `webapp/public/offline.html:1-120`.
+Impact: First offline navigation can fail with a blank page.
+Recommendation: Add `/offline.html` to `STATIC_ASSETS` during SW install.
+Effort: Small.
 
 ## Security
 Issue S1 (P1) - Telegram initData persistence removed (Fixed).
@@ -89,6 +141,20 @@ Recommendation: Keep ws_token flow and remove init_data fallback server-side aft
 Effort: Medium (done).
 
 Security note: No `dangerouslySetInnerHTML` usage found in `webapp/src`, so direct DOM XSS injection risk is lower.
+
+Issue S3 (P2) - PII and payment context persist in localStorage.
+Problem: Cart, pending payments, and location data are stored in localStorage without a short TTL.
+Evidence: `webapp/src/context/CartContext.jsx:1-120`, `webapp/src/utils/pendingPayment.js:1-90`, `webapp/src/utils/cityUtils.js:290-350`.
+Impact: Sensitive data may persist on shared devices or if storage is compromised.
+Recommendation: Prefer sessionStorage for PII, add TTLs, and provide a "clear data" action in settings.
+Effort: Medium.
+
+Issue S4 (P2) - Leaflet loaded from CDN without integrity pinning.
+Problem: Map assets are fetched from `unpkg.com` with no SRI.
+Evidence: `webapp/src/pages/CartPage.jsx:21-380`.
+Impact: Supply-chain risk if CDN content is tampered or blocked.
+Recommendation: Self-host Leaflet or add integrity + fallback handling.
+Effort: Small to Medium.
 
 ## Accessibility
 Issue A1 (P1) - Zoom is disabled globally.
@@ -118,3 +184,33 @@ Evidence: `webapp/src/pages/CategoryProductsPage.jsx:273`.
 Impact: Users cannot understand the control via assistive tech.
 Recommendation: Add `aria-label` or visually hidden text.
 Effort: Small.
+
+Issue A5 (P2) - Focus styles rely solely on `:focus-visible`.
+Problem: Global `*:focus { outline: none; }` removes focus for browsers that do not support `focus-visible`.
+Evidence: `webapp/src/styles/focus-indicators.css:15-35`.
+Impact: Keyboard users may lose focus indication in older browsers.
+Recommendation: Add a `:focus` fallback or ship the `focus-visible` polyfill.
+Effort: Small.
+
+Issue A6 (P2) - Toast notifications are not announced to screen readers.
+Problem: Toast container lacks `role="status"`/`aria-live`.
+Evidence: `webapp/src/components/Toast.jsx:1-35`.
+Impact: Status messages are invisible to assistive tech.
+Recommendation: Add `role="status"` and `aria-live="polite"` to the toast root.
+Effort: Small.
+
+## Observability
+Issue O1 (P2) - Sentry lacks source maps in production.
+Problem: Build disables source maps, limiting actionable stack traces.
+Evidence: `webapp/vite.config.js:20-30`, `webapp/src/utils/sentry.js:1-40`.
+Impact: Slower debugging and higher MTTR for production errors.
+Recommendation: Enable source maps in production and upload to Sentry during CI/CD.
+Effort: Medium.
+
+## Testing
+Issue T1 (P2) - Critical flows lack integration coverage.
+Problem: Unit tests exist but checkout/payment, Telegram WebApp init, and WS flows are not covered end-to-end.
+Evidence: `webapp/tests/e2e/app.spec.js:1-200`, `webapp/src/pages/CartPage.jsx:2000-2200`, `webapp/src/pages/OrderDetailsPage.jsx:200-280`.
+Impact: High-risk areas can regress without detection.
+Recommendation: Add Playwright smoke tests for checkout + payment link creation and WS reconnect behavior.
+Effort: Medium.

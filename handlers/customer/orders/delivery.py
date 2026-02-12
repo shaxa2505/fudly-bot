@@ -1102,7 +1102,11 @@ async def dlv_pay_click(
                     "Failed to create order before Click link: %s", result.error_message
                 )
                 await state.update_data(delivery_payment_in_progress=False)
-                await callback.answer(get_text(lang, "system_error"), show_alert=True)
+                err_msg = (result.error_message or "").strip()
+                await callback.answer(
+                    err_msg or get_text(lang, "system_error"),
+                    show_alert=True,
+                )
                 return
 
             order_id = result.order_ids[0]
@@ -1275,7 +1279,11 @@ async def dlv_pay_cash(
                 "Failed to create cash delivery order: %s", result.error_message
             )
             await state.update_data(delivery_payment_in_progress=False)
-            await callback.answer(get_text(lang, "system_error"), show_alert=True)
+            err_msg = (result.error_message or "").strip()
+            await callback.answer(
+                err_msg or get_text(lang, "system_error"),
+                show_alert=True,
+            )
             return
     except Exception as e:
         logger.error(f"Error creating cash delivery order: {e}", exc_info=True)
