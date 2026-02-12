@@ -488,11 +488,13 @@ class NotificationTemplates:
                 )
             except Exception:
                 total_value = int(total or 0)
-        if normalized_type in ("delivery", "taxi") and delivery_price:
-            if total_value:
-                total_value += int(delivery_price)
-            else:
-                total_value = int(delivery_price)
+
+        is_delivery = normalized_type in ("delivery", "taxi")
+        delivery_note = None
+        if is_delivery and delivery_price:
+            delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+            if delivery_note == "delivery_fee_paid_to_courier":
+                delivery_note = None
 
         order_label = get_text(lang, "label_order")
         status_label_text = get_text(lang, "label_status")
@@ -518,6 +520,8 @@ class NotificationTemplates:
 
         if total_value > 0:
             lines.append(f"{amount_label}: <b>{total_value:,} {currency}</b>")
+        if delivery_note:
+            lines.append(f"<i>{delivery_note}</i>")
         if type_value:
             lines.append(f"{type_label}: {type_value}")
         if ready_until:

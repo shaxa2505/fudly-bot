@@ -9,7 +9,6 @@ import os
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.order_math import calc_total_price as calc_total_price_order
 from app.core.units import calc_total_price as calc_total_price_units
 from app.core.units import format_quantity, normalize_unit, unit_label
 from handlers.common.utils import html_escape as _esc
@@ -40,7 +39,7 @@ def build_delivery_card_text(
     qty_text = format_quantity(quantity, unit_type, lang)
 
     subtotal = calc_total_price_units(price, quantity)
-    total = calc_total_price_order(subtotal, delivery_price)
+    total = subtotal
 
     lines = [
         f"<b>{get_text(lang, 'delivery_card_title')}</b>",
@@ -59,9 +58,12 @@ def build_delivery_card_text(
     lines.append(
         f"{get_text(lang, 'delivery_qty_label')}: <b>{qty_text}</b> {unit_text}"
     )
-    lines.append(f"{get_text(lang, 'delivery_delivery_label')}: {delivery_price:,} {currency}")
     lines.append("-" * 24)
     lines.append(f"<b>{get_text(lang, 'delivery_total_label')}: {total:,} {currency}</b>")
+    if delivery_price:
+        delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+        if delivery_note and delivery_note != "delivery_fee_paid_to_courier":
+            lines.append(f"<i>{delivery_note}</i>")
     lines.append("")
 
     # Address section

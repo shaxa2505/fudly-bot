@@ -774,8 +774,7 @@ function CartPage({ user }) {
   // Calculate totals using context values
   const subtotal = cartTotal
   const serviceFee = 0
-  const deliveryTotal = orderType === 'delivery' ? (Number.isFinite(deliveryFee) ? deliveryFee : 0) : 0
-  const total = calcTotalPrice(subtotal, serviceFee + deliveryTotal)
+  const total = calcTotalPrice(subtotal, serviceFee)
   const checkoutTotal = total
   const itemsCount = safeItemsCount
   const unavailableCartItems = useMemo(() => {
@@ -876,7 +875,6 @@ function CartPage({ user }) {
       return option.time || option.label || ''
     }, [deliveryOptions, deliverySlot])
   const deliveryOptionDisabled = storeInfoLoading || !storeDeliveryEnabled
-  const deliverySummaryCost = deliveryCheck?.deliveryCost ?? (Number.isFinite(deliveryFee) ? deliveryFee : null)
   const deliverySummaryMin = deliveryCheck?.minOrderAmount ?? (Number.isFinite(minOrderAmount) ? minOrderAmount : null)
   const deliverySummaryEta = deliveryCheck?.estimatedTime || ''
   const deliveryMinNotMet = Number.isFinite(minOrderAmount) && minOrderAmount > 0 && subtotal < minOrderAmount
@@ -2720,14 +2718,8 @@ function CartPage({ user }) {
                           <div className="checkout-delivery-message">{deliveryStatus.message}</div>
                         )}
 
-                        {storeDeliveryEnabled && (deliverySummaryCost != null || deliverySummaryMin != null || deliverySummaryEta) && (
+                        {storeDeliveryEnabled && (deliverySummaryMin != null || deliverySummaryEta) && (
                           <div className="checkout-delivery-meta">
-                            {deliverySummaryCost != null && (
-                              <div className="checkout-delivery-result-row">
-                                <span>Narx</span>
-                                <strong>{formatSum(deliverySummaryCost)} so'm</strong>
-                              </div>
-                            )}
                             {deliverySummaryMin != null && deliverySummaryMin > 0 && (
                               <div className="checkout-delivery-result-row">
                                 <span>Minimal buyurtma</span>
@@ -2879,14 +2871,8 @@ function CartPage({ user }) {
                         <span>{formatSum(subtotal)} so'm</span>
                       </div>
                       {orderType === 'delivery' && (
-                        <div className="checkout-summary-row">
-                          <span>Yetkazib berish</span>
-                          <span>{formatSum(deliveryFee)} so'm</span>
-                        </div>
-                      )}
-                      {orderType === 'delivery' && (
                         <p className="checkout-hint neutral">
-                          Yetkazib berish narxi taksiga yetkazilganda to'lanadi. Ilovadagi to'lov faqat mahsulotlar uchun.
+                          Yetkazib berish to'lovi taksist yoki kuryerga alohida to'lanadi. Ilovadagi to'lov faqat mahsulotlar uchun.
                         </p>
                       )}
                       <div className="checkout-summary-row">

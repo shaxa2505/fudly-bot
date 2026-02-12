@@ -428,13 +428,6 @@ async def create_order(
 
         order_id = created_items[0]["id"] if created_items else 0
         total_amount = sum(b["total"] for b in created_items)
-        if is_delivery:
-            delivery_fee = 0
-            try:
-                delivery_fee = int(order_items[0].delivery_price) if order_items else 0
-            except Exception:
-                delivery_fee = 0
-            total_amount = int(total_amount) + delivery_fee
         total_items = sum(b["quantity"] for b in created_items)
         logger.info(
             "ORDER_CREATED: id=%s, user=%s, type=%s, total=%s, items=%s, source=webapp_api",

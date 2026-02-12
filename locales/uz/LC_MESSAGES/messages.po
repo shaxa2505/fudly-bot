@@ -151,7 +151,7 @@ msgstr[0] "{n} ta taklif"
 msgstr[1] "{n} ta taklif"
 #: Payment notes
 msgid "delivery_fee_paid_to_courier"
-msgstr "Yetkazib berish to'lovi qabul qilganda kuryerga to'lanadi."
+msgstr "Yetkazib berish to'lovi taksist yoki kuryerga alohida to'lanadi."
 
 #: Cart delivery location
 msgid "cart_delivery_location_prompt"

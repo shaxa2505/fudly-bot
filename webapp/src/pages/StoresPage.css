@@ -429,7 +429,7 @@
 .sp-store-media {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   background: #F1F5F9;
 }
@@ -772,7 +772,7 @@
 
 .sp-skel-media {
   width: 100%;
-  aspect-ratio: 4 / 5;
+  aspect-ratio: 4 / 3;
   border-radius: 20px 20px 0 0;
   background: linear-gradient(90deg, #F0F0F0 25%, #E3E3E3 50%, #F0F0F0 75%);
   background-size: 200% 100%;

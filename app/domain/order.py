@@ -63,9 +63,14 @@ class PaymentStatus:
         payment_proof_photo_id: str | None = None,
     ) -> str | None:
         if payment_status is None:
-            return None
-
-        status = str(payment_status).strip().lower()
+            if payment_proof_photo_id:
+                return cls.PROOF_SUBMITTED
+            has_method = payment_method is not None and str(payment_method).strip() != ""
+            if not has_method:
+                return None
+            status = ""
+        else:
+            status = str(payment_status).strip().lower()
         method = cls.normalize_method(payment_method)
 
         legacy_map = {

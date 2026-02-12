@@ -392,7 +392,6 @@ async def process_successful_payment(message: types.Message) -> None:
         qty_label = "Miqdor" if lang == "uz" else "Кол-во"
         price_label = "Narxi" if lang == "uz" else "Цена"
         unit_label = "dona" if lang == "uz" else "шт"
-        delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
         total_label = "JAMI" if lang == "uz" else "ИТОГО"
         receipt_label = "Chek" if lang == "uz" else "Чек"
         addr_label = "Manzil" if lang == "uz" else "Адрес"
@@ -410,10 +409,8 @@ async def process_successful_payment(message: types.Message) -> None:
                 delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
                 if delivery_note == "delivery_fee_paid_to_courier":
                     delivery_note = None
-            note_suffix = f" ({delivery_note})" if delivery_note else ""
-            lines.append(
-                f"🚚 {delivery_label}: {delivery_price:,} {currency}{note_suffix}"
-            )
+            if delivery_note:
+                lines.append(f"🚚 {delivery_note}")
 
         lines.append("")
         lines.append("─" * 25)

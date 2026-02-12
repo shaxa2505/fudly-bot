@@ -13,7 +13,7 @@ from localization import get_text
 
 from .common import esc
 from . import common
-from app.core.order_math import calc_items_total, calc_total_price
+from app.core.order_math import calc_items_total
 
 try:
     from logging_config import logger
@@ -90,7 +90,6 @@ async def _send_cart_payment_selection(
 
     currency = "so'm" if lang == "uz" else "сум"
     total = calc_items_total(cart_items_stored)
-    total_with_delivery = calc_total_price(total, delivery_price)
 
     lines: list[str] = [f"<b>{get_text(lang, 'cart_delivery_products_title')}:</b>"]
     for item in cart_items_stored:
@@ -98,10 +97,11 @@ async def _send_cart_payment_selection(
         lines.append(f"- {esc(item['title'])} x {item['quantity']} = {subtotal:,} {currency}")
 
     lines.append("")
-    lines.append(f"{get_text(lang, 'cart_delivery_label')}: {delivery_price:,} {currency}")
-    lines.append(
-        f"<b>{get_text(lang, 'cart_grand_total_label')}: {total_with_delivery:,} {currency}</b>"
-    )
+    lines.append(f"<b>{get_text(lang, 'cart_grand_total_label')}: {total:,} {currency}</b>")
+    if delivery_price:
+        delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+        if delivery_note and delivery_note != "delivery_fee_paid_to_courier":
+            lines.append(f"<i>{delivery_note}</i>")
     lines.append("")
     lines.append(f"{get_text(lang, 'cart_delivery_address_label')}: {esc(delivery_address)}")
     lines.append("")

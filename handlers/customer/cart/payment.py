@@ -4,7 +4,7 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.order_math import calc_items_total, calc_total_price
+from app.core.order_math import calc_items_total
 from app.integrations.payment_service import get_payment_service
 from app.services.unified_order_service import (
     OrderItem,
@@ -132,9 +132,11 @@ def register(router: Router) -> None:
         except Exception:
             order_total = None
 
-        if not order_total:
-            items_total = calc_items_total(cart_items_stored)
-            order_total = calc_total_price(items_total, int(delivery_price or 0))
+        items_total = calc_items_total(cart_items_stored)
+        if items_total > 0:
+            order_total = int(items_total)
+        elif not order_total:
+            order_total = 0
 
         return_url = None
         try:
@@ -370,14 +372,17 @@ def register(router: Router) -> None:
 
         currency = "so'm" if lang == "uz" else "сум"
         total = calc_items_total(cart_items_stored)
-        total_with_delivery = calc_total_price(total, int(delivery_price or 0))
 
         safe_address = esc(address)
         text = (
             f"<b>{get_text(lang, 'cart_payment_select_title')}</b>\n\n"
-            f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total_with_delivery:,} {currency}</b>\n"
+            f"{get_text(lang, 'cart_payment_amount_label')}: <b>{total:,} {currency}</b>\n"
             f"{get_text(lang, 'cart_delivery_address_label')}: {safe_address}"
         )
+        if delivery_price:
+            delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+            if delivery_note and delivery_note != "delivery_fee_paid_to_courier":
+                text += f"\n<i>{delivery_note}</i>"
 
         kb = InlineKeyboardBuilder()
         kb.button(

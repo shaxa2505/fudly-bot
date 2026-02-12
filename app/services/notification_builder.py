@@ -218,20 +218,28 @@ class NotificationBuilder:
         total_value = int(total or 0)
         if total_value == 0 and items_total:
             total_value = items_total
+        delivery_note = None
         if self.order_type == "delivery" and delivery_price:
-            delivery_fee_val = int(delivery_price)
-            lines.append(
-                f"{get_text(lang, 'label_delivery_fee')}: {delivery_fee_val:,} {currency}"
-            )
-            if total_value:
-                # Avoid double-counting delivery if total already includes it.
-                if not (items_total and total_value >= (items_total + delivery_fee_val)):
-                    total_value += delivery_fee_val
+            if role == "seller":
+                delivery_fee_val = int(delivery_price)
+                lines.append(
+                    f"{get_text(lang, 'label_delivery_fee')}: {delivery_fee_val:,} {currency}"
+                )
+                if total_value:
+                    # Avoid double-counting delivery if total already includes it.
+                    if not (items_total and total_value >= (items_total + delivery_fee_val)):
+                        total_value += delivery_fee_val
+                else:
+                    total_value = (items_total or 0) + delivery_fee_val
             else:
-                total_value = (items_total or 0) + delivery_fee_val
+                delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+                if delivery_note == "delivery_fee_paid_to_courier":
+                    delivery_note = None
 
         if total_value:
             lines.append(f"{get_text(lang, 'label_total')}: <b>{total_value:,} {currency}</b>")
+        if delivery_note:
+            lines.append(f"<i>{delivery_note}</i>")
 
         if reject_reason and status in ("rejected", "cancelled"):
             lines.append(f"{get_text(lang, 'label_reason')}: {self._esc(reject_reason)}")

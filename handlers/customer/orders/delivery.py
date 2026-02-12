@@ -988,11 +988,18 @@ async def dlv_pay_click(
     except Exception:
         order_total = None
 
-    if not order_total:
+    items_total = 0
+    try:
         price = int(data.get("price", 0))
         quantity = float(data.get("quantity", 1) or 1)
-        delivery_cost = int(data.get("delivery_price", 0))
-        order_total = calc_total_price(price, quantity) + delivery_cost
+        items_total = calc_total_price(price, quantity)
+    except Exception:
+        items_total = 0
+
+    if items_total > 0:
+        order_total = int(items_total)
+    elif not order_total:
+        order_total = 0
 
     return_url = None
     try:
