@@ -514,6 +514,7 @@ async def create_order(
 @router.get("/orders")
 @limiter.limit("60/minute")
 async def get_orders(
+    request: Request,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db=Depends(get_db),
@@ -893,6 +894,7 @@ async def get_orders(
 @router.get("/orders/summary", response_model=OrdersSummaryResponse)
 @limiter.limit("60/minute")
 async def get_orders_summary(
+    request: Request,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
 ) -> OrdersSummaryResponse:

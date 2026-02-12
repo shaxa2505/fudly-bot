@@ -12,7 +12,7 @@ from typing import Any
 
 import qrcode
 from aiogram import Bot
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field, AliasChoices
 
 from app.api.webapp.common import get_current_user
@@ -490,6 +490,7 @@ async def format_booking_to_order_status(booking: Any, db) -> OrderStatus:
 @router.get("")
 @limiter.limit("60/minute")
 async def get_user_orders(
+    request: Request,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -667,6 +668,7 @@ async def upload_payment_proof(
 @router.get("/{booking_id}/status", response_model=OrderStatus)
 @limiter.limit("60/minute")
 async def get_order_status(
+    request: Request,
     booking_id: int,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -718,6 +720,7 @@ async def get_order_status(
 @router.get("/{booking_id}/timeline", response_model=OrderTimeline)
 @limiter.limit("60/minute")
 async def get_order_timeline(
+    request: Request,
     booking_id: int,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
@@ -875,7 +878,8 @@ async def get_order_timeline(
 @router.post("/calculate-delivery", response_model=DeliveryResult)
 @limiter.limit("60/minute")
 async def calculate_delivery(
-    request: DeliveryCalculation,
+    request: Request,
+    payload: DeliveryCalculation,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),
 ):
@@ -888,18 +892,19 @@ async def calculate_delivery(
         DeliveryResult with cost and availability
     """
     return await calculate_delivery_cost(
-        request.city,
-        request.address,
-        request.store_id,
+        payload.city,
+        payload.address,
+        payload.store_id,
         db,
-        delivery_lat=request.delivery_lat,
-        delivery_lon=request.delivery_lon,
+        delivery_lat=payload.delivery_lat,
+        delivery_lon=payload.delivery_lon,
     )
 
 
 @router.get("/{booking_id}/qr")
 @limiter.limit("60/minute")
 async def get_order_qr_code(
+    request: Request,
     booking_id: int,
     db=Depends(get_db),
     user: dict = Depends(get_current_user),

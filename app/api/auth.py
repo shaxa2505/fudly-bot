@@ -11,7 +11,7 @@ import time
 from typing import Any
 from urllib.parse import parse_qsl
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.config import load_settings
@@ -267,6 +267,7 @@ async def validate_auth(request: AuthRequest, db=Depends(get_db)) -> UserProfile
 @router.post("/auth/ws-token", response_model=WsTokenResponse)
 @limiter.limit("60/minute")
 async def create_ws_token(
+    request: Request,
     x_telegram_init_data: str = Header(None, alias="X-Telegram-Init-Data"),
 ) -> WsTokenResponse:
     """Issue short-lived WebSocket auth token."""
@@ -374,6 +375,7 @@ class OrdersHistoryResponse(BaseModel):
 @router.get("/user/orders", response_model=OrdersHistoryResponse)
 @limiter.limit("60/minute")
 async def get_user_orders(
+    request: Request,
     user_id: int | None = None,
     status: str | None = None,
     limit: int = 50,
@@ -497,6 +499,7 @@ async def get_user_orders(
 @router.get("/user/bookings", response_model=OrdersHistoryResponse)
 @limiter.limit("60/minute")
 async def get_user_bookings(
+    request: Request,
     user_id: int | None = None,
     status: str | None = None,
     limit: int = 50,
@@ -504,4 +507,11 @@ async def get_user_bookings(
     db=Depends(get_db),
 ) -> OrdersHistoryResponse:
     """Alias for bookings history (compatibility)."""
-    return await get_user_orders(user_id, status, limit, x_telegram_init_data, db)
+    return await get_user_orders(
+        request,
+        user_id,
+        status,
+        limit,
+        x_telegram_init_data,
+        db,
+    )
