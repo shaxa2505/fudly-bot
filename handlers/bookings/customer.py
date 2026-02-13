@@ -12,7 +12,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
-from app.core.order_math import calc_total_price
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
@@ -97,8 +96,12 @@ def build_order_card_text(
     unit = unit or ("dona" if lang == "uz" else "шт")
 
     subtotal = price * quantity
-    delivery_cost = delivery_price if delivery_method == "delivery" else 0
-    total = calc_total_price(subtotal, delivery_cost)
+    total = subtotal
+    delivery_note = None
+    if delivery_enabled and delivery_method == "delivery" and int(delivery_price or 0) > 0:
+        delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+        if delivery_note == "delivery_fee_paid_to_courier":
+            delivery_note = None
 
     lines = [f"🛍 <b>{_esc(title)}</b>"]
 
@@ -147,9 +150,8 @@ def build_order_card_text(
     if delivery_enabled:
         delivery_label = "Yetkazib berish" if lang == "uz" else "Доставка"
         pickup_label = "Olib ketish" if lang == "uz" else "Самовывоз"
-        delivery_price_sums = int(delivery_price)
         pickup_value = "bepul" if lang == "uz" else "бесплатно"
-        lines.append(f"{delivery_label}: {delivery_price_sums:,} {currency}")
+        lines.append(f"{delivery_label}")
         lines.append(f"{pickup_label}: {pickup_value}")
         if not delivery_method:
             hint = (
@@ -162,9 +164,8 @@ def build_order_card_text(
     lines.append("")
     total_label = "Jami" if lang == "uz" else "Итого"
     lines.append(f"<b>{total_label}: {total:,} {currency}</b>")
-    if delivery_method == "delivery" and delivery_cost > 0:
-        incl_delivery = "yetkazish bilan" if lang == "uz" else "с доставкой"
-        lines.append(f"<i>({incl_delivery})</i>")
+    if delivery_note:
+        lines.append(f"<i>{delivery_note}</i>")
 
     return "\n".join(lines)
 
@@ -976,18 +977,16 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
         # Ask for delivery choice
         await state.set_state(BookOffer.delivery_choice)
 
-        delivery_price = get_store_field(store, "delivery_price", 0)
-
         kb = InlineKeyboardBuilder()
         if lang == "uz":
             kb.button(text="🏪 O'zim olib ketaman", callback_data="pickup_choice")
             kb.button(
-                text=f"🚚 Yetkazib berish ({delivery_price:,} so'm)",
+                text="🚚 Yetkazib berish",
                 callback_data="delivery_choice",
             )
         else:
             kb.button(text="🏪 Самовывоз", callback_data="pickup_choice")
-            kb.button(text=f"🚚 Доставка ({delivery_price:,} сум)", callback_data="delivery_choice")
+            kb.button(text="🚚 Доставка", callback_data="delivery_choice")
         kb.button(
             text="❌ " + ("Bekor qilish" if lang == "uz" else "Отмена"),
             callback_data="cancel_booking_flow",
@@ -1695,3 +1694,4 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
 async def noop_handler(callback: types.CallbackQuery) -> None:
     """No-operation handler for closing dialogs."""
     await callback.answer()
+

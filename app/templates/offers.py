@@ -136,10 +136,12 @@ def render_store_card(lang: str, store: StoreDetails) -> str:
         available = "доступна" if lang == "ru" else "mavjud"
         lines.append(f"{delivery_label}: {available}")
         if store.delivery_price > 0:
-            cost_label = "Стоимость" if lang == "ru" else "Narx"
-            lines.append(
-                f"{cost_label}: {_format_money(store.delivery_price)} {currency}"
+            delivery_note = (
+                "Оплачивается отдельно таксисту или курьеру"
+                if lang == "ru"
+                else "Taksist yoki kuryerga alohida to'lanadi"
             )
+            lines.append(delivery_note)
         if store.min_order_amount > 0:
             min_order = "Мин. заказ" if lang == "ru" else "Min. buyurtma"
             lines.append(
@@ -293,9 +295,7 @@ def format_product_card(
 
     if delivery_enabled is True:
         if delivery_price and delivery_price > 0:
-            optional.append(
-                (4, f"{labels['delivery']}: {_format_money(delivery_price)} {labels['currency']}")
-            )
+            optional.append((4, labels["delivery_paid_separately"]))
         else:
             optional.append((4, labels["delivery_free"]))
         if min_order_amount and min_order_amount > 0:
@@ -391,6 +391,7 @@ def _product_card_labels(lang: str) -> dict[str, str]:
             "store": "Магазин",
             "address": "Адрес",
             "delivery": "Доставка",
+            "delivery_paid_separately": "Оплачивается отдельно таксисту или курьеру",
             "delivery_free": "Доставка: бесплатно",
             "delivery_none": "Только самовывоз",
             "min_order": "Мин. заказ",
@@ -406,6 +407,7 @@ def _product_card_labels(lang: str) -> dict[str, str]:
         "store": "Do'kon",
         "address": "Manzil",
         "delivery": "Yetkazib berish",
+        "delivery_paid_separately": "Taksist yoki kuryerga alohida to'lanadi",
         "delivery_free": "Yetkazib berish: bepul",
         "delivery_none": "Faqat olib ketish",
         "min_order": "Min. buyurtma",

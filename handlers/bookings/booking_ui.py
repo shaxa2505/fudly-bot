@@ -7,9 +7,9 @@ from __future__ import annotations
 
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.order_math import calc_total_price
 from handlers.common.utils import fix_mojibake_text, html_escape as _esc
 from logging_config import logger
+from localization import get_text
 
 
 def build_order_card_text(
@@ -32,10 +32,14 @@ def build_order_card_text(
     currency = "so'm" if lang == "uz" else "сум"
     unit = unit or ("dona" if lang == "uz" else "шт")
 
-    # Calculate totals
+    # Delivery fee is paid separately to courier/taxi driver.
     subtotal = price * quantity
-    delivery_cost = delivery_price if delivery_method == "delivery" else 0
-    total = calc_total_price(subtotal, delivery_cost)
+    total = subtotal
+    delivery_note = None
+    if delivery_enabled and delivery_method == "delivery" and int(delivery_price or 0) > 0:
+        delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+        if delivery_note == "delivery_fee_paid_to_courier":
+            delivery_note = None
 
     # Header - same as product card
     lines = [f"📦 <b>{_esc(title)}</b>"]
@@ -86,7 +90,7 @@ def build_order_card_text(
     if delivery_enabled:
         lines.append("")
         delivery_label = "Yetkazish" if lang == "uz" else "Доставка"
-        lines.append(f"🚚 {delivery_label}: {delivery_price:,} {currency}")
+        lines.append(f"🚚 {delivery_label}")
 
         # Show selection hint if not selected
         if not delivery_method:
@@ -98,9 +102,8 @@ def build_order_card_text(
     lines.append("─" * 25)
     total_label = "JAMI" if lang == "uz" else "ИТОГО"
     lines.append(f"💵 <b>{total_label}: {total:,} {currency}</b>")
-    if delivery_method == "delivery" and delivery_cost > 0:
-        incl_delivery = "yetkazish bilan" if lang == "uz" else "с доставкой"
-        lines.append(f"   <i>({incl_delivery})</i>")
+    if delivery_note:
+        lines.append(f"   <i>{delivery_note}</i>")
 
     return fix_mojibake_text("\n".join(lines))
 

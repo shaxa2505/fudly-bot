@@ -48,15 +48,52 @@ function OrdersPage() {
   const normalizeOrder = (order) => {
     const displayStatus = deriveStatus(order)
     const normalizedStatus = normalizeOrderStatus(order?.order_status || order?.status || 'pending')
+    const hasOrderId = order?.order_id != null || order?.id != null
+    const entityType = hasOrderId ? 'order' : 'booking'
     return {
       ...order,
       status: displayStatus,
       order_status: normalizedStatus || 'pending',
+      __entityType: entityType,
     }
   }
 
-  const getOrderKey = (order) => (
-    order?.id || order?.booking_id || order?.order_id || null
+  const getOrderKey = (order) => {
+    const rawId = order?.order_id ?? order?.id ?? order?.booking_id ?? null
+    if (rawId == null) return null
+    const entityType = order?.__entityType || ((order?.order_id != null || order?.id != null) ? 'order' : 'booking')
+    return `${entityType}:${rawId}`
+  }
+
+  const toCreatedTimestamp = (value) => {
+    if (!value) return 0
+    const raw = String(value).trim()
+    if (!raw) return 0
+
+    const hasTimezoneHint = /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
+    const plainMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/)
+    if (plainMatch && !hasTimezoneHint) {
+      const year = Number(plainMatch[1])
+      const month = Number(plainMatch[2]) - 1
+      const day = Number(plainMatch[3])
+      const hour = Number(plainMatch[4] || 0)
+      const minute = Number(plainMatch[5] || 0)
+      const second = Number(plainMatch[6] || 0)
+      return Date.UTC(year, month, day, hour, minute, second)
+    }
+
+    const normalizedRaw = raw.includes('T') ? raw : raw.replace(' ', 'T')
+    const date = new Date(normalizedRaw)
+    if (Number.isNaN(date.getTime())) return 0
+    return date.getTime()
+  }
+
+  const sortByCreatedAtDesc = (list) => (
+    [...list].sort((a, b) => {
+      const tsB = toCreatedTimestamp(b?.created_at || b?.createdAt)
+      const tsA = toCreatedTimestamp(a?.created_at || a?.createdAt)
+      return tsB - tsA
+    })
   )
 
   const appendOrders = (prev, next) => {
@@ -107,7 +144,11 @@ function OrdersPage() {
         ? response.has_more
         : ordersPageCount === PAGE_SIZE
 
-      setOrders((prev) => (reset ? pageOrders : appendOrders(prev, pageOrders)))
+      setOrders((prev) => (
+        reset
+          ? sortByCreatedAtDesc(pageOrders)
+          : sortByCreatedAtDesc(appendOrders(prev, pageOrders))
+      ))
       setHasMore(hasMoreResult)
       setPageOffset(reset ? (nextOffset || 0) : (nextOffset ?? pageOffset))
     } catch (error) {
@@ -145,7 +186,7 @@ function OrdersPage() {
         ? response.has_more
         : ordersPageCount === PAGE_SIZE
 
-      setOrders((prev) => mergeFirstPage(prev, pageOrders))
+      setOrders((prev) => sortByCreatedAtDesc(mergeFirstPage(prev, pageOrders)))
       setHasMore(hasMoreResult)
       setPageOffset((prev) => Math.max(prev, nextOffset ?? 0))
     } catch (error) {
@@ -277,9 +318,29 @@ function OrdersPage() {
   const formatOrderDate = (dateStr) => {
     if (!dateStr) return ''
     const raw = String(dateStr)
-    const date = new Date(raw)
+    const months = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek']
+    const hasTimezoneHint = /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
+
+    // Avoid timezone-shifts for plain timestamps without timezone info.
+    if (!hasTimezoneHint) {
+      const ymdMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+      if (ymdMatch) {
+        const monthIndex = Number(ymdMatch[2]) - 1
+        const month = months[monthIndex] || ymdMatch[2]
+        return `${ymdMatch[3]} ${month}`
+      }
+      const dmyNumericMatch = raw.match(/^(\d{1,2})[./-](\d{1,2})(?:[./-]\d{2,4})?/)
+      if (dmyNumericMatch) {
+        const day = dmyNumericMatch[1].padStart(2, '0')
+        const monthIndex = Number(dmyNumericMatch[2]) - 1
+        const month = months[monthIndex] || dmyNumericMatch[2]
+        return `${day} ${month}`
+      }
+    }
+
+    const normalizedRaw = raw.includes('T') ? raw : raw.replace(' ', 'T')
+    const date = new Date(normalizedRaw)
     if (!Number.isNaN(date.getTime())) {
-      const months = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek']
       const day = String(date.getDate()).padStart(2, '0')
       return `${day} ${months[date.getMonth()]}`
     }
@@ -566,10 +627,10 @@ function OrdersPage() {
                               try {
                                 await api.cancelOrder(orderId)
                                 toast.success('Buyurtma bekor qilindi')
-                                setTimeout(() => loadOrders(true), 500)
+                                setTimeout(() => loadOrders({ reset: true, force: true }), 500)
                               } catch (error) {
                                 console.error('Cancel order failed:', error)
-                                loadOrders(true)
+                                loadOrders({ reset: true, force: true })
                                 const errorMsg =
                                   error?.response?.data?.detail ||
                                   error?.response?.data?.message ||

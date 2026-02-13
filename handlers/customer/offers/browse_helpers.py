@@ -157,7 +157,11 @@ def format_offer_card_text(
     if store_address:
         lines.append(f"📍 {store_address}")
     if delivery_enabled:
-        lines.append(f"🚚 Доставка: {int(delivery_price):,} {currency}")
+        delivery_note = get_text(lang, "delivery_fee_paid_to_courier")
+        if delivery_note and delivery_note != "delivery_fee_paid_to_courier":
+            lines.append(f"🚚 {delivery_note}")
+        else:
+            lines.append("🚚 Доставка доступна" if lang == "ru" else "🚚 Yetkazib berish mavjud")
 
     return "\n".join(lines)
 

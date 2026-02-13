@@ -948,9 +948,8 @@ export default function OrderDetailsPage() {
             <strong>{formatMoney(itemsSubtotal)} UZS</strong>
           </div>
           {isDelivery && (
-            <div className="order-summary-row">
-              <span>Yetkazib berish</span>
-              <strong>{formatMoney(deliveryFee)} UZS</strong>
+            <div className="order-summary-note">
+              Yetkazib berish to'lovi taksist yoki kuryerga alohida to'lanadi.
             </div>
           )}
           {showDiscount && (

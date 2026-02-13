@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import json
 import os
+from datetime import datetime
 from typing import Any
 
 from aiogram import Bot
@@ -148,6 +149,88 @@ async def _fetch_completed_stats(
     except Exception:
         quantity = float(getattr(row, "get", lambda *_: 0)("qty", 0) or 0)
     return count, quantity
+
+
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _serialize_datetime(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            pass
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if "T" in raw:
+        return raw
+    if len(raw) >= 19 and raw[4] == "-" and raw[7] == "-" and raw[10] == " ":
+        return raw.replace(" ", "T", 1)
+    return raw
+
+
+def _normalize_booking_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    booking_id = payload.get("booking_id")
+    quantity = _to_float(payload.get("quantity"), 1.0) or 1.0
+    explicit_total = payload.get("total_price")
+    if explicit_total is not None:
+        total_price = _to_int(explicit_total, 0)
+    else:
+        discount_price = _to_int(payload.get("discount_price"), 0)
+        total_price = int(round(discount_price * quantity))
+
+    status = OrderStatus.normalize(str(payload.get("status") or "pending").lower())
+    offer_title = payload.get("offer_title") or payload.get("title")
+    store_name = payload.get("store_name") or payload.get("name")
+    store_address = payload.get("store_address") or payload.get("address")
+    offer_photo = (
+        payload.get("offer_photo")
+        or payload.get("photo")
+        or payload.get("offer_photo_id")
+        or payload.get("photo_id")
+    )
+
+    return {
+        "booking_id": booking_id,
+        "status": status,
+        "order_status": status,
+        "order_type": "pickup",
+        "booking_code": payload.get("booking_code")
+        or payload.get("code")
+        or payload.get("pickup_code"),
+        "pickup_time": payload.get("pickup_time"),
+        "quantity": quantity,
+        "created_at": _serialize_datetime(payload.get("created_at")),
+        "offer_title": offer_title,
+        "total_price": total_price,
+        "items_total": total_price,
+        "total_with_delivery": total_price,
+        "store_name": store_name,
+        "store_address": store_address,
+        "offer_photo": offer_photo,
+        "offer_id": payload.get("offer_id"),
+        "store_id": payload.get("store_id"),
+        "payment_method": payload.get("payment_method") or "cash",
+        "payment_status": payload.get("payment_status"),
+        "delivery_address": None,
+        "delivery_fee": 0,
+    }
 
 
 def _normalize_phone(raw_phone: str | None) -> str:
@@ -681,8 +764,15 @@ async def get_orders(
                     }
                 )
         else:
-            qty = float(r.get("quantity") or 1)
-            price = int(r.get("item_price") or r.get("offer_price") or 0)
+            qty = _to_float(r.get("quantity"), 1.0) or 1.0
+            price = _to_int(r.get("item_price"), 0)
+            if price <= 0:
+                price = _to_int(r.get("offer_price"), 0)
+            stored_total = _to_int(r.get("total_price"), 0)
+            if price <= 0 and qty > 0 and stored_total > 0:
+                delivery_hint = _to_int(r.get("delivery_price"), 0) if order_type in ("delivery", "taxi") else 0
+                base_total = max(0, stored_total - delivery_hint)
+                price = int(round(base_total / qty)) if qty else 0
             title = r.get("item_title") or r.get("offer_title") or "Tovar"
             photo = r.get("offer_photo") or r.get("offer_photo_id")
             items_total = calc_items_total([{"price": price, "quantity": qty}])
@@ -700,9 +790,12 @@ async def get_orders(
                 }
             )
 
-        total_price = int(r.get("total_price") or 0)
+        total_price = _to_int(r.get("total_price"), 0)
+        if total_price <= 0 and items_total > 0:
+            delivery_hint = _to_int(r.get("delivery_price"), 0) if order_type in ("delivery", "taxi") else 0
+            total_price = int(items_total + max(0, delivery_hint))
         delivery_fee = calc_delivery_fee(
-            total_price,
+            total_price if total_price > 0 else None,
             items_total,
             delivery_price=r.get("delivery_price"),
             order_type=order_type,
@@ -735,8 +828,8 @@ async def get_orders(
                 "items_total": items_total,
                 "total_with_delivery": total_with_delivery,
                 "quantity": qty_total,
-                "created_at": str(r.get("created_at") or ""),
-                "updated_at": str(r.get("updated_at") or "") if r.get("updated_at") else None,
+                "created_at": _serialize_datetime(r.get("created_at")),
+                "updated_at": _serialize_datetime(r.get("updated_at")),
                 "store_id": r.get("store_id"),
                 "store_name": r.get("store_name"),
                 "store_address": r.get("store_address"),
@@ -764,36 +857,24 @@ async def get_orders(
                         except Exception:
                             pass
 
-                    bookings.append(
-                        {
-                            "booking_id": b[0] if len(b) > 0 else None,
-                            "offer_id": b[1] if len(b) > 1 else None,
-                            "user_id": b[2] if len(b) > 2 else None,
-                            "status": OrderStatus.normalize(
-                                str(b[3] if len(b) > 3 else "pending").lower()
-                            ),
-                            "booking_code": b[4] if len(b) > 4 else None,
-                            "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
-                            "quantity": float(b[6]) if len(b) > 6 and b[6] is not None else 1.0,
-                            "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
-                            "offer_title": b[8] if len(b) > 8 else None,
-                            "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
-                            "store_name": b[11] if len(b) > 11 else None,
-                            "store_address": b[12] if len(b) > 12 else None,
-                            "offer_photo": offer_photo,
-                        }
-                    )
+                    booking_payload = {
+                        "booking_id": b[0] if len(b) > 0 else None,
+                        "offer_id": b[1] if len(b) > 1 else None,
+                        "user_id": b[2] if len(b) > 2 else None,
+                        "status": b[3] if len(b) > 3 else "pending",
+                        "booking_code": b[4] if len(b) > 4 else None,
+                        "pickup_time": b[5] if len(b) > 5 else None,
+                        "quantity": b[6] if len(b) > 6 else 1.0,
+                        "created_at": b[7] if len(b) > 7 else None,
+                        "title": b[8] if len(b) > 8 else None,
+                        "discount_price": b[9] if len(b) > 9 else 0,
+                        "name": b[11] if len(b) > 11 else None,
+                        "address": b[12] if len(b) > 12 else None,
+                        "offer_photo": offer_photo,
+                    }
+                    bookings.append(_normalize_booking_payload(booking_payload))
                 elif isinstance(b, dict):
-                    booking = {}
-                    for key, value in b.items():
-                        if hasattr(value, "isoformat"):
-                            booking[key] = value.isoformat()
-                        else:
-                            booking[key] = value
-                    booking["status"] = OrderStatus.normalize(
-                        str(booking.get("status") or "pending").lower()
-                    )
-                    bookings.append(booking)
+                    bookings.append(_normalize_booking_payload(dict(b)))
         except Exception as e:
             logger.warning(f"Webapp get_orders failed to fetch bookings: {e}")
             raw_bookings = []
@@ -847,36 +928,24 @@ async def get_orders(
                     except Exception:
                         pass
 
-                bookings.append(
-                    {
-                        "booking_id": b[0] if len(b) > 0 else None,
-                        "offer_id": b[1] if len(b) > 1 else None,
-                        "user_id": b[2] if len(b) > 2 else None,
-                        "status": OrderStatus.normalize(
-                            str(b[3] if len(b) > 3 else "pending").lower()
-                        ),
-                        "booking_code": b[4] if len(b) > 4 else None,
-                        "pickup_time": str(b[5]) if len(b) > 5 and b[5] else None,
-                        "quantity": float(b[6]) if len(b) > 6 and b[6] is not None else 1.0,
-                        "created_at": str(b[7]) if len(b) > 7 and b[7] else None,
-                        "offer_title": b[8] if len(b) > 8 else None,
-                        "total_price": (b[9] or 0) * (b[6] or 1) if len(b) > 9 else 0,
-                        "store_name": b[11] if len(b) > 11 else None,
-                        "store_address": b[12] if len(b) > 12 else None,
-                        "offer_photo": offer_photo,
-                    }
-                )
+                booking_payload = {
+                    "booking_id": b[0] if len(b) > 0 else None,
+                    "offer_id": b[1] if len(b) > 1 else None,
+                    "user_id": b[2] if len(b) > 2 else None,
+                    "status": b[3] if len(b) > 3 else "pending",
+                    "booking_code": b[4] if len(b) > 4 else None,
+                    "pickup_time": b[5] if len(b) > 5 else None,
+                    "quantity": b[6] if len(b) > 6 else 1.0,
+                    "created_at": b[7] if len(b) > 7 else None,
+                    "title": b[8] if len(b) > 8 else None,
+                    "discount_price": b[9] if len(b) > 9 else 0,
+                    "name": b[11] if len(b) > 11 else None,
+                    "address": b[12] if len(b) > 12 else None,
+                    "offer_photo": offer_photo,
+                }
+                bookings.append(_normalize_booking_payload(booking_payload))
             elif isinstance(b, dict):
-                booking = {}
-                for key, value in b.items():
-                    if hasattr(value, "isoformat"):
-                        booking[key] = value.isoformat()
-                    else:
-                        booking[key] = value
-                booking["status"] = OrderStatus.normalize(
-                    str(booking.get("status") or "pending").lower()
-                )
-                bookings.append(booking)
+                bookings.append(_normalize_booking_payload(dict(b)))
 
     logger.info(
         f"📊 get_orders result for user {user_id}: {len(orders)} orders, {len(bookings)} bookings"

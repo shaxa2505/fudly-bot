@@ -316,11 +316,12 @@ function OrderTrackingPage({ user }) {
           {order.delivery_address && (
             <>
               <p className="delivery-address">Manzil: {order.delivery_address}</p>
-              {order.delivery_cost && (
-                <p className="delivery-cost">
-                  {t('Стоимость доставки', 'Yetkazib berish narxi')}: {order.delivery_cost.toLocaleString()} {t('сум', 'so\'m')}
-                </p>
-              )}
+              <p className="delivery-cost">
+                {t(
+                  'Стоимость доставки оплачивается отдельно таксисту или курьеру.',
+                  "Yetkazib berish to'lovi taksist yoki kuryerga alohida to'lanadi."
+                )}
+              </p>
             </>
           )}
           {order.pickup_address && (

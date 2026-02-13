@@ -47,6 +47,15 @@ const ACTIVE_STATUSES = new Set([
 
 const COMPLETED_STATUSES = new Set(['completed', 'cancelled', 'rejected'])
 
+const toCreatedTimestamp = (value) => {
+  if (!value) return 0
+  const raw = String(value).trim()
+  if (!raw) return 0
+  const normalizedRaw = raw.includes('T') ? raw : raw.replace(' ', 'T')
+  const date = new Date(normalizedRaw)
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime()
+}
+
 const applyOrderFilter = (orders, orderFilter) => {
   if (orderFilter === 'active') {
     return orders.filter(order =>
@@ -79,7 +88,7 @@ export function useOrders(activeSection) {
       const normalizedBookings = normalizeBookings(bookings)
 
       const mergedOrders = [...normalizedOrders, ...normalizedBookings]
-        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+        .sort((a, b) => toCreatedTimestamp(b.created_at) - toCreatedTimestamp(a.created_at))
 
     setOrders(applyOrderFilter(mergedOrders, orderFilter))
     } catch (error) {

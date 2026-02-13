@@ -694,6 +694,15 @@ async def get_order_status(
             raise HTTPException(status_code=403, detail="Access denied")
         # Convert order to booking format for compatibility
         return await format_booking_to_order_status(order, db)
+
+    # Legacy compatibility: check active bookings table
+    if hasattr(db, "get_booking"):
+        booking = await db.get_booking(booking_id)
+        if booking:
+            booking_dict = dict(booking) if not isinstance(booking, dict) else booking
+            if int(booking_dict.get("user_id") or 0) != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+            return await format_booking_to_order_status(booking, db)
     
     # Fallback: check archived bookings for old orders (optional table)
     if await _bookings_archive_exists(db):
@@ -740,6 +749,8 @@ async def get_order_timeline(
 
     # v24+: try unified orders table first
     order = await db.get_order(booking_id)
+    if not order and hasattr(db, "get_booking"):
+        order = await db.get_booking(booking_id)
     if not order and await _bookings_archive_exists(db):
         # Fallback: check archived bookings
         try:
@@ -925,6 +936,8 @@ async def get_order_qr_code(
 
     # v24+: try unified orders table first
     order = await db.get_order(booking_id)
+    if not order and hasattr(db, "get_booking"):
+        order = await db.get_booking(booking_id)
     if not order and await _bookings_archive_exists(db):
         # Fallback: check archived bookings
         try:

@@ -33,7 +33,12 @@ const getStatusInfo = (status, orderType) => {
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
   try {
-    const date = new Date(dateStr)
+    const raw = String(dateStr).trim()
+    if (!raw) return ''
+    const hasTimezoneHint = /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
+    const normalizedRaw = hasTimezoneHint || raw.includes('T') ? raw : raw.replace(' ', 'T')
+    const date = new Date(normalizedRaw)
+    if (Number.isNaN(date.getTime())) return raw
     const now = new Date()
     const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24))
 
