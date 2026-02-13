@@ -8,10 +8,8 @@ import {
   Croissant,
   Salad,
   Star,
-  Bell,
   MapPin,
   List,
-  ChevronDown,
   Navigation,
   ArrowRight,
 } from 'lucide-react'
@@ -26,7 +24,7 @@ import {
   buildLocationFromReverseGeocode,
 } from '../utils/cityUtils'
 import { getCurrentLocation, addDistanceToStores } from '../utils/geolocation'
-import { getStoreAvailability, getTashkentNowMinutes } from '../utils/availability'
+import { getStoreAvailability } from '../utils/availability'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
 import { resolveUiLanguage, tByLang } from '../utils/uiLanguage'
@@ -37,8 +35,10 @@ import './StoresPage.css'
 
 const FILTER_CHIP_DEFS = [
   { id: 'all' },
-  { id: 'bakery', businessType: 'bakery' },
+  { id: 'favorites' },
+  { id: 'nearby' },
   { id: 'supermarket', businessType: 'supermarket' },
+  { id: 'bakery', businessType: 'bakery' },
 ]
 
 const BUSINESS_META = {
@@ -125,7 +125,8 @@ const getMinutesUntilClosing = (availability) => {
   if (!availability?.isOpen) return null
   const closeAtMinutes = parseClockLabelToMinutes(availability.endLabel)
   if (closeAtMinutes == null) return null
-  const nowMinutes = getTashkentNowMinutes()
+  const now = new Date()
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
   const delta = closeAtMinutes - nowMinutes
   if (delta >= 0) return delta
   return 24 * 60 + delta
@@ -137,23 +138,12 @@ const getStoreCategoryLabel = (store) => {
     store?.business_type_label ||
     store?.store_type_label ||
     store?.category
-  if (explicit) {
-    return String(explicit).replace(/[_-]+/g, ' ').trim().toUpperCase()
-  }
+  if (explicit) return String(explicit).replace(/[_-]+/g, ' ').trim().toUpperCase()
 
   const businessType = String(store?.business_type || '').trim().toLowerCase()
-  if (STORE_CATEGORY_LABELS[businessType]) {
-    return STORE_CATEGORY_LABELS[businessType]
-  }
-
-  if ((store?.name || '').toLowerCase().includes('pizza')) {
-    return STORE_CATEGORY_LABELS.pizzeria
-  }
-
-  if (businessType) {
-    return businessType.replace(/[_-]+/g, ' ').toUpperCase()
-  }
-
+  if (STORE_CATEGORY_LABELS[businessType]) return STORE_CATEGORY_LABELS[businessType]
+  if ((store?.name || '').toLowerCase().includes('pizza')) return STORE_CATEGORY_LABELS.pizzeria
+  if (businessType) return businessType.replace(/[_-]+/g, ' ').toUpperCase()
   return 'STORE'
 }
 
@@ -162,17 +152,11 @@ const getStoreStatusLine = (store, availability, lang) => {
   const offers = Number(store?.offers_count || 0)
 
   if (offers <= 0) {
-    if (!availability.isOpen && availability.startLabel) {
-      return { tone: 'warning', text: t(`Opens at ${availability.startLabel}`, `${availability.startLabel} da ochiladi`) }
-    }
-    return { tone: 'muted', text: t('No items available', 'Mahsulotlar mavjud emas') }
+    return { tone: 'muted', text: t('Нет доступных товаров', 'Mahsulotlar mavjud emas') }
   }
 
   if (!availability.isOpen) {
-    if (availability.startLabel) {
-      return { tone: 'warning', text: t(`Closed now, opens at ${availability.startLabel}`, `${availability.startLabel} da ochiladi`) }
-    }
-    return { tone: 'warning', text: t('Closed now', 'Hozir yopiq') }
+    return { tone: 'warning', text: t('Сейчас закрыто', 'Hozir yopiq') }
   }
 
   const minutesUntilClose = getMinutesUntilClosing(availability)
@@ -181,8 +165,8 @@ const getStoreStatusLine = (store, availability, lang) => {
     return {
       tone: 'warning',
       text: closesInLabel
-        ? t(`Last chance: closes in ${closesInLabel}`, `${closesInLabel} dan keyin yopiladi`)
-        : t('Last chance: closes soon', 'Tez orada yopiladi'),
+        ? t(`Последний шанс: закрывается через ${closesInLabel}`, `${closesInLabel} dan keyin yopiladi`)
+        : t('Последний шанс: скоро закрывается', 'Tez orada yopiladi'),
     }
   }
 
@@ -190,21 +174,9 @@ const getStoreStatusLine = (store, availability, lang) => {
     store?.business_type === 'supermarket'
       ? t('mystery boxes', 'mystery boxlar')
       : store?.business_type === 'bakery'
-        ? t('pastries', 'pishiriqlar')
-        : t('items', 'mahsulotlar')
-
-  return { tone: 'success', text: `${offers} ${noun} ${t('left today', 'bugun qoldi')}` }
-}
-
-const getHeaderLocationLabel = (location, cityLatin) => {
-  const city = String(cityLatin || '').split(',')[0].trim()
-  const district = String(location?.district || '').split(',')[0].trim()
-  if (city && district && city.toLowerCase() !== district.toLowerCase()) {
-    return `${city}, ${district}`
-  }
-  if (city) return city
-  if (district) return district
-  return 'Tashkent'
+        ? t('выпечки', 'pishiriqlar')
+        : t('товаров', 'mahsulotlar')
+  return { tone: 'success', text: `${offers} ${noun} ${t('осталось сегодня', 'bugun qoldi')}` }
 }
 
 const formatDistanceLabel = (distance) => {
@@ -220,16 +192,6 @@ const formatRatingLabel = (rating) => {
   return value.toFixed(1)
 }
 
-const getStoreCardAriaLabel = (storeName, lang) => (
-  tByLang(lang, `Open ${storeName}`, `${storeName} ni ochish`)
-)
-
-const getMapToggleAriaLabel = (viewMode, lang) => (
-  viewMode === 'list'
-    ? tByLang(lang, 'Показать карту', "Xaritani ko'rish")
-    : tByLang(lang, 'Показать список', "Ro'yxatni ko'rish")
-)
-
 function StoresPage({ user }) {
   const navigate = useNavigate()
   const routeLocation = useLocation()
@@ -240,7 +202,10 @@ function StoresPage({ user }) {
   const locale = lang === 'ru' ? 'ru-RU' : 'uz-UZ'
 
   const [stores, setStores] = useState([])
+  const [favoriteStores, setFavoriteStores] = useState([])
+  const [favoriteIds, setFavoriteIds] = useState(() => new Set())
   const [loading, setLoading] = useState(true)
+  const [favoritesLoading, setFavoritesLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
@@ -265,10 +230,14 @@ function StoresPage({ user }) {
       ...chip,
       label:
         chip.id === 'all'
-          ? t('ALL STORES', 'ALL STORES')
-          : chip.id === 'supermarket'
-            ? t('SUPERMARKETS', 'SUPERMARKETS')
-            : t('BAKERIES', 'BAKERIES'),
+          ? t('Все', 'Hammasi')
+          : chip.id === 'favorites'
+            ? t('Избранные', 'Sevimlilar')
+            : chip.id === 'nearby'
+              ? t('Рядом', 'Yaqin-atrofda')
+              : chip.id === 'supermarket'
+                ? t('Супермаркет', 'Supermarket')
+                : t('Выпечка', 'Pishiriqlar'),
     })),
     [lang]
   )
@@ -286,14 +255,14 @@ function StoresPage({ user }) {
   const fallbackCenter = location?.coordinates?.lat != null && location?.coordinates?.lon != null
     ? { lat: location.coordinates.lat, lon: location.coordinates.lon }
     : CITY_CENTERS[normalizedCityKey] || null
-  const headerLocationLabel = useMemo(
-    () => getHeaderLocationLabel(location, cityLatin),
-    [location, cityLatin]
-  )
 
   useEffect(() => {
     loadStores()
   }, [activeFilter, cityRaw, regionRaw, districtRaw, userLocation, viewMode, lang])
+
+  useEffect(() => {
+    loadFavorites()
+  }, [])
 
   useEffect(() => {
     if (userLocation) return
@@ -328,7 +297,31 @@ function StoresPage({ user }) {
     return () => window.removeEventListener('fudly:location', handleLocationUpdate)
   }, [])
 
+  const loadFavorites = async () => {
+    setFavoritesLoading(true)
+    try {
+      const data = await api.getFavorites()
+      const list = Array.isArray(data) ? data : []
+      setFavoriteStores(list)
+      setFavoriteIds(new Set(list.map((store) => store.id)))
+    } catch (error) {
+      console.error('Error loading favorites:', error)
+    } finally {
+      setFavoritesLoading(false)
+    }
+  }
+
   const loadStores = async () => {
+    if (activeFilter === 'favorites') {
+      setLoading(false)
+      return
+    }
+
+    if (activeFilter === 'nearby' && !userLocation) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       const params = {}
@@ -448,6 +441,12 @@ function StoresPage({ user }) {
 
   const handleFilterSelect = (id) => {
     setActiveFilter(id)
+    if (id === 'nearby' && !userLocation) {
+      requestLocation()
+    }
+    if (id === 'favorites' && favoriteStores.length === 0) {
+      loadFavorites()
+    }
   }
 
   const handleOfferClick = (offer) => {
@@ -455,51 +454,68 @@ function StoresPage({ user }) {
     navigate('/product', { state: { offer } })
   }
 
+  const toggleFavorite = useCallback(async (storeId) => {
+    if (!storeId) return
+    const isFavorite = favoriteIds.has(storeId)
+    try {
+      if (isFavorite) {
+        await api.removeFavoriteStore(storeId)
+      } else {
+        await api.addFavoriteStore(storeId)
+      }
+      setFavoriteIds((prev) => {
+        const next = new Set(prev)
+        if (isFavorite) {
+          next.delete(storeId)
+        } else {
+          next.add(storeId)
+        }
+        return next
+      })
+      setFavoriteStores((prev) => {
+        if (isFavorite) {
+          return prev.filter((store) => store.id !== storeId)
+        }
+        if (prev.some((store) => store.id === storeId)) {
+          return prev
+        }
+        const addedStore = stores.find((store) => store.id === storeId)
+        return addedStore ? [addedStore, ...prev] : prev
+      })
+    } catch (error) {
+      console.error('Favorite toggle error:', error)
+      window.Telegram?.WebApp?.showAlert?.(t('Не удалось обновить избранное', "Sevimlilarni yangilab bo'lmadi"))
+    }
+  }, [favoriteIds, stores, lang])
+
+  const baseStores = useMemo(
+    () => (activeFilter === 'favorites' ? favoriteStores : stores),
+    [activeFilter, favoriteStores, stores]
+  )
+
   const filteredStores = useMemo(() => {
-    if (!normalizedQuery) return stores
-    return stores.filter((store) => {
+    if (!normalizedQuery) return baseStores
+    return baseStores.filter((store) => {
       const name = (store.name || '').toLowerCase()
       const address = (store.address || '').toLowerCase()
       return name.includes(normalizedQuery) || address.includes(normalizedQuery)
     })
-  }, [stores, normalizedQuery])
+  }, [baseStores, normalizedQuery])
 
   const visibleStores = useMemo(() => {
     if (!userLocation) return filteredStores
     return addDistanceToStores(filteredStores, userLocation)
   }, [filteredStores, userLocation])
 
-  const isLoading = loading
+  const isLoading = activeFilter === 'favorites' ? favoritesLoading : loading
 
   return (
     <div className="sp">
       <header className="sp-header">
         <div className="sp-header-top">
           <div className="sp-header-title">
-            <span className="sp-location-label">{t('CURRENT LOCATION', 'CURRENT LOCATION')}</span>
-            <button
-              type="button"
-              className="sp-location-btn"
-              onClick={() => navigate('/location-picker', { state: { returnTo: '/stores' } })}
-              aria-label={t('Изменить локацию', 'Joylashuvni ozgartirish')}
-            >
-              <MapPin size={16} strokeWidth={2.2} className="sp-location-pin" />
-              <span className="sp-location-city-name">{headerLocationLabel}</span>
-              <ChevronDown size={14} strokeWidth={2} className="sp-location-caret" />
-            </button>
+            <span className="sp-location-city-name">{t('Магазины', "Do'konlar")}</span>
           </div>
-          <button
-            type="button"
-            className="sp-header-action"
-            onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
-            aria-label={getMapToggleAriaLabel(viewMode, lang)}
-          >
-            {viewMode === 'list' ? (
-              <Bell size={18} strokeWidth={2.2} />
-            ) : (
-              <List size={18} strokeWidth={2.2} />
-            )}
-          </button>
         </div>
       </header>
 
@@ -514,7 +530,7 @@ function StoresPage({ user }) {
               ref={searchInputRef}
               type="text"
               className="sp-search-input"
-              placeholder={t('Search for stores, bakeries...', 'Search for stores, bakeries...')}
+              placeholder={t('Поиск магазинов...', "Do'kon qidirish...")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -542,10 +558,28 @@ function StoresPage({ user }) {
             type="button"
             className={`sp-chip ${activeFilter === chip.id ? 'active' : ''}`}
             onClick={() => handleFilterSelect(chip.id)}
+            disabled={chip.id === 'nearby' && locationLoading}
           >
             {chip.label}
           </button>
         ))}
+      </div>
+
+      <div className="sp-section-header">
+        <h3 className="sp-section-title">{t('Магазины', "Do'konlar")}</h3>
+        <button
+          type="button"
+          className="sp-section-action"
+          onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
+          aria-label={viewMode === 'list' ? t('Показать карту', "Xaritani ko'rish") : t('Показать список', "Ro'yxatni ko'rish")}
+        >
+          <span>{viewMode === 'list' ? t('Карта', 'Xarita') : t('Список', "Ro'yxat")}</span>
+          {viewMode === 'list' ? (
+            <MapPin size={16} strokeWidth={2} />
+          ) : (
+            <List size={16} strokeWidth={2} />
+          )}
+        </button>
       </div>
       <div className="sp-divider" />
 
@@ -586,8 +620,7 @@ function StoresPage({ user }) {
           <div className="sp-store-list">
             {visibleStores.map((store) => {
               const storePhotoUrl = resolveStoreImageUrl(store)
-              const meta = BUSINESS_META[store.business_type] || {}
-              const Icon = meta.icon || Store
+              const Icon = (BUSINESS_META[store.business_type] || {}).icon || Store
               const storeAvailability = getStoreAvailability(store)
               const distanceLabel = formatDistanceLabel(store.distance)
               const ratingLabel = formatRatingLabel(store.rating)
@@ -655,7 +688,7 @@ function StoresPage({ user }) {
                           e.stopPropagation()
                           loadStoreOffers(store)
                         }}
-                        aria-label={getStoreCardAriaLabel(store.name, lang)}
+                        aria-label={t('Открыть магазин', "Do'konni ochish")}
                       >
                         <ArrowRight size={18} strokeWidth={2.1} />
                       </button>
