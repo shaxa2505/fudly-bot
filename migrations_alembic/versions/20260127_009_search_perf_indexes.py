@@ -19,6 +19,19 @@ def upgrade() -> None:
     # Enable trigram search support
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
 
+    # Compatibility for clean Alembic databases:
+    # `stock_quantity` historically came from runtime schema init, but some
+    # databases were created from migrations only.
+    op.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS stock_quantity REAL DEFAULT 0")
+    op.execute(
+        """
+        UPDATE offers
+        SET stock_quantity = COALESCE(quantity, 0)
+        WHERE stock_quantity IS NULL
+           OR (stock_quantity = 0 AND COALESCE(quantity, 0) > 0)
+        """
+    )
+
     # Common filter indexes (safe if already present)
     op.execute("CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(status);")
     op.execute("CREATE INDEX IF NOT EXISTS idx_offers_category ON offers(category);")
