@@ -318,7 +318,7 @@ async def show_store_settings(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("store_working_hours_"))
+@router.callback_query(F.data.regexp(r"^store_working_hours_\d+$"))
 async def request_store_working_hours(
     callback: types.CallbackQuery, state: FSMContext
 ) -> None:
@@ -422,7 +422,7 @@ async def handle_store_working_hours(message: types.Message, state: FSMContext) 
     await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
 
 
-@router.callback_query(F.data.startswith("store_delivery_price_"))
+@router.callback_query(F.data.regexp(r"^store_delivery_price_\d+$"))
 async def request_store_delivery_price(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Request store delivery price update."""
     if not db:
@@ -475,6 +475,9 @@ async def handle_store_delivery_price(message: types.Message, state: FSMContext)
 
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
+    if is_cancel_text(message.text) or is_main_menu_button(message.text):
+        await state.clear()
+        return
 
     data = await state.get_data()
     store_id = data.get("store_id")
@@ -517,7 +520,7 @@ async def handle_store_delivery_price(message: types.Message, state: FSMContext)
     await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
 
 
-@router.callback_query(F.data.startswith("store_delivery_radius_"))
+@router.callback_query(F.data.regexp(r"^store_delivery_radius_\d+$"))
 async def request_store_delivery_radius(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Request store delivery radius update."""
     if not db:
@@ -570,6 +573,9 @@ async def handle_store_delivery_radius(message: types.Message, state: FSMContext
 
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
+    if is_cancel_text(message.text) or is_main_menu_button(message.text):
+        await state.clear()
+        return
 
     data = await state.get_data()
     store_id = data.get("store_id")
@@ -612,7 +618,7 @@ async def handle_store_delivery_radius(message: types.Message, state: FSMContext
     await message.answer(success_text, parse_mode="HTML", reply_markup=back_kb.as_markup())
 
 
-@router.callback_query(F.data.startswith("store_min_order_"))
+@router.callback_query(F.data.regexp(r"^store_min_order_\d+$"))
 async def request_store_min_order(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Request minimum order amount update."""
     if not db:
@@ -663,6 +669,9 @@ async def handle_store_min_order(message: types.Message, state: FSMContext) -> N
 
     assert message.from_user is not None
     lang = db.get_user_language(message.from_user.id)
+    if is_cancel_text(message.text) or is_main_menu_button(message.text):
+        await state.clear()
+        return
 
     data = await state.get_data()
     store_id = data.get("store_id")

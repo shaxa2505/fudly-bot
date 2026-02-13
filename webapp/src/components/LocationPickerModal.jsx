@@ -264,6 +264,7 @@ function LocationPickerModal({
   onDetectLocation,
   onApply,
   onReset,
+  asPage = false,
 }) {
   const [mode, setMode] = useState('map')
   const [query, setQuery] = useState('')
@@ -355,7 +356,7 @@ function LocationPickerModal({
   }, [])
 
   useEffect(() => {
-    if (!isOpen) return undefined
+    if (!isOpen || asPage) return undefined
     const body = document.body
     const html = document.documentElement
     const appSurface = document.querySelector('.app-surface')
@@ -376,7 +377,7 @@ function LocationPickerModal({
         appSurface.style.overflow = ''
       }
     }
-  }, [isOpen])
+  }, [asPage, isOpen])
 
   useEffect(() => {
     if (!isOpen || mode !== 'search') return
@@ -842,298 +843,322 @@ function LocationPickerModal({
 
   const showGeoSuggestion = Boolean(canDetect || geoSupported)
   const errorMessage = locationError || localLocationError
-  return (
-    <div className="location-picker-overlay" onClick={onClose}>
-      <div className={`location-picker ${mode === 'search' ? 'search-mode' : ''}`} onClick={(event) => event.stopPropagation()}>
-        {mode === 'search' ? (
-          <div className="location-picker-search-view">
-            <div className="location-picker-search-header">
+  const content = (
+    <div
+      className={`location-picker ${mode === 'search' ? 'search-mode' : ''}${asPage ? ' as-page' : ''}`}
+      onClick={(event) => {
+        if (!asPage) {
+          event.stopPropagation()
+        }
+      }}
+    >
+      {mode === 'search' ? (
+        <div className="location-picker-search-view">
+          <div className="location-picker-search-header">
+            <button
+              type="button"
+              className="location-picker-back"
+              onClick={closeSearch}
+              aria-label="Ortga"
+            >
+              <span aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </span>
+            </button>
+            <div className="location-picker-search-title">
+              <p>Manzilni tanlang</p>
+              <span>Shahar, mahalla yoki ko'cha</span>
+            </div>
+            <span className="location-picker-search-spacer" aria-hidden="true" />
+          </div>
+
+          <div className="location-picker-search-field">
+            <div className="location-picker-input">
+              <span className="location-picker-input-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+                  <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Shahar, mahalla yoki ko'cha"
+              />
               <button
                 type="button"
-                className="location-picker-back"
-                onClick={closeSearch}
-                aria-label="Ortga"
+                className={`location-picker-clear${query ? '' : ' is-hidden'}`}
+                onClick={() => setQuery('')}
+                aria-label="Tozalash"
+                disabled={!query}
               >
-                <span aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               </button>
-              <div className="location-picker-search-title">
-                <p>Manzilni tanlang</p>
-                <span>Shahar, mahalla yoki ko'cha</span>
-              </div>
-              <span className="location-picker-search-spacer" aria-hidden="true" />
-            </div>
-
-            <div className="location-picker-search-field">
-              <div className="location-picker-input">
-                <span className="location-picker-input-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
-                    <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Shahar, mahalla yoki ko'cha"
-                />
-                <button
-                  type="button"
-                  className={`location-picker-clear${query ? '' : ' is-hidden'}`}
-                  onClick={() => setQuery('')}
-                  aria-label="Tozalash"
-                  disabled={!query}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="location-picker-results">
-              <div className="location-picker-results-header">
-                <span>Natijalar</span>
-                <span className="location-picker-results-hint">Bosib tanlang</span>
-              </div>
-              {searchLoading && (
-                <div className="location-picker-loading">Qidirilmoqda...</div>
-              )}
-
-              {!searchLoading && !hasResults && query.trim().length >= 2 && (
-                <div className="location-picker-empty">
-                  {searchError || 'Hech narsa topilmadi'}
-                </div>
-              )}
-
-              {hasResults && results.map((item, index) => (
-                <button
-                  key={`${item.place_id || item.osm_id || index}`}
-                  type="button"
-                  className="location-picker-result"
-                  onClick={() => handleSelectResult(item)}
-                >
-                  <span className="location-picker-result-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M12 21s7-7 7-11a7 7 0 1 0-14 0c0 4 7 11 7 11z" stroke="currentColor" strokeWidth="2" fill="none" />
-                      <circle cx="12" cy="10" r="2.5" fill="currentColor" />
-                    </svg>
-                  </span>
-                  <span className="location-picker-result-body">
-                    <span className="location-picker-result-title">{getPrimaryLabel(item)}</span>
-                    <span className="location-picker-result-subtitle">{getSecondaryLabel(item)}</span>
-                  </span>
-                  {distanceLabel(item) && (
-                    <span className="location-picker-result-distance">{distanceLabel(item)}</span>
-                  )}
-                </button>
-              ))}
-
-              {query.trim().length >= 2 && (
-                <button
-                  type="button"
-                  className="location-picker-result manual"
-                  onClick={handleUseTyped}
-                >
-                  <span className="location-picker-result-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <path d="M4 20l4-1 9-9-3-3-9 9-1 4z" stroke="currentColor" strokeWidth="2" fill="none" />
-                      <path d="M13 7l3 3" stroke="currentColor" strokeWidth="2" />
-                    </svg>
-                  </span>
-                  <span className="location-picker-result-body">
-                    <span className="location-picker-result-title">Kiritilgan manzilni tanlash</span>
-                    <span className="location-picker-result-hint">Agar aniq manzil topilmasa</span>
-                    <span className="location-picker-result-subtitle">{query.trim()}</span>
-                  </span>
-                </button>
-              )}
             </div>
           </div>
-        ) : (
-          <>
-            <div className="location-picker-map">
-              <div className="location-picker-map-canvas">
-                {!mapLoaded && (
-                  <div className="location-picker-map-loading">
-                    Xarita yuklanmoqda...
-                  </div>
+
+          <div className="location-picker-results">
+            <div className="location-picker-results-header">
+              <span>Natijalar</span>
+              <span className="location-picker-results-hint">Bosib tanlang</span>
+            </div>
+            {searchLoading && (
+              <div className="location-picker-loading">Qidirilmoqda...</div>
+            )}
+
+            {!searchLoading && !hasResults && query.trim().length >= 2 && (
+              <div className="location-picker-empty">
+                {searchError || 'Hech narsa topilmadi'}
+              </div>
+            )}
+
+            {hasResults && results.map((item, index) => (
+              <button
+                key={`${item.place_id || item.osm_id || index}`}
+                type="button"
+                className="location-picker-result"
+                onClick={() => handleSelectResult(item)}
+              >
+                <span className="location-picker-result-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 21s7-7 7-11a7 7 0 1 0-14 0c0 4 7 11 7 11z" stroke="currentColor" strokeWidth="2" fill="none" />
+                    <circle cx="12" cy="10" r="2.5" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="location-picker-result-body">
+                  <span className="location-picker-result-title">{getPrimaryLabel(item)}</span>
+                  <span className="location-picker-result-subtitle">{getSecondaryLabel(item)}</span>
+                </span>
+                {distanceLabel(item) && (
+                  <span className="location-picker-result-distance">{distanceLabel(item)}</span>
                 )}
-                <div ref={mapRef} className="location-picker-map-view" />
+              </button>
+            ))}
+
+            {query.trim().length >= 2 && (
+              <button
+                type="button"
+                className="location-picker-result manual"
+                onClick={handleUseTyped}
+              >
+                <span className="location-picker-result-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 20l4-1 9-9-3-3-9 9-1 4z" stroke="currentColor" strokeWidth="2" fill="none" />
+                    <path d="M13 7l3 3" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                </span>
+                <span className="location-picker-result-body">
+                  <span className="location-picker-result-title">Kiritilgan manzilni tanlash</span>
+                  <span className="location-picker-result-hint">Agar aniq manzil topilmasa</span>
+                  <span className="location-picker-result-subtitle">{query.trim()}</span>
+                </span>
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="location-picker-map">
+            <div className="location-picker-map-canvas">
+              {!mapLoaded && (
+                <div className="location-picker-map-loading">
+                  Xarita yuklanmoqda...
+                </div>
+              )}
+              <div ref={mapRef} className="location-picker-map-view" />
+              {!asPage && onClose && (
                 <button className="location-picker-map-back" onClick={onClose} aria-label="Ortga">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </button>
-                {showGeoSuggestion && (
+              )}
+              <div className="location-picker-map-hint">Xaritani siljiting</div>
+            </div>
+          </div>
+
+          {showGeoSuggestion && (
+            <button
+              type="button"
+              className={`location-picker-map-locate${isDetecting ? ' is-loading' : ''}`}
+              onClick={handleDetectClick}
+              disabled={isDetecting}
+              aria-label="Joriy joylashuv"
+              title="Joriy joylashuv"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.35" />
+              </svg>
+            </button>
+          )}
+
+          <div className="location-picker-sheet">
+            <div className="location-picker-sheet-handle" aria-hidden="true">
+              <span />
+            </div>
+            <div className="location-picker-sheet-scroll">
+              <div className="location-picker-sheet-title">
+                <h2>Manzilni tanlang</h2>
+                <p>Yaqin atrofdagi takliflarni topamiz</p>
+              </div>
+
+              <div
+                className={`location-picker-search ${mapAddress ? '' : 'is-empty'}`}
+                role="button"
+                tabIndex={0}
+                onClick={openSearch}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    openSearch()
+                  }
+                }}
+                aria-label="Manzilni qidirish"
+              >
+                <span className="location-picker-search-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
+                    <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span className="location-picker-search-text">
+                  {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Yetkazish yoki olib ketish manzili')}
+                </span>
+                {onReset && mapAddress && (
                   <button
                     type="button"
-                    className={`location-picker-map-locate${isDetecting ? ' is-loading' : ''}`}
-                    onClick={handleDetectClick}
-                    disabled={isDetecting}
-                    aria-label="Joriy joylashuv"
-                    title="Joriy joylashuv"
+                    className="location-picker-search-clear"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onReset()
+                    }}
+                    aria-label="Tozalash"
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
-                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.35" />
+                      <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     </svg>
                   </button>
                 )}
-                <div className="location-picker-map-hint">Xaritani siljiting</div>
               </div>
-            </div>
 
-            <div className="location-picker-sheet">
-              <div className="location-picker-sheet-handle" aria-hidden="true">
-                <span />
+              <div className="location-picker-chips">
+                {QUICK_CHIPS.map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    className={`location-picker-chip${activeChip === chip.id ? ' is-active' : ''}`}
+                    onClick={() => handleChipSelect(chip.id)}
+                  >
+                    <span className="location-picker-chip-icon" aria-hidden="true">
+                      {chip.id === 'home' && (
+                        <svg viewBox="0 0 24 24">
+                          <path d="M3 10.5L12 3l9 7.5v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {chip.id === 'work' && (
+                        <svg viewBox="0 0 24 24">
+                          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2h4a1 1 0 0 1 1 1v4H4V7a1 1 0 0 1 1-1h4zm2 0h2V4h-2v2zm9 6v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7h7v2h2v-2h7z" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {chip.id === 'yunusabad' && (
+                        <svg viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" fill="none" />
+                          <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="location-picker-chip-label">{chip.label}</span>
+                  </button>
+                ))}
               </div>
-              <div className="location-picker-sheet-scroll">
-                <div className="location-picker-sheet-title">
-                  <h2>Manzilni tanlang</h2>
-                  <p>Yaqin atrofdagi takliflarni topamiz</p>
-                </div>
 
-                <div
-                  className={`location-picker-search ${mapAddress ? '' : 'is-empty'}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={openSearch}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      openSearch()
-                    }
-                  }}
-                  aria-label="Manzilni qidirish"
-                >
-                  <span className="location-picker-search-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" fill="none" />
-                      <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                  </span>
-                  <span className="location-picker-search-text">
-                    {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Yetkazish yoki olib ketish manzili')}
-                  </span>
-                  {onReset && mapAddress && (
-                    <button
-                      type="button"
-                      className="location-picker-search-clear"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        onReset()
-                      }}
-                      aria-label="Tozalash"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-
-                <div className="location-picker-chips">
-                  {QUICK_CHIPS.map((chip) => (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      className={`location-picker-chip${activeChip === chip.id ? ' is-active' : ''}`}
-                      onClick={() => handleChipSelect(chip.id)}
-                    >
-                      <span className="location-picker-chip-icon" aria-hidden="true">
-                        {chip.id === 'home' && (
-                          <svg viewBox="0 0 24 24">
-                            <path d="M3 10.5L12 3l9 7.5v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                        {chip.id === 'work' && (
-                          <svg viewBox="0 0 24 24">
-                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2h4a1 1 0 0 1 1 1v4H4V7a1 1 0 0 1 1-1h4zm2 0h2V4h-2v2zm9 6v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7h7v2h2v-2h7z" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                        {chip.id === 'yunusabad' && (
-                          <svg viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" fill="none" />
-                            <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </span>
-                      <span className="location-picker-chip-label">{chip.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="location-picker-details">
-                  <div className="location-picker-details-title">Manzil tafsilotlari</div>
-                  <div className="location-picker-details-grid">
-                    <label className="location-picker-field">
-                      <span className="location-picker-field-label">Kirish</span>
-                      <input
-                        type="text"
-                        value={details.entrance}
-                        onChange={(event) => handleDetailChange('entrance', event.target.value)}
-                        placeholder="Masalan, 1"
-                      />
-                    </label>
-                    <label className="location-picker-field">
-                      <span className="location-picker-field-label">Qavat</span>
-                      <input
-                        type="text"
-                        value={details.floor}
-                        onChange={(event) => handleDetailChange('floor', event.target.value)}
-                        placeholder="Masalan, 4"
-                      />
-                    </label>
-                    <label className="location-picker-field">
-                      <span className="location-picker-field-label">Xonadon/Ofis</span>
-                      <input
-                        type="text"
-                        value={details.apartment}
-                        onChange={(event) => handleDetailChange('apartment', event.target.value)}
-                        placeholder="Masalan, 24"
-                      />
-                    </label>
-                  </div>
-                  <label className="location-picker-field location-picker-field-full">
-                    <span className="location-picker-field-label">Kuryer uchun izoh (ixtiyoriy)</span>
-                    <textarea
-                      rows={3}
-                      className="location-picker-note"
-                      value={details.note}
-                      onChange={(event) => handleDetailChange('note', event.target.value)}
-                      placeholder="Domofon, mo'ljal..."
+              <div className="location-picker-details">
+                <div className="location-picker-details-title">Manzil tafsilotlari</div>
+                <div className="location-picker-details-grid">
+                  <label className="location-picker-field">
+                    <span className="location-picker-field-label">Kirish</span>
+                    <input
+                      type="text"
+                      value={details.entrance}
+                      onChange={(event) => handleDetailChange('entrance', event.target.value)}
+                      placeholder="Masalan, 1"
+                    />
+                  </label>
+                  <label className="location-picker-field">
+                    <span className="location-picker-field-label">Qavat</span>
+                    <input
+                      type="text"
+                      value={details.floor}
+                      onChange={(event) => handleDetailChange('floor', event.target.value)}
+                      placeholder="Masalan, 4"
+                    />
+                  </label>
+                  <label className="location-picker-field">
+                    <span className="location-picker-field-label">Xonadon/Ofis</span>
+                    <input
+                      type="text"
+                      value={details.apartment}
+                      onChange={(event) => handleDetailChange('apartment', event.target.value)}
+                      placeholder="Masalan, 24"
                     />
                   </label>
                 </div>
-
-                {errorMessage && (
-                  <div className="location-picker-error">{errorMessage}</div>
-                )}
-
-                <button type="button" className="location-picker-confirm" onClick={handleConfirmMap}>
-                  <span>Manzilni tasdiqlash</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12h12M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-
-                {onReset && (
-                  <button type="button" className="location-picker-reset" onClick={onReset}>
-                    Joylashuvni tozalash
-                  </button>
-                )}
+                <label className="location-picker-field location-picker-field-full">
+                  <span className="location-picker-field-label">Kuryer uchun izoh (ixtiyoriy)</span>
+                  <textarea
+                    rows={3}
+                    className="location-picker-note"
+                    value={details.note}
+                    onChange={(event) => handleDetailChange('note', event.target.value)}
+                    placeholder="Domofon, mo'ljal..."
+                  />
+                </label>
               </div>
             </div>
-          </>
-        )}
+
+            <div className="location-picker-sheet-footer">
+              {errorMessage && (
+                <div className="location-picker-error">{errorMessage}</div>
+              )}
+
+              <button type="button" className="location-picker-confirm" onClick={handleConfirmMap}>
+                <span>Manzilni tasdiqlash</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h12M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {onReset && (
+                <button type="button" className="location-picker-reset" onClick={onReset}>
+                  Joylashuvni tozalash
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+
+  if (asPage) {
+    return (
+      <div className="location-picker-page">
+        {content}
       </div>
+    )
+  }
+
+  return (
+    <div className="location-picker-overlay" onClick={() => onClose?.()}>
+      {content}
     </div>
   )
 }

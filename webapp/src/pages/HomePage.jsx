@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { transliterateCity, getSavedLocation, saveLocation, DEFAULT_LOCATION, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
+import { transliterateCity, getSavedLocation, saveLocation, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
 import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
@@ -12,7 +12,6 @@ import HeroBanner from '../components/HeroBanner'
 import BottomNav from '../components/BottomNav'
 import PullToRefresh from '../components/PullToRefresh'
 import ScrollTopButton from '../components/ScrollTopButton'
-import LocationPickerModal from '../components/LocationPickerModal'
 import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { getScrollContainer, getScrollTop } from '../utils/scrollContainer'
 import { blurOnEnter, formatPrice } from '../utils/helpers'
@@ -95,8 +94,7 @@ function HomePage() {
   const [location, setLocation] = useState(getSavedLocation)
   const [isLocating, setIsLocating] = useState(false)
   const [locationError, setLocationError] = useState('')
-  const [showAddressModal, setShowAddressModal] = useState(false)
-  const [geoStatusLabel, setGeoStatusLabel] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
+  const [, setGeoStatusLabel] = useState(() => localStorage.getItem(GEO_STATUS_KEY) || '')
   const [locationPulse, setLocationPulse] = useState(false)
 
   // Quick filters state
@@ -776,7 +774,7 @@ function HomePage() {
         console.log('Auto-geolocation denied or failed:', error?.message || error)
         if (error?.code === error.PERMISSION_DENIED) {
           setGeoAttempt('denied')
-          setShowAddressModal(true)
+          navigate('/location-picker', { state: { returnTo: '/' } })
         } else {
           setGeoAttempt('fail')
         }
@@ -791,7 +789,7 @@ function HomePage() {
   }, [])
 
   // Функция для автоматического геокодирования (при старте)
-  const applyLocation = useCallback((nextLocation, options = {}) => {
+  const applyLocation = useCallback((nextLocation) => {
     if (!nextLocation) return
     const normalized = {
       ...nextLocation,
@@ -800,9 +798,6 @@ function HomePage() {
       district: normalizeLocationName(nextLocation.district || ''),
     }
     setLocation(prev => ({ ...prev, ...normalized }))
-    if (options.closeModal) {
-      setShowAddressModal(false)
-    }
     setLocationError('')
   }, [])
 
@@ -850,68 +845,8 @@ function HomePage() {
 
   // Cart is now saved automatically via CartContext
 
-  const reverseGeocode = async (lat, lon) => {
-    try {
-      const data = await api.reverseGeocode(lat, lon, 'uz')
-      if (!data) throw new Error('Geo lookup failed')
-      applyLocation(buildLocationFromReverseGeocode(data, lat, lon), { closeModal: true })
-      return true // Закрываем модалку после успешного определения
-    } catch (error) {
-      console.error('Reverse geocode error', error)
-      setLocationError('Manzilni aniqlab bo\'lmadi')
-      return false
-    } finally {
-      setIsLocating(false)
-    }
-  }
-
-  const handleDetectLocation = () => {
-    if (!navigator.geolocation && !window.Telegram?.WebApp?.requestLocation) {
-      setLocationError('Qurilmada geolokatsiya qo\'llab-quvvatlanmaydi')
-      return
-    }
-    setIsLocating(true)
-    setGeoAttempt('start')
-    setLocationError('')
-    getPreferredLocation({
-      preferTelegram: true,
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
-      minAccuracy: GEO_ACCURACY_METERS,
-      retryOnLowAccuracy: true,
-      highAccuracyTimeout: 20000,
-      highAccuracyMaximumAge: 0,
-    })
-      .then(async ({ latitude, longitude }) => {
-        const ok = await reverseGeocode(latitude, longitude)
-        setGeoAttempt(ok ? 'ok' : 'fail')
-      })
-      .catch((error) => {
-        console.error('Geolocation error', error)
-        if (error?.code === error.PERMISSION_DENIED) {
-          setLocationError('Geolokatsiyaga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering.')
-        } else if (error?.code === error.TIMEOUT) {
-          setLocationError('Joylashuvni aniqlash vaqti tugadi. Qayta urinib ko\'ring.')
-        } else {
-          setLocationError('Geolokatsiyani olish imkonsiz')
-        }
-        setGeoAttempt(error?.code === error.PERMISSION_DENIED ? 'denied' : 'fail')
-        setIsLocating(false)
-      })
-  }
-
   const openAddressModal = () => {
-    setShowAddressModal(true)
-  }
-
-  const handleResetLocation = () => {
-    setLocation(DEFAULT_LOCATION)
-    setLocationError('')
-    localStorage.removeItem(GEO_ATTEMPT_KEY)
-    localStorage.removeItem(GEO_STATUS_KEY)
-    autoLocationAttempted.current = false
-    setShowAddressModal(false)
+    navigate('/location-picker', { state: { returnTo: '/' } })
   }
 
   // Cart functions now come from useCart() hook
@@ -1244,7 +1179,7 @@ function HomePage() {
           Yaqin atrofda takliflar topilmadi. Siz kengaytirilgan hududdagi mahsulotlarni ko'ryapsiz.
           <button
             className="location-warning-btn"
-            onClick={() => setShowAddressModal(true)}
+            onClick={openAddressModal}
           >
             Manzilni o‘zgartirish
           </button>
@@ -1357,24 +1292,8 @@ function HomePage() {
         cartCount={cartCount}
       />
 
-      <LocationPickerModal
-        isOpen={showAddressModal}
-        location={location}
-        isLocating={isLocating}
-        locationError={locationError}
-        geoStatusLabel={geoStatusLabel}
-        onClose={() => setShowAddressModal(false)}
-        onDetectLocation={handleDetectLocation}
-        onApply={(nextLocation) => applyLocation(nextLocation, { closeModal: true })}
-        onReset={handleResetLocation}
-      />
     </div>
   )
 }
 
 export default HomePage
-
-
-
-
-
