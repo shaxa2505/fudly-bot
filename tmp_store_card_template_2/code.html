@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Premium Stores List | Anti-Food Waste</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3A5A40",
+                        "sage": "#A3B18A",
+                        "off-white": "#F9F9F9",
+                        "charcoal": "#2D2D2D",
+                        "forest": "#344E41",
+                        "background-light": "#F9F9F9",
+                        "background-dark": "#112116",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    letterSpacing: {
+                        "premium": "0.05em",
+                        "button": "0.1em"
+                    },
+                    boxShadow: {
+                        "soft": "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem", 
+                        "lg": "1rem", 
+                        "xl": "1.5rem", 
+                        "full": "9999px"
+                    }
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body {
+            -webkit-tap-highlight-color: transparent;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            background-color: #F9F9F9;
+            color: #2D2D2D;
+            min-height: 100dvh;
+        }
+        body::-webkit-scrollbar {
+            display: none;
+        }
+        .ios-blur {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display bg-background-light dark:bg-background-dark text-charcoal">
+<div class="h-11 w-full bg-off-white"></div>
+<header class="sticky top-0 z-50 bg-off-white/95 ios-blur border-b border-gray-100/50 pb-4">
+<div class="px-6 pt-2 pb-4 flex flex-col items-center justify-center relative">
+<div class="flex flex-col items-center">
+<span class="text-[10px] uppercase tracking-[0.2em] text-primary/60 font-bold mb-1">Current Location</span>
+<div class="flex items-center gap-1 cursor-pointer group hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-primary text-lg">location_on</span>
+<span class="text-sm font-bold text-charcoal tracking-tight">Tashkent, Chilanzar</span>
+<span class="material-symbols-outlined text-sm text-charcoal/40">expand_more</span>
+</div>
+</div>
+<div class="absolute right-6 top-3">
+<div class="w-9 h-9 rounded-full bg-white border border-gray-100 flex items-center justify-center shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<span class="material-symbols-outlined text-charcoal text-[20px]">notifications</span>
+</div>
+</div>
+</div>
+<div class="px-6">
+<div class="relative w-full group">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 text-[20px]">search</span>
+</div>
+<input class="w-full bg-white border border-gray-200 text-charcoal text-sm rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-primary/40 focus:ring-0 placeholder:text-gray-400 placeholder:text-[13px] placeholder:font-medium transition-all shadow-sm hover:shadow-soft" placeholder="Search for stores, bakeries..." type="text"/>
+</div>
+</div>
+</header>
+<main class="pb-32 pt-2">
+<section class="px-6 py-4 overflow-x-auto flex gap-3 no-scrollbar sticky top-[125px] z-40 bg-off-white/95 ios-blur">
+<button class="flex-none px-5 py-2 rounded-full bg-primary text-white text-[11px] font-bold uppercase tracking-button shadow-sm">All Stores</button>
+<button class="flex-none px-5 py-2 rounded-full bg-white border border-gray-200 text-charcoal/70 text-[11px] font-bold uppercase tracking-button hover:border-primary/30 hover:text-primary transition-colors">Bakeries</button>
+<button class="flex-none px-5 py-2 rounded-full bg-white border border-gray-200 text-charcoal/70 text-[11px] font-bold uppercase tracking-button hover:border-primary/30 hover:text-primary transition-colors">Supermarkets</button>
+<button class="flex-none px-5 py-2 rounded-full bg-white border border-gray-200 text-charcoal/70 text-[11px] font-bold uppercase tracking-button hover:border-primary/30 hover:text-primary transition-colors">Cafes</button>
+</section>
+<section class="px-6 flex flex-col gap-6">
+<div class="flex flex-col gap-3 group cursor-pointer">
+<div class="relative w-full aspect-[2/1] rounded-2xl overflow-hidden bg-gray-100 border border-gray-100/50 shadow-soft">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Safia Bakery exterior warm lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIiKMJFCeirU8R3dSeHWqINYaqmOle3YhUdjpAZJBCWqNtPchCJUQokxfIHImZk4YKWlSRjhKeKP0to3AErXQpJmAo2ldjzLGDTKT6FMt9x8gi5Qj2RtFWzziq6oksFU0p1nKdbT0qD00iCUxzmDwZ2Hqc4ZPmUYeVwgC2S1tDJiTUNJXm3FDeq-1jeU2hjd3SDpaaEek0nbgpch6H_WSJLfKIiMdnMx1lGcCb0DX6uYxIVqEC71YsSX1pS39GAgBlZZFH-lQFpY8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+<div class="absolute top-3 left-3 flex gap-2">
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-charcoal">near_me</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">0.8 km</span>
+</div>
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-yellow-500 font-variation-fill-1">star</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">4.9</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-1 px-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-charcoal tracking-tight leading-tight">Safia Bakery</h3>
+<p class="text-[11px] font-medium text-charcoal/50 uppercase tracking-wider mt-0.5">Bakery &amp; Pastry</p>
+</div>
+<div class="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center bg-white shadow-sm group-hover:border-primary/30 transition-colors">
+<span class="material-symbols-outlined text-charcoal text-[18px]">arrow_forward</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-xs font-semibold text-primary">3 items left today</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-3 group cursor-pointer">
+<div class="relative w-full aspect-[2/1] rounded-2xl overflow-hidden bg-gray-100 border border-gray-100/50 shadow-soft">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Korzinka supermarket fresh produce section" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdQJF-ZZPrcq9S2Qd6aQ7KsEysteO3vZm1RXRv_QYkkFATc0-J7YRkjAVsP_TBkmaC-HZV3_f-SLAA2u3KRlxaWk_ZuUGIbAsJZ5VK-eHY-ynhQpEHngBLkEW0e6ai9OexYDgCMyFOs8IjnCCeZ0clISRqzG08xfMnQAUcd0bL-b45LFOgtmtMBOkp7YRRbJYchAgTPzG5hNlIXH5R7MEkVs5--Hmd3X8mVcmpEIk64iI8dAzbk63xNZt0KKrmPV4rePUANa7-Kys"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+<div class="absolute top-3 left-3 flex gap-2">
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-charcoal">near_me</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">1.2 km</span>
+</div>
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-yellow-500 font-variation-fill-1">star</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">4.7</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-1 px-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-charcoal tracking-tight leading-tight">Korzinka.uz</h3>
+<p class="text-[11px] font-medium text-charcoal/50 uppercase tracking-wider mt-0.5">Supermarket</p>
+</div>
+<div class="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center bg-white shadow-sm group-hover:border-primary/30 transition-colors">
+<span class="material-symbols-outlined text-charcoal text-[18px]">arrow_forward</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-xs font-semibold text-primary">12 mystery boxes available</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-3 group cursor-pointer">
+<div class="relative w-full aspect-[2/1] rounded-2xl overflow-hidden bg-gray-100 border border-gray-100/50 shadow-soft">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Paul bakery french style interior" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHMatgRdjInWiTPkP_egSNTD2A9UAra9TLyY9uFgq-tdLFwIXbUTFm3UNXMkM_0U9bPz16b5nueXBRMrwc3E5soY-aOK3Wf8CDF_3jr8XUWpx98aYC6WaNV1hw89PPQMYDfvxBPqA1JTeAaqGNYnv0hMKQrqHZYNUttZLF_mpxxQEKmDr1OMX5N8M0xqPTgPAtB5Eui4ax1qrI1zqsvWJWavQvaQBVGllx84pQ23R3F8gy7aDkazT7xDXDcc8cP4L7siZbN05fDws"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+<div class="absolute top-3 left-3 flex gap-2">
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-charcoal">near_me</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">2.4 km</span>
+</div>
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-yellow-500 font-variation-fill-1">star</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">4.8</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-1 px-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-charcoal tracking-tight leading-tight">Paul Uzbekistan</h3>
+<p class="text-[11px] font-medium text-charcoal/50 uppercase tracking-wider mt-0.5">French Bakery</p>
+</div>
+<div class="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center bg-white shadow-sm group-hover:border-primary/30 transition-colors">
+<span class="material-symbols-outlined text-charcoal text-[18px]">arrow_forward</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-xs font-semibold text-primary">5 pastries left</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-3 group cursor-pointer">
+<div class="relative w-full aspect-[2/1] rounded-2xl overflow-hidden bg-gray-100 border border-gray-100/50 shadow-soft">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" data-alt="Bella Pizza authentic oven" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCg6v2-eHPqdJAjw6d6NyzqbODY01sl_ihycdqFdwaL0WYPK58BmkXrRpsVRPhfCWKa16ucD0nuPxLjJ-VfiXouVSfEUqLRmjhlR_5RoSE3WsExp67a4bjNGLfzxDbjOVivG6rcyR_ZP7VZYzdfPdWlPL2Wi70GlOZjPXd2clphkxkDy5Lau-xndal5kc_223uW68kFvUKyuMqCW1a7YSxZeQGgZmV6IAvSLtQH2KJTicdMwUdusXhA6_Y8o1yAhs9qSfOutWdhJwE"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+<div class="absolute top-3 left-3 flex gap-2">
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-charcoal">near_me</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">1.5 km</span>
+</div>
+<div class="px-2.5 py-1 bg-white/90 ios-blur border border-white/40 rounded-lg shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[10px] text-yellow-500 font-variation-fill-1">star</span>
+<span class="text-[10px] font-bold text-charcoal tracking-tight">4.5</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-1 px-1">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-charcoal tracking-tight leading-tight">Bella Pizza</h3>
+<p class="text-[11px] font-medium text-charcoal/50 uppercase tracking-wider mt-0.5">Pizzeria</p>
+</div>
+<div class="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center bg-white shadow-sm group-hover:border-primary/30 transition-colors">
+<span class="material-symbols-outlined text-charcoal text-[18px]">arrow_forward</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+<span class="text-xs font-semibold text-orange-400">Last chance: Closes in 1h</span>
+</div>
+</div>
+</div>
+</section>
+<div class="h-8"></div>
+</main>
+<nav class="fixed bottom-0 left-0 right-0 bg-white/90 ios-blur border-t border-gray-100 px-8 pt-4 pb-10 z-[60]">
+<div class="max-w-md mx-auto flex items-center justify-between">
+<a class="flex flex-col items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-charcoal/40 group-hover:text-primary transition-colors">grid_view</span>
+<span class="text-[9px] font-bold uppercase tracking-premium text-charcoal/40 group-hover:text-primary">Home</span>
+</a>
+<a class="flex flex-col items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-primary font-variation-fill-1">storefront</span>
+<span class="text-[9px] font-bold uppercase tracking-premium text-primary">Stores</span>
+</a>
+<div class="relative -top-3">
+<a class="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20 transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined text-white text-3xl">shopping_cart</span>
+</a>
+</div>
+<a class="flex flex-col items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-charcoal/40 group-hover:text-primary transition-colors">receipt_long</span>
+<span class="text-[9px] font-bold uppercase tracking-premium text-charcoal/40">Orders</span>
+</a>
+<a class="flex flex-col items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-charcoal/40 group-hover:text-primary transition-colors">person</span>
+<span class="text-[9px] font-bold uppercase tracking-premium text-charcoal/40">Profile</span>
+</a>
+</div>
+</nav>
+
+</body></html>

@@ -24,7 +24,7 @@ import {
   buildLocationFromReverseGeocode,
 } from '../utils/cityUtils'
 import { getCurrentLocation, addDistanceToStores } from '../utils/geolocation'
-import { getStoreAvailability } from '../utils/availability'
+import { getStoreAvailability, getTashkentNowMinutes } from '../utils/availability'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
 import { resolveUiLanguage, tByLang } from '../utils/uiLanguage'
@@ -125,8 +125,7 @@ const getMinutesUntilClosing = (availability) => {
   if (!availability?.isOpen) return null
   const closeAtMinutes = parseClockLabelToMinutes(availability.endLabel)
   if (closeAtMinutes == null) return null
-  const now = new Date()
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const nowMinutes = getTashkentNowMinutes()
   const delta = closeAtMinutes - nowMinutes
   if (delta >= 0) return delta
   return 24 * 60 + delta
