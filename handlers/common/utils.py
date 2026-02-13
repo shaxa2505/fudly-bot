@@ -327,8 +327,9 @@ def is_cart_button(text: str | None) -> bool:
     stripped = _strip(text)
     if not stripped:
         return False
+    count_pattern = r"(?: \(\d+(?:[.,]\d+)?\))?"
     for base in _menu_labels()["my_cart"] | {"🛒 Корзина", "🛒 Savat"}:
-        if re.fullmatch(rf"{re.escape(base)}(?: \(\d+\))?", stripped):
+        if re.fullmatch(rf"{re.escape(base)}{count_pattern}", stripped):
             return True
     return False
 

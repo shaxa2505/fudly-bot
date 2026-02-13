@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
 from datetime import date, datetime
+from typing import TYPE_CHECKING, Any
 
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.units import effective_order_unit, unit_label
+from app.core.units import format_quantity as core_format_quantity
 from app.core.utils import calc_discount_percent, to_uzb_datetime
 from localization import get_text
 
@@ -270,24 +272,15 @@ def normalize_unit_value(unit: str | None) -> str:
 
 def display_unit(unit: str | None, lang: str) -> str:
     """Return unit display label."""
-    unit_value = normalize_unit_value(unit)
-    if lang == "uz":
-        return UNIT_DISPLAY_UZ.get(unit_value, unit_value)
-    return unit_value
+    unit_value = effective_order_unit(unit)
+    return unit_label(unit_value, lang)
 
 
 def format_quantity(value: Any, unit: str | None, lang: str) -> str:
     """Format quantity with unit for display."""
-    unit_value = display_unit(unit, lang)
-    try:
-        qty = float(value)
-        if qty.is_integer():
-            qty_str = str(int(qty))
-        else:
-            qty_str = f"{qty:.2f}".rstrip("0").rstrip(".")
-    except (TypeError, ValueError):
-        qty_str = str(value) if value is not None else "0"
-    return f"{qty_str} {unit_value}"
+    unit_value = effective_order_unit(unit)
+    qty_str = core_format_quantity(value, unit_value, lang)
+    return f"{qty_str} {unit_label(unit_value, lang)}"
 
 
 def parse_expiry_date(value: Any) -> date | None:
@@ -423,9 +416,10 @@ def build_offer_card(offer: Any, lang: str) -> tuple[str, Any]:
     )
 
     discount_percent = get_offer_discount_percent(offer)
-    unit_display = display_unit(unit, lang)
+    order_unit = effective_order_unit(unit)
+    unit_display = unit_label(order_unit, lang)
     currency = "сум" if lang == "ru" else "so'm"
-    show_unit = unit_display not in ("шт", "dona")
+    show_unit = order_unit != "piece"
     price_line = (
         f"{_format_money(original_price)} → {_format_money(discount_price)} (–{discount_percent}%)"
     )

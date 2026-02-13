@@ -434,13 +434,13 @@ class DatabaseProtocol(Protocol):
     ) -> bool:
         ...
 
-    def update_offer_quantity(self, offer_id: int, new_quantity: int) -> None:
+    def update_offer_quantity(self, offer_id: int, new_quantity: float) -> None:
         ...
 
-    def increment_offer_quantity(self, offer_id: int, amount: int = 1) -> None:
+    def increment_offer_quantity(self, offer_id: int, amount: float = 1) -> None:
         ...
 
-    def increment_offer_quantity_atomic(self, offer_id: int, amount: int = 1) -> int:
+    def increment_offer_quantity_atomic(self, offer_id: int, amount: float = 1) -> float:
         ...
 
     def deactivate_offer(self, offer_id: int) -> None:

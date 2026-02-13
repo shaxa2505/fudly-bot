@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+import re
+
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -13,6 +15,20 @@ from . import common
 from .storage import cart_storage
 from app.core.order_math import calc_items_total
 from app.core.units import calc_total_price, format_quantity, normalize_unit, unit_label
+
+
+def _extract_count_from_cart_button(text: str | None) -> float | None:
+    """Extract numeric cart count from labels like `🛒 Корзина (1)`."""
+    if not text:
+        return None
+    match = re.search(r"\((\d+(?:[.,]\d+)?)\)\s*$", text.strip())
+    if not match:
+        return None
+    raw_value = match.group(1).replace(",", ".")
+    try:
+        return float(raw_value)
+    except ValueError:
+        return None
 
 
 async def _build_cart_view(user_id: int) -> tuple[str, InlineKeyboardBuilder] | None:
@@ -127,6 +143,16 @@ def register(router: Router) -> None:
 
     @router.message(F.text.func(is_cart_button))
     async def show_cart_message(message: types.Message, state: FSMContext) -> None:
+        if common.db and message.from_user:
+            user_id = message.from_user.id
+            lang = common.db.get_user_language(user_id)
+            requested_count = _extract_count_from_cart_button(message.text)
+            current_count = float(cart_storage.get_cart_count(user_id))
+            if requested_count is not None and abs(requested_count - current_count) > 1e-9:
+                await message.answer(
+                    get_text(lang, "main_menu"),
+                    reply_markup=main_menu_customer(lang, current_count),
+                )
         await show_cart(message, state, is_callback=False)
 
     @router.callback_query(F.data == "back_to_cart")
