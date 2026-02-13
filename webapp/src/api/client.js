@@ -520,6 +520,49 @@ const api = {
     return data
   },
 
+  async getCartState() {
+    try {
+      const { data } = await client.get('/cart/state')
+      if (!data || typeof data !== 'object') {
+        return { items: [], total: 0, items_count: 0 }
+      }
+      return {
+        items: Array.isArray(data.items) ? data.items : [],
+        total: Number(data.total || 0),
+        items_count: Number(data.items_count || 0),
+      }
+    } catch (error) {
+      const status = error?.response?.status
+      if (status !== 401 && status !== 404) {
+        console.warn('getCartState error:', error)
+      }
+      return null
+    }
+  },
+
+  async replaceCartState(items = []) {
+    try {
+      const payload = {
+        items: Array.isArray(items)
+          ? items
+              .map((item) => ({
+                offer_id: Number(item?.offer_id ?? item?.offerId ?? 0),
+                quantity: Number(item?.quantity ?? 0),
+              }))
+              .filter((item) => item.offer_id > 0 && Number.isFinite(item.quantity) && item.quantity > 0)
+          : [],
+      }
+      const { data } = await client.put('/cart/state', payload)
+      return data
+    } catch (error) {
+      const status = error?.response?.status
+      if (status !== 401 && status !== 404) {
+        console.warn('replaceCartState error:', error)
+      }
+      return null
+    }
+  },
+
   async createOrder(orderData) {
     try {
       const idempotencyKey = generateIdempotencyKey()

@@ -1,18 +1,6 @@
-"""Cart storage facade used by bot handlers.
-
-The actual implementation is Redis-backed with 24h TTL and automatic
-in-memory fallback when Redis is unavailable.
-"""
+"""Cart storage facade used by bot handlers."""
 from __future__ import annotations
 
-from app.integrations.redis_cart import CartItem, RedisCartStorage
-
-
-class CartStorage(RedisCartStorage):
-    """Backward-compatible alias for the Redis-backed cart storage."""
-
-
-# Global cart storage instance
-cart_storage = CartStorage()
+from app.core.cart_storage import CartItem, CartStorage, cart_storage
 
 __all__ = ["CartItem", "CartStorage", "cart_storage"]

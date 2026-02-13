@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { calcItemsTotal, calcQuantity } from '../utils/orderMath';
 import { getOfferAvailability } from '../utils/availability';
+import api from '../api/client';
 
 const STORAGE_KEY = 'fudly_cart_v2';
 const STORAGE_PREFIX = 'fudly_cart_user_';
@@ -97,6 +98,53 @@ const saveCartToStorage = (cart) => {
   }
 };
 
+const toSyncItems = (cart) => (
+  Object.values(cart || {})
+    .map((item) => ({
+      offer_id: Number(item?.offer?.id ?? item?.offer_id ?? item?.offerId ?? 0),
+      quantity: Number(item?.quantity ?? 0),
+    }))
+    .filter((item) => item.offer_id > 0 && Number.isFinite(item.quantity) && item.quantity > 0)
+);
+
+const buildCartSignature = (cart) => {
+  const rows = Object.values(cart || {})
+    .map((item) => ({
+      offerId: Number(item?.offer?.id ?? item?.offer_id ?? item?.offerId ?? 0),
+      quantity: Number(item?.quantity ?? 0),
+    }))
+    .filter((item) => item.offerId > 0 && Number.isFinite(item.quantity) && item.quantity > 0)
+    .sort((a, b) => a.offerId - b.offerId)
+    .map((item) => `${item.offerId}:${item.quantity}`);
+  return rows.join('|');
+};
+
+const normalizeServerCart = (serverState) => {
+  if (!serverState || !Array.isArray(serverState.items)) return {};
+  const normalized = {};
+  serverState.items.forEach((item) => {
+    const offerRaw = item?.offer;
+    if (!offerRaw || typeof offerRaw !== 'object') return;
+    const offerId = Number(offerRaw.id ?? item.offer_id ?? item.offerId ?? 0);
+    const quantity = Number(item?.quantity ?? 0);
+    if (!offerId || !Number.isFinite(quantity) || quantity <= 0) return;
+
+    const stock = Number(offerRaw.quantity ?? offerRaw.stock ?? 0);
+    normalized[String(offerId)] = {
+      offer: {
+        ...offerRaw,
+        id: offerId,
+        store_id: offerRaw.store_id ?? offerRaw.storeId ?? offerRaw.store?.id,
+        store_name: offerRaw.store_name ?? offerRaw.storeName ?? offerRaw.store?.name,
+        store_address: offerRaw.store_address ?? offerRaw.storeAddress ?? offerRaw.store?.address,
+        stock: Number.isFinite(stock) ? stock : (offerRaw.stock ?? 99),
+      },
+      quantity,
+    };
+  });
+  return normalized;
+};
+
 // Create context
 const CartContext = createContext(null);
 
@@ -104,29 +152,119 @@ const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [cart, setCart] = useState(getCartFromStorage);
   const storageKeyRef = useRef(getStorageKey());
+  const cartRef = useRef(cart);
+  const syncReadyRef = useRef(false);
+  const skipNextSyncPushRef = useRef(false);
+  const syncTimerRef = useRef(null);
+  const lastSyncedSignatureRef = useRef(buildCartSignature(cart));
 
-  // Save to localStorage whenever cart changes
   useEffect(() => {
-    saveCartToStorage(cart);
+    cartRef.current = cart;
   }, [cart]);
 
+  const pushCartToServer = useCallback(async (cartSnapshot) => {
+    const payload = toSyncItems(cartSnapshot);
+    const result = await api.replaceCartState(payload);
+    if (!result) return false;
+    const resultSignature = buildCartSignature(normalizeServerCart(result));
+    lastSyncedSignatureRef.current = resultSignature || buildCartSignature(cartSnapshot);
+    return true;
+  }, []);
+
+  const pullCartFromServer = useCallback(async ({ pushLocalIfServerEmpty = false } = {}) => {
+    const serverState = await api.getCartState();
+    if (!serverState) return false;
+
+    const serverCart = normalizeServerCart(serverState);
+    const serverSignature = buildCartSignature(serverCart);
+    const localSignature = buildCartSignature(cartRef.current);
+
+    if (serverSignature) {
+      if (serverSignature !== localSignature) {
+        skipNextSyncPushRef.current = true;
+        setCart(serverCart);
+      }
+      lastSyncedSignatureRef.current = serverSignature;
+      return true;
+    }
+
+    if (pushLocalIfServerEmpty && localSignature) {
+      await pushCartToServer(cartRef.current);
+      return true;
+    }
+
+    if (!localSignature) {
+      lastSyncedSignatureRef.current = '';
+    }
+    return true;
+  }, [pushCartToServer]);
+
+  // Save to localStorage and sync to backend whenever cart changes
   useEffect(() => {
-    const syncStorageKey = () => {
+    saveCartToStorage(cart);
+    if (!syncReadyRef.current) return;
+
+    if (skipNextSyncPushRef.current) {
+      skipNextSyncPushRef.current = false;
+      return;
+    }
+
+    const signature = buildCartSignature(cart);
+    if (signature === lastSyncedSignatureRef.current) return;
+
+    if (syncTimerRef.current) {
+      clearTimeout(syncTimerRef.current);
+    }
+    syncTimerRef.current = setTimeout(() => {
+      void pushCartToServer(cart);
+    }, 250);
+
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+      }
+    };
+  }, [cart, pushCartToServer]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const syncStorageKey = async () => {
       const nextKey = getStorageKey();
       if (storageKeyRef.current !== nextKey) {
         storageKeyRef.current = nextKey;
-        setCart(getCartFromStorage());
+        const localCart = getCartFromStorage();
+        skipNextSyncPushRef.current = true;
+        setCart(localCart);
+      }
+      if (!disposed) {
+        await pullCartFromServer({ pushLocalIfServerEmpty: true });
       }
     };
 
-    syncStorageKey();
-    window.addEventListener('focus', syncStorageKey);
-    document.addEventListener('visibilitychange', syncStorageKey);
-    return () => {
-      window.removeEventListener('focus', syncStorageKey);
-      document.removeEventListener('visibilitychange', syncStorageKey);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void syncStorageKey();
+      }
     };
-  }, []);
+
+    void syncStorageKey().finally(() => {
+      if (!disposed) {
+        syncReadyRef.current = true;
+      }
+    });
+
+    window.addEventListener('focus', syncStorageKey);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true;
+      window.removeEventListener('focus', syncStorageKey);
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+      }
+    };
+  }, [pullCartFromServer]);
 
   // Add item to cart
   const addToCart = useCallback((offer) => {

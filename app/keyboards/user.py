@@ -11,6 +11,17 @@ from localization import get_text
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
 
 
+def _format_cart_count(cart_count: float | int) -> str:
+    """Format cart count without trailing zeros."""
+    try:
+        value = float(cart_count)
+    except (TypeError, ValueError):
+        return "0"
+    if value.is_integer():
+        return str(int(value))
+    return f"{value:g}"
+
+
 def main_menu_customer(lang: str = "ru", cart_count: float = 0) -> ReplyKeyboardMarkup:
     """Main menu for customers - 3 compact rows with clear actions.
 
@@ -27,7 +38,7 @@ def main_menu_customer(lang: str = "ru", cart_count: float = 0) -> ReplyKeyboard
     # Row 2: Cart + Orders
     cart_text = f"🛒 {get_text(lang, 'my_cart')}"
     if cart_count > 0:
-        count_text = f"{cart_count:g}" if isinstance(cart_count, float) else str(cart_count)
+        count_text = _format_cart_count(cart_count)
         cart_text = f"{cart_text} ({count_text})"
     builder.button(text=cart_text)
     builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
@@ -53,7 +64,7 @@ def registration_complete_keyboard(lang: str = "ru", cart_count: float = 0) -> R
     # Row 3: Cart + Orders
     cart_text = f"🛒 {get_text(lang, 'my_cart')}"
     if cart_count > 0:
-        count_text = f"{cart_count:g}" if isinstance(cart_count, float) else str(cart_count)
+        count_text = _format_cart_count(cart_count)
         cart_text = f"{cart_text} ({count_text})"
     builder.button(text=cart_text)
     builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")

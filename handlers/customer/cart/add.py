@@ -784,8 +784,9 @@ def register(router: Router) -> None:
 
         cart_count = cart_storage.get_cart_count(user_id)
         if cart_count > 0:
+            count_text = f"{float(cart_count):g}"
             kb.button(
-                text=f"{get_text(lang, 'my_cart')} ({cart_count})",
+                text=f"{get_text(lang, 'my_cart')} ({count_text})",
                 callback_data="view_cart",
             )
             kb.adjust(1)

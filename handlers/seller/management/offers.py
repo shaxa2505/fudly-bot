@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 import re
-from typing import Any
 from datetime import date, datetime, timedelta
+from typing import Any
 
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.core.units import effective_order_unit, parse_quantity_input
 from app.domain.offer_rules import (
     DISCOUNT_MUST_BE_LOWER_MESSAGE,
     INVALID_OFFER_PRICE_MESSAGE,
@@ -26,14 +27,14 @@ from logging_config import logger
 from .utils import (
     build_offer_card,
     format_quantity,
-    get_db,
-    get_offer_field,
-    get_store_field,
     get_category_labels,
+    get_db,
     get_offer_discount_percent,
     get_offer_effective_status,
     get_offer_expiry_days,
+    get_offer_field,
     get_offer_quantity_value,
+    get_store_field,
     offer_has_photo,
     send_offer_card,
     update_offer_message,
@@ -101,6 +102,16 @@ def _price_input_hint(lang: str) -> str:
 
 def _extract_numbers(text: str) -> list[int]:
     return [int(value) for value in re.findall(r"\d+", text or "")]
+
+
+def _parse_quantity_value(raw_text: str | None, unit: str, *, allow_zero: bool = False) -> float:
+    """Parse quantity for seller stock actions using shared unit rules."""
+    raw = (raw_text or "").strip().replace(",", ".").replace(" ", "")
+    if not raw:
+        raise ValueError("invalid")
+    if allow_zero and raw in {"0", "0.0", "0.00"}:
+        return 0.0
+    return float(parse_quantity_input(raw, unit))
 
 
 def _parse_qty_delta(callback_data: str, default_delta: int) -> tuple[int, int] | None:
@@ -301,7 +312,7 @@ class _MessageProxy:
     async def answer(self, *args: Any, **kwargs: Any) -> Any:
         if self._callback.message:
             return await self._callback.message.answer(*args, **kwargs)
-        return await self._callback.bot.send_message(chat_id=self.from_user.id, *args, **kwargs)
+        return await self._callback.bot.send_message(*args, chat_id=self.from_user.id, **kwargs)
 
 
 def _category_keyboard(offer_id: int, lang: str) -> InlineKeyboardBuilder:
@@ -677,6 +688,7 @@ async def quantity_add(callback: types.CallbackQuery, state: FSMContext) -> None
         return
 
     offer_store_id = get_offer_field(offer, "store_id")
+    offer_unit = effective_order_unit(get_offer_field(offer, "unit", "piece"))
     user_stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -701,14 +713,16 @@ async def quantity_add(callback: types.CallbackQuery, state: FSMContext) -> None
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    new_quantity_text = format_quantity(new_quantity, offer_unit, lang)
+    delta_text = format_quantity(abs(delta), offer_unit, lang)
     await update_offer_message(callback, offer_id, lang)
     await callback.answer(
         (
-            f"Количество увеличено на {abs(delta)}"
+            f"Количество увеличено на {delta_text}"
             if lang == "ru"
-            else f"Miqdor {abs(delta)} taga oshirildi"
+            else f"Miqdor {delta_text} ga oshirildi"
         )
-        + f" ({new_quantity})"
+        + f" ({new_quantity_text})"
     )
 
 
@@ -733,6 +747,7 @@ async def quantity_subtract(callback: types.CallbackQuery, state: FSMContext) ->
         return
 
     offer_store_id = get_offer_field(offer, "store_id")
+    offer_unit = effective_order_unit(get_offer_field(offer, "unit", "piece"))
     user_stores = db.get_user_accessible_stores(callback.from_user.id)
     if not any(get_store_field(store, "store_id") == offer_store_id for store in user_stores):
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
@@ -757,6 +772,8 @@ async def quantity_subtract(callback: types.CallbackQuery, state: FSMContext) ->
         await callback.answer(get_text(lang, "error"), show_alert=True)
         return
 
+    new_quantity_text = format_quantity(new_quantity, offer_unit, lang)
+    delta_text = format_quantity(abs(delta), offer_unit, lang)
     await update_offer_message(callback, offer_id, lang)
 
     if new_quantity == 0:
@@ -764,11 +781,11 @@ async def quantity_subtract(callback: types.CallbackQuery, state: FSMContext) ->
     else:
         await callback.answer(
             (
-                f"Количество уменьшено на {abs(delta)}"
+                f"Количество уменьшено на {delta_text}"
                 if lang == "ru"
-                else f"Miqdor {abs(delta)} taga kamaytirildi"
+                else f"Miqdor {delta_text} ga kamaytirildi"
             )
-            + f" ({new_quantity})"
+            + f" ({new_quantity_text})"
         )
 
 
@@ -1344,14 +1361,16 @@ async def edit_quantity_start(callback: types.CallbackQuery, state: FSMContext) 
         await callback.answer(get_text(lang, "not_your_offer"), show_alert=True)
         return
 
-    current_qty = int(get_offer_field(offer, "quantity", 0) or 0)
+    unit = effective_order_unit(get_offer_field(offer, "unit", "piece"))
+    current_qty = get_offer_field(offer, "quantity", 0) or 0
+    current_qty_text = format_quantity(current_qty, unit, lang)
 
     await state.update_data(offer_id=offer_id, edit_field="quantity")
     await state.set_state(EditOffer.value)
 
     text = (
         f"{get_text(lang, 'seller_label_stock')}\n"
-        f"{'Текущая' if lang == 'ru' else 'Joriy'}: {current_qty}"
+        f"{'Текущая' if lang == 'ru' else 'Joriy'}: {current_qty_text}"
     )
     await callback.message.answer(text, parse_mode="HTML")
     await callback.answer()
@@ -1470,18 +1489,19 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
             discount_price=discount_price,
         )
     elif edit_field == "quantity":
-        numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text or "")
-        if len(numbers) != 1:
-            await message.answer(get_text(lang, "error_qty_gt_zero"))
+        unit = effective_order_unit(get_offer_field(offer, "unit", "piece"))
+        try:
+            quantity = _parse_quantity_value(message.text, unit, allow_zero=True)
+        except ValueError as exc:
+            code = str(exc)
+            if code == "integer":
+                await message.answer(get_text(lang, "quantity_integer_only"))
+            elif code == "step":
+                await message.answer(get_text(lang, "offer_error_quantity_step"))
+            else:
+                await message.answer(get_text(lang, "error_qty_gt_zero"))
             return
-        quantity = float(numbers[0].replace(",", "."))
-        if quantity != int(quantity):
-            await message.answer(get_text(lang, "quantity_integer_only"))
-            return
-        if quantity < 0:
-            await message.answer(get_text(lang, "error_qty_gt_zero"))
-            return
-        db.update_offer_quantity(offer_id, int(quantity))
+        db.update_offer_quantity(offer_id, quantity)
     elif edit_field == "description":
         description = (message.text or "").strip()
         if not description:
@@ -1498,24 +1518,26 @@ async def edit_offer_value(message: types.Message, state: FSMContext) -> None:
             expiry_value = _parse_expiry_input_text(message.text or "")
         except ValueError:
             await message.answer(
-                (
-                    "Формат: ДД.ММ или ДД.ММ.ГГГГ (например 25.12 или 25.12.2027)"
-                    if lang == "ru"
-                    else "Format: KK.OO yoki KK.OO.YYYY (masalan 25.12 yoki 25.12.2027)"
-                )
+                "Формат: ДД.ММ или ДД.ММ.ГГГГ (например 25.12 или 25.12.2027)"
+                if lang == "ru"
+                else "Format: KK.OO yoki KK.OO.YYYY (masalan 25.12 yoki 25.12.2027)"
             )
             return
         db.update_offer_expiry(offer_id, expiry_value)
     elif edit_field in ("quantity_add", "quantity_sub"):
-        numbers = re.findall(r"\d+(?:[.,]\d+)?", message.text or "")
-        if len(numbers) != 1:
-            await message.answer(get_text(lang, "error_qty_gt_zero"))
+        unit = effective_order_unit(get_offer_field(offer, "unit", "piece"))
+        try:
+            amount = _parse_quantity_value(message.text, unit, allow_zero=False)
+        except ValueError as exc:
+            code = str(exc)
+            if code == "integer":
+                await message.answer(get_text(lang, "quantity_integer_only"))
+            elif code == "step":
+                await message.answer(get_text(lang, "offer_error_quantity_step"))
+            else:
+                await message.answer(get_text(lang, "error_qty_gt_zero"))
             return
-        amount = float(numbers[0].replace(",", "."))
-        if amount <= 0:
-            await message.answer(get_text(lang, "error_qty_gt_zero"))
-            return
-        delta = int(amount)
+        delta = amount
         if edit_field == "quantity_sub":
             delta = -delta
         db.increment_offer_quantity_atomic(offer_id, delta)

@@ -788,7 +788,7 @@ function LocationPickerModal({
     setMapResolving(true)
     const timer = setTimeout(async () => {
       try {
-        const data = await api.reverseGeocode(mapCenter.lat, mapCenter.lon, 'uz', { enrich: false })
+        const data = await api.reverseGeocode(mapCenter.lat, mapCenter.lon, 'uz')
         if (!activeRef.current) return
         const next = buildLocationFromReverseGeocode(data, mapCenter.lat, mapCenter.lon)
         const resolvedAddress = next.address || next.city || ''
