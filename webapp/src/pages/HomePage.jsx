@@ -4,7 +4,14 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { transliterateCity, getSavedLocation, saveLocation, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
+import {
+  transliterateCity,
+  getSavedLocation,
+  saveLocation,
+  normalizeLocationName,
+  buildLocationFromReverseGeocode,
+  formatCompactAddressLabel,
+} from '../utils/cityUtils'
 import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
@@ -326,7 +333,7 @@ function HomePage() {
     ? location.city.split(',')[0].trim()
     : ''
   const cityForApi = cityRaw ? transliterateCity(cityRaw) : ''
-  const cityLabel = cityRaw || 'Shahar tanlang'
+  const cityLabel = formatCompactAddressLabel(location.address, cityRaw)
   const isLocationUnset = !cityRaw && !location.coordinates
 
   useEffect(() => {

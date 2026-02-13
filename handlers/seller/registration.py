@@ -57,7 +57,7 @@ async def _safe_answer_or_send(msg_like, user_id: int, text: str, **kwargs) -> N
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
     if not db:
-        return main_menu_customer(lang)
+        return main_menu_customer(lang, user_id=user_id)
     return _get_appropriate_menu(user_id, lang, db)
 
 

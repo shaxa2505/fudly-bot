@@ -14,6 +14,7 @@ import { buildLocationFromReverseGeocode, saveLocation, getSavedLocation } from 
 import { getCurrentLocation } from '../utils/geolocation'
 import { readPendingPayment, savePendingPayment, clearPendingPayment } from '../utils/pendingPayment'
 import { getOfferAvailability, getTashkentNowMinutes } from '../utils/availability'
+import { resolveUiLanguage, tByLang } from '../utils/uiLanguage'
 import BottomNav from '../components/BottomNav'
 import clickLogo from '../assets/click_logo.png'
 import './CartPage.css'
@@ -122,6 +123,10 @@ function CartPage({ user }) {
   const cachedUser = getCurrentUser()
   const canonicalPhone = (user?.phone || '').toString().trim()
   const userId = getUserId()
+  const lang = resolveUiLanguage(user)
+  const t = (ru, uz) => tByLang(lang, ru, uz)
+  const sumLabel = t('сум', "so'm")
+  const locale = lang === 'ru' ? 'ru-RU' : 'uz-UZ'
 
   const [orderLoading, setOrderLoading] = useState(false)
   const [cartValidationLoading, setCartValidationLoading] = useState(false)
@@ -252,7 +257,7 @@ function CartPage({ user }) {
     let resolved = null
 
     try {
-      const apiData = await api.reverseGeocode(lat, lon, 'uz')
+      const apiData = await api.reverseGeocode(lat, lon, lang)
       if (apiData) {
         resolved = buildLocationFromReverseGeocode(apiData, lat, lon)
       }
@@ -272,7 +277,7 @@ function CartPage({ user }) {
       }
       saveLocation({ ...resolved, address: normalizedAddress })
     } else {
-      setMapError('Manzilni aniqlab bo\'lmadi')
+      setMapError(t('Не удалось определить адрес', "Manzilni aniqlab bo'lmadi"))
       saveCoordsFallback(lat, lon)
     }
 
@@ -281,7 +286,7 @@ function CartPage({ user }) {
       mapResolveFailSafeRef.current = null
     }
     setMapResolving(false)
-  }, [saveCoordsFallback])
+  }, [saveCoordsFallback, lang])
 
   const showCheckoutSheet = showCheckout || isCheckoutRoute
   const mapEnabled = showCheckoutSheet && orderType === 'delivery' && showMapEditor
@@ -325,7 +330,7 @@ function CartPage({ user }) {
       setMapSearchLoading(true)
       try {
         const response = await api.searchLocations(query, {
-          lang: 'uz',
+          lang,
           limit: 6,
           lat: deliveryCoords?.lat,
           lon: deliveryCoords?.lon,
@@ -351,7 +356,7 @@ function CartPage({ user }) {
       isActive = false
       clearTimeout(timeout)
     }
-  }, [mapEnabled, mapQuery, mapSearchOpen, deliveryCoords?.lat, deliveryCoords?.lon])
+  }, [mapEnabled, mapQuery, mapSearchOpen, deliveryCoords?.lat, deliveryCoords?.lon, lang])
 
   useEffect(() => {
     if (!mapEnabled) return
@@ -377,7 +382,7 @@ function CartPage({ user }) {
     }
     const handleError = () => {
       if (!isActive) return
-      setMapError('Xarita yuklanmadi')
+      setMapError(t('Карта не загрузилась', 'Xarita yuklanmadi'))
     }
 
     if (existingScript) {
@@ -400,7 +405,7 @@ function CartPage({ user }) {
     return () => {
       isActive = false
     }
-  }, [mapEnabled])
+  }, [mapEnabled, lang])
 
   useEffect(() => {
     if (!mapEnabled) {
@@ -631,11 +636,14 @@ function CartPage({ user }) {
   )
   const cartStoreId = cartStoreIds[0] || null
   const hasMultipleStores = cartStoreIds.length > 1
-  const multiStoreMessage = "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
+  const multiStoreMessage = t(
+    'В корзине могут быть товары только из одного магазина. Очистите корзину и попробуйте снова.',
+    "Savatda faqat bitta do'kondan mahsulot bo'lishi mumkin. Savatni tozalab qayta urinib ko'ring."
+  )
   const storeName =
     cartItems[0]?.offer?.store_name ||
     cartItems[0]?.offer?.store?.name ||
-    "Do'kon"
+    t('Магазин', "Do'kon")
   const recommendedOffers = useMemo(() => {
     if (!storeOffers.length) return []
     const cartOfferIds = new Set(
@@ -802,8 +810,8 @@ function CartPage({ user }) {
       return sum + (original - discount) * item.quantity
     }, 0)
   }, [safeCartItems])
-  const formatSum = (value) => Math.round(value || 0).toLocaleString('ru-RU')
-  const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} so'm` : `0 so'm`
+  const formatSum = (value) => Math.round(value || 0).toLocaleString(locale)
+  const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} ${sumLabel}` : `0 ${sumLabel}`
   const summaryTotal = calcTotalPrice(subtotal, serviceFee)
     const deliveryOptions = useMemo(() => {
       const hoursRaw = storeWorkingHours || DEFAULT_WORKING_HOURS
@@ -814,9 +822,9 @@ function CartPage({ user }) {
 
       if (startMinutes == null || endMinutes == null) {
         return [
-          { id: 'fast', label: 'Tezda', time: '25-35 daqiqa' },
-          { id: 'slot-1', label: 'Bugun', time: '18:00 - 18:30' },
-          { id: 'slot-2', label: 'Bugun', time: '19:00 - 19:30' },
+          { id: 'fast', label: t('Скоро', 'Tezda'), time: t('25-35 минут', '25-35 daqiqa') },
+          { id: 'slot-1', label: t('Сегодня', 'Bugun'), time: '18:00 - 18:30' },
+          { id: 'slot-2', label: t('Сегодня', 'Bugun'), time: '19:00 - 19:30' },
         ]
       }
 
@@ -829,13 +837,13 @@ function CartPage({ user }) {
       )
       options.push({
         id: 'fast',
-        label: 'Tezda',
-        time: '25-35 daqiqa',
+        label: t('Скоро', 'Tezda'),
+        time: t('25-35 минут', '25-35 daqiqa'),
         disabled: !canFast,
       })
 
       const buildSlotsForDay = (dayOffset, startAtMinutes) => {
-        const label = dayOffset === 0 ? 'Bugun' : 'Ertaga'
+        const label = dayOffset === 0 ? t('Сегодня', 'Bugun') : t('Завтра', 'Ertaga')
         const slots = []
         for (
           let start = startAtMinutes;
@@ -884,16 +892,16 @@ function CartPage({ user }) {
     if (deliveryValidationLoading) {
       return {
         status: 'pending',
-        label: 'Tekshirilmoqda...',
-        message: 'Manzil tekshirilmoqda...',
+        label: t('Проверяется...', 'Tekshirilmoqda...'),
+        message: t('Адрес проверяется...', 'Manzil tekshirilmoqda...'),
       }
     }
 
     if (!storeInfoLoading && !storeDeliveryEnabled) {
       return {
         status: 'error',
-        label: 'Mavjud emas',
-        message: 'Yetkazib berish mavjud emas',
+        label: t('Недоступно', 'Mavjud emas'),
+        message: t('Доставка недоступна', 'Yetkazib berish mavjud emas'),
       }
     }
 
@@ -901,16 +909,16 @@ function CartPage({ user }) {
     if (!trimmedAddress) {
       return {
         status: 'warn',
-        label: 'Manzil kiritilmagan',
-        message: 'Manzil kiritilmagan',
+        label: t('Адрес не указан', 'Manzil kiritilmagan'),
+        message: t('Адрес не указан', 'Manzil kiritilmagan'),
       }
     }
 
     if (!hasDeliveryCoords) {
       return {
         status: 'warn',
-        label: 'Manzil belgilanmagan',
-        message: 'Xaritada manzilni belgilang',
+        label: t('Точка не выбрана', 'Manzil belgilanmagan'),
+        message: t('Выберите адрес на карте', 'Xaritada manzilni belgilang'),
       }
     }
 
@@ -918,20 +926,20 @@ function CartPage({ user }) {
       if (!deliveryCheck.canDeliver) {
         return {
           status: deliveryCheck.status || 'error',
-          label: deliveryCheck.label || 'Mavjud emas',
-          message: deliveryCheck.message || 'Yetkazib berish mavjud emas',
+          label: deliveryCheck.label || t('Недоступно', 'Mavjud emas'),
+          message: deliveryCheck.message || t('Доставка недоступна', 'Yetkazib berish mavjud emas'),
         }
       }
       if (deliveryMinNotMet) {
         return {
           status: 'warn',
-          label: 'Minimal buyurtma talab qilinadi',
-          message: deliveryCheck.message || 'Minimal buyurtma talab qilinadi',
+          label: t('Требуется минимальная сумма', 'Minimal buyurtma talab qilinadi'),
+          message: deliveryCheck.message || t('Требуется минимальная сумма', 'Minimal buyurtma talab qilinadi'),
         }
       }
       return {
         status: deliveryCheck.status || 'ok',
-        label: deliveryCheck.label || 'Mavjud',
+        label: deliveryCheck.label || t('Доступно', 'Mavjud'),
         message: deliveryCheck.message || '',
       }
     }
@@ -939,23 +947,23 @@ function CartPage({ user }) {
     if (deliveryMinNotMet) {
       return {
         status: 'warn',
-        label: 'Minimal buyurtma talab qilinadi',
-        message: 'Minimal buyurtma talab qilinadi',
+        label: t('Требуется минимальная сумма', 'Minimal buyurtma talab qilinadi'),
+        message: t('Требуется минимальная сумма', 'Minimal buyurtma talab qilinadi'),
       }
     }
 
     if (storeInfoLoading) {
       return {
         status: 'pending',
-        label: 'Tekshirilmoqda...',
-        message: 'Yetkazib berish shartlari tekshirilmoqda...',
+        label: t('Проверяется...', 'Tekshirilmoqda...'),
+        message: t('Проверяются условия доставки...', 'Yetkazib berish shartlari tekshirilmoqda...'),
       }
     }
 
     return {
       status: 'pending',
-      label: 'Tekshirilmoqda...',
-      message: 'Manzil tekshirilmoqda...',
+      label: t('Проверяется...', 'Tekshirilmoqda...'),
+      message: t('Адрес проверяется...', 'Manzil tekshirilmoqda...'),
     }
   }, [
     address,
@@ -966,6 +974,7 @@ function CartPage({ user }) {
     storeDeliveryEnabled,
     storeInfoLoading,
     hasDeliveryCoords,
+    lang,
   ])
   const pendingItemsCount = useMemo(() => {
     const cart = pendingPayment?.cart
@@ -1031,7 +1040,10 @@ function CartPage({ user }) {
   const shouldShowPendingCard =
     hasPendingPayment && pendingStatusChecked && pendingStatus === 'awaiting'
   const confirmResumePendingPayment = useCallback(async () => {
-    const message = "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
+    const message = t(
+      'У вас есть незавершенный платеж. Продолжить его сейчас?',
+      "Sizda yakunlanmagan to'lov mavjud. Avval uni davom ettirasizmi?"
+    )
     const tg = window.Telegram?.WebApp
     if (tg?.showConfirm) {
       try {
@@ -1046,7 +1058,7 @@ function CartPage({ user }) {
       return window.confirm(message)
     }
     return true
-  }, [])
+  }, [lang])
 
   // Check if minimum order met for delivery
   const canDelivery = subtotal >= minOrderAmount
@@ -1057,7 +1069,7 @@ function CartPage({ user }) {
     String(import.meta.env.VITE_DELIVERY_CASH_ENABLED ?? '0').toLowerCase()
   )
   const deliveryRequiresPrepay = orderType === 'delivery' && !deliveryCashEnabled
-  const checkoutTitle = "Buyurtmani rasmiylashtirish"
+  const checkoutTitle = t('Оформление заказа', 'Buyurtmani rasmiylashtirish')
   const paymentOptions = [
     {
       id: 'click',
@@ -1067,23 +1079,23 @@ function CartPage({ user }) {
     },
     {
       id: 'cash',
-      label: 'Naqd pul',
+      label: t('Наличные', 'Naqd pul'),
       icon: 'cash',
       disabled: deliveryRequiresPrepay,
     },
   ]
   const paymentIconLabels = {
     click: 'Click',
-    cash: 'Naqd',
+    cash: t('Нал.', 'Naqd'),
   }
   const checkoutBusy = orderLoading || cartValidationLoading || deliveryValidationLoading
   const checkoutButtonLabel = orderLoading
-    ? 'Buyurtma yuborilmoqda...'
+    ? t('Отправка заказа...', 'Buyurtma yuborilmoqda...')
     : cartValidationLoading
-      ? 'Savat tekshirilmoqda...'
+      ? t('Проверка корзины...', 'Savat tekshirilmoqda...')
       : deliveryValidationLoading
-        ? 'Manzil tekshirilmoqda...'
-        : 'Buyurtmani tasdiqlash'
+        ? t('Проверка адреса...', 'Manzil tekshirilmoqda...')
+        : t('Подтвердить заказ', 'Buyurtmani tasdiqlash')
 
   useEffect(() => {
     if (!deliveryRequiresPrepay) return
@@ -1164,11 +1176,14 @@ function CartPage({ user }) {
 
   const handleRestorePendingCart = useCallback(() => {
     if (!pendingPayment?.cart) {
-      toast.error("Savatni tiklab bo'lmadi")
+      toast.error(t('Не удалось восстановить корзину', "Savatni tiklab bo'lmadi"))
       return
     }
     if (!isSafeEmpty) {
-      const message = "Joriy savat almashtiriladi. Davom etasizmi?"
+      const message = t(
+        'Текущая корзина будет заменена. Продолжить?',
+        'Joriy savat almashtiriladi. Davom etasizmi?'
+      )
       const tg = window.Telegram?.WebApp
       if (tg?.showConfirm) {
         try {
@@ -1177,7 +1192,7 @@ function CartPage({ user }) {
             replaceCart(pendingPayment.cart)
             clearPendingPayment()
             setPendingPayment(null)
-            toast.success("Savat tiklandi")
+            toast.success(t('Корзина восстановлена', 'Savat tiklandi'))
           })
           return
         } catch {
@@ -1191,8 +1206,8 @@ function CartPage({ user }) {
     replaceCart(pendingPayment.cart)
     clearPendingPayment()
     setPendingPayment(null)
-    toast.success("Savat tiklandi")
-  }, [pendingPayment, replaceCart, toast, isSafeEmpty])
+    toast.success(t('Корзина восстановлена', 'Savat tiklandi'))
+  }, [pendingPayment, replaceCart, toast, isSafeEmpty, lang])
 
   const handleResumePayment = useCallback(async () => {
     if (!pendingPayment?.orderId) return
@@ -1206,7 +1221,7 @@ function CartPage({ user }) {
       if (paymentStatus && paymentStatus !== 'awaiting_payment') {
         clearPendingPayment()
         setPendingPayment(null)
-        toast.info("To'lov allaqachon yakunlangan")
+        toast.info(t('Платеж уже завершен', "To'lov allaqachon yakunlangan"))
         return
       }
       if (['cancelled', 'rejected'].includes(orderStatus)) {
@@ -1214,13 +1229,13 @@ function CartPage({ user }) {
         setPendingPayment(null)
         setPendingStatus('cleared')
         setPendingStatusChecked(true)
-        toast.error("Buyurtma bekor qilingan")
+        toast.error(t('Заказ отменен', 'Buyurtma bekor qilingan'))
         return
       }
       if (doneStatuses.has(orderStatus)) {
         clearPendingPayment()
         setPendingPayment(null)
-        toast.info("Buyurtma allaqachon tasdiqlangan")
+        toast.info(t('Заказ уже подтвержден', "Buyurtma allaqachon tasdiqlangan"))
         return
       }
 
@@ -1240,14 +1255,14 @@ function CartPage({ user }) {
           window.location.href = paymentData.payment_url
         }
       } else {
-        toast.error("To'lov havolasi olinmadi")
+        toast.error(t('Не удалось получить ссылку на оплату', "To'lov havolasi olinmadi"))
       }
     } catch (error) {
-      toast.error("To'lovni davom ettirib bo'lmadi")
+      toast.error(t('Не удалось продолжить оплату', "To'lovni davom ettirib bo'lmadi"))
     } finally {
       setPendingActionLoading(false)
     }
-  }, [pendingActionLoading, pendingPayment, toast, safeCartItems])
+  }, [pendingActionLoading, pendingPayment, toast, safeCartItems, lang])
 
   useEffect(() => {
     if (!showCheckoutSheet) {
@@ -1522,7 +1537,10 @@ function CartPage({ user }) {
       verifiedPhone = await refreshProfilePhone()
     }
     if (!verifiedPhone) {
-      const message = "Telefon raqamingiz botda tasdiqlanmagan. Botga o'ting va raqamni yuboring."
+      const message = t(
+        'Ваш номер не подтвержден в боте. Перейдите в бот и отправьте номер.',
+        "Telefon raqamingiz botda tasdiqlanmagan. Botga o'ting va raqamni yuboring."
+      )
       toast.error(message)
       const tg = window.Telegram?.WebApp
       if (tg?.showAlert) {
@@ -1577,7 +1595,7 @@ function CartPage({ user }) {
       .filter((item) => item.offerId && item.quantity > 0)
 
     if (payload.length === 0) {
-      toast.error("Savat bo'sh yoki mahsulotlar topilmadi")
+      toast.error(t("Корзина пуста или товары не найдены", "Savat bo'sh yoki mahsulotlar topilmadi"))
       return { ok: false, reason: 'invalid' }
     }
 
@@ -1586,7 +1604,7 @@ function CartPage({ user }) {
       const serverItems = Array.isArray(response?.items) ? response.items : []
 
       if (serverItems.length === 0) {
-        toast.error("Savatdagi mahsulotlar endi mavjud emas")
+        toast.error(t('Товары в корзине больше недоступны', "Savatdagi mahsulotlar endi mavjud emas"))
         return { ok: false, reason: 'missing' }
       }
 
@@ -1635,17 +1653,17 @@ function CartPage({ user }) {
       }
 
       if (missingIds.length > 0 || updates.length > 0) {
-        toast.warning("Savat yangilandi. Iltimos, qayta tekshiring.")
+        toast.warning(t('Корзина обновлена. Проверьте еще раз.', 'Savat yangilandi. Iltimos, qayta tekshiring.'))
         return { ok: false, reason: 'updated' }
       }
 
       return { ok: true }
     } catch (error) {
       console.warn('Cart validation failed:', error)
-      toast.error("Savatni tekshirib bo'lmadi. Qayta urinib ko'ring.")
+      toast.error(t("Не удалось проверить корзину. Попробуйте снова.", "Savatni tekshirib bo'lmadi. Qayta urinib ko'ring."))
       return { ok: false, reason: 'error' }
     }
-  }, [safeCartItems, isSafeEmpty, removeItem, toast, updateOfferData])
+  }, [safeCartItems, isSafeEmpty, removeItem, toast, updateOfferData, lang])
 
   const validateDeliveryWithServer = useCallback(async () => {
     if (orderType !== 'delivery') {
@@ -1654,25 +1672,25 @@ function CartPage({ user }) {
     const shouldToast = !showCheckoutSheet
     if (!storeDeliveryEnabled) {
       if (shouldToast) {
-        toast.error('Yetkazib berish mavjud emas')
+        toast.error(t('Доставка недоступна', 'Yetkazib berish mavjud emas'))
       }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
-        label: 'Mavjud emas',
-        message: 'Yetkazib berish mavjud emas',
+        label: t('Недоступно', 'Mavjud emas'),
+        message: t('Доставка недоступна', 'Yetkazib berish mavjud emas'),
       })
       return { ok: false, reason: 'disabled' }
     }
     if (!cartStoreId) {
       if (shouldToast) {
-        toast.error('Do\'kon topilmadi')
+        toast.error(t('Магазин не найден', "Do'kon topilmadi"))
       }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
-        label: 'Mavjud emas',
-        message: 'Do\'kon topilmadi',
+        label: t('Недоступно', 'Mavjud emas'),
+        message: t('Магазин не найден', "Do'kon topilmadi"),
       })
       return { ok: false, reason: 'store' }
     }
@@ -1680,26 +1698,26 @@ function CartPage({ user }) {
     const trimmedAddress = address.trim()
     if (!trimmedAddress) {
       if (shouldToast) {
-        toast.warning('Yetkazib berish manzilini kiriting')
+        toast.warning(t('Введите адрес доставки', 'Yetkazib berish manzilini kiriting'))
       }
       setDeliveryCheck({
         status: 'warn',
         canDeliver: false,
-        label: 'Manzil kiritilmagan',
-        message: 'Manzil kiritilmagan',
+        label: t('Адрес не указан', 'Manzil kiritilmagan'),
+        message: t('Адрес не указан', 'Manzil kiritilmagan'),
       })
       return { ok: false, reason: 'address' }
     }
 
     if (!Number.isFinite(deliveryCoords?.lat) || !Number.isFinite(deliveryCoords?.lon)) {
       if (shouldToast) {
-        toast.warning('Xaritada manzilni belgilang')
+        toast.warning(t('Выберите адрес на карте', 'Xaritada manzilni belgilang'))
       }
       setDeliveryCheck({
         status: 'warn',
         canDeliver: false,
-        label: 'Manzil belgilanmagan',
-        message: 'Xaritada manzilni belgilang',
+        label: t('Точка не выбрана', 'Manzil belgilanmagan'),
+        message: t('Выберите адрес на карте', 'Xaritada manzilni belgilang'),
       })
       return { ok: false, reason: 'coords' }
     }
@@ -1714,13 +1732,13 @@ function CartPage({ user }) {
     }
     if (!city) {
       if (shouldToast) {
-        toast.warning('Shaharni tanlang')
+        toast.warning(t('Выберите город', 'Shaharni tanlang'))
       }
       setDeliveryCheck({
         status: 'warn',
         canDeliver: false,
-        label: 'Shahar tanlanmagan',
-        message: 'Shaharni tanlang',
+        label: t('Город не выбран', 'Shahar tanlanmagan'),
+        message: t('Выберите город', 'Shaharni tanlang'),
       })
       return { ok: false, reason: 'city' }
     }
@@ -1755,13 +1773,13 @@ function CartPage({ user }) {
 
       if (!canDeliver) {
         if (shouldToast) {
-          toast.error(response?.message || 'Yetkazib berish mavjud emas')
+          toast.error(response?.message || t('Доставка недоступна', 'Yetkazib berish mavjud emas'))
         }
         setDeliveryCheck({
           status: 'error',
           canDeliver: false,
-          label: 'Mavjud emas',
-          message: response?.message || 'Yetkazib berish mavjud emas',
+          label: t('Недоступно', 'Mavjud emas'),
+          message: response?.message || t('Доставка недоступна', 'Yetkazib berish mavjud emas'),
         })
         return { ok: false, reason: 'unavailable' }
       }
@@ -1800,13 +1818,13 @@ function CartPage({ user }) {
         deliveryCost: Number.isFinite(serverFee) ? serverFee : null,
         minOrderAmount: Number.isFinite(serverMin) ? serverMin : null,
         estimatedTime,
-        label: 'Mavjud',
+        label: t('Доступно', 'Mavjud'),
         message: response?.message || '',
       })
 
       if (updated) {
         if (shouldToast) {
-          toast.warning("Yetkazib berish shartlari yangilandi. Iltimos, qayta tekshiring.")
+          toast.warning(t('Условия доставки обновились. Проверьте еще раз.', "Yetkazib berish shartlari yangilandi. Iltimos, qayta tekshiring."))
         }
         return { ok: false, reason: 'updated' }
       }
@@ -1814,13 +1832,16 @@ function CartPage({ user }) {
       if (Number.isFinite(serverMin) && serverMin > 0 && subtotal < serverMin) {
         if (shouldToast) {
           toast.warning(
-            `Yetkazib berish uchun minimum ${formatSum(serverMin)} so'm buyurtma qiling`
+            t(
+              `Минимальная сумма для доставки: ${formatSum(serverMin)} ${sumLabel}`,
+              `Yetkazib berish uchun minimum ${formatSum(serverMin)} so'm buyurtma qiling`
+            )
           )
         }
         setDeliveryCheck((prev) => ({
           ...(prev || {}),
           status: 'warn',
-          message: 'Minimal buyurtma talab qilinadi',
+          message: t('Требуется минимальная сумма заказа', 'Minimal buyurtma talab qilinadi'),
         }))
         return { ok: false, reason: 'min' }
       }
@@ -1829,12 +1850,12 @@ function CartPage({ user }) {
     } catch (error) {
       console.warn('Delivery validation failed:', error)
       if (shouldToast) {
-        toast.error("Yetkazib berish narxini tekshirib bo'lmadi. Qayta urinib ko'ring.")
+        toast.error(t("Не удалось проверить доставку. Попробуйте снова.", "Yetkazib berish narxini tekshirib bo'lmadi. Qayta urinib ko'ring."))
       }
       setDeliveryCheck({
         status: 'error',
         canDeliver: false,
-        message: "Tekshirib bo'lmadi",
+        message: t("Не удалось проверить", "Tekshirib bo'lmadi"),
       })
       return { ok: false, reason: 'error' }
     }
@@ -1852,17 +1873,18 @@ function CartPage({ user }) {
     toast,
     deliveryCoords?.lat,
     deliveryCoords?.lon,
+    lang,
   ])
 
   const pendingPaymentCard = shouldShowPendingCard ? (
     <div className={`pending-payment-card animate-in`}>
       <div className="pending-payment-header">
         <div>
-          <p className="pending-payment-title">To'lov kutilmoqda</p>
+          <p className="pending-payment-title">{t('Ожидается оплата', "To'lov kutilmoqda")}</p>
           <p className="pending-payment-subtitle">
-            Buyurtma #{pendingPayment.orderId}
-            {pendingItemsCount > 0 ? ` - ${pendingItemsCount} dona` : ''}
-            {pendingPayment.total ? ` - ${formatSum(pendingPayment.total)} so'm` : ''}
+            {t('Заказ', 'Buyurtma')} #{pendingPayment.orderId}
+            {pendingItemsCount > 0 ? ` - ${pendingItemsCount} ${t('шт', 'dona')}` : ''}
+            {pendingPayment.total ? ` - ${formatSum(pendingPayment.total)} ${sumLabel}` : ''}
           </p>
         </div>
         <span className={`pending-payment-badge ${pendingPulse ? 'pulse' : ''}`}>
@@ -1876,7 +1898,7 @@ function CartPage({ user }) {
           onClick={handleResumePayment}
           disabled={pendingActionLoading}
         >
-          {pendingActionLoading ? "Tekshirilmoqda..." : "To'lovni davom ettirish"}
+          {pendingActionLoading ? t('Проверяется...', 'Tekshirilmoqda...') : t('Продолжить оплату', "To'lovni davom ettirish")}
         </button>
         <button
           type="button"
@@ -1884,7 +1906,7 @@ function CartPage({ user }) {
           onClick={handleRestorePendingCart}
           disabled={pendingActionLoading}
         >
-          Savatni tiklash
+          {t('Восстановить корзину', 'Savatni tiklash')}
         </button>
       </div>
     </div>
@@ -1961,23 +1983,23 @@ function CartPage({ user }) {
     const trimmedAddress = address.trim()
     if (!trimmedAddress) return null
     const lines = [trimmedAddress]
-    if (entrance.trim()) lines.push(`Kiraverish: ${entrance.trim()}`)
-    if (floor.trim()) lines.push(`Qavat: ${floor.trim()}`)
-    if (apartment.trim()) lines.push(`Xonadon: ${apartment.trim()}`)
+    if (entrance.trim()) lines.push(`${t('Подъезд', 'Kiraverish')}: ${entrance.trim()}`)
+    if (floor.trim()) lines.push(`${t('Этаж', 'Qavat')}: ${floor.trim()}`)
+    if (apartment.trim()) lines.push(`${t('Квартира', 'Xonadon')}: ${apartment.trim()}`)
     return lines.join('\n')
-  }, [orderType, address, entrance, floor, apartment])
+  }, [orderType, address, entrance, floor, apartment, lang])
 
   const buildOrderComment = useCallback(() => {
     if (!orderType) {
       return comment.trim()
     }
-    const lines = [orderType === 'pickup' ? "O'zi olib ketadi" : 'Yetkazib berish']
+    const lines = [orderType === 'pickup' ? t('Самовывоз', "O'zi olib ketadi") : t('Доставка', 'Yetkazib berish')]
     if (orderType === 'delivery' && deliverySlotLabel) {
-      lines.push(`Yetkazish vaqti: ${deliverySlotLabel}`)
+      lines.push(`${t('Время доставки', 'Yetkazish vaqti')}: ${deliverySlotLabel}`)
     }
     if (comment.trim()) lines.push(comment.trim())
     return lines.join('\n').trim()
-  }, [orderType, deliverySlotLabel, comment])
+  }, [orderType, deliverySlotLabel, comment, lang])
 
   // Proceed to payment
   const proceedToPayment = async () => {
@@ -1990,8 +2012,8 @@ function CartPage({ user }) {
     }
     if (hasUnavailableItems) {
       const message = unavailableTimeRange
-        ? `Buyurtma vaqti: ${unavailableTimeRange}`
-        : 'Hozir buyurtma qilish mumkin emas'
+        ? `${t('Время заказа', 'Buyurtma vaqti')}: ${unavailableTimeRange}`
+        : t('Сейчас нельзя оформить заказ', 'Hozir buyurtma qilish mumkin emas')
       toast.warning(message)
       return
     }
@@ -2000,19 +2022,19 @@ function CartPage({ user }) {
       return
     }
     if (!orderType) {
-      toast.warning('Buyurtma turini tanlang')
+      toast.warning(t('Выберите тип заказа', 'Buyurtma turini tanlang'))
       return
     }
     if (orderType === 'delivery' && !address.trim()) {
-      toast.warning('Yetkazib berish manzilini kiriting')
+      toast.warning(t('Введите адрес доставки', 'Yetkazib berish manzilini kiriting'))
       return
     }
     if (orderType === 'delivery' && (!Number.isFinite(deliveryCoords?.lat) || !Number.isFinite(deliveryCoords?.lon))) {
-      toast.warning('Xaritada manzilni belgilang')
+      toast.warning(t('Выберите адрес на карте', 'Xaritada manzilni belgilang'))
       return
     }
     if (deliveryRequiresPrepay && !hasOnlineProviders) {
-      toast.error('Yetkazib berish uchun to\'lov usullari mavjud emas')
+      toast.error(t('Нет доступных способов оплаты для доставки', "Yetkazib berish uchun to'lov usullari mavjud emas"))
       return
     }
 
@@ -2046,12 +2068,15 @@ function CartPage({ user }) {
     if (isSafeEmpty) return
     if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
       toast.warning(
-        `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+        t(
+          `Минимальная сумма для доставки: ${formatSum(minOrderAmount)} ${sumLabel}`,
+          `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+        )
       )
       return
     }
     if (orderType === 'delivery' && (!Number.isFinite(deliveryCoords?.lat) || !Number.isFinite(deliveryCoords?.lon))) {
-      toast.warning('Xaritada manzilni belgilang')
+      toast.warning(t('Выберите адрес на карте', 'Xaritada manzilni belgilang'))
       return
     }
 
@@ -2128,12 +2153,15 @@ function CartPage({ user }) {
   // Handle online payment (Click)
   const handleOnlinePayment = async () => {
     if (!isProviderAvailable('click')) {
-      toast.error("Click to'lovi vaqtincha mavjud emas. Boshqa to'lov usulini tanlang.")
+      toast.error(t("Платеж Click временно недоступен. Выберите другой способ.", "Click to'lovi vaqtincha mavjud emas. Boshqa to'lov usulini tanlang."))
       return
     }
     if (orderType === 'delivery' && storeDeliveryEnabled && !canDelivery) {
       toast.warning(
-        `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+        t(
+          `Минимальная сумма для доставки: ${formatSum(minOrderAmount)} ${sumLabel}`,
+          `Yetkazib berish uchun minimum ${formatSum(minOrderAmount)} so'm buyurtma qiling`
+        )
       )
       return
     }
@@ -2205,7 +2233,7 @@ function CartPage({ user }) {
       }
     } catch (error) {
       console.error('Online payment error:', error)
-      toast.error(`Click to'lovida xatolik: ` + (error.message || 'Noma\'lum xatolik'))
+      toast.error(`${t('Ошибка оплаты Click', "Click to'lovida xatolik")}: ` + (error.message || t('Неизвестная ошибка', "Noma'lum xatolik")))
       if (orderId) {
         navigate(`/order/${orderId}`)
       }
@@ -2222,7 +2250,7 @@ function CartPage({ user }) {
           <div className="app-header-inner">
             <div className="app-header-spacer" aria-hidden="true" />
             <div className="app-header-title">
-              <h1 className="app-header-title-text">Savat</h1>
+              <h1 className="app-header-title-text">{t('Корзина', 'Savat')}</h1>
             </div>
             <div className="app-header-spacer" aria-hidden="true" />
           </div>
@@ -2235,25 +2263,25 @@ function CartPage({ user }) {
             <div className="empty-icon">
               <ShoppingCart size={72} strokeWidth={1.5} color="#3A5A40" aria-hidden="true" />
             </div>
-            <h2>Savatingiz bo'sh</h2>
+            <h2>{t('Ваша корзина пуста', "Savatingiz bo'sh")}</h2>
             <p className="empty-description">
-              Mahsulotlarni ko'rish va savatga qo'shish uchun bosh sahifaga o'ting.
+              {t("Перейдите на главную, чтобы добавить товары в корзину.", "Mahsulotlarni ko'rish va savatga qo'shish uchun bosh sahifaga o'ting.")}
             </p>
             <div className="empty-actions">
               <button className="btn-primary" onClick={() => navigate('/')}>
                 <Home size={18} strokeWidth={2} aria-hidden="true" />
-                <span>Bosh sahifaga o'tish</span>
+                <span>{t('На главную', "Bosh sahifaga o'tish")}</span>
               </button>
               <button className="btn-secondary" onClick={() => navigate('/stores')}>
                 <Sparkles size={18} strokeWidth={2} aria-hidden="true" />
-                <span>Do'konlarni ko'rish</span>
+                <span>{t('Смотреть магазины', "Do'konlarni ko'rish")}</span>
               </button>
             </div>
           </div>
         </div>
       </main>
 
-        <BottomNav currentPage="cart" cartCount={0} />
+        <BottomNav currentPage="cart" cartCount={0} lang={lang} />
       </div>
     )
   }
@@ -2264,7 +2292,7 @@ function CartPage({ user }) {
         <div className="app-header-inner">
           <div className="app-header-spacer" aria-hidden="true" />
           <div className="app-header-title">
-            <h1 className="app-header-title-text">Savat</h1>
+            <h1 className="app-header-title-text">{t('Корзина', 'Savat')}</h1>
           </div>
           <div className="app-header-spacer" aria-hidden="true" />
         </div>
@@ -2363,7 +2391,7 @@ function CartPage({ user }) {
                         type="button"
                         className="cart-item-remove"
                         onClick={() => removeItem(item.offer.id)}
-                        aria-label={`${item.offer.title} ni savatdan o'chirish`}
+                        aria-label={t(`Удалить ${item.offer.title} из корзины`, `${item.offer.title} ni savatdan o'chirish`)}
                       >
                         <X size={16} strokeWidth={2} aria-hidden="true" />
                       </button>
@@ -2389,19 +2417,19 @@ function CartPage({ user }) {
                         disableIncrement={item.quantity >= stockLimit || isUnavailableNow}
                         size="sm"
                         className="cart-item-qty"
-                        decrementLabel={`${item.offer.title} miqdorini kamaytirish`}
-                        incrementLabel={`${item.offer.title} miqdorini oshirish`}
+                        decrementLabel={t(`Уменьшить количество ${item.offer.title}`, `${item.offer.title} miqdorini kamaytirish`)}
+                        incrementLabel={t(`Увеличить количество ${item.offer.title}`, `${item.offer.title} miqdorini oshirish`)}
                         stopPropagation
                       />
                     </div>
                     {maxStock != null && item.quantity >= maxStock && (
                       <p className="cart-item-stock-warning">
-                        Maksimum: {maxStock} {getUnitLabel(item.offer.unit)}
+                        {t('Максимум', 'Maksimum')}: {maxStock} {getUnitLabel(item.offer.unit, lang)}
                       </p>
                     )}
                     {isUnavailableNow && (
                       <p className="cart-item-availability">
-                        Hozir yopiq - Buyurtma vaqti: {availability.timeRange}
+                        {t('Сейчас закрыто - Время заказа', 'Hozir yopiq - Buyurtma vaqti')}: {availability.timeRange}
                       </p>
                     )}
                   </div>
@@ -2413,7 +2441,7 @@ function CartPage({ user }) {
 
         {storeOffersLoading && (
           <section className="cart-recommendations" aria-hidden="true">
-            <h3 className="cart-recommendations-title">Tavsiya etamiz</h3>
+            <h3 className="cart-recommendations-title">{t('Рекомендуем', 'Tavsiya etamiz')}</h3>
             <div className="cart-recommendations-list">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="cart-recommendation-card is-skeleton">
@@ -2431,7 +2459,7 @@ function CartPage({ user }) {
 
         {!storeOffersLoading && recommendedOffers.length > 0 && (
           <section className="cart-recommendations">
-            <h3 className="cart-recommendations-title">Tavsiya etamiz</h3>
+            <h3 className="cart-recommendations-title">{t('Рекомендуем', 'Tavsiya etamiz')}</h3>
             <div className="cart-recommendations-list">
               {recommendedOffers.map((offer) => {
                 const offerId = offer?.id || offer?.offer_id
@@ -2444,7 +2472,7 @@ function CartPage({ user }) {
                     <div className="cart-recommendation-thumb">
                       <img
                         src={photoUrl}
-                        alt={offer.title || 'Offer'}
+                        alt={offer.title || t('Товар', 'Offer')}
                         loading="lazy"
                         decoding="async"
                         onError={(e) => {
@@ -2455,14 +2483,14 @@ function CartPage({ user }) {
                         }}
                       />
                     </div>
-                    <p className="cart-recommendation-title">{offer.title || 'Mahsulot'}</p>
+                    <p className="cart-recommendation-title">{offer.title || t('Товар', 'Mahsulot')}</p>
                     <div className="cart-recommendation-meta">
                       <span className="cart-recommendation-price">{formatSum(price)}</span>
                       <button
                         type="button"
                         className="cart-recommendation-add"
                         onClick={() => addToCart(normalizedOffer)}
-                        aria-label={`${offer.title || 'Mahsulot'} savatga qo'shish`}
+                        aria-label={t(`Добавить ${offer.title || 'товар'} в корзину`, `${offer.title || 'Mahsulot'} savatga qo'shish`)}
                       >
                         <Plus size={14} strokeWidth={2} />
                       </button>
@@ -2477,26 +2505,26 @@ function CartPage({ user }) {
         {!isCheckoutRoute && (
           <section className="cart-summary">
             <div className="cart-summary-card">
-              <h3 className="cart-summary-title">Buyurtma ma'lumoti</h3>
+              <h3 className="cart-summary-title">{t('Сводка заказа', "Buyurtma ma'lumoti")}</h3>
               <div className="cart-summary-rows">
                 <div className="cart-summary-row">
-                  <span>Mahsulotlar</span>
-                  <span>{formatSum(subtotal)} so'm</span>
+                  <span>{t('Товары', 'Mahsulotlar')}</span>
+                  <span>{formatSum(subtotal)} {sumLabel}</span>
                 </div>
                 <div className="cart-summary-row">
-                  <span>Xizmat haqi</span>
-                  <span>{formatSum(serviceFee)} so'm</span>
+                  <span>{t('Сервисный сбор', 'Xizmat haqi')}</span>
+                  <span>{formatSum(serviceFee)} {sumLabel}</span>
                 </div>
                 <div className="cart-summary-row savings">
-                  <span>Tejamkorlik</span>
+                  <span>{t('Экономия', 'Tejamkorlik')}</span>
                   <span>{savingsLabel}</span>
                 </div>
               </div>
               <div className="cart-summary-total">
-                <span>Jami</span>
+                <span>{t('Итого', 'Jami')}</span>
                 <div className="cart-summary-total-values">
-                  <span>{formatSum(summaryTotal)} so'm</span>
-                  <span className="cart-summary-total-note">Soliqlar bilan</span>
+                  <span>{formatSum(summaryTotal)} {sumLabel}</span>
+                  <span className="cart-summary-total-note">{t('С налогами', 'Soliqlar bilan')}</span>
                 </div>
               </div>
             </div>
@@ -2505,14 +2533,14 @@ function CartPage({ user }) {
               onClick={handleCheckout}
               disabled={hasMultipleStores}
             >
-              To'lovga o'tish
+              {t('Перейти к оплате', "To'lovga o'tish")}
             </button>
           </section>
         )}
       </main>
 
       {!isCheckoutRoute && (
-        <BottomNav currentPage="cart" cartCount={itemsCount} />
+        <BottomNav currentPage="cart" cartCount={itemsCount} lang={lang} />
       )}
 
       {/* Checkout Modal */}
@@ -2528,13 +2556,16 @@ function CartPage({ user }) {
 
             {shouldShowPendingCard && (
               <div className="checkout-pending-banner" role="status" aria-live="polite">
-                <div className="checkout-pending-title">To'lov yakunlanmagan</div>
+                <div className="checkout-pending-title">{t('Платеж не завершен', "To'lov yakunlanmagan")}</div>
                 <div className="checkout-pending-meta">
-                  Buyurtma #{pendingPayment.orderId}
-                  {pendingPayment.total ? ` • ${formatSum(pendingPayment.total)} so'm` : ''}
+                  {t('Заказ', 'Buyurtma')} #{pendingPayment.orderId}
+                  {pendingPayment.total ? ` • ${formatSum(pendingPayment.total)} ${sumLabel}` : ''}
                 </div>
                 <p className="checkout-pending-text">
-                  Oldingi buyurtma uchun to'lov kutilmoqda. Xohlasangiz uni davom ettiring.
+                  {t(
+                    'Ожидается оплата предыдущего заказа. Вы можете продолжить ее.',
+                    "Oldingi buyurtma uchun to'lov kutilmoqda. Xohlasangiz uni davom ettiring."
+                  )}
                 </p>
                 <div className="checkout-pending-actions">
                   <button
@@ -2543,7 +2574,7 @@ function CartPage({ user }) {
                     onClick={handleResumePayment}
                     disabled={pendingActionLoading}
                   >
-                    {pendingActionLoading ? "Tekshirilmoqda..." : "To'lovni davom ettirish"}
+                    {pendingActionLoading ? t('Проверяется...', 'Tekshirilmoqda...') : t('Продолжить оплату', "To'lovni davom ettirish")}
                   </button>
                   {!hasMatchingPendingCart && (
                     <button
@@ -2552,7 +2583,7 @@ function CartPage({ user }) {
                       onClick={handleRestorePendingCart}
                       disabled={pendingActionLoading}
                     >
-                      Savatni tiklash
+                      {t('Восстановить корзину', 'Savatni tiklash')}
                     </button>
                   )}
                 </div>
@@ -2564,7 +2595,7 @@ function CartPage({ user }) {
               {checkoutStep === 'details' && (
                 <div className="checkout-layout">
                   <section className="checkout-block">
-                    <h3>Buyurtma turi</h3>
+                    <h3>{t('Тип заказа', 'Buyurtma turi')}</h3>
                     <div className="order-type-options">
                       <button
                         type="button"
@@ -2574,8 +2605,8 @@ function CartPage({ user }) {
                         }}
                       >
                         <span className="order-type-icon" aria-hidden="true"></span>
-                        <span className="order-type-text">O'zi olib ketish</span>
-                        <span className="order-type-desc">Do'kondan olib ketasiz</span>
+                        <span className="order-type-text">{t('Самовывоз', "O'zi olib ketish")}</span>
+                        <span className="order-type-desc">{t('Заберете из магазина', "Do'kondan olib ketasiz")}</span>
                       </button>
                       <button
                         type="button"
@@ -2587,18 +2618,18 @@ function CartPage({ user }) {
                         disabled={deliveryOptionDisabled}
                       >
                         <span className="order-type-icon" aria-hidden="true"></span>
-                        <span className="order-type-text">Yetkazib berish</span>
+                        <span className="order-type-text">{t('Доставка', 'Yetkazib berish')}</span>
                         <span className="order-type-desc">
                           {storeInfoLoading
-                            ? 'Ma\'lumot yuklanmoqda'
-                            : (storeDeliveryEnabled ? 'Kuryer orqali' : 'Mavjud emas')}
+                            ? t('Загрузка данных', "Ma'lumot yuklanmoqda")
+                            : (storeDeliveryEnabled ? t('Через курьера', 'Kuryer orqali') : t('Недоступно', 'Mavjud emas'))}
                         </span>
                       </button>
                     </div>
                   </section>
                   <section className="checkout-block">
                     <div className="checkout-block-header">
-                      <h3>Yetkazib berish manzili</h3>
+                      <h3>{t('Адрес доставки', 'Yetkazib berish manzili')}</h3>
                       <button
                         type="button"
                         className="checkout-block-action"
@@ -2614,7 +2645,7 @@ function CartPage({ user }) {
                         }}
                         disabled={orderType !== 'delivery'}
                       >
-                        {showMapEditor ? 'Yopish' : 'Xaritada o\'zgartirish'}
+                        {showMapEditor ? t('Закрыть', 'Yopish') : t('Изменить на карте', "Xaritada o'zgartirish")}
                       </button>
                     </div>
                     <div className={`checkout-address-card${orderType !== 'delivery' ? ' is-disabled' : ''}`}>
@@ -2626,7 +2657,7 @@ function CartPage({ user }) {
                           <div ref={checkoutMapRef} className="checkout-map-canvas" aria-hidden="true"></div>
                           {mapEnabled && mapSearchOpen && mapQuery.trim().length > 0 && mapQuery.trim().length < 3 && (
                             <div className="checkout-map-search-hint">
-                              Kamida 3 ta belgi kiriting
+                              {t('Введите минимум 3 символа', 'Kamida 3 ta belgi kiriting')}
                             </div>
                           )}
                           {mapEnabled && mapSearchOpen && mapQuery.trim().length >= 3 && (
@@ -2647,7 +2678,7 @@ function CartPage({ user }) {
                                   className="checkout-map-search-item empty"
                                   disabled
                                 >
-                                  Manzil topilmadi
+                                  {t('Адрес не найден', 'Manzil topilmadi')}
                                 </button>
                               )}
                               {mapSearchResults.map((result) => (
@@ -2667,18 +2698,18 @@ function CartPage({ user }) {
                             className="checkout-map-locate"
                             onClick={handleLocateMe}
                             disabled={!mapEnabled}
-                            aria-label="Mening joylashuvim"
+                            aria-label={t('Мое местоположение', 'Mening joylashuvim')}
                           >
                             <LocateFixed size={16} strokeWidth={2} />
                           </button>
                           {mapEnabled && !mapLoaded && !mapError && (
                             <div className="checkout-map-status">
-                              Xarita yuklanmoqda...
+                              {t('Карта загружается...', 'Xarita yuklanmoqda...')}
                             </div>
                           )}
                           {mapEnabled && mapResolving && (
                             <div className="checkout-map-status">
-                              Manzil aniqlanmoqda...
+                              {t('Определяем адрес...', 'Manzil aniqlanmoqda...')}
                             </div>
                           )}
                           {mapEnabled && mapError && (
@@ -2692,7 +2723,7 @@ function CartPage({ user }) {
                         <input
                           ref={addressInputRef}
                           className="checkout-address-title"
-                          placeholder="Manzilni kiriting"
+                          placeholder={t('Введите адрес', 'Manzilni kiriting')}
                           value={address}
                           onChange={(event) => {
                             const nextValue = event.target.value
@@ -2725,7 +2756,7 @@ function CartPage({ user }) {
                         />
                         <div className="checkout-address-meta">
                           <label className="checkout-address-col">
-                            <span>Kiraverish</span>
+                            <span>{t('Подъезд', 'Kiraverish')}</span>
                             <input
                               className="checkout-meta-input"
                               placeholder="-"
@@ -2735,7 +2766,7 @@ function CartPage({ user }) {
                             />
                           </label>
                           <label className="checkout-address-col">
-                            <span>Qavat</span>
+                            <span>{t('Этаж', 'Qavat')}</span>
                             <input
                               className="checkout-meta-input"
                               inputMode="numeric"
@@ -2746,7 +2777,7 @@ function CartPage({ user }) {
                             />
                           </label>
                           <label className="checkout-address-col">
-                            <span>Xonadon</span>
+                            <span>{t('Квартира', 'Xonadon')}</span>
                             <input
                               className="checkout-meta-input"
                               inputMode="numeric"
@@ -2776,13 +2807,13 @@ function CartPage({ user }) {
                           <div className="checkout-delivery-meta">
                             {deliverySummaryMin != null && deliverySummaryMin > 0 && (
                               <div className="checkout-delivery-result-row">
-                                <span>Minimal buyurtma</span>
-                                <strong>{formatSum(deliverySummaryMin)} so'm</strong>
+                                <span>{t('Минимальный заказ', 'Minimal buyurtma')}</span>
+                                <strong>{formatSum(deliverySummaryMin)} {sumLabel}</strong>
                               </div>
                             )}
                             {deliverySummaryEta && (
                               <div className="checkout-delivery-result-row">
-                                <span>Vaqt</span>
+                                <span>{t('Время', 'Vaqt')}</span>
                                 <strong>{deliverySummaryEta}</strong>
                               </div>
                             )}
@@ -2793,7 +2824,7 @@ function CartPage({ user }) {
 
                     <input
                       className="checkout-input"
-                      placeholder="Kuryer uchun izoh (masalan: domofon ishlamayapti)"
+                      placeholder={t('Комментарий для курьера (например: не работает домофон)', 'Kuryer uchun izoh (masalan: domofon ishlamayapti)')}
                       value={comment}
                       onChange={e => setComment(e.target.value)}
                       onKeyDown={blurOnEnter}
@@ -2803,7 +2834,7 @@ function CartPage({ user }) {
 
                   {orderType === 'delivery' && (
                     <section className="checkout-block">
-                      <h3>Yetkazib berish vaqti</h3>
+                      <h3>{t('Время доставки', 'Yetkazib berish vaqti')}</h3>
                       <div className="checkout-time-scroll">
                           {deliveryOptions.map(option => (
                             <button
@@ -2825,7 +2856,7 @@ function CartPage({ user }) {
                   )}
 
                   <section className="checkout-block">
-                    <h3>To'lov turi</h3>
+                    <h3>{t('Способ оплаты', "To'lov turi")}</h3>
                     <div className="checkout-payment-list">
                       {paymentOptions.map(option => {
                         const isActive = selectedPaymentMethod === option.id
@@ -2863,22 +2894,22 @@ function CartPage({ user }) {
                     </div>
                     {orderType === 'delivery' && deliveryRequiresPrepay && !hasPrepayProviders && (
                       <p className="checkout-hint">
-                        Yetkazib berish uchun to'lov usullari mavjud emas
+                        {t('Нет доступных способов оплаты для доставки', "Yetkazib berish uchun to'lov usullari mavjud emas")}
                       </p>
                     )}
                   </section>
 
                   <section className="checkout-block checkout-block--last">
                     <div className="checkout-order-header">
-                      <h3>Sizning buyurtmangiz</h3>
+                      <h3>{t('Ваш заказ', 'Sizning buyurtmangiz')}</h3>
                       <button
                         type="button"
                         className="checkout-order-toggle"
                         onClick={() => setOrderItemsExpanded(prev => !prev)}
                         aria-expanded={orderItemsExpanded}
-                        aria-label="Sizning buyurtmangiz"
+                        aria-label={t('Ваш заказ', 'Sizning buyurtmangiz')}
                       >
-                        <span>{itemsCount} dona</span>
+                        <span>{itemsCount} {t('шт', 'dona')}</span>
                         <ChevronRight
                           size={16}
                           strokeWidth={2}
@@ -2910,10 +2941,10 @@ function CartPage({ user }) {
                                 />
                                 <div>
                                   <p className="checkout-order-title">{item.offer.title}</p>
-                                  <p className="checkout-order-qty">{item.quantity} dona</p>
+                                  <p className="checkout-order-qty">{item.quantity} {t('шт', 'dona')}</p>
                                 </div>
                               </div>
-                              <span className="checkout-order-price">{formatSum(lineTotal)} so'm</span>
+                              <span className="checkout-order-price">{formatSum(lineTotal)} {sumLabel}</span>
                             </div>
                           )
                         })}
@@ -2921,26 +2952,30 @@ function CartPage({ user }) {
                     )}
                     <div className="checkout-summary">
                       <div className="checkout-summary-row">
-                        <span>Mahsulotlar</span>
-                        <span>{formatSum(subtotal)} so'm</span>
+                        <span>{t('Товары', 'Mahsulotlar')}</span>
+                        <span>{formatSum(subtotal)} {sumLabel}</span>
                       </div>
                       {orderType === 'delivery' && (
                         <p className="checkout-hint neutral">
-                          Yetkazib berish to'lovi taksist yoki kuryerga alohida to'lanadi. Ilovadagi to'lov faqat mahsulotlar uchun.
+                          {t(
+                            'Стоимость доставки оплачивается отдельно таксисту или курьеру. Оплата в приложении только за товары.',
+                            "Yetkazib berish to'lovi taksist yoki kuryerga alohida to'lanadi. Ilovadagi to'lov faqat mahsulotlar uchun."
+                          )}
                         </p>
                       )}
                       <div className="checkout-summary-row">
-                        <span>Xizmat haqi</span>
-                        <span>{formatSum(serviceFee)} so'm</span>
+                        <span>{t('Сервисный сбор', 'Xizmat haqi')}</span>
+                        <span>{formatSum(serviceFee)} {sumLabel}</span>
                       </div>
                       <div className="checkout-summary-row total">
-                        <span>Jami</span>
-                        <span>{formatSum(checkoutTotal)} so'm</span>
+                        <span>{t('Итого', 'Jami')}</span>
+                        <span>{formatSum(checkoutTotal)} {sumLabel}</span>
                       </div>
                     </div>
                     {hasUnavailableItems && (
                       <p className="checkout-hint">
-                        Hozir buyurtma qilish mumkin emas{unavailableTimeRange ? ` - ${unavailableTimeRange}` : ''}
+                        {t('Сейчас нельзя оформить заказ', 'Hozir buyurtma qilish mumkin emas')}
+                        {unavailableTimeRange ? ` - ${unavailableTimeRange}` : ''}
                       </p>
                     )}
                   </section>
@@ -2959,7 +2994,7 @@ function CartPage({ user }) {
                   {checkoutBusy && <span className="checkout-confirm-spinner" aria-hidden="true"></span>}
                   <span>{checkoutButtonLabel}</span>
                   {!checkoutBusy && (
-                    <span className="checkout-confirm-total">{formatSum(checkoutTotal)} so'm</span>
+                    <span className="checkout-confirm-total">{formatSum(checkoutTotal)} {sumLabel}</span>
                   )}
                 </button>
               </div>
@@ -2976,37 +3011,37 @@ function CartPage({ user }) {
             {orderResult.success ? (
               <>
                 <div className="result-icon success">OK</div>
-                <h2>{orderResult.message || 'Buyurtma qabul qilindi!'}</h2>
+                <h2>{orderResult.message || t('Заказ принят!', 'Buyurtma qabul qilindi!')}</h2>
 
                 {orderResult.bookingCode && (
                   <p className="booking-code-display">
-                    Kod: <strong>{orderResult.bookingCode}</strong>
+                    {t('Код', 'Kod')}: <strong>{orderResult.bookingCode}</strong>
                   </p>
                 )}
                 <p className="order-type-result">
                   {orderResult.orderType === 'pickup'
-                    ? 'O\'zi olib ketish'
-                    : 'Yetkazib berish'
+                    ? t('Самовывоз', "O'zi olib ketish")
+                    : t('Доставка', 'Yetkazib berish')
                   }
                 </p>
                 <p className="order-total-result">
-                  Jami: {Math.round(orderResult.total).toLocaleString()} so'm
+                  {t('Итого', 'Jami')}: {Math.round(orderResult.total).toLocaleString(locale)} {sumLabel}
                 </p>
 
                 <button className="btn-primary" onClick={() => {
                   setOrderResult(null)
                   navigate('/')
                 }}>
-                  Bosh sahifaga
+                  {t('На главную', 'Bosh sahifaga')}
                 </button>
               </>
             ) : (
               <>
                 <div className="result-icon error">ERR</div>
-                <h2>Xatolik yuz berdi</h2>
-                <p>{orderResult.error || 'Iltimos, qaytadan urinib ko\'ring'}</p>
+                <h2>{t('Произошла ошибка', 'Xatolik yuz berdi')}</h2>
+                <p>{orderResult.error || t('Пожалуйста, попробуйте снова', "Iltimos, qaytadan urinib ko'ring")}</p>
                 <button className="btn-primary" onClick={() => setOrderResult(null)}>
-                  Yopish
+                  {t('Закрыть', 'Yopish')}
                 </button>
               </>
             )}
@@ -3020,7 +3055,7 @@ function CartPage({ user }) {
           <div className="cart-modal cart-payment-sheet" onClick={e => e.stopPropagation()}>
             <div className="sheet-handle"></div>
             <div className="cart-payment-sheet-header">
-              <h3>To'lov usullari</h3>
+              <h3>{t('Способы оплаты', "To'lov usullari")}</h3>
               <button className="cart-modal-close" onClick={() => setShowPaymentSheet(false)}>x</button>
             </div>
             <div className="cart-payment-sheet-list">
@@ -3033,7 +3068,7 @@ function CartPage({ user }) {
                 }}
                 disabled={deliveryRequiresPrepay}
               >
-                <span className="cart-payment-sheet-label">Naqd</span>
+                <span className="cart-payment-sheet-label">{t('Наличные', 'Naqd')}</span>
                 <span className="cart-payment-sheet-radio" aria-hidden="true"></span>
               </button>
               <button

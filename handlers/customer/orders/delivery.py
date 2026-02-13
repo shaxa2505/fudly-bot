@@ -109,7 +109,7 @@ def setup_dependencies(
 def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
     if not db:
-        return main_menu_customer(lang)
+        return main_menu_customer(lang, user_id=user_id)
     return _get_appropriate_menu(user_id, lang, db)
 
 
@@ -457,7 +457,7 @@ async def dlv_cancel_order(
 
     await callback.message.answer(
         get_text(lang, "delivery_cancelled"),
-        reply_markup=main_menu_customer(lang),
+        reply_markup=main_menu_customer(lang, user_id=user_id),
     )
     await callback.answer()
 
@@ -509,7 +509,7 @@ async def dlv_cancel(
         # No offers - show main menu
         await callback.message.answer(
             get_text(lang, "delivery_cancelled"),
-            reply_markup=main_menu_customer(lang),
+            reply_markup=main_menu_customer(lang, user_id=user_id),
         )
         await callback.answer()
         return
@@ -905,7 +905,7 @@ async def dlv_address_input(message: types.Message, state: FSMContext) -> None:
         await state.clear()
         await message.answer(
             get_text(lang, "delivery_cancelled"),
-            reply_markup=main_menu_customer(lang),
+            reply_markup=main_menu_customer(lang, user_id=message.from_user.id),
         )
         return
 
@@ -1323,7 +1323,12 @@ async def _return_to_address_step(message: types.Message, state: FSMContext, dat
     offer_id = data.get("offer_id")
     if not offer_id:
         await state.clear()
-        await message.answer(get_text(lang, "system_error"), reply_markup=main_menu_customer(lang))
+        await message.answer(
+            get_text(lang, "system_error"),
+            reply_markup=main_menu_customer(
+                lang, user_id=message.from_user.id if message.from_user else None
+            ),
+        )
         return
 
     await state.set_state(OrderDelivery.address)
@@ -1371,7 +1376,7 @@ async def dlv_quantity_text(
         await state.clear()
         await message.answer(
             get_text(lang, "delivery_cancelled"),
-            reply_markup=main_menu_customer(lang),
+            reply_markup=main_menu_customer(lang, user_id=message.from_user.id),
         )
         return
 

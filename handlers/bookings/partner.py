@@ -300,7 +300,7 @@ async def process_review_text(message: types.Message, state: FSMContext) -> None
     thanks = _t(lang, "Спасибо! Отзыв сохранён.", "Rahmat! Sharh saqlandi.")
     from app.keyboards import main_menu_customer
 
-    await message.answer(thanks, reply_markup=main_menu_customer(lang))
+    await message.answer(thanks, reply_markup=main_menu_customer(lang, user_id=user_id))
 
 
 @router.callback_query(F.data.regexp(r"^skip_review_\d+$"))

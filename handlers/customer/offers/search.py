@@ -313,7 +313,8 @@ def setup(
         lang = db.get_user_language(message.from_user.id)
         await state.clear()
         await message.answer(
-            get_text(lang, "operation_cancelled"), reply_markup=main_menu_customer(lang)
+            get_text(lang, "operation_cancelled"),
+            reply_markup=main_menu_customer(lang, user_id=message.from_user.id),
         )
 
     @dp.message(F.text.func(is_search_button))
@@ -346,7 +347,8 @@ def setup(
         if is_main_menu_button(raw_text):
             await state.clear()
             await message.answer(
-                get_text(lang, "operation_cancelled"), reply_markup=menu_customer(lang)
+                get_text(lang, "operation_cancelled"),
+                reply_markup=menu_customer(lang, user_id=message.from_user.id),
             )
             return
 
@@ -359,7 +361,8 @@ def setup(
         if _is_cancel_text(raw_text):
             await state.clear()
             await message.answer(
-                get_text(lang, "operation_cancelled"), reply_markup=menu_customer(lang)
+                get_text(lang, "operation_cancelled"),
+                reply_markup=menu_customer(lang, user_id=message.from_user.id),
             )
             return
 
@@ -490,7 +493,10 @@ def setup(
         total_results = len(all_results) + len(store_results)
 
         if total_results == 0:
-            await message.answer(get_text(lang, "no_results"), reply_markup=menu_customer(lang))
+            await message.answer(
+                get_text(lang, "no_results"),
+                reply_markup=menu_customer(lang, user_id=message.from_user.id),
+            )
             return
 
         # Save search results to FSM for pagination

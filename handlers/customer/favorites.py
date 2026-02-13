@@ -52,7 +52,7 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     """Get appropriate menu based on user view mode."""
     if not db:
         from app.keyboards import main_menu_customer
-        return main_menu_customer(lang)
+        return main_menu_customer(lang, user_id=user_id)
     return _get_appropriate_menu(user_id, lang, db)
 
 

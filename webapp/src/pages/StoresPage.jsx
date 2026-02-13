@@ -28,25 +28,26 @@ import { getCurrentLocation, addDistanceToStores } from '../utils/geolocation'
 import { getStoreAvailability } from '../utils/availability'
 import { blurOnEnter } from '../utils/helpers'
 import { resolveOfferImageUrl, resolveStoreImageUrl } from '../utils/imageUtils'
+import { resolveUiLanguage, tByLang } from '../utils/uiLanguage'
 import BottomNav from '../components/BottomNav'
 import StoreMap from '../components/StoreMap'
 import ScrollTopButton from '../components/ScrollTopButton'
 import './StoresPage.css'
 
-const FILTER_CHIPS = [
-  { id: 'all', label: 'Hammasi' },
-  { id: 'favorites', label: 'Sevimlilar' },
-  { id: 'nearby', label: 'Yaqin-atrofda' },
-  { id: 'supermarket', label: 'Supermarket', businessType: 'supermarket' },
-  { id: 'bakery', label: 'Pishiriqlar', businessType: 'bakery' },
+const FILTER_CHIP_DEFS = [
+  { id: 'all' },
+  { id: 'favorites' },
+  { id: 'nearby' },
+  { id: 'supermarket', businessType: 'supermarket' },
+  { id: 'bakery', businessType: 'bakery' },
 ]
 
 const BUSINESS_META = {
-  supermarket: { label: 'Supermarket', icon: ShoppingCart },
-  cafe: { label: 'Kafe', icon: CafeIcon },
-  restaurant: { label: 'Restoran', icon: Utensils },
-  bakery: { label: 'Nonvoyxona', icon: Croissant },
-  grocery: { label: 'Oziq-ovqat', icon: Salad },
+  supermarket: { labelRu: 'Супермаркет', labelUz: 'Supermarket', icon: ShoppingCart },
+  cafe: { labelRu: 'Кафе', labelUz: 'Kafe', icon: CafeIcon },
+  restaurant: { labelRu: 'Ресторан', labelUz: 'Restoran', icon: Utensils },
+  bakery: { labelRu: 'Пекарня', labelUz: 'Nonvoyxona', icon: Croissant },
+  grocery: { labelRu: 'Продукты', labelUz: 'Oziq-ovqat', icon: Salad },
 }
 
 const CITY_CENTERS = {
@@ -95,17 +96,18 @@ const CITY_CENTERS = {
 }
 
 
-const getStoreStatus = (store) => {
+const getStoreStatus = (store, lang) => {
+  const t = (ru, uz) => tByLang(lang, ru, uz)
   const offers = Number(store?.offers_count || 0)
   if (!offers) return null
   const availability = getStoreAvailability(store)
   if (availability.timeRange && !availability.isOpen) {
-    return { label: 'Hozir yopiq', tone: 'closed' }
+    return { label: t('Сейчас закрыто', 'Hozir yopiq'), tone: 'closed' }
   }
   if (offers <= 2) {
-    return { label: 'Tez tugayapti', tone: 'low' }
+    return { label: t('Почти закончилось', 'Tez tugayapti'), tone: 'low' }
   }
-  return { label: 'Ochiq', tone: 'open', showIcon: true }
+  return { label: t('Открыто', 'Ochiq'), tone: 'open', showIcon: true }
 }
 
 const toPriceNumber = (value) => {
@@ -145,7 +147,8 @@ const getStorePrices = (store) => {
   return { current, original: normalizedOriginal }
 }
 
-const getNextOpenLabel = (store, hoursLabel) => {
+const getNextOpenLabel = (store, hoursLabel, lang) => {
+  const t = (ru, uz) => tByLang(lang, ru, uz)
   const rawStart =
     store?.open_time ||
     store?.opening_time ||
@@ -157,14 +160,18 @@ const getNextOpenLabel = (store, hoursLabel) => {
     const [firstPart] = String(hoursLabel).split('-')
     start = (firstPart || '').trim()
   }
-  if (!start) return 'Ertaga'
-  return `Ertaga ${start}`
+  if (!start) return t('Завтра', 'Ertaga')
+  return `${t('Завтра', 'Ertaga')} ${start}`
 }
 
-function StoresPage() {
+function StoresPage({ user }) {
   const navigate = useNavigate()
   const routeLocation = useLocation()
   const { cartCount } = useCart()
+  const lang = resolveUiLanguage(user)
+  const t = (ru, uz) => tByLang(lang, ru, uz)
+  const sumLabel = t('сум', "so'm")
+  const locale = lang === 'ru' ? 'ru-RU' : 'uz-UZ'
 
   const [stores, setStores] = useState([])
   const [favoriteStores, setFavoriteStores] = useState([])
@@ -190,6 +197,22 @@ function StoresPage() {
   const [locationLoading, setLocationLoading] = useState(false)
   const searchInputRef = useRef(null)
   const openStoreRef = useRef(null)
+  const filterChips = useMemo(
+    () => FILTER_CHIP_DEFS.map((chip) => ({
+      ...chip,
+      label:
+        chip.id === 'all'
+          ? t('Все', 'Hammasi')
+          : chip.id === 'favorites'
+            ? t('Избранные', 'Sevimlilar')
+            : chip.id === 'nearby'
+              ? t('Рядом', 'Yaqin-atrofda')
+              : chip.id === 'supermarket'
+                ? t('Супермаркет', 'Supermarket')
+                : t('Выпечка', 'Pishiriqlar'),
+    })),
+    [lang]
+  )
 
   const deferredQuery = useDeferredValue(searchQuery)
   const normalizedQuery = deferredQuery.trim().toLowerCase()
@@ -198,7 +221,7 @@ function StoresPage() {
   const cityRaw = getCyrillicCity(location.city)
   const regionRaw = location.region || ''
   const districtRaw = location.district || ''
-  const activeChip = FILTER_CHIPS.find((chip) => chip.id === activeFilter)
+  const activeChip = filterChips.find((chip) => chip.id === activeFilter)
   const activeBusinessType = activeChip?.businessType || 'all'
   const normalizedCityKey = normalizeLocationName(cityLatin).toLowerCase()
   const fallbackCenter = location?.coordinates?.lat != null && location?.coordinates?.lon != null
@@ -207,7 +230,7 @@ function StoresPage() {
 
   useEffect(() => {
     loadStores()
-  }, [activeFilter, cityRaw, regionRaw, districtRaw, userLocation, viewMode])
+  }, [activeFilter, cityRaw, regionRaw, districtRaw, userLocation, viewMode, lang])
 
   useEffect(() => {
     loadFavorites()
@@ -293,7 +316,10 @@ function StoresPage() {
     } catch (error) {
       console.error('Error loading stores:', error)
       window.Telegram?.WebApp?.showAlert?.(
-        'Do\'konlarni yuklashda xatolik. Iltimos, qaytadan urinib ko\'ring.'
+        t(
+          'Ошибка загрузки магазинов. Попробуйте еще раз.',
+          "Do'konlarni yuklashda xatolik. Iltimos, qaytadan urinib ko'ring."
+        )
       )
       setStores([])
     } finally {
@@ -319,13 +345,13 @@ function StoresPage() {
       setStoreReviews(reviews || { reviews: [], average_rating: 0, total_reviews: 0 })
     } catch (error) {
       console.error('Error loading store data:', error)
-      window.Telegram?.WebApp?.showAlert?.('Ma\'lumotlarni yuklashda xatolik')
+      window.Telegram?.WebApp?.showAlert?.(t('Ошибка загрузки данных', "Ma'lumotlarni yuklashda xatolik"))
       setStoreOffers([])
       setStoreReviews({ reviews: [], average_rating: 0, total_reviews: 0 })
     } finally {
       setLoadingOffers(false)
     }
-  }, [])
+  }, [lang])
 
   useEffect(() => {
     const openStore = routeLocation.state?.openStore
@@ -358,7 +384,7 @@ function StoresPage() {
       }
 
       try {
-        const data = await api.reverseGeocode(coords.latitude, coords.longitude, 'uz')
+        const data = await api.reverseGeocode(coords.latitude, coords.longitude, lang)
         if (data) {
           const resolved = buildLocationFromReverseGeocode(data, coords.latitude, coords.longitude)
           nextLocation = {
@@ -379,7 +405,7 @@ function StoresPage() {
       saveLocation(nextLocation)
     } catch (error) {
       console.error('Location error:', error)
-      window.Telegram?.WebApp?.showAlert?.('Joylashuvni aniqlab bo\'lmadi')
+      window.Telegram?.WebApp?.showAlert?.(t('Не удалось определить локацию', "Joylashuvni aniqlab bo'lmadi"))
     } finally {
       setLocationLoading(false)
     }
@@ -430,9 +456,9 @@ function StoresPage() {
       })
     } catch (error) {
       console.error('Favorite toggle error:', error)
-      window.Telegram?.WebApp?.showAlert?.('Sevimlilarni yangilab bo\'lmadi')
+      window.Telegram?.WebApp?.showAlert?.(t('Не удалось обновить избранное', "Sevimlilarni yangilab bo'lmadi"))
     }
-  }, [favoriteIds, stores])
+  }, [favoriteIds, stores, lang])
 
   const baseStores = useMemo(
     () => (activeFilter === 'favorites' ? favoriteStores : stores),
@@ -460,13 +486,7 @@ function StoresPage() {
       <header className="sp-header">
         <div className="sp-header-top">
           <div className="sp-header-title">
-            <span className="sp-location-label">Yetkazish manzili</span>
-            <button className="sp-location-btn" type="button" onClick={requestLocation}>
-              <span className="sp-location-city-name">{cityLatin || 'Tanlanmagan'}</span>
-              <svg className="sp-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            <span className="sp-location-city-name">{t('Магазины', "Do'konlar")}</span>
           </div>
         </div>
       </header>
@@ -482,7 +502,7 @@ function StoresPage() {
               ref={searchInputRef}
               type="text"
               className="sp-search-input"
-              placeholder="Do'kon qidirish..."
+              placeholder={t('Поиск магазинов...', "Do'kon qidirish...")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -494,7 +514,7 @@ function StoresPage() {
                 type="button"
                 className="sp-search-clear"
                 onClick={() => setSearchQuery('')}
-                aria-label="Qidiruvni tozalash"
+                aria-label={t('Очистить поиск', 'Qidiruvni tozalash')}
               >
                 x
               </button>
@@ -503,8 +523,8 @@ function StoresPage() {
         </div>
       </div>
 
-      <div className="sp-chip-row" role="tablist" aria-label="Filtrlar">
-        {FILTER_CHIPS.map((chip) => (
+      <div className="sp-chip-row" role="tablist" aria-label={t('Фильтры', 'Filtrlar')}>
+        {filterChips.map((chip) => (
           <button
             key={chip.id}
             type="button"
@@ -518,14 +538,14 @@ function StoresPage() {
       </div>
 
       <div className="sp-section-header">
-        <h3 className="sp-section-title">Do'konlar</h3>
+        <h3 className="sp-section-title">{t('Магазины', "Do'konlar")}</h3>
         <button
           type="button"
           className="sp-section-action"
           onClick={() => setViewMode(viewMode === 'list' ? 'map' : 'list')}
-          aria-label={viewMode === 'list' ? "Xaritani ko'rish" : "Ro'yxatni ko'rish"}
+          aria-label={viewMode === 'list' ? t('Показать карту', "Xaritani ko'rish") : t('Показать список', "Ro'yxatni ko'rish")}
         >
-          <span>{viewMode === 'list' ? 'Xarita' : "Ro'yxat"}</span>
+          <span>{viewMode === 'list' ? t('Карта', 'Xarita') : t('Список', "Ro'yxat")}</span>
           {viewMode === 'list' ? (
             <MapPin size={16} strokeWidth={2} />
           ) : (
@@ -546,7 +566,7 @@ function StoresPage() {
               onRequestLocation={requestLocation}
               locationLoading={locationLoading}
               onStoreSelect={loadStoreOffers}
-              lang="uz"
+              lang={lang}
             />
           </div>
         ) : isLoading ? (
@@ -565,8 +585,8 @@ function StoresPage() {
         ) : visibleStores.length === 0 ? (
           <div className="sp-empty">
             <span>INFO</span>
-            <h3>Do'konlar topilmadi</h3>
-            <p>Bu hududda do'konlar mavjud emas</p>
+            <h3>{t('Магазины не найдены', "Do'konlar topilmadi")}</h3>
+            <p>{t('В этом районе пока нет магазинов', "Bu hududda do'konlar mavjud emas")}</p>
           </div>
         ) : (
           <div className="sp-store-list">
@@ -574,7 +594,7 @@ function StoresPage() {
               const storePhotoUrl = resolveStoreImageUrl(store)
               const meta = BUSINESS_META[store.business_type] || {}
               const Icon = meta.icon || Store
-              const status = getStoreStatus(store)
+              const status = getStoreStatus(store, lang)
               const distanceLabel =
                 store.distance != null ? `${store.distance.toFixed(1)} km` : ''
               const isFavorite = favoriteIds.has(store.id)
@@ -588,17 +608,19 @@ function StoresPage() {
                 (store.open_time && store.close_time
                   ? `${store.open_time} - ${store.close_time}`
                   : '')
-              const pickupLabel = store.delivery_enabled ? 'Yetkazib berish' : 'Olib ketish'
+              const pickupLabel = store.delivery_enabled
+                ? t('Доставка', 'Yetkazib berish')
+                : t('Самовывоз', 'Olib ketish')
               const showSchedule = store.delivery_enabled === false && hoursLabel
               const { current: currentPrice, original: originalPrice } = getStorePrices(store)
               const priceTone = showSchedule ? 'is-dark' : ''
               const priceLabel = currentPrice != null
-                ? `${Math.round(currentPrice).toLocaleString()} so'm`
+                ? `${Math.round(currentPrice).toLocaleString(locale)} ${sumLabel}`
                 : ''
               const originalLabel = originalPrice != null
-                ? `${Math.round(originalPrice).toLocaleString()} so'm`
+                ? `${Math.round(originalPrice).toLocaleString(locale)} ${sumLabel}`
                 : ''
-              const nextOpenLabel = getNextOpenLabel(store, hoursLabel)
+              const nextOpenLabel = getNextOpenLabel(store, hoursLabel, lang)
               const discountPercent =
                 originalPrice && currentPrice && originalPrice > currentPrice
                   ? Math.round((1 - currentPrice / originalPrice) * 100)
@@ -673,7 +695,9 @@ function StoresPage() {
                               {store.rating.toFixed(1)}
                             </span>
                           )}
-                          {meta.label && <span className="sp-meta-item">{meta.label}</span>}
+                          {(meta.labelRu || meta.labelUz) && (
+                            <span className="sp-meta-item">{t(meta.labelRu || '', meta.labelUz || '')}</span>
+                          )}
                         </div>
                       </div>
 
@@ -684,7 +708,7 @@ function StoresPage() {
                           e.stopPropagation()
                           toggleFavorite(store.id)
                         }}
-                        aria-label="Sevimlilar"
+                        aria-label={t('В избранное', 'Sevimlilar')}
                       >
                         <Heart size={20} strokeWidth={2} fill={isFavorite ? 'currentColor' : 'none'} />
                       </button>
@@ -711,7 +735,7 @@ function StoresPage() {
                         ) : (
                           <div className="sp-store-badge">
                             <ShoppingBag size={12} strokeWidth={2} />
-                            {offersCount} ta qoldi
+                            {t(`Осталось ${offersCount}`, `${offersCount} ta qoldi`)}
                           </div>
                         )
                       ) : (
@@ -744,7 +768,7 @@ function StoresPage() {
                 <div>
                   <h2>{selectedStore.name}</h2>
                   {selectedStore.address && (
-                    <p>Manzil: {selectedStore.address}</p>
+                    <p>{t('Адрес', 'Manzil')}: {selectedStore.address}</p>
                   )}
                   {(storeReviews.average_rating > 0 || selectedStore.rating > 0) && (
                     <span className="sp-sheet-rating">
@@ -769,13 +793,13 @@ function StoresPage() {
                 className={`sp-sheet-tab ${activeTab === 'offers' ? 'active' : ''}`}
                 onClick={() => setActiveTab('offers')}
               >
-                Takliflar ({storeOffers.length})
+                {t('Предложения', 'Takliflar')} ({storeOffers.length})
               </button>
               <button
                 className={`sp-sheet-tab ${activeTab === 'reviews' ? 'active' : ''}`}
                 onClick={() => setActiveTab('reviews')}
               >
-                Sharhlar ({storeReviews.total_reviews})
+                {t('Отзывы', 'Sharhlar')} ({storeReviews.total_reviews})
               </button>
             </div>
 
@@ -783,18 +807,18 @@ function StoresPage() {
               {loadingOffers ? (
                 <div className="sp-sheet-loading">
                   <div className="sp-spinner"></div>
-                  <p>Yuklanmoqda...</p>
+                  <p>{t('Загрузка...', 'Yuklanmoqda...')}</p>
                 </div>
               ) : activeTab === 'offers' ? (
                 storeOffers.length === 0 ? (
                   <div className="sp-sheet-empty">
                     <span>INFO</span>
-                    <p>Hozirda takliflar yo'q</p>
+                    <p>{t('Сейчас предложений нет', "Hozirda takliflar yo'q")}</p>
                   </div>
                 ) : (
                   <>
                     <h3 className="sp-sheet-title">
-                      Mavjud takliflar
+                      {t('Доступные предложения', 'Mavjud takliflar')}
                       <span>({storeOffers.length})</span>
                     </h3>
                     <div className="sp-offers">
@@ -838,11 +862,11 @@ function StoresPage() {
                               <h4>{offer.title}</h4>
                               <div className="sp-offer-price">
                                 <span className="sp-offer-current">
-                                  {Math.round(offer.discount_price).toLocaleString()} so'm
+                                  {Math.round(offer.discount_price).toLocaleString(locale)} {sumLabel}
                                 </span>
                                 {offer.original_price > offer.discount_price && (
                                   <span className="sp-offer-old">
-                                    {Math.round(offer.original_price).toLocaleString()}
+                                    {Math.round(offer.original_price).toLocaleString(locale)}
                                   </span>
                                 )}
                                 {discountPercent > 0 && (
@@ -863,14 +887,14 @@ function StoresPage() {
                 storeReviews.reviews.length === 0 ? (
                   <div className="sp-sheet-empty">
                     <Star size={48} color="#FFB800" strokeWidth={2} aria-hidden="true" />
-                    <p>Hali sharhlar yo'q</p>
+                    <p>{t('Пока нет отзывов', "Hali sharhlar yo'q")}</p>
                   </div>
                 ) : (
                   <div className="sp-reviews">
                     {storeReviews.reviews.map((review, idx) => (
                       <div key={idx} className="sp-review">
                         <div className="sp-review-header">
-                          <span className="sp-review-name">{review.user_name || 'Foydalanuvchi'}</span>
+                          <span className="sp-review-name">{review.user_name || t('Пользователь', 'Foydalanuvchi')}</span>
                           <span className="sp-review-stars">
                             {Array.from({ length: review.rating }).map((_, i) => (
                               <Star key={i} size={14} fill="#FFB800" color="#FFB800" strokeWidth={0} aria-hidden="true" />
@@ -882,7 +906,7 @@ function StoresPage() {
                         )}
                         {review.created_at && (
                           <span className="sp-review-date">
-                            {new Date(review.created_at).toLocaleDateString('uz-UZ')}
+                            {new Date(review.created_at).toLocaleDateString(locale)}
                           </span>
                         )}
                       </div>
@@ -901,7 +925,7 @@ function StoresPage() {
                     navigate('/', { state: { storeId: selectedStore.id } })
                   }}
                 >
-                  Barcha mahsulotlarni ko'rish
+                  {t('Посмотреть все товары', "Barcha mahsulotlarni ko'rish")}
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -913,7 +937,7 @@ function StoresPage() {
       )}
 
       <ScrollTopButton />
-      <BottomNav currentPage="stores" cartCount={cartCount} />
+      <BottomNav currentPage="stores" cartCount={cartCount} lang={lang} />
     </div>
   )
 }

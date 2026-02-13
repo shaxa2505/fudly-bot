@@ -333,7 +333,7 @@
 
 .location-picker-search-text {
   flex: 1;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary, #2D2D2D);
   display: -webkit-box;

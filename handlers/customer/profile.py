@@ -58,7 +58,7 @@ def get_appropriate_menu(user_id: int, lang: str) -> Any:
     if not db:
         from app.keyboards import main_menu_customer
 
-        return main_menu_customer(lang)
+        return main_menu_customer(lang, user_id=user_id)
     return _get_appropriate_menu(user_id, lang, db)
 
 
@@ -389,7 +389,7 @@ async def switch_to_customer_cb(callback: types.CallbackQuery) -> None:
         try:
             await callback.message.answer(
                 get_text(lang, "switched_to_customer"),
-                reply_markup=main_menu_customer(lang),
+                reply_markup=main_menu_customer(lang, user_id=user_id),
             )
             await callback.answer()
         except Exception as e:

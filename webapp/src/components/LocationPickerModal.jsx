@@ -6,6 +6,7 @@ import {
   normalizeCityQuery,
   buildCitySearchKey,
   CITY_TRANSLATIONS,
+  formatCompactAddressLabel,
 } from '../utils/cityUtils'
 import { getPreferredLocation } from '../utils/geolocation'
 import { readStorageItem, writeStorageItem } from '../utils/storage'
@@ -867,6 +868,10 @@ function LocationPickerModal({
 
   const showGeoSuggestion = Boolean(canDetect || geoSupported)
   const errorMessage = locationError || localLocationError
+  const compactMapAddress = formatCompactAddressLabel(
+    mapAddress,
+    normalizeLocationName(location?.city?.split(',')[0] || '')
+  )
   const content = (
     <div
       className={`location-picker ${mode === 'search' ? 'search-mode' : ''}${asPage ? ' as-page' : ''}`}
@@ -1054,7 +1059,7 @@ function LocationPickerModal({
                   </svg>
                 </span>
                 <span className="location-picker-search-text">
-                  {mapResolving ? 'Aniqlanmoqda...' : (mapAddress || 'Yetkazish yoki olib ketish manzili')}
+                  {mapResolving ? 'Aniqlanmoqda...' : (compactMapAddress || 'Yetkazish yoki olib ketish manzili')}
                 </span>
                 {onReset && mapAddress && (
                   <button

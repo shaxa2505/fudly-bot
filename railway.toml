@@ -3,7 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "sh -c \"/opt/venv/bin/python -m alembic upgrade head && /opt/venv/bin/python bot.py\""
+startCommand = "sh -c \"/opt/venv/bin/python prestart.py -- /opt/venv/bin/python bot.py\""
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"

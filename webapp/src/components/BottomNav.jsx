@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { resolveUiLanguage, tByLang } from '../utils/uiLanguage'
 import './BottomNav.css'
 
 // Map page IDs to routes
@@ -11,12 +12,16 @@ const PAGE_ROUTES = {
   'profile': '/profile',
 }
 
-function BottomNav({ currentPage, cartCount }) {
+function BottomNav({ currentPage, cartCount, lang: langProp }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [cartPulse, setCartPulse] = useState(false)
   const [cartIconPulse, setCartIconPulse] = useState(false)
   const prevCountRef = useRef(cartCount)
+  const lang = resolveUiLanguage(
+    typeof langProp === 'string' ? { language: langProp } : null
+  )
+  const t = (ru, uz) => tByLang(lang, ru, uz)
 
   // Determine current page from route if not explicitly passed
   const activePage = currentPage || (() => {
@@ -78,11 +83,11 @@ function BottomNav({ currentPage, cartCount }) {
   }
 
   const menuItems = [
-    { id: 'home', label: 'Asosiy' },
-    { id: 'stores', label: "Do'konlar" },
-    { id: 'cart', label: 'Savat', badge: cartCount },
-    { id: 'orders', label: 'Buyurtmalar' },
-    { id: 'profile', label: 'Profil' },
+    { id: 'home', label: t('Главная', 'Asosiy') },
+    { id: 'stores', label: t('Магазины', "Do'konlar") },
+    { id: 'cart', label: t('Корзина', 'Savat'), badge: cartCount },
+    { id: 'orders', label: t('Заказы', 'Buyurtmalar') },
+    { id: 'profile', label: t('Профиль', 'Profil') },
   ]
 
   const handleNavigate = (pageId) => {

@@ -314,7 +314,11 @@ async def admin_exit(message: types.Message, db: DatabaseProtocol):
 
     # Return to appropriate main menu based on user role
     user_role = user.role if user else "customer"
-    menu = main_menu_seller(lang) if user_role == "seller" else main_menu_customer(lang)
+    menu = (
+        main_menu_seller(lang)
+        if user_role == "seller"
+        else main_menu_customer(lang, user_id=message.from_user.id)
+    )
 
     await message.answer("👋 Выход из админ-панели", reply_markup=menu)
 

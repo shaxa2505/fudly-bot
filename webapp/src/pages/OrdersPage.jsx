@@ -10,6 +10,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh'
 import { resolveImageUrl } from '../utils/imageUtils'
 import { calcQuantity, calcDeliveryFee, calcTotalPrice } from '../utils/orderMath'
 import { deriveDisplayStatus as deriveStatus, displayStatusText, normalizeOrderStatus, resolveOrderType } from '../utils/orderStatus'
+import { resolveUiLanguage, tByLang } from '../utils/uiLanguage'
 import './YanaPage.css'
 import './OrdersPage.css'
 
@@ -33,10 +34,14 @@ const TAB_ACTIVE = 'active'
 const TAB_HISTORY = 'history'
 const PAGE_SIZE = 30
 
-function OrdersPage() {
+function OrdersPage({ user }) {
   const navigate = useNavigate()
   const { cartCount } = useCart()
   const { toast } = useToast()
+  const lang = resolveUiLanguage(user)
+  const t = (ru, uz) => tByLang(lang, ru, uz)
+  const sumLabel = t('сум', "so'm")
+  const locale = lang === 'ru' ? 'ru-RU' : 'uz-UZ'
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageOffset, setPageOffset] = useState(0)
@@ -155,7 +160,7 @@ function OrdersPage() {
       console.error('Error loading orders:', error)
       if (reset) {
         setOrders([])
-        toast.error("Buyurtmalarni yuklab bo'lmadi")
+        toast.error(t('Не удалось загрузить заказы', "Buyurtmalarni yuklab bo'lmadi"))
       }
     } finally {
       if (reset) {
@@ -234,7 +239,7 @@ function OrdersPage() {
       payment_rejected: { color: 'var(--color-error)', bg: 'var(--color-error-light)' },
     }
     const palette = statusMap[status] || { color: 'var(--color-text-secondary)', bg: 'var(--color-bg-tertiary)' }
-    return { ...palette, text: displayStatusText(status, 'uz', orderType) }
+    return { ...palette, text: displayStatusText(status, lang, orderType) }
   }
 
   const getOrderQuantity = (order) => {
@@ -289,8 +294,8 @@ function OrdersPage() {
     const unitPrice = quantity
       ? Math.round((baseTotal || 0) / quantity)
       : (items[0]?.price ?? items[0]?.discount_price ?? 0)
-    const offerTitle = order.offer_title || order.title || items[0]?.title || items[0]?.offer_title || 'Buyurtma'
-    const storeName = order.store_name || items[0]?.store_name || "Do'kon"
+    const offerTitle = order.offer_title || order.title || items[0]?.title || items[0]?.offer_title || t('Заказ', 'Buyurtma')
+    const storeName = order.store_name || items[0]?.store_name || t('Магазин', "Do'kon")
     const bookingCode = order.booking_code || order.pickup_code
     const photoUrl = resolveImageUrl(
       order.offer_photo,
@@ -326,7 +331,9 @@ function OrdersPage() {
   const formatOrderDate = (dateStr) => {
     if (!dateStr) return ''
     const raw = String(dateStr)
-    const months = ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek']
+    const months = lang === 'ru'
+      ? ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+      : ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek']
     const hasTimezoneHint = /[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)
 
     // Avoid timezone-shifts for plain timestamps without timezone info.
@@ -353,21 +360,37 @@ function OrdersPage() {
       return `${day} ${months[date.getMonth()]}`
     }
 
-    const monthMap = {
-      'янв': 'yan',
-      'фев': 'fev',
-      'мар': 'mar',
-      'апр': 'apr',
-      'май': 'may',
-      'июн': 'iyn',
-      'июл': 'iyl',
-      'авг': 'avg',
-      'сен': 'sen',
-      'сент': 'sen',
-      'окт': 'okt',
-      'ноя': 'noy',
-      'дек': 'dek',
-    }
+    const monthMap = lang === 'ru'
+      ? {
+          'янв': 'янв',
+          'фев': 'фев',
+          'мар': 'мар',
+          'апр': 'апр',
+          'май': 'мая',
+          'июн': 'июн',
+          'июл': 'июл',
+          'авг': 'авг',
+          'сен': 'сен',
+          'сент': 'сен',
+          'окт': 'окт',
+          'ноя': 'ноя',
+          'дек': 'дек',
+        }
+      : {
+          'янв': 'yan',
+          'фев': 'fev',
+          'мар': 'mar',
+          'апр': 'apr',
+          'май': 'may',
+          'июн': 'iyn',
+          'июл': 'iyl',
+          'авг': 'avg',
+          'сен': 'sen',
+          'сент': 'sen',
+          'окт': 'okt',
+          'ноя': 'noy',
+          'дек': 'dek',
+        }
     const match = raw.toLowerCase().match(/(\d{1,2})\s*[-.\s]*\s*([а-яё]+)/i)
     if (match) {
       const day = match[1].padStart(2, '0')
@@ -384,31 +407,31 @@ function OrdersPage() {
     const numeric = toNumeric(value)
     if (!Number.isFinite(numeric)) return '0'
     const rounded = Math.round(numeric + Number.EPSILON)
-    return rounded.toLocaleString('uz-UZ')
+    return rounded.toLocaleString(locale)
   }
 
   const getProgressSteps = (orderType) => {
     if (orderType === 'delivery') {
       return [
         {
-          label: 'Tasdiqlandi',
+          label: t('Подтвержден', 'Tasdiqlandi'),
           statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected'],
         },
-        { label: 'Tayyorlanmoqda', statuses: ['preparing'] },
-        { label: 'Tayyor', statuses: ['ready'] },
-        { label: "Yo'lda", statuses: ['delivering'] },
-        { label: 'Yetkazildi', statuses: ['completed'] },
+        { label: t('Готовится', 'Tayyorlanmoqda'), statuses: ['preparing'] },
+        { label: t('Готов', 'Tayyor'), statuses: ['ready'] },
+        { label: t('В пути', "Yo'lda"), statuses: ['delivering'] },
+        { label: t('Доставлен', 'Yetkazildi'), statuses: ['completed'] },
       ]
     }
 
     return [
       {
-        label: 'Tasdiqlandi',
+        label: t('Подтвержден', 'Tasdiqlandi'),
         statuses: ['pending', 'confirmed', 'awaiting_payment', 'awaiting_proof', 'proof_submitted', 'payment_rejected'],
       },
-      { label: 'Tayyorlanmoqda', statuses: ['preparing'] },
-      { label: 'Olib ketish', statuses: ['ready'] },
-      { label: 'Berildi', statuses: ['completed'] },
+      { label: t('Готовится', 'Tayyorlanmoqda'), statuses: ['preparing'] },
+      { label: t('Самовывоз', 'Olib ketish'), statuses: ['ready'] },
+      { label: t('Выдан', 'Berildi'), statuses: ['completed'] },
     ]
   }
 
@@ -456,7 +479,7 @@ function OrdersPage() {
         <div className="app-header-inner">
           <div className="app-header-spacer" aria-hidden="true" />
           <div className="app-header-title">
-            <h1 className="app-header-title-text">Buyurtmalar</h1>
+            <h1 className="app-header-title-text">{t('Заказы', 'Buyurtmalar')}</h1>
           </div>
           <div className="app-header-spacer" aria-hidden="true" />
         </div>
@@ -466,14 +489,14 @@ function OrdersPage() {
             className={`orders-tab ${activeTab === TAB_ACTIVE ? 'active' : ''}`}
             onClick={() => setActiveTab(TAB_ACTIVE)}
           >
-            Faol ({activeOrders.length})
+            {t('Активные', 'Faol')} ({activeOrders.length})
           </button>
           <button
             type="button"
             className={`orders-tab ${activeTab === TAB_HISTORY ? 'active' : ''}`}
             onClick={() => setActiveTab(TAB_HISTORY)}
           >
-            Tarix
+            {t('История', 'Tarix')}
           </button>
         </div>
       </header>
@@ -483,19 +506,19 @@ function OrdersPage() {
           <>
             <section className="orders-section">
               <div className="orders-section-header">
-                <h2 className="orders-section-title">Joriy buyurtma</h2>
+                <h2 className="orders-section-title">{t('Текущие заказы', 'Joriy buyurtma')}</h2>
               </div>
               {loading ? (
                 <div className="orders-loading">
                   <div className="orders-spinner"></div>
-                  <p>Yuklanmoqda...</p>
+                  <p>{t('Загрузка...', 'Yuklanmoqda...')}</p>
                 </div>
               ) : activeOrders.length === 0 ? (
                 <div className="orders-empty">
                   <div className="orders-empty-icon">*</div>
-                  <h3>Faol buyurtmalar yo'q</h3>
-                  <p>Yangi buyurtmalar shu yerda ko'rinadi.</p>
-                  <button className="orders-empty-btn" onClick={() => navigate('/')}>Xarid qilish</button>
+                  <h3>{t('Активных заказов нет', "Faol buyurtmalar yo'q")}</h3>
+                  <p>{t('Новые заказы появятся здесь.', "Yangi buyurtmalar shu yerda ko'rinadi.")}</p>
+                  <button className="orders-empty-btn" onClick={() => navigate('/')}>{t('К покупкам', 'Xarid qilish')}</button>
                 </div>
               ) : (
                 <div className="orders-active-list">
@@ -544,7 +567,7 @@ function OrdersPage() {
                               </span>
                             </div>
                             <div className="order-card-meta">
-                              ID: #{summary.orderId} &bull; {summary.quantity} ta
+                              ID: #{summary.orderId} &bull; {summary.quantity} {t('шт', 'ta')}
                             </div>
                             <div className="order-card-sub">
                               {formatOrderDate(summary.createdAt)}
@@ -586,7 +609,7 @@ function OrdersPage() {
                             className="order-card-primary"
                             onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
                           >
-                            Tafsilotlar
+                            {t('Детали', 'Tafsilotlar')}
                           </button>
                           <button
                             type="button"
@@ -599,20 +622,20 @@ function OrdersPage() {
                                 window.open(link, '_blank', 'noopener,noreferrer')
                               }
                             }}
-                            aria-label="Qo'llab-quvvatlash"
+                            aria-label={t('Поддержка', "Qo'llab-quvvatlash")}
                           >
                             <MessageCircle size={18} strokeWidth={2} />
                           </button>
                         </div>
 
                         <div className="order-card-footer">
-                          <span className="order-card-price">{formatSum(summary.totalPrice)} so'm</span>
+                          <span className="order-card-price">{formatSum(summary.totalPrice)} {sumLabel}</span>
                           <button
                             type="button"
                             className="order-card-more"
                             onClick={() => summary.orderId && navigate(`/order/${summary.orderId}`)}
                           >
-                            Batafsil
+                            {t('Подробнее', 'Batafsil')}
                             <ArrowRight size={14} strokeWidth={2.2} />
                           </button>
                         </div>
@@ -634,7 +657,7 @@ function OrdersPage() {
 
                               try {
                                 await api.cancelOrder(orderId)
-                                toast.success('Buyurtma bekor qilindi')
+                                toast.success(t('Заказ отменен', 'Buyurtma bekor qilindi'))
                                 setTimeout(() => loadOrders({ reset: true, force: true }), 500)
                               } catch (error) {
                                 console.error('Cancel order failed:', error)
@@ -643,13 +666,15 @@ function OrdersPage() {
                                   error?.response?.data?.detail ||
                                   error?.response?.data?.message ||
                                   error?.message
-                                toast.error(errorMsg || 'Bekor qilishda xatolik')
+                                toast.error(errorMsg || t('Ошибка при отмене', 'Bekor qilishda xatolik'))
                               } finally {
                                 setCancelingOrderId(null)
                               }
                             }}
                           >
-                            {cancelingOrderId === summary.orderId ? 'Bekor qilinmoqda...' : 'Bekor qilish'}
+                            {cancelingOrderId === summary.orderId
+                              ? t('Отмена...', 'Bekor qilinmoqda...')
+                              : t('Отменить', 'Bekor qilish')}
                           </button>
                         )}
                       </div>
@@ -661,17 +686,17 @@ function OrdersPage() {
 
             <section className="orders-section">
               <div className="orders-section-header">
-                <h2 className="orders-section-title">Oldingi xaridlar</h2>
+                <h2 className="orders-section-title">{t('Прошлые покупки', 'Oldingi xaridlar')}</h2>
               </div>
               {loading ? (
                 <div className="orders-loading">
                   <div className="orders-spinner"></div>
-                  <p>Yuklanmoqda...</p>
+                  <p>{t('Загрузка...', 'Yuklanmoqda...')}</p>
                 </div>
               ) : completedOrders.length === 0 ? (
                 <div className="orders-empty compact">
-                  <h3>Buyurtmalar tarixi bo'sh</h3>
-                  <p>Birinchi buyurtmangizni bering!</p>
+                  <h3>{t('История заказов пуста', "Buyurtmalar tarixi bo'sh")}</h3>
+                  <p>{t('Сделайте первый заказ!', 'Birinchi buyurtmangizni bering!')}</p>
                 </div>
               ) : (
                 <div className="orders-history-list">
@@ -704,7 +729,7 @@ function OrdersPage() {
                         <div className="order-history-main">
                           <div className="order-history-row">
                             <h4>{summary.storeName}</h4>
-                            <span className="order-history-price">{formatSum(summary.totalPrice)} so'm</span>
+                            <span className="order-history-price">{formatSum(summary.totalPrice)} {sumLabel}</span>
                           </div>
                           <div className="order-history-meta">
                             <span>{formatOrderDate(summary.createdAt)}</span>
@@ -713,7 +738,7 @@ function OrdersPage() {
                           </div>
                         </div>
                         <span className="order-history-action">
-                          Qayta
+                          {t('Повторить', 'Qayta')}
                           <ArrowRight size={12} strokeWidth={2.2} />
                         </span>
                       </button>
@@ -730,8 +755,8 @@ function OrdersPage() {
                 onClick={() => navigate('/')}
               >
                 <div>
-                  <span className="orders-cta-title">Barqaror tanlov</span>
-                  <span className="orders-cta-text">Tumaningizdagi qolgan takliflarni ko'ring.</span>
+                  <span className="orders-cta-title">{t('Осознанный выбор', 'Barqaror tanlov')}</span>
+                  <span className="orders-cta-text">{t('Посмотрите доступные предложения рядом.', "Tumaningizdagi qolgan takliflarni ko'ring.")}</span>
                 </div>
                 <ArrowRight size={18} strokeWidth={2.2} />
               </button>
@@ -740,19 +765,19 @@ function OrdersPage() {
         ) : (
           <section className="orders-section">
             <div className="orders-section-header">
-              <h2 className="orders-section-title">Buyurtmalar tarixi</h2>
+              <h2 className="orders-section-title">{t('История заказов', 'Buyurtmalar tarixi')}</h2>
             </div>
             {loading ? (
               <div className="orders-loading">
                 <div className="orders-spinner"></div>
-                <p>Yuklanmoqda...</p>
+                <p>{t('Загрузка...', 'Yuklanmoqda...')}</p>
               </div>
             ) : completedOrders.length === 0 ? (
               <div className="orders-empty">
                 <div className="orders-empty-icon">*</div>
-                <h3>Buyurtmalar tarixi bo'sh</h3>
-                <p>Yangi buyurtmalar shu yerda ko'rinadi.</p>
-                <button className="orders-empty-btn" onClick={() => navigate('/')}>Xarid qilish</button>
+                <h3>{t('История заказов пуста', "Buyurtmalar tarixi bo'sh")}</h3>
+                <p>{t('Новые заказы появятся здесь.', "Yangi buyurtmalar shu yerda ko'rinadi.")}</p>
+                <button className="orders-empty-btn" onClick={() => navigate('/')}>{t('К покупкам', 'Xarid qilish')}</button>
               </div>
             ) : (
               <div className="orders-history-list">
@@ -785,7 +810,7 @@ function OrdersPage() {
                       <div className="order-history-main">
                         <div className="order-history-row">
                           <h4>{summary.storeName}</h4>
-                          <span className="order-history-price">{formatSum(summary.totalPrice)} so'm</span>
+                          <span className="order-history-price">{formatSum(summary.totalPrice)} {sumLabel}</span>
                         </div>
                         <div className="order-history-meta">
                           <span>{formatOrderDate(summary.createdAt)}</span>
@@ -794,7 +819,7 @@ function OrdersPage() {
                         </div>
                       </div>
                       <span className="order-history-action">
-                        Qayta
+                        {t('Повторить', 'Qayta')}
                         <ArrowRight size={12} strokeWidth={2.2} />
                       </span>
                     </button>
@@ -813,13 +838,13 @@ function OrdersPage() {
               onClick={handleLoadMore}
               disabled={loadingMore}
             >
-              {loadingMore ? 'Yuklanmoqda...' : 'Yana yuklash'}
+              {loadingMore ? t('Загрузка...', 'Yuklanmoqda...') : t('Загрузить еще', 'Yana yuklash')}
             </button>
           </div>
         )}
       </main>
 
-      <BottomNav currentPage="orders" cartCount={cartCount} />
+      <BottomNav currentPage="orders" cartCount={cartCount} lang={lang} />
     </div>
   )
 }

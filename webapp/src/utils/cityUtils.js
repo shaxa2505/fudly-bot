@@ -96,10 +96,16 @@ export const CITY_TRANSLATIONS = {
 }
 
 const CYRILLIC_RE = /[\u0400-\u04FF]/
+const LATIN_RE = /[A-Za-z]/
 const APOSTROPHE_RE = /[\u2018\u2019\u02BB\u02BC\u2032\u2035\u00B4\u0060]/g
 const CITY_KEY_RE = /[\s'’`,.\-]+/g
+const HOUSE_NUMBER_RE = /^\d+[A-Za-z\u0400-\u04FF/-]*$/
+const BLOCK_PART_RE = /(?:daha(?:si)?|daxasi|\u0434\u0430\u0445\u0430\u0441\u0438|\u043c\u0430\u0441\u0441\u0438\u0432|kvartal|\u043a\u0432\u0430\u0440\u0442\u0430\u043b|[c\u0441\u0446]\s*[-/]?\s*\d+)/i
+const ROAD_PART_RE = /(?:ko['’`]?chasi|kochasi|\u0443\u043b\u0438\u0446\u0430|\u0443\u043b\.?|street|road|avenue|prospekt|\u043f\u0440\u043e\u0441\u043f\u0435\u043a\u0442|yo['’`]?li|yoli|shoh|\u0448\u043e\u0445)/i
+const MAX_COMPACT_ADDRESS_LENGTH = 34
 
 const hasCyrillic = (value) => CYRILLIC_RE.test(String(value || ''))
+const hasLatin = (value) => LATIN_RE.test(String(value || ''))
 const normalizeApostrophes = (value) => String(value || '').replace(APOSTROPHE_RE, "'")
 
 const LOCATION_SUFFIXES = [
@@ -158,6 +164,89 @@ export const normalizeCityQuery = (value) => {
   if (!normalized) return ''
   const key = buildCitySearchKey(normalized)
   return CITY_QUERY_ALIASES[key] || ''
+}
+
+const normalizeAddressPart = (value) => (
+  normalizeApostrophes(String(value || ''))
+    .replace(/\s+/g, ' ')
+    .trim()
+)
+
+const stripBlockDecorations = (value) => (
+  normalizeAddressPart(value)
+    .replace(/\(\s*[c\u0441\u0446]\s*[-/]?\s*\d+[A-Za-z\u0400-\u04FF]?\s*\)/gi, '')
+    .replace(/(?:daha(?:si)?|daxasi|\u0434\u0430\u0445\u0430\u0441\u0438|\u043c\u0430\u0441\u0441\u0438\u0432|kvartal|\u043a\u0432\u0430\u0440\u0442\u0430\u043b)/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+)
+
+const looksLikeHouseNumber = (value) => (
+  HOUSE_NUMBER_RE.test(String(value || '').replace(/\s+/g, ''))
+)
+
+const isBlockLikePart = (value) => BLOCK_PART_RE.test(String(value || ''))
+
+const truncateCompactLabel = (value) => {
+  const normalized = normalizeAddressPart(value)
+  if (normalized.length <= MAX_COMPACT_ADDRESS_LENGTH) return normalized
+  return `${normalized.slice(0, MAX_COMPACT_ADDRESS_LENGTH - 3).trim()}...`
+}
+
+const pickByPreferredScript = (values, preferLatin) => {
+  if (!values.length) return ''
+  if (preferLatin) {
+    const latinOnly = values.find((item) => hasLatin(item) && !hasCyrillic(item))
+    if (latinOnly) return latinOnly
+    const latinMixed = values.find((item) => hasLatin(item))
+    if (latinMixed) return latinMixed
+  } else {
+    const cyrOnly = values.find((item) => hasCyrillic(item) && !hasLatin(item))
+    if (cyrOnly) return cyrOnly
+    const cyrMixed = values.find((item) => hasCyrillic(item))
+    if (cyrMixed) return cyrMixed
+  }
+  return values[0]
+}
+
+export const formatCompactAddressLabel = (address, fallbackCity = '') => {
+  const fallback = normalizeLocationName(fallbackCity || '')
+  const raw = String(address || '').trim()
+  if (!raw) return fallback || 'Shahar tanlang'
+
+  const rawParts = raw
+    .split(',')
+    .map(normalizeAddressPart)
+    .filter(Boolean)
+  if (!rawParts.length) return fallback || 'Shahar tanlang'
+
+  const partEntries = rawParts
+    .map((rawPart) => ({
+      raw: rawPart,
+      cleaned: stripBlockDecorations(rawPart),
+    }))
+    .filter((entry) => Boolean(entry.cleaned))
+
+  const preferLatin = !hasCyrillic(fallback)
+  const houseCandidate = rawParts.find((part) => looksLikeHouseNumber(part)) || ''
+  const houseNumber = normalizeAddressPart(houseCandidate)
+  const roadCandidates = partEntries
+    .filter((entry) => ROAD_PART_RE.test(entry.cleaned) && !isBlockLikePart(entry.raw))
+    .map((entry) => entry.cleaned)
+
+  if (roadCandidates.length) {
+    const road = pickByPreferredScript(roadCandidates, preferLatin)
+    const label = houseNumber ? `${road} ${houseNumber}` : road
+    return truncateCompactLabel(label)
+  }
+
+  if (fallback) return truncateCompactLabel(fallback)
+
+  const fallbackPart = partEntries.find((entry) => !isBlockLikePart(entry.raw))
+  if (fallbackPart) {
+    return truncateCompactLabel(fallbackPart.cleaned)
+  }
+
+  return fallback || 'Shahar tanlang'
 }
 
 export const buildLocationFromReverseGeocode = (data, lat, lon) => {

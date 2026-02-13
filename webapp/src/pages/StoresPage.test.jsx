@@ -42,6 +42,7 @@ vi.mock('../api/client', () => ({
     removeFavoriteStore: apiMocks.removeFavoriteStore,
     reverseGeocode: apiMocks.reverseGeocode,
   },
+  getTelegramInitData: () => '',
 }))
 
 vi.mock('../utils/geolocation', () => ({
@@ -123,7 +124,7 @@ describe('StoresPage', () => {
       expect(apiMocks.getStores).toHaveBeenCalled()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Xarita' }))
+    fireEvent.click(screen.getByRole('button', { name: /Xarit/i }))
 
     expect(screen.getByTestId('store-map')).toBeInTheDocument()
   })

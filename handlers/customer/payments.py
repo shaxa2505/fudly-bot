@@ -479,7 +479,9 @@ async def process_successful_payment(message: types.Message) -> None:
 
         if not edit_success:
             sent_msg = await message.answer(
-                success_text, parse_mode="HTML", reply_markup=main_menu_customer(lang)
+                success_text,
+                parse_mode="HTML",
+                reply_markup=main_menu_customer(lang, user_id=user_id),
             )
             if sent_msg and db:
                 if entity_type == "order" and hasattr(db, "set_order_customer_message_id"):

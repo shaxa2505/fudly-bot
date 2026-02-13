@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.api.rate_limit import limiter
 from app.core.caching import get_cache_service
 from app.core.location_search import build_nearby_radius_steps
+from app.core.units import effective_order_unit
 from app.core.utils import normalize_city
 
 from .common import (
@@ -225,7 +226,7 @@ def _to_offer_response(offer: Any, store_fallback: dict | None = None) -> OfferR
         discount_price=discount_price,
         discount_percent=discount_percent,
         quantity=float(get_val(offer, "quantity", 0) or 0),
-        unit=get_val(offer, "unit", "dona") or "dona",
+        unit=effective_order_unit(get_val(offer, "unit", "piece")),
         category=get_val(offer, "category", "other") or "other",
         store_id=store_id,
         store_name=store_name,
@@ -743,7 +744,7 @@ async def get_offers(
                         discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
                         or _calc_discount_percent(original_price_sums, discount_price_sums),
                         quantity=float(get_val(offer, "quantity", 0) or 0),
-                        unit=get_val(offer, "unit", "dona") or "dona",
+                        unit=effective_order_unit(get_val(offer, "unit", "piece")),
                         category=get_val(offer, "category", "other") or "other",
                         store_id=int(get_val(offer, "store_id", 0) or 0),
                         store_name=get_val(offer, "store_name")
@@ -927,7 +928,7 @@ async def get_offer(offer_id: int, db=Depends(get_db)):
             discount_percent=float(get_val(offer, "discount_percent", 0) or 0)
             or _calc_discount_percent(original_price_sums, discount_price_sums),
             quantity=float(get_val(offer, "quantity", 0) or 0),
-            unit=get_val(offer, "unit", "dona") or "dona",
+            unit=effective_order_unit(get_val(offer, "unit", "piece")),
             category=get_val(offer, "category", "other") or "other",
             store_id=int(get_val(offer, "store_id", 0) or 0),
             store_name=get_val(offer, "store_name")
@@ -1032,7 +1033,7 @@ async def get_flash_deals(
                             discount_price=discount_price_sums,
                             discount_percent=discount,
                             quantity=float(get_val(offer, "quantity", 0) or 0),
-                            unit=get_val(offer, "unit", "dona") or "dona",
+                            unit=effective_order_unit(get_val(offer, "unit", "piece")),
                             category=get_val(offer, "category", "other") or "other",
                             store_id=int(get_val(offer, "store_id", 0) or 0),
                             store_name=get_val(offer, "store_name") or get_val(offer, "name") or "",

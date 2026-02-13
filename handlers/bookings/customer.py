@@ -629,7 +629,7 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 
         # Fallback to main menu if store not found
         cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
-        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
+        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang, user_id=user_id))
         await callback.answer()
         return
 
@@ -701,7 +701,7 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
 
         # Fallback to main menu
         cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
-        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
+        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang, user_id=user_id))
         await callback.answer()
         return
 
@@ -721,7 +721,7 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
     if not result.items:
         # No offers - show main menu
         cancelled = "❌ Bekor qilindi" if lang == "uz" else "❌ Отменено"
-        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang))
+        await callback.message.answer(cancelled, reply_markup=main_menu_customer(lang, user_id=user_id))
         await callback.answer()
         return
 
@@ -951,7 +951,7 @@ async def book_offer_quantity(message: types.Message, state: FSMContext) -> None
     ):
         await state.clear()
         await message.answer(
-            get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
+            get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang, user_id=user_id)
         )
         return
 
@@ -1095,7 +1095,7 @@ async def cancel_booking_flow(callback: types.CallbackQuery, state: FSMContext) 
     await state.clear()
     await safe_edit_reply_markup(callback.message)
     await callback.message.answer(
-        get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang)
+        get_text(lang, "action_cancelled"), reply_markup=main_menu_customer(lang, user_id=user_id)
     )
     await callback.answer()
 
@@ -1689,7 +1689,9 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
             if lang == "ru"
             else "✅ Bron bekor qilindi. Mahsulot miqdori qaytarildi."
         )
-        await bot.send_message(user_id, cancel_text, reply_markup=main_menu_customer(lang))
+        await bot.send_message(
+            user_id, cancel_text, reply_markup=main_menu_customer(lang, user_id=user_id)
+        )
     else:
         await callback.answer(get_text(lang, "error"), show_alert=True)
 
@@ -1698,4 +1700,3 @@ async def confirm_cancel_booking(callback: types.CallbackQuery) -> None:
 async def noop_handler(callback: types.CallbackQuery) -> None:
     """No-operation handler for closing dialogs."""
     await callback.answer()
-

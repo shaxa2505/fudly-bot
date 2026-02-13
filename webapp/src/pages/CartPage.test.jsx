@@ -25,6 +25,7 @@ vi.mock('../api/client', () => ({
     getPaymentCard: apiMocks.getPaymentCard,
     createPaymentLink: apiMocks.createPaymentLink,
   },
+  getTelegramInitData: () => '',
 }))
 
 vi.mock('../components/BottomNav', () => ({
@@ -70,7 +71,7 @@ describe('CartPage', () => {
     )
     localStorage.setItem('fudly_user', JSON.stringify({ phone: '+998901234567' }))
 
-    renderWithProviders(<CartPage />)
+    renderWithProviders(<CartPage user={{ phone: '+998901234567' }} />)
 
     expect(await screen.findByRole('heading', { name: 'Milk' })).toBeInTheDocument()
 

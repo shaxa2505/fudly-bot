@@ -11,13 +11,38 @@ from localization import get_text
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://fudly-webapp.vercel.app")
 
 
-def main_menu_customer(lang: str = "ru", cart_count: float = 0) -> ReplyKeyboardMarkup:
+def _resolve_cart_count(cart_count: float | None, user_id: int | None) -> float:
+    """Resolve cart count using explicit value or cart storage for user."""
+    if cart_count is not None:
+        try:
+            return float(cart_count)
+        except (TypeError, ValueError):
+            return 0.0
+
+    if not user_id:
+        return 0.0
+
+    try:
+        from handlers.customer.cart.storage import cart_storage
+
+        return float(cart_storage.get_cart_count(int(user_id)) or 0)
+    except Exception:
+        return 0.0
+
+
+def main_menu_customer(
+    lang: str = "ru",
+    cart_count: float | None = None,
+    user_id: int | None = None,
+) -> ReplyKeyboardMarkup:
     """Main menu for customers - 3 compact rows with clear actions.
 
     Args:
         lang: Interface language
         cart_count: Number of items in cart (shown on button)
+        user_id: Telegram user ID for automatic cart count resolution
     """
+    resolved_cart_count = _resolve_cart_count(cart_count, user_id)
     hot_offers_text = get_text(lang, "hot_offers")
     builder = ReplyKeyboardBuilder()
 
@@ -26,8 +51,12 @@ def main_menu_customer(lang: str = "ru", cart_count: float = 0) -> ReplyKeyboard
 
     # Row 2: Cart + Orders
     cart_text = f"🛒 {get_text(lang, 'my_cart')}"
-    if cart_count > 0:
-        count_text = f"{cart_count:g}" if isinstance(cart_count, float) else str(cart_count)
+    if resolved_cart_count > 0:
+        count_text = (
+            f"{resolved_cart_count:g}"
+            if isinstance(resolved_cart_count, float)
+            else str(resolved_cart_count)
+        )
         cart_text = f"{cart_text} ({count_text})"
     builder.button(text=cart_text)
     builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")
@@ -40,7 +69,11 @@ def main_menu_customer(lang: str = "ru", cart_count: float = 0) -> ReplyKeyboard
     return builder.as_markup(resize_keyboard=True)
 
 
-def registration_complete_keyboard(lang: str = "ru", cart_count: float = 0) -> ReplyKeyboardMarkup:
+def registration_complete_keyboard(
+    lang: str = "ru",
+    cart_count: float | None = None,
+    user_id: int | None = None,
+) -> ReplyKeyboardMarkup:
     """Main menu for registration completion with a WebApp shortcut."""
     builder = ReplyKeyboardBuilder()
 
@@ -52,8 +85,13 @@ def registration_complete_keyboard(lang: str = "ru", cart_count: float = 0) -> R
 
     # Row 3: Cart + Orders
     cart_text = f"🛒 {get_text(lang, 'my_cart')}"
-    if cart_count > 0:
-        count_text = f"{cart_count:g}" if isinstance(cart_count, float) else str(cart_count)
+    resolved_cart_count = _resolve_cart_count(cart_count, user_id)
+    if resolved_cart_count > 0:
+        count_text = (
+            f"{resolved_cart_count:g}"
+            if isinstance(resolved_cart_count, float)
+            else str(resolved_cart_count)
+        )
         cart_text = f"{cart_text} ({count_text})"
     builder.button(text=cart_text)
     builder.button(text=f"🧾 {get_text(lang, 'my_orders')}")

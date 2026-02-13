@@ -62,7 +62,9 @@ async def _after_phone_saved(
 
             await message.answer(
                 get_text(lang, "registration_resume_cart"),
-                reply_markup=main_menu_customer(lang),
+                reply_markup=main_menu_customer(
+                    lang, user_id=message.from_user.id if message.from_user else None
+                ),
             )
 
         await state.clear()
@@ -97,7 +99,9 @@ async def _after_phone_saved(
 
             await message.answer(
                 get_text(lang, "registration_continue_offers"),
-                reply_markup=main_menu_customer(lang),
+                reply_markup=main_menu_customer(
+                    lang, user_id=message.from_user.id if message.from_user else None
+                ),
             )
             return
 
@@ -142,7 +146,9 @@ async def _send_completion_menu(message: types.Message, lang: str) -> None:
         )
     await message.answer(
         get_text(lang, "main_menu"),
-        reply_markup=registration_complete_keyboard(lang),
+        reply_markup=registration_complete_keyboard(
+            lang, user_id=message.from_user.id if message.from_user else None
+        ),
     )
 
 
@@ -309,7 +315,7 @@ async def registration_city_callback(
     await callback.message.answer(
         complete_text,
         parse_mode="HTML",
-        reply_markup=registration_complete_keyboard(lang),
+        reply_markup=registration_complete_keyboard(lang, user_id=callback.from_user.id),
     )
     await callback.answer()
 
@@ -388,7 +394,7 @@ async def registration_district_callback(
     await callback.message.answer(
         complete_text,
         parse_mode="HTML",
-        reply_markup=registration_complete_keyboard(lang),
+        reply_markup=registration_complete_keyboard(lang, user_id=callback.from_user.id),
     )
     await callback.answer()
 

@@ -79,7 +79,8 @@ async def switch_to_customer(message: types.Message):
     set_user_view_mode(user_id, "customer", db)
 
     await message.answer(
-        get_text(lang, "switched_to_customer"), reply_markup=main_menu_customer(lang)
+        get_text(lang, "switched_to_customer"),
+        reply_markup=main_menu_customer(lang, user_id=user_id),
     )
 
     logger.info(f"User {user_id} switched to customer mode successfully")
