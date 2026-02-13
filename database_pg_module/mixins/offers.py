@@ -310,6 +310,8 @@ class OfferMixin:
         expiry_date: str = None,  # Will be converted to DATE by Pydantic
         unit: str = "piece",
         category: str = "other",
+        package_value: float | None = None,
+        package_unit: str | None = None,
     ):
         """
         Add new offer with unified schema.
@@ -330,8 +332,8 @@ class OfferMixin:
                 """
                 INSERT INTO offers (store_id, title, description, original_price, discount_price,
                                   quantity, stock_quantity, available_from, available_until,
-                                  expiry_date, photo_id, unit, category)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                  expiry_date, photo_id, unit, category, package_value, package_unit)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING offer_id
             """,
                 (
@@ -348,6 +350,8 @@ class OfferMixin:
                     photo_id,  # No more hack - direct parameter
                     unit,
                     category,
+                    package_value,
+                    package_unit,
                 ),
             )
             result = cursor.fetchone()
@@ -374,6 +378,8 @@ class OfferMixin:
         stock_quantity: float | None = None,
         status: str | None = None,
         photo_id: str | None = None,
+        package_value: float | None = None,
+        package_unit: str | None = None,
     ) -> bool:
         """Update offer with strict pricing guard shared with create flow."""
         existing = self.get_offer(offer_id)
@@ -432,6 +438,12 @@ class OfferMixin:
         if category is not None:
             update_fields.append("category = %s")
             params.append(category)
+        if package_value is not None:
+            update_fields.append("package_value = %s")
+            params.append(package_value)
+        if package_unit is not None:
+            update_fields.append("package_unit = %s")
+            params.append(package_unit)
         if status is not None:
             update_fields.append("status = %s")
             params.append(status)

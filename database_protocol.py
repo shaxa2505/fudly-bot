@@ -297,6 +297,8 @@ class DatabaseProtocol(Protocol):
         expiry_date: str | None = None,
         unit: str = "шт",
         category: str = "other",
+        package_value: float | None = None,
+        package_unit: str | None = None,
     ) -> int:
         ...
 
@@ -431,6 +433,8 @@ class DatabaseProtocol(Protocol):
         stock_quantity: float | None = None,
         status: str | None = None,
         photo_id: str | None = None,
+        package_value: float | None = None,
+        package_unit: str | None = None,
     ) -> bool:
         ...
 

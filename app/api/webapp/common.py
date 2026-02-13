@@ -235,6 +235,8 @@ class OfferResponse(BaseModel):
     discount_percent: float
     quantity: float
     unit: str = "piece"
+    package_value: float | None = None
+    package_unit: str | None = None
     category: str
     store_id: int
     store_name: str

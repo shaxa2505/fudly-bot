@@ -176,7 +176,15 @@ function ProductDetailPage() {
 
   const pickupLabel = availability.timeRange || '—'
   const expiryLabel = buildExpiryDisplay() || '—'
-  const stockUnitLabel = isPieceUnit(offer?.unit)
+  const packageValueRaw = offer?.package_value ?? offer?.packageValue
+  const packageValue = Number(packageValueRaw)
+  const packageUnitRaw = offer?.package_unit ?? offer?.packageUnit
+  const packageUnitLabel = getUnitLabel(packageUnitRaw, 'uz') || String(packageUnitRaw || '').trim()
+  const hasPackageInfo = Number.isFinite(packageValue) && packageValue > 0 && Boolean(packageUnitLabel)
+  const packageLabel = hasPackageInfo
+    ? `1 ta = ${formatQuantityValue(packageValue)} ${packageUnitLabel}`
+    : '—'
+  const stockUnitLabel = hasPackageInfo || isPieceUnit(offer?.unit)
     ? 'ta'
     : (getUnitLabel(offer?.unit, 'uz') || 'ta')
   const remainingLabel = hasStock
@@ -365,6 +373,18 @@ function ProductDetailPage() {
               </div>
               <div className="pdp-info-value">{remainingLabel}</div>
             </div>
+            {hasPackageInfo && (
+              <div className="pdp-info-card">
+                <div className="pdp-info-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 7h16v10H4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+                    <path d="M12 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  Qadoq
+                </div>
+                <div className="pdp-info-value">{packageLabel}</div>
+              </div>
+            )}
             <div className="pdp-info-card">
               <div className="pdp-info-label">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">

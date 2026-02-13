@@ -186,6 +186,8 @@ class Offer(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     unit = Column(String(20), default="piece")
     category = Column(String(50), default="other")
+    package_value = Column(Float, nullable=True)
+    package_unit = Column(String(20), nullable=True)
     search_vector = Column(TSVECTOR, nullable=True)
 
     # Relationships

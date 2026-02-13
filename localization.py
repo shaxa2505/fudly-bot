@@ -369,6 +369,7 @@ TEXTS = {
         "offer_step2_original_hint": "Р’РІРµРґРёС‚Рµ РћР‘Р«Р§РќРЈР® С†РµРЅСѓ С‚РѕРІР°СЂР°",
         "offer_step2_discount_hint": "Р’РІРµРґРёС‚Рµ Р¦Р•РќРЈ РЎРћ РЎРљРР”РљРћР™\nРЎРєРёРґРєР° РїРѕСЃС‡РёС‚Р°РµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё",
         "offer_step3_unit_hint": "Р’С‹Р±РµСЂРёС‚Рµ РµРґРёРЅРёС†Сѓ РёР·РјРµСЂРµРЅРёСЏ С‚РѕРІР°СЂР°",
+        "offer_step3_package_hint": "Р’РІРµРґРёС‚Рµ СЂР°Р·РјРµСЂ 1 СѓРїР°РєРѕРІРєРё РІ {unit}. РџСЂРёРјРµСЂ: 250",
         "offer_step4_quantity_hint_piece": "Р’С‹Р±РµСЂРёС‚Рµ РєРѕР»РёС‡РµСЃС‚РІРѕ",
         "offer_step4_quantity_hint_weight": "Р’РІРµРґРёС‚Рµ РґРѕСЃС‚СѓРїРЅС‹Р№ РІРµСЃ",
         "offer_step4_quantity_hint_volume": "Р’РІРµРґРёС‚Рµ РґРѕСЃС‚СѓРїРЅС‹Р№ РѕР±СЉС‘Рј",
@@ -382,6 +383,7 @@ TEXTS = {
         "offer_confirm_was": "Р‘С‹Р»Рѕ",
         "offer_confirm_now": "РЎС‚Р°Р»Рѕ",
         "offer_confirm_qty": "РљРѕР»РёС‡РµСЃС‚РІРѕ",
+        "offer_confirm_package": "Р Р°Р·РјРµСЂ СѓРїР°РєРѕРІРєРё",
         "offer_confirm_expiry": "РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё",
         "offer_confirm_urgent": "РЎСЂРѕС‡РЅРѕ",
         "offer_publish_btn": "вњ… РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ",
@@ -402,6 +404,7 @@ TEXTS = {
         "offer_error_quantity_volume_range": "вљ пёЏ РћР±СЉС‘Рј РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕС‚ 0.1 РґРѕ {max}",
         "offer_error_quantity_integer": "вљ пёЏ Р’РІРµРґРёС‚Рµ С†РµР»РѕРµ С‡РёСЃР»Рѕ",
         "offer_error_quantity_step": "вљ пёЏ РЁР°Рі вЂ” 0.1",
+        "offer_error_package_range": "вљ пёЏ Р Р°Р·РјРµСЂ СѓРїР°РєРѕРІРєРё РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕС‚ 1 РґРѕ {max}",
         "cart_weight_select_title": "Р’С‹Р±РµСЂРёС‚Рµ РІРµСЃ",
         "cart_volume_select_title": "Р’С‹Р±РµСЂРёС‚Рµ РѕР±СЉС‘Рј",
         "cart_weight_custom_prompt": "Р’РІРµРґРёС‚Рµ РІРµСЃ. РџСЂРёРјРµСЂ: 1.5",
@@ -1336,6 +1339,7 @@ Menyu pastda.""",
         "offer_step2_original_hint": "Mahsulotning ODDIY narxini kiriting",
         "offer_step2_discount_hint": "CHEGIRMALI narxni kiriting\nChegirma avtomatik hisoblanadi",
         "offer_step3_unit_hint": "Mahsulot o'lchov birligini tanlang",
+        "offer_step3_package_hint": "1 qadoq hajmini {unit} da kiriting. Misol: 250",
         "offer_step4_quantity_hint_piece": "Miqdorni tanlang",
         "offer_step4_quantity_hint_weight": "Mavjud og'irlikni kiriting",
         "offer_step4_quantity_hint_volume": "Mavjud hajmni kiriting",
@@ -1349,6 +1353,7 @@ Menyu pastda.""",
         "offer_confirm_was": "Oldin",
         "offer_confirm_now": "Hozir",
         "offer_confirm_qty": "Miqdor",
+        "offer_confirm_package": "Qadoq hajmi",
         "offer_confirm_expiry": "Yaroqlilik muddati",
         "offer_confirm_urgent": "Shoshilinch",
         "offer_publish_btn": "? Nashr qilish",
@@ -1369,6 +1374,7 @@ Menyu pastda.""",
         "offer_error_quantity_volume_range": "?? Hajm 0.1 dan {max} gacha bo'lishi kerak",
         "offer_error_quantity_integer": "?? Butun son kiriting",
         "offer_error_quantity_step": "?? Qadam вЂ” 0.1",
+        "offer_error_package_range": "?? Qadoq hajmi 1 dan {max} gacha bo'lishi kerak",
         "cart_weight_select_title": "Og'irlikni tanlang",
         "cart_volume_select_title": "Hajmni tanlang",
         "cart_weight_custom_prompt": "Og'irlikni kiriting. Misol: 1.5",
@@ -2018,6 +2024,14 @@ def _normalize_mojibake(value: object) -> object:
 # Normalize static localization data once at import time.
 LANGUAGES = _normalize_mojibake(LANGUAGES)
 TEXTS = _normalize_mojibake(TEXTS)
+
+# Fix explicit package-size labels added after mojibake normalization.
+TEXTS["ru"]["offer_step3_package_hint"] = "Введите размер 1 упаковки в {unit}. Пример: 250"
+TEXTS["ru"]["offer_confirm_package"] = "Размер упаковки"
+TEXTS["ru"]["offer_error_package_range"] = "Размер упаковки должен быть от 1 до {max}"
+TEXTS["uz"]["offer_step3_package_hint"] = "1 qadoq hajmini {unit} da kiriting. Misol: 250"
+TEXTS["uz"]["offer_confirm_package"] = "Qadoq hajmi"
+TEXTS["uz"]["offer_error_package_range"] = "Qadoq hajmi 1 dan {max} gacha bo'lishi kerak"
 
 
 def get_text(lang: str, key: str, **kwargs: str) -> str:

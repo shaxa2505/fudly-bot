@@ -167,7 +167,11 @@ def discount_keyboard(lang: str = "ru") -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMarkup:
+def quantity_keyboard(
+    lang: str = "ru",
+    unit: str = "шт",
+    back_callback: str = "create_back_unit",
+) -> InlineKeyboardMarkup:
     """Quick quantity selection keyboard (unit-aware)."""
     builder = InlineKeyboardBuilder()
 
@@ -188,7 +192,7 @@ def quantity_keyboard(lang: str = "ru", unit: str = "шт") -> InlineKeyboardMar
         builder.button(text=label, callback_data=f"quantity_{q}")
 
     builder.button(text="✍️ Другое" if lang == "ru" else "✍️ Boshqa", callback_data="quantity_custom")
-    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_unit")
+    builder.button(text=get_text(lang, "btn_back"), callback_data=back_callback)
     builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
     builder.adjust(2, 2, 2)
     return builder.as_markup()

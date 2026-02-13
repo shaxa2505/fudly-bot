@@ -6,7 +6,12 @@ os.environ.setdefault("TELEGRAM_BOT_TOKEN", "test-token")
 os.environ.setdefault("ADMIN_ID", "1")
 
 from app.core.units import unit_label
-from handlers.seller.create_offer import _parse_quantity_value, build_progress_text
+from handlers.seller.create_offer import (
+    _parse_package_size_value,
+    _parse_quantity_value,
+    _requires_package_size,
+    build_progress_text,
+)
 
 
 def test_create_offer_parse_quantity_uses_piece_rules_when_measured_units_disabled(monkeypatch) -> None:
@@ -25,3 +30,22 @@ def test_create_offer_progress_shows_piece_stock_when_measured_units_disabled(mo
     text = build_progress_text({"unit": "ml", "quantity": 250}, "ru", 5)
     assert unit_label("ml", "ru") in text
     assert f"250 {unit_label('piece', 'ru')}" in text
+
+
+def test_create_offer_requires_package_size_when_measured_units_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("BOT_MEASURED_UNITS_ENABLED", "0")
+    assert _requires_package_size("ml") is True
+    assert _requires_package_size("piece") is False
+
+
+def test_create_offer_requires_package_size_disabled_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("BOT_MEASURED_UNITS_ENABLED", raising=False)
+    assert _requires_package_size("ml") is False
+
+
+def test_create_offer_parse_package_size_obeys_selected_unit_rules() -> None:
+    assert _parse_package_size_value("1.5", "kg") == pytest.approx(1.5)
+    with pytest.raises(ValueError, match="integer"):
+        _parse_package_size_value("1.5", "ml")
+    with pytest.raises(ValueError, match="range"):
+        _parse_package_size_value("6000", "ml")

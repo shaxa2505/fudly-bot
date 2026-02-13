@@ -137,6 +137,8 @@ class SchemaMixin:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     unit TEXT DEFAULT 'piece',
                     category TEXT DEFAULT 'other',
+                    package_value REAL,
+                    package_unit TEXT,
                     FOREIGN KEY (store_id) REFERENCES stores(store_id)
                 )
             """
@@ -160,6 +162,8 @@ class SchemaMixin:
                     cursor.execute(
                         "ALTER TABLE offers ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'other'"
                     )
+                    cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS package_value REAL")
+                    cursor.execute("ALTER TABLE offers ADD COLUMN IF NOT EXISTS package_unit TEXT")
                 except Exception as e:
                     logger.warning(f"Migration for offers table: {e}")
                     conn.rollback()

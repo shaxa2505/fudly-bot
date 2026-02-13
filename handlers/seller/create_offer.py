@@ -49,6 +49,7 @@ MAX_DISCOUNT_PERCENT = 90
 MIN_TITLE_LEN = 3
 MAX_TITLE_LEN = 80
 MAX_QUANTITY = 500
+MAX_PACKAGE_SIZE = 5000
 MAX_EXPIRY_DAYS = 30  # Legacy limit (no longer enforced)
 WIZARD_TTL_SECONDS = 600
 DEFAULT_OFFER_AVAILABLE_FROM = "08:00"
@@ -424,6 +425,17 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
         unit = data.get("unit")
         if unit:
             parts.append(f"📦 {html_escape(unit_label(unit, lang))}")
+        package_value = data.get("package_value")
+        package_unit = data.get("package_unit")
+        if package_value is not None and package_unit:
+            try:
+                package_qty = format_quantity(package_value, package_unit, lang)
+            except Exception:
+                package_qty = str(package_value)
+            package_text = (
+                f"1 {unit_label('piece', lang)} = {package_qty} {unit_label(package_unit, lang)}"
+            )
+            parts.append(f"box {html_escape(_shorten(package_text, 22))}")
 
     if current_step > 4:
         quantity = data.get("quantity")
@@ -564,6 +576,19 @@ def _parse_quantity_value(raw: str | None, unit: str) -> float:
         return 1.0
     value = parse_quantity_input(raw, effective_order_unit(unit))
     return float(value)
+
+
+def _requires_package_size(unit: str | None) -> bool:
+    unit_type = normalize_unit(unit)
+    return unit_type != "piece" and effective_order_unit(unit_type) == "piece"
+
+
+def _parse_package_size_value(raw: str, unit: str) -> float:
+    value = parse_quantity_input(raw, normalize_unit(unit))
+    package_value = float(value)
+    if package_value <= 0 or package_value > MAX_PACKAGE_SIZE:
+        raise ValueError("range")
+    return package_value
 
 
 def _quick_add_instructions(lang: str) -> str:
@@ -1394,7 +1419,7 @@ async def _go_to_unit_step(target: types.Message, state: FSMContext, lang: str) 
 
 @router.callback_query(CreateOffer.unit_type, F.data.startswith("unit_type_"))
 async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -> None:
-    """Unit type selected - move to quantity."""
+    """Unit type selected - move to package/quantity step."""
     if not db or not callback.message:
         await callback.answer("System error", show_alert=True)
         return
@@ -1413,11 +1438,88 @@ async def unit_type_selected(callback: types.CallbackQuery, state: FSMContext) -
         return
 
     await state.update_data(unit=unit_type)
-    await _prompt_quantity_step(callback.message, state, lang)
+    if _requires_package_size(unit_type):
+        await _prompt_package_size_step(callback.message, state, lang)
+    else:
+        await state.update_data(package_value=None, package_unit=None)
+        await _prompt_quantity_step(callback.message, state, lang)
     await callback.answer()
 
 
 # ============ STEP 4: Quantity ============
+
+
+async def _prompt_package_size_step(
+    target: types.Message, state: FSMContext, lang: str
+) -> None:
+    data = await state.get_data()
+    selected_unit = normalize_unit(data.get("unit", "piece"))
+    unit_text = unit_label(selected_unit, lang)
+
+    text = _compose_step_message(
+        data,
+        lang,
+        4,
+        "Остаток и срок годности",
+        "Miqdor va yaroqlilik",
+        "📦",
+        get_text(lang, "offer_step3_package_hint").format(unit=unit_text),
+    )
+
+    builder = InlineKeyboardBuilder()
+    builder.button(text=get_text(lang, "btn_back"), callback_data="create_back_unit")
+    builder.button(text=get_text(lang, "btn_cancel"), callback_data="create_cancel")
+    builder.adjust(2)
+
+    await _upsert_prompt(
+        target,
+        state,
+        text,
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML",
+    )
+    await state.set_state(CreateOffer.package_size)
+
+
+@router.message(CreateOffer.package_size, F.text)
+async def package_size_entered(message: types.Message, state: FSMContext) -> None:
+    """Package size entered for non-piece unit in piece-order mode."""
+    if not db:
+        await message.answer("System error")
+        return
+
+    if await _handle_main_menu_action(message, state):
+        return
+
+    lang = db.get_user_language(message.from_user.id)
+    if not await _ensure_wizard_alive(message, state, lang):
+        return
+
+    data = await state.get_data()
+    selected_unit = normalize_unit(data.get("unit", "piece"))
+
+    if not _requires_package_size(selected_unit):
+        await _prompt_quantity_step(message, state, lang)
+        await safe_delete_message(message)
+        return
+
+    try:
+        package_value = _parse_package_size_value(message.text or "", selected_unit)
+    except ValueError as exc:
+        reason = str(exc)
+        if reason == "integer":
+            msg = get_text(lang, "offer_error_quantity_integer")
+        elif reason == "step":
+            msg = get_text(lang, "offer_error_quantity_step")
+        else:
+            msg = get_text(lang, "offer_error_package_range").format(max=MAX_PACKAGE_SIZE)
+        await _upsert_prompt(message, state, msg)
+        await safe_delete_message(message)
+        return
+
+    await state.update_data(package_value=package_value, package_unit=selected_unit)
+    await _prompt_quantity_step(message, state, lang)
+    await safe_delete_message(message)
 
 
 async def _prompt_quantity_step(
@@ -1426,6 +1528,7 @@ async def _prompt_quantity_step(
     data = await state.get_data()
     selected_unit = data.get("unit", "piece")
     quantity_unit = effective_order_unit(selected_unit)
+    back_callback = "create_back_package" if _requires_package_size(selected_unit) else "create_back_unit"
     if quantity_unit in {"kg", "g"}:
         hint = get_text(lang, "offer_step4_quantity_hint_weight")
     elif quantity_unit in {"l", "ml"}:
@@ -1447,7 +1550,7 @@ async def _prompt_quantity_step(
         target,
         state,
         text,
-        reply_markup=quantity_keyboard(lang, unit=quantity_unit),
+        reply_markup=quantity_keyboard(lang, unit=quantity_unit, back_callback=back_callback),
         parse_mode="HTML",
     )
     await state.set_state(CreateOffer.quantity)
@@ -1752,6 +1855,17 @@ async def _show_confirmation(target: types.Message, state: FSMContext, lang: str
         qty_display = f"{format_quantity(quantity, unit, lang)} {unit_label(unit, lang)}"
     except Exception:
         qty_display = f"{quantity} {unit_label(unit, lang)}"
+    package_value = data.get("package_value")
+    package_unit = data.get("package_unit")
+    package_display = None
+    if package_value is not None and package_unit:
+        try:
+            package_qty = format_quantity(package_value, package_unit, lang)
+        except Exception:
+            package_qty = str(package_value)
+        package_display = (
+            f"1 {unit_label('piece', lang)} = {package_qty} {unit_label(package_unit, lang)}"
+        )
 
     expiry_raw = data.get("expiry_date") or ""
 
@@ -1785,8 +1899,14 @@ async def _show_confirmation(target: types.Message, state: FSMContext, lang: str
         f"{get_text(lang, 'offer_confirm_now')}: {discount_price:,} {currency} (-{discount_percent}%)",
         "",
         f"{get_text(lang, 'offer_confirm_qty')}: {qty_display}",
+        (
+            f"{get_text(lang, 'offer_confirm_package')}: {package_display}"
+            if package_display
+            else None
+        ),
         f"{get_text(lang, 'offer_confirm_expiry')}: {expiry_prefix} {expiry_display}{urgent_label}",
     ]
+    lines = [line for line in lines if line]
 
     builder = InlineKeyboardBuilder()
     builder.button(text=get_text(lang, "offer_publish_btn"), callback_data="create_publish")
@@ -1812,10 +1932,17 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
         if not db:
             raise ValueError("Database not initialized")
 
-        unit = data.get("unit", "piece")
-        quantity_unit = effective_order_unit(unit)
+        selected_unit = normalize_unit(data.get("unit", "piece"))
+        quantity_unit = effective_order_unit(selected_unit)
         quantity = float(data["quantity"])
         qty_display = f"{format_quantity(quantity, quantity_unit, lang)} {unit_label(quantity_unit, lang)}"
+        package_value = data.get("package_value")
+        package_unit = data.get("package_unit")
+        if _requires_package_size(selected_unit):
+            package_unit = normalize_unit(package_unit or selected_unit)
+        else:
+            package_value = None
+            package_unit = None
 
         store = None
         if hasattr(db, "get_store") and data.get("store_id") is not None:
@@ -1840,8 +1967,10 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
             available_until=available_until.isoformat(),  # ISO time format
             photo_id=data.get("photo"),  # Unified parameter name
             expiry_date=data.get("expiry_date"),  # Will be parsed by Pydantic
-            unit=unit,
+            unit=quantity_unit,
             category=data.get("category", "other"),
+            package_value=package_value,
+            package_unit=package_unit,
         )
 
         success_text = f"<b>{get_text(lang, 'offer_published_title')}</b>\n{get_text(lang, 'offer_published_hint')}"
@@ -2076,6 +2205,22 @@ async def back_to_quantity(callback: types.CallbackQuery, state: FSMContext) -> 
     await callback.answer()
 
 
+@router.callback_query(F.data == "create_back_package")
+async def back_to_package(callback: types.CallbackQuery, state: FSMContext) -> None:
+    """Go back to package size step."""
+    if not db or not callback.message:
+        await callback.answer()
+        return
+
+    lang = db.get_user_language(callback.from_user.id)
+    if not await _ensure_wizard_alive(callback, state, lang):
+        await callback.answer()
+        return
+
+    await _prompt_package_size_step(callback.message, state, lang)
+    await callback.answer()
+
+
 @router.callback_query(F.data == "create_back_unit")
 async def back_to_unit(callback: types.CallbackQuery, state: FSMContext) -> None:
     """Go back to unit selection."""
@@ -2295,7 +2440,10 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         original_price = offer.get("original_price", 0)
         discount_price = offer.get("discount_price", 0)
         quantity = offer.get("quantity", 0)
+        unit = offer.get("unit", "piece")
         category = offer.get("category", "other")
+        package_value = offer.get("package_value")
+        package_unit = offer.get("package_unit")
         photo = offer.get("photo") or offer.get("photo_id")
         store_id = offer.get("store_id")
         expiry_date = offer.get("expiry_date", "")
@@ -2304,7 +2452,10 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         original_price = getattr(offer, "original_price", 0)
         discount_price = getattr(offer, "discount_price", 0)
         quantity = getattr(offer, "quantity", 0)
+        unit = getattr(offer, "unit", "piece")
         category = getattr(offer, "category", "other")
+        package_value = getattr(offer, "package_value", None)
+        package_unit = getattr(offer, "package_unit", None)
         photo = getattr(offer, "photo", None) or getattr(offer, "photo_id", None)
         store_id = getattr(offer, "store_id", None)
         expiry_date = getattr(offer, "expiry_date", "")
@@ -2330,6 +2481,9 @@ async def copy_offer_start(callback: types.CallbackQuery, state: FSMContext) -> 
         discount_percent=discount_percent,
         discount_price=discount_price,
         quantity=quantity,
+        unit=unit,
+        package_value=package_value,
+        package_unit=package_unit,
         expiry_date=expiry_date,
         photo=photo,
         is_copy=True,
@@ -2421,3 +2575,5 @@ async def go_my_offers(callback: types.CallbackQuery, state: FSMContext) -> None
     lang = db.get_user_language(callback.from_user.id) if db else "ru"
     await callback.message.answer(get_text(lang, "my_items"))
     await callback.answer()
+
+

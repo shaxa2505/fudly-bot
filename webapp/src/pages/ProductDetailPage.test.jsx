@@ -8,6 +8,8 @@ const apiMocks = vi.hoisted(() => ({
   addRecentlyViewed: vi.fn(),
   getOffer: vi.fn(),
   getStore: vi.fn(),
+  getCartState: vi.fn(),
+  replaceCartState: vi.fn(),
   getTelegramInitData: vi.fn(),
 }))
 
@@ -17,6 +19,8 @@ vi.mock('../api/client', () => ({
     addRecentlyViewed: apiMocks.addRecentlyViewed,
     getOffer: apiMocks.getOffer,
     getStore: apiMocks.getStore,
+    getCartState: apiMocks.getCartState,
+    replaceCartState: apiMocks.replaceCartState,
   },
   getTelegramInitData: apiMocks.getTelegramInitData,
 }))
@@ -28,6 +32,10 @@ describe('ProductDetailPage', () => {
     apiMocks.addRecentlyViewed.mockReset()
     apiMocks.getOffer.mockReset()
     apiMocks.getStore.mockReset()
+    apiMocks.getCartState.mockReset()
+    apiMocks.replaceCartState.mockReset()
+    apiMocks.getCartState.mockResolvedValue(null)
+    apiMocks.replaceCartState.mockResolvedValue(null)
   })
 
   it('shows error state when no offer is provided', async () => {
@@ -89,5 +97,32 @@ describe('ProductDetailPage', () => {
     })
 
     expect(screen.getByText(/250 ml qoldi/)).toBeInTheDocument()
+  })
+
+  it('shows package size separately and keeps stock in pieces when package data is provided', async () => {
+    apiMocks.getPhotoUrl.mockReturnValue('https://example.com/photo.jpg')
+    apiMocks.addRecentlyViewed.mockResolvedValue({})
+    apiMocks.getOffer.mockResolvedValue({})
+    apiMocks.getStore.mockResolvedValue(null)
+
+    const offer = {
+      id: 12,
+      title: 'Yogurt',
+      discount_price: 7000,
+      original_price: 10000,
+      store_name: 'Demo Store',
+      quantity: 20,
+      unit: 'ml',
+      package_value: 250,
+      package_unit: 'ml',
+    }
+
+    renderWithProviders(<ProductDetailPage />, {
+      route: '/product',
+      state: { offer },
+    })
+
+    expect(screen.getByText(/20 ta qoldi/)).toBeInTheDocument()
+    expect(screen.getByText(/1 ta = 250 ml/)).toBeInTheDocument()
   })
 })

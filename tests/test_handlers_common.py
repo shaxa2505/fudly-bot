@@ -294,6 +294,7 @@ class TestStates:
         assert hasattr(CreateOffer, "title")
         assert hasattr(CreateOffer, "original_price")
         assert hasattr(CreateOffer, "discount_price")
+        assert hasattr(CreateOffer, "package_size")
 
     def test_change_city_states_exist(self) -> None:
         """Test ChangeCity states are defined."""
