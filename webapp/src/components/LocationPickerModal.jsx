@@ -839,6 +839,11 @@ function LocationPickerModal({
           district: location?.district || '',
           source: 'geo',
         }
+    const cityFallback = normalizeLocationName((baseLocation.city || '').split(',')[0] || '')
+    const compactAddress = formatCompactAddressLabel(baseLocation.address || mapAddress, cityFallback)
+    if (compactAddress) {
+      baseLocation.address = compactAddress
+    }
     if (hasDetails) {
       baseLocation.details = normalizedDetails
     }

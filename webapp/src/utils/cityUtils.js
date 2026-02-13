@@ -285,11 +285,13 @@ export const buildLocationFromReverseGeocode = (data, lat, lon) => {
   const cityName = addressData.city || addressData.town || addressData.village || addressData.county || ''
   const derivedParts = []
 
-  if (placeName) derivedParts.push(placeName)
   if (road) {
     derivedParts.push(houseNumber ? `${road} ${houseNumber}` : road)
   } else if (houseNumber) {
     derivedParts.push(houseNumber)
+  } else if (placeName) {
+    // Use POI only when street-level address is unavailable.
+    derivedParts.push(placeName)
   }
   if (neighbourhood && neighbourhood !== cityName) derivedParts.push(neighbourhood)
   if (cityName) derivedParts.push(cityName)
