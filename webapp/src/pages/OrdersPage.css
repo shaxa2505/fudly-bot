@@ -1,6 +1,7 @@
 .orders-page {
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
+  font-family: var(--font-family);
   --orders-accent: var(--color-primary);
   --orders-accent-dark: var(--color-primary-dark);
   --orders-muted: var(--color-text-tertiary);
