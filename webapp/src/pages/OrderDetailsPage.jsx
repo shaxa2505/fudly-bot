@@ -537,7 +537,7 @@ export default function OrderDetailsPage() {
         return sum + toMoneyInt(price * qty)
       }, 0)
     : 0
-  const itemsSubtotal = rawItemsSubtotal > 0 ? rawItemsSubtotal : explicitItemsTotal
+  const baseItemsSubtotal = rawItemsSubtotal > 0 ? rawItemsSubtotal : explicitItemsTotal
   const rawTotal = (() => {
     const candidates = isDelivery
       ? [order?.total_with_delivery, order?.total_price, order?.total_amount, order?.total, order?.items_total]
@@ -549,21 +549,25 @@ export default function OrderDetailsPage() {
     return 0
   })()
   const rawTotalRounded = toMoneyInt(rawTotal)
-  const deliveryFee = isDelivery
-    ? toMoneyInt(calcDeliveryFee(rawTotal || null, itemsSubtotal, {
-      deliveryFee: order?.delivery_fee,
+  const explicitDeliveryFee = toMoneyInt(order?.delivery_fee ?? order?.delivery_cost ?? 0)
+  const inferredDeliveryFee = isDelivery && baseItemsSubtotal > 0
+    ? toMoneyInt(calcDeliveryFee(rawTotal || null, baseItemsSubtotal, {
+      deliveryFee: explicitDeliveryFee > 0 ? explicitDeliveryFee : undefined,
       isDelivery,
     }))
     : 0
+  const deliveryFee = isDelivery ? (explicitDeliveryFee > 0 ? explicitDeliveryFee : inferredDeliveryFee) : 0
+  const itemsSubtotal = (() => {
+    if (baseItemsSubtotal > 0) return baseItemsSubtotal
+    if (rawTotalRounded <= 0) return 0
+    return isDelivery ? Math.max(0, rawTotalRounded - deliveryFee) : rawTotalRounded
+  })()
   const rescueDiscount = toMoneyInt(order?.discount_amount ?? order?.discount ?? 0)
   const showDiscount = Number.isFinite(rescueDiscount) && rescueDiscount > 0
-  const derivedTotal = Math.max(0, itemsSubtotal + deliveryFee - (showDiscount ? rescueDiscount : 0))
-  const totalDue = (() => {
-    if (rawTotalRounded > 0 && derivedTotal > 0 && Math.abs(rawTotalRounded - derivedTotal) <= 1) {
-      return derivedTotal
-    }
-    return rawTotalRounded > 0 ? rawTotalRounded : derivedTotal
-  })()
+  const discountedItemsTotal = Math.max(0, itemsSubtotal - (showDiscount ? rescueDiscount : 0))
+  const totalDue = isDelivery
+    ? discountedItemsTotal
+    : (rawTotalRounded > 0 ? rawTotalRounded : calcTotalPrice(discountedItemsTotal, deliveryFee))
   const payableTotal = Number(
     totalDue
   )
@@ -933,7 +937,7 @@ export default function OrderDetailsPage() {
                 <div className="order-selection-body">
                   <div className="order-selection-row">
                     <p>{order.offer_title || 'Buyurtma'}</p>
-                    <strong>{formatMoney(totalDue)} UZS</strong>
+                    <strong>{formatMoney(itemsSubtotal)} UZS</strong>
                   </div>
                   <span>{totalUnits} ta</span>
                 </div>

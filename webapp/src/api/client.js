@@ -449,9 +449,14 @@ const api = {
     return cachedGet('/search', params, 10000, options) || { query: normalized, offers: [], stores: [] }
   },
 
-  async reverseGeocode(lat, lon, lang = 'uz') {
+  async reverseGeocode(lat, lon, lang = 'uz', options = {}) {
     if (lat == null || lon == null) return null
-    return cachedGet('/location/reverse', { lat, lon, lang }, 3600000)
+    const params = { lat, lon, lang }
+    if (options.enrich === false) {
+      params.enrich = 0
+    }
+    const ttl = Number.isFinite(options.ttlMs) ? options.ttlMs : 3600000
+    return cachedGet('/location/reverse', params, ttl)
   },
 
   async searchLocations(query, options = {}) {

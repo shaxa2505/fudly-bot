@@ -253,7 +253,7 @@ function OrdersPage() {
     const orderStatus = normalizeOrderStatus(order.order_status || order.status)
     const quantity = getOrderQuantity(order)
     const explicitItemsTotal = toNumeric(order.items_total ?? order.itemsTotal ?? 0)
-    const itemsTotal = Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
+    const baseItemsTotal = Number.isFinite(explicitItemsTotal) && explicitItemsTotal > 0
       ? explicitItemsTotal
       : items.reduce((sum, item) => {
           const price = toNumeric(item?.price ?? item?.discount_price ?? 0)
@@ -272,12 +272,20 @@ function OrdersPage() {
       }
       return 0
     })()
-    const deliveryFee = calcDeliveryFee(rawTotal || null, itemsTotal, {
-      deliveryFee: order?.delivery_fee,
-      isDelivery,
-    })
-    const baseTotal = itemsTotal || (rawTotal ? Math.max(0, rawTotal - deliveryFee) : 0)
-    const totalPrice = rawTotal > 0 ? rawTotal : calcTotalPrice(itemsTotal, deliveryFee)
+    const explicitDeliveryFee = toNumeric(order?.delivery_fee ?? order?.delivery_cost ?? 0)
+    const inferredDeliveryFee = isDelivery && baseItemsTotal > 0
+      ? calcDeliveryFee(rawTotal || null, baseItemsTotal, {
+          deliveryFee: explicitDeliveryFee > 0 ? explicitDeliveryFee : undefined,
+          isDelivery,
+        })
+      : 0
+    const deliveryFee = isDelivery ? (explicitDeliveryFee > 0 ? explicitDeliveryFee : inferredDeliveryFee) : 0
+    const baseTotal = baseItemsTotal > 0
+      ? baseItemsTotal
+      : (rawTotal > 0 ? Math.max(0, rawTotal - (isDelivery ? deliveryFee : 0)) : 0)
+    const totalPrice = isDelivery
+      ? baseTotal
+      : (rawTotal > 0 ? rawTotal : calcTotalPrice(baseTotal, deliveryFee))
     const unitPrice = quantity
       ? Math.round((baseTotal || 0) / quantity)
       : (items[0]?.price ?? items[0]?.discount_price ?? 0)

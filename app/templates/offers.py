@@ -5,8 +5,8 @@ import html
 from collections.abc import Iterable, Sequence
 from typing import Any
 
+from app.core.units import effective_order_unit, format_quantity, unit_label
 from app.services.offer_service import OfferDetails, OfferListItem, StoreDetails, StoreSummary
-from app.core.units import format_quantity, normalize_unit, unit_label
 from localization import get_text
 
 
@@ -233,7 +233,7 @@ def format_product_card(
         current_price = getattr(offer, "price", 0) or 0
     original_price = getattr(offer, "original_price", 0) or 0
 
-    unit_type = normalize_unit(getattr(offer, "unit", "") or labels["unit"])
+    unit_type = effective_order_unit(getattr(offer, "unit", "") or labels["unit"])
     unit_text = unit_label(unit_type, lang)
 
     if original_price and original_price > current_price:

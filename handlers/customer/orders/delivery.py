@@ -21,8 +21,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
 from app.core.geocoding import reverse_geocode_store
+from app.core.units import calc_total_price, effective_order_unit, parse_quantity_input
 from app.core.utils import get_offer_field, get_store_field
-from app.core.units import calc_total_price, normalize_unit, parse_quantity_input
 from app.integrations.payment_service import get_payment_service
 from app.keyboards import main_menu_customer
 from app.services.unified_order_service import (
@@ -77,7 +77,7 @@ def location_request_keyboard(lang: str) -> types.ReplyKeyboardMarkup:
 
 
 def _default_quantity_for_unit(unit: str) -> float:
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type in {"kg", "l"}:
         return 0.5
     if unit_type == "g":
@@ -85,6 +85,16 @@ def _default_quantity_for_unit(unit: str) -> float:
     if unit_type == "ml":
         return 250.0
     return 1.0
+
+
+def _normalize_max_qty_for_unit(max_qty: float, unit: str) -> float:
+    unit_type = effective_order_unit(unit)
+    if unit_type != "piece":
+        return max_qty
+    try:
+        return max(1.0, float(int(max_qty)))
+    except Exception:
+        return 1.0
 
 
 def setup_dependencies(
@@ -187,8 +197,8 @@ async def resume_delivery_after_phone(
         await message.answer(get_text(lang, "offer_not_found"))
         return
 
-    max_qty = float(get_offer_field(offer, "quantity", 0) or 0)
-    if max_qty <= 0:
+    raw_max_qty = float(get_offer_field(offer, "quantity", 0) or 0)
+    if raw_max_qty <= 0:
         await message.answer(get_text(lang, "no_offers"))
         return
 
@@ -207,7 +217,8 @@ async def resume_delivery_after_phone(
         or get_offer_field(offer, "original_price", 0)
     )
     title = get_offer_field(offer, "title", "")
-    unit = normalize_unit(get_offer_field(offer, "unit", None))
+    unit = effective_order_unit(get_offer_field(offer, "unit", None))
+    max_qty = _normalize_max_qty_for_unit(raw_max_qty, unit)
     store_name = get_store_field(store, "name", "")
     delivery_price = get_store_field(store, "delivery_price", 0)
     min_order = get_store_field(store, "min_order_amount", 0)
@@ -301,8 +312,8 @@ async def start_delivery_order(
         await callback.answer(get_text(lang, "offer_not_found"), show_alert=True)
         return
 
-    max_qty = float(get_offer_field(offer, "quantity", 0) or 0)
-    if max_qty <= 0:
+    raw_max_qty = float(get_offer_field(offer, "quantity", 0) or 0)
+    if raw_max_qty <= 0:
         await callback.answer(get_text(lang, "no_offers"), show_alert=True)
         return
 
@@ -324,7 +335,8 @@ async def start_delivery_order(
         or get_offer_field(offer, "original_price", 0)
     )
     title = get_offer_field(offer, "title", "")
-    unit = normalize_unit(get_offer_field(offer, "unit", None))
+    unit = effective_order_unit(get_offer_field(offer, "unit", None))
+    max_qty = _normalize_max_qty_for_unit(raw_max_qty, unit)
     store_name = get_store_field(store, "name", "")
     delivery_price = get_store_field(store, "delivery_price", 0)
     min_order = get_store_field(store, "min_order_amount", 0)
@@ -536,7 +548,7 @@ async def dlv_change_qty(
         return
 
     data = await state.get_data()
-    unit = data.get("unit", "piece")
+    unit = effective_order_unit(data.get("unit", "piece"))
     max_qty = float(data.get("max_qty", 1) or 1)
     price = data.get("price", 0)
 
@@ -1366,7 +1378,7 @@ async def dlv_quantity_text(
     # Try to parse quantity
     try:
         data = await state.get_data()
-        unit = data.get("unit", "piece")
+        unit = effective_order_unit(data.get("unit", "piece"))
         qty = float(parse_quantity_input(text, unit))
         max_qty = float(data.get("max_qty", 1) or 1)
         min_order = int(data.get("min_order", 0) or 0)

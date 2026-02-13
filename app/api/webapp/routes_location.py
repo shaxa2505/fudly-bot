@@ -16,8 +16,9 @@ _geocode_cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=5000, ttl=3600)
 _search_cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=5000, ttl=3600)
 
 
-def _make_cache_key(lat: float, lon: float, lang: str) -> str:
-    return f"{round(lat, 5)}:{round(lon, 5)}:{lang.strip().lower()}"
+def _make_cache_key(lat: float, lon: float, lang: str, enrich: bool) -> str:
+    enrich_key = "1" if enrich else "0"
+    return f"{round(lat, 5)}:{round(lon, 5)}:{lang.strip().lower()}:{enrich_key}"
 
 
 def _make_search_key(
@@ -219,15 +220,16 @@ async def reverse_geocode(
     lat: float = Query(..., description="Latitude"),
     lon: float = Query(..., description="Longitude"),
     lang: str = Query("uz", description="Response language"),
+    enrich: bool = Query(True, description="Include optional address enrichment"),
 ) -> dict[str, Any]:
-    cache_key = _make_cache_key(lat, lon, lang)
+    cache_key = _make_cache_key(lat, lon, lang, enrich)
     cached = _geocode_cache.get(cache_key)
     if cached is not None:
         return cached
 
     try:
         data = await _fetch_reverse_geocode(lat, lon, lang)
-        if _needs_overpass_details(data):
+        if enrich and _needs_overpass_details(data):
             try:
                 overpass = await _fetch_overpass_address(lat, lon)
                 if overpass:

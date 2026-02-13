@@ -202,6 +202,7 @@ export async function getPreferredLocation(options = {}) {
     preferTelegram = true,
     enableHighAccuracy = true,
     timeout = 10000,
+    telegramTimeout = timeout,
     maximumAge = 60000,
     minAccuracy,
     retryOnLowAccuracy = false,
@@ -211,7 +212,7 @@ export async function getPreferredLocation(options = {}) {
 
   let telegramLocation = null;
   if (preferTelegram) {
-    telegramLocation = await requestTelegramLocation({ timeout });
+    telegramLocation = await requestTelegramLocation({ timeout: telegramTimeout });
     if (telegramLocation && isAccurateEnough(telegramLocation, minAccuracy)) {
       return telegramLocation;
     }

@@ -1,7 +1,8 @@
 """Helpers for unit types, quantity parsing/formatting, and totals."""
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import os
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 from localization import get_text
@@ -44,22 +45,13 @@ UNIT_ALIASES = {
     # ML
     "мл": UNIT_ML,
     "ml": UNIT_ML,
-    # Cyrillic aliases (unicode escapes)
-    "\u0448\u0442": UNIT_PIECE,
-    "\u0448\u0442\u0443\u043a": UNIT_PIECE,
-    "\u0448\u0442\u0443\u043a\u0430": UNIT_PIECE,
-    "\u043a\u0433": UNIT_KG,
-    "\u043a\u0438\u043b\u043e\u0433\u0440\u0430\u043c\u043c": UNIT_KG,
-    "\u0433": UNIT_G,
-    "\u0433\u0440": UNIT_G,
-    "\u043b": UNIT_L,
-    "\u043c\u043b": UNIT_ML,
 }
 
 WEIGHT_UNITS = {UNIT_KG, UNIT_G}
 VOLUME_UNITS = {UNIT_L, UNIT_ML}
 
 KG_L_STEP = Decimal("0.1")
+_TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def normalize_unit(value: str | None) -> str:
@@ -84,6 +76,26 @@ def unit_label(unit: str, lang: str = "ru") -> str:
     if unit_type == UNIT_ML:
         return get_text(lang, "unit_ml")
     return get_text(lang, "unit_piece")
+
+
+def measured_units_enabled() -> bool:
+    """Whether non-piece units should be treated as weighted/volumetric quantities."""
+    raw = os.getenv("BOT_MEASURED_UNITS_ENABLED", "1").strip().lower()
+    return raw in _TRUE_VALUES
+
+
+def effective_order_unit(unit: str | None) -> str:
+    """Resolve unit for order/cart quantity math.
+
+    When BOT_MEASURED_UNITS_ENABLED=0, non-piece units are treated as piece for
+    quantity controls and totals (price per item behavior, aligned with WebApp).
+    """
+    unit_type = normalize_unit(unit)
+    if unit_type == UNIT_PIECE:
+        return UNIT_PIECE
+    if measured_units_enabled():
+        return unit_type
+    return UNIT_PIECE
 
 
 def quantity_step(unit: str) -> Decimal:

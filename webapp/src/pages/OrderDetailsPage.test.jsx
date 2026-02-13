@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   getOrderTimeline: vi.fn(),
   getOrderQR: vi.fn(),
   getPhotoUrl: vi.fn(),
+  getOrders: vi.fn(),
   getPaymentProviders: vi.fn(),
   createPaymentLink: vi.fn(),
 }))
@@ -19,6 +20,7 @@ vi.mock('../api/client', () => ({
     getOrderTimeline: apiMocks.getOrderTimeline,
     getOrderQR: apiMocks.getOrderQR,
     getPhotoUrl: apiMocks.getPhotoUrl,
+    getOrders: apiMocks.getOrders,
     getPaymentProviders: apiMocks.getPaymentProviders,
     createPaymentLink: apiMocks.createPaymentLink,
   },
@@ -33,9 +35,11 @@ describe('OrderDetailsPage', () => {
     apiMocks.getOrderTimeline.mockReset()
     apiMocks.getOrderQR.mockReset()
     apiMocks.getPhotoUrl.mockReset()
+    apiMocks.getOrders.mockReset()
     apiMocks.getPaymentProviders.mockReset()
     apiMocks.createPaymentLink.mockReset()
     apiMocks.getPhotoUrl.mockReturnValue('')
+    apiMocks.getOrders.mockResolvedValue({ orders: [], bookings: [] })
   })
 
   it('renders order details from API response', async () => {
@@ -83,5 +87,42 @@ describe('OrderDetailsPage', () => {
     await waitFor(() => {
       expect(apiMocks.getOrderStatus).toHaveBeenCalled()
     })
+  })
+
+  it('does not include delivery fee in payable total for delivery orders', async () => {
+    apiMocks.getOrderStatus.mockResolvedValueOnce({
+      booking_id: 456,
+      booking_code: 'DEL456',
+      status: 'pending',
+      payment_status: 'awaiting_payment',
+      payment_method: 'click',
+      order_type: 'delivery',
+      created_at: '2025-01-01T10:00:00Z',
+      items: [],
+      offer_title: 'Yogurt',
+      quantity: 1,
+      total_price: 65001,
+      total_with_delivery: 65001,
+      items_total: 50001,
+      delivery_cost: 15000,
+      delivery_address: 'Tashkent',
+      store_id: 10,
+      store_name: 'Store A',
+      store_address: 'Main street',
+      store_phone: '+998901234567',
+      qr_code: null,
+    })
+    apiMocks.getOrderTimeline.mockResolvedValueOnce({ timeline: [] })
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/order/:orderId" element={<OrderDetailsPage />} />
+      </Routes>,
+      { initialEntries: ['/order/456'] }
+    )
+
+    expect(await screen.findByText('ID #456')).toBeInTheDocument()
+    expect(await screen.findAllByText(/50(?:\s|\u00a0)001 UZS/)).not.toHaveLength(0)
+    expect(screen.queryByText(/65(?:\s|\u00a0)001 UZS/)).not.toBeInTheDocument()
   })
 })
