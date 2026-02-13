@@ -18,9 +18,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("stores", sa.Column("city_slug", sa.Text(), nullable=True))
-    op.add_column("stores", sa.Column("region_slug", sa.Text(), nullable=True))
-    op.add_column("stores", sa.Column("district_slug", sa.Text(), nullable=True))
+    # Compatibility for databases created outside Alembic chain:
+    # runtime schema may already include these columns, while clean Alembic
+    # history may not include legacy region/district columns yet.
+    op.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region TEXT")
+    op.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district TEXT")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS region TEXT")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS district TEXT")
+
+    op.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS city_slug TEXT")
+    op.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS region_slug TEXT")
+    op.execute("ALTER TABLE stores ADD COLUMN IF NOT EXISTS district_slug TEXT")
 
     conn = op.get_bind()
     from database_pg_module.mixins.offers import canonicalize_geo_slug
@@ -60,10 +68,12 @@ def upgrade() -> None:
             )
         conn.execute(update_sql, payloads)
 
-    op.create_index("idx_stores_city_slug", "stores", ["city_slug"])
-    op.create_index("idx_stores_region_slug", "stores", ["region_slug"])
-    op.create_index("idx_stores_district_slug", "stores", ["district_slug"])
-    op.create_index("idx_stores_city_slug_status", "stores", ["city_slug", "status"])
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stores_city_slug ON stores(city_slug)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stores_region_slug ON stores(region_slug)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_stores_district_slug ON stores(district_slug)")
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stores_city_slug_status ON stores(city_slug, status)"
+    )
 
 
 def downgrade() -> None:
