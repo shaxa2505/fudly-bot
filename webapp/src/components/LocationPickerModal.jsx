@@ -16,7 +16,10 @@ const DEFAULT_CENTER = { lat: 41.2995, lon: 69.2401 }
 const SEARCH_DELAY_MS = 250
 const REVERSE_GEOCODE_DELAY_MS = 280
 const MIN_REVERSE_DISTANCE_M = 18
-const GEO_ACCURACY_METERS = 200
+const GEO_ACCURACY_METERS = 450
+const GEO_FAST_TIMEOUT_MS = 7000
+const GEO_FALLBACK_TIMEOUT_MS = 4000
+const GEO_CACHE_AGE_MS = 180000
 const CITY_SUGGESTION_LIMIT = 4
 const DETAILS_STORAGE_KEY = 'fudly_address_meta'
 const DEFAULT_DETAILS = {
@@ -592,16 +595,37 @@ function LocationPickerModal({
     setLocalLocationError('')
     setLocalLocating(true)
     try {
-      const coords = await getPreferredLocation({
-        preferTelegram: true,
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0,
-        minAccuracy: GEO_ACCURACY_METERS,
-        retryOnLowAccuracy: true,
-        highAccuracyTimeout: 20000,
-        highAccuracyMaximumAge: 0,
-      })
+      const hasBrowserGeo = Boolean(window.navigator?.geolocation)
+      let coords = null
+
+      if (hasBrowserGeo) {
+        try {
+          coords = await getPreferredLocation({
+            preferTelegram: false,
+            enableHighAccuracy: false,
+            timeout: GEO_FAST_TIMEOUT_MS,
+            maximumAge: GEO_CACHE_AGE_MS,
+            minAccuracy: GEO_ACCURACY_METERS,
+            retryOnLowAccuracy: false,
+          })
+        } catch (browserError) {
+          if (!window.Telegram?.WebApp?.requestLocation) {
+            throw browserError
+          }
+        }
+      }
+
+      if (!coords) {
+        coords = await getPreferredLocation({
+          preferTelegram: true,
+          enableHighAccuracy: false,
+          timeout: GEO_FALLBACK_TIMEOUT_MS,
+          telegramTimeout: 3000,
+          maximumAge: GEO_CACHE_AGE_MS,
+          minAccuracy: GEO_ACCURACY_METERS,
+          retryOnLowAccuracy: false,
+        })
+      }
       if (!coords?.latitude || !coords?.longitude) {
         throw new Error('Geolocation failed')
       }
@@ -764,7 +788,7 @@ function LocationPickerModal({
     setMapResolving(true)
     const timer = setTimeout(async () => {
       try {
-        const data = await api.reverseGeocode(mapCenter.lat, mapCenter.lon, 'uz')
+        const data = await api.reverseGeocode(mapCenter.lat, mapCenter.lon, 'uz', { enrich: false })
         if (!activeRef.current) return
         const next = buildLocationFromReverseGeocode(data, mapCenter.lat, mapCenter.lon)
         const resolvedAddress = next.address || next.city || ''

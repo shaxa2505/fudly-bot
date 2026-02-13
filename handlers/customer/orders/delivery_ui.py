@@ -10,10 +10,9 @@ import os
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.units import calc_total_price as calc_total_price_units
-from app.core.units import format_quantity, normalize_unit, unit_label
+from app.core.units import effective_order_unit, format_quantity, unit_label
 from handlers.common.utils import html_escape as _esc
 from localization import get_text
-
 
 # =============================================================================
 # DELIVERY ORDER CARD BUILDERS
@@ -34,7 +33,7 @@ def build_delivery_card_text(
 ) -> str:
     """Build delivery order card text."""
     currency = "so'm" if lang == "uz" else "сум"
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     unit_text = unit_label(unit_type, lang)
     qty_text = format_quantity(quantity, unit_type, lang)
 
@@ -93,7 +92,7 @@ def build_delivery_qty_keyboard(
     """Build quantity selection keyboard for delivery."""
     kb = InlineKeyboardBuilder()
 
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     unit_text = unit_label(unit_type, lang)
 
     if unit_type == "piece":

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.core.units import calc_total_price
+from app.core.units import calc_total_price as calc_line_total_price
 
 
 def parse_cart_items(cart_items: Any) -> list[dict]:
@@ -32,7 +32,7 @@ def calc_items_total(cart_items: list[dict]) -> int:
             qty = float(item.get("quantity") or 1)
         except Exception:
             qty = 1
-        total += calc_total_price(price, qty)
+        total += calc_line_total_price(price, qty)
     return total
 
 

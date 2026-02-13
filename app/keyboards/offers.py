@@ -8,8 +8,8 @@ from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE, STORES_PER_PAGE
+from app.core.units import effective_order_unit
 from localization import get_text
-from app.core.units import normalize_unit
 
 
 def hot_entry_keyboard(lang: str) -> InlineKeyboardMarkup:
@@ -48,7 +48,7 @@ def hot_offers_compact_keyboard(
     for idx, offer in enumerate(offers, start=1):
         offer_id = offer.id if hasattr(offer, "id") else offer.get("offer_id", 0)
         unit_value = getattr(offer, "unit", None)
-        unit_type = normalize_unit(unit_value)
+        unit_type = effective_order_unit(unit_value)
         if unit_type in {"kg", "g"}:
             action_text = f"{idx} {weight_label}"
             action_cb = f"add_to_cart_{offer_id}"
@@ -139,7 +139,7 @@ def offer_details_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add to cart button (primary action)
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type in {"kg", "g"}:
         cart = get_text(lang, "catalog_pick_weight_button")
     elif unit_type in {"l", "ml"}:
@@ -169,7 +169,7 @@ def offer_details_with_back_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Main action: Add to cart (most common)
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type in {"kg", "g"}:
         cart = get_text(lang, "catalog_pick_weight_button")
     elif unit_type in {"l", "ml"}:
@@ -193,7 +193,7 @@ def offer_details_with_back_keyboard(
 def catalog_details_keyboard(lang: str, offer_id: int, unit: str | None = None) -> InlineKeyboardMarkup:
     """Catalog details screen: add to cart + back."""
     builder = InlineKeyboardBuilder()
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type in {"kg", "g"}:
         cart_text = get_text(lang, "catalog_pick_weight_button")
     elif unit_type in {"l", "ml"}:
@@ -213,7 +213,7 @@ def offer_details_search_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Main action: Add to cart
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type in {"kg", "g"}:
         cart = get_text(lang, "catalog_pick_weight_button")
     elif unit_type in {"l", "ml"}:
@@ -240,7 +240,7 @@ def offer_quick_keyboard(
     builder = InlineKeyboardBuilder()
 
     # Add to cart - main action
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type in {"kg", "g"}:
         cart = get_text(lang, "catalog_pick_weight_button")
     elif unit_type in {"l", "ml"}:

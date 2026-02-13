@@ -5,10 +5,10 @@ used across cart submodules.
 """
 from __future__ import annotations
 
+import html
 from typing import Any
 
-import html
-
+from app.core.units import effective_order_unit
 from app.core.utils import get_offer_field, get_store_field
 from localization import get_text
 
@@ -152,7 +152,7 @@ def refresh_cart_items(user_id: int, lang: str) -> tuple[list[str], bool]:
             item.original_price = new_original
             item_changed = True
 
-        unit = get_offer_field(offer, "unit", item.unit)
+        unit = effective_order_unit(get_offer_field(offer, "unit", item.unit))
         if unit and str(unit) != item.unit:
             item.unit = str(unit)
             item_changed = True

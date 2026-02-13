@@ -10,12 +10,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE, STORES_PER_PAGE
+from app.core.units import effective_order_unit, format_quantity, unit_label
 from app.core.utils import normalize_city
 from app.keyboards import offers as offer_keyboards
 from app.keyboards import offers_category_filter
 from app.services.offer_service import OfferDetails, OfferListItem, OfferService
 from app.templates import offers as offer_templates
-from app.core.units import format_quantity, normalize_unit, unit_label
 from handlers.common import BrowseOffers
 from handlers.common.utils import is_hot_offers_button, safe_delete_message, safe_edit_message
 from localization import get_product_categories, get_text, normalize_category
@@ -167,7 +167,7 @@ def _render_catalog_details(
     discount_pct = _discount_percent(offer)
 
     qty = offer.quantity or 0
-    unit_type = normalize_unit(getattr(offer, "unit", None))
+    unit_type = effective_order_unit(getattr(offer, "unit", None))
     unit_text = unit_label(unit_type, lang)
 
     pickup_until = _format_time(getattr(offer, "available_until", None))

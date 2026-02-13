@@ -4,20 +4,29 @@ from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from localization import get_text
 from app.core.units import (
     calc_total_price,
+    effective_order_unit,
     format_quantity,
-    normalize_unit,
     parse_quantity_input,
     unit_label,
 )
 from handlers.common.states import CartAdd
+from localization import get_text
 
 from . import common
 from .common import esc
 from .storage import cart_storage
 
+
+def _normalize_max_qty_for_unit(max_qty: float, unit: str) -> float:
+    unit_type = effective_order_unit(unit)
+    if unit_type != "piece":
+        return max_qty
+    try:
+        return max(1.0, float(int(max_qty)))
+    except Exception:
+        return 1.0
 
 
 def build_cart_add_card_text(
@@ -38,7 +47,7 @@ def build_cart_add_card_text(
     safe_description = esc(description)
     safe_store = esc(store_name)
     safe_address = esc(store_address)
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     unit_text = unit_label(unit_type, lang)
 
     text_parts: list[str] = [f"<b>{safe_title}</b>"]
@@ -95,7 +104,7 @@ def build_cart_add_card_text(
 def build_cart_add_card_keyboard(
     lang: str, offer_id: int, quantity: float, max_qty: float, unit: str
 ) -> InlineKeyboardBuilder:
-    unit_type = normalize_unit(unit)
+    unit_type = effective_order_unit(unit)
     if unit_type == "piece":
         return _build_cart_add_piece_keyboard(lang, offer_id, int(quantity), int(max_qty))
     return _build_cart_add_weight_keyboard(lang, offer_id, float(quantity), float(max_qty), unit_type)
@@ -199,15 +208,16 @@ def register(router: Router) -> None:
                 return data.get(key, default)
             return default
 
-        max_qty = float(get_field(offer, "quantity", 0) or 0)
-        if max_qty <= 0:
+        raw_max_qty = float(get_field(offer, "quantity", 0) or 0)
+        if raw_max_qty <= 0:
             await callback.answer(get_text(lang, "cart_add_out_of_stock"), show_alert=True)
             return
 
         price = float(get_field(offer, "discount_price", 0) or 0)
         original_price = float(get_field(offer, "original_price", 0) or 0)
         title = str(get_field(offer, "title", get_text(lang, "offer_not_found")))
-        unit = normalize_unit(get_field(offer, "unit", None))
+        unit = effective_order_unit(get_field(offer, "unit", None))
+        max_qty = _normalize_max_qty_for_unit(raw_max_qty, unit)
         expiry_date = str(get_field(offer, "expiry_date", "") or "")
         store_id = get_field(offer, "store_id")
         offer_photo = get_field(offer, "photo", None)
@@ -299,8 +309,8 @@ def register(router: Router) -> None:
                 return data.get(key, default)
             return default
 
-        max_qty = float(get_field(offer, "quantity", 0) or 0)
-        if max_qty <= 0:
+        raw_max_qty = float(get_field(offer, "quantity", 0) or 0)
+        if raw_max_qty <= 0:
             await callback.answer(
                 get_text(lang, "cart_add_out_of_stock"),
                 show_alert=True,
@@ -311,7 +321,8 @@ def register(router: Router) -> None:
         original_price = float(get_field(offer, "original_price", 0) or 0)
         title = str(get_field(offer, "title", get_text(lang, "offer_not_found")))
         description = str(get_field(offer, "description", ""))
-        unit = normalize_unit(get_field(offer, "unit", None))
+        unit = effective_order_unit(get_field(offer, "unit", None))
+        max_qty = _normalize_max_qty_for_unit(raw_max_qty, unit)
         expiry_date = str(get_field(offer, "expiry_date", "") or "")
         store_id = get_field(offer, "store_id")
         offer_photo = get_field(offer, "photo", None)
@@ -400,7 +411,7 @@ def register(router: Router) -> None:
 
         data = await state.get_data()
         max_qty = float(data.get("max_quantity", 1))
-        unit = data.get("offer_unit", "piece")
+        unit = effective_order_unit(str(data.get("offer_unit", "piece")))
 
         try:
             new_qty = float(parse_quantity_input(new_qty_raw, unit))
@@ -455,7 +466,7 @@ def register(router: Router) -> None:
         user_id = callback.from_user.id
         lang = common.db.get_user_language(user_id)
         data = await state.get_data()
-        unit = data.get("offer_unit", "piece")
+        unit = effective_order_unit(str(data.get("offer_unit", "piece")))
 
         if unit in {"kg", "g"}:
             prompt = get_text(lang, "cart_weight_custom_prompt")
@@ -476,7 +487,7 @@ def register(router: Router) -> None:
         user_id = message.from_user.id
         lang = common.db.get_user_language(user_id)
         data = await state.get_data()
-        unit = data.get("offer_unit", "piece")
+        unit = effective_order_unit(str(data.get("offer_unit", "piece")))
         max_qty = float(data.get("max_quantity", 1))
 
         try:
