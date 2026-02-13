@@ -327,8 +327,9 @@ def is_cart_button(text: str | None) -> bool:
     stripped = _strip(text)
     if not stripped:
         return False
+    count_pattern = r"(?: \(\d+(?:[.,]\d+)?\))?"
     for base in _menu_labels()["my_cart"] | {"🛒 Корзина", "🛒 Savat"}:
-        if re.fullmatch(rf"{re.escape(base)}(?: \(\d+(?:[.,]\d+)?\))?", stripped):
+        if re.fullmatch(rf"{re.escape(base)}{count_pattern}", stripped):
             return True
     return False
 
@@ -561,7 +562,7 @@ def get_appropriate_menu(
     lang: str,
     db: DatabaseProtocol,
     main_menu_seller: Callable[[str], Any] | None = None,
-    main_menu_customer: Callable[..., Any] | None = None,
+    main_menu_customer: Callable[[str], Any] | None = None,
 ) -> Any:
     """Return appropriate menu for user based on their store approval status and current mode.
 
@@ -575,15 +576,9 @@ def get_appropriate_menu(
         main_menu_seller = main_menu_seller or mms
         main_menu_customer = main_menu_customer or mmc
 
-    def _customer_menu() -> Any:
-        try:
-            return main_menu_customer(lang, user_id=user_id)
-        except TypeError:
-            return main_menu_customer(lang)
-
     user = db.get_user_model(user_id)
     if not user:
-        return _customer_menu()
+        return main_menu_customer(lang)
 
     role = user.role
     if role == "store_owner":
@@ -619,14 +614,14 @@ def get_appropriate_menu(
                 db.set_user_view_mode(user_id, "customer")
             except Exception:
                 pass
-            return _customer_menu()
+            return main_menu_customer(lang)
 
         return main_menu_seller(lang, user_id=user_id)
 
     if role == "seller":
         return main_menu_seller(lang, user_id=user_id)
 
-    return _customer_menu()
+    return main_menu_customer(lang)
 
 
 class RegistrationCheckMiddleware(BaseMiddleware):

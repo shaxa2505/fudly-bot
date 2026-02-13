@@ -4,14 +4,7 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import {
-  transliterateCity,
-  getSavedLocation,
-  saveLocation,
-  normalizeLocationName,
-  buildLocationFromReverseGeocode,
-  formatCompactAddressLabel,
-} from '../utils/cityUtils'
+import { transliterateCity, getSavedLocation, saveLocation, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
 import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
@@ -73,6 +66,31 @@ const buildLocationCacheKey = (locationValue) => {
     coords.lon ?? '',
   ]
   return parts.map(part => String(part).trim().toLowerCase()).join('|')
+}
+
+const formatHeaderLocation = (locationValue, fallbackCity) => {
+  const rawAddress = String(locationValue?.address || '').trim()
+  if (rawAddress) {
+    const parts = rawAddress
+      .split(',')
+      .map(part => part.trim())
+      .filter(Boolean)
+
+    if (parts.length > 1) {
+      const houseNumber = parts[0]
+      const street = parts[1]
+      const compactHouse = houseNumber.replace(/\s+/g, '')
+      if (/^\d/.test(compactHouse) && street) {
+        return `${street} ${houseNumber}`.trim()
+      }
+    }
+
+    if (parts.length > 0) {
+      return parts.slice(0, 2).join(', ')
+    }
+  }
+
+  return fallbackCity || 'Shahar tanlang'
 }
 
 const applyScrollTop = (target, value) => {
@@ -138,14 +156,6 @@ function HomePage() {
 
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
-  const formattedAddress = location.address
-    ? location.address
-        .split(',')
-        .map(part => part.trim())
-        .filter(Boolean)
-        .slice(0, 3)
-        .join(', ')
-    : ''
   const hasPreciseLocation = Boolean(location.coordinates || location.address)
   const autoLocationAttempted = useRef(null)
   const loadingRef = useRef(false)
@@ -333,7 +343,7 @@ function HomePage() {
     ? location.city.split(',')[0].trim()
     : ''
   const cityForApi = cityRaw ? transliterateCity(cityRaw) : ''
-  const cityLabel = formatCompactAddressLabel(location.address, cityRaw)
+  const headerLocationLabel = formatHeaderLocation(location, cityRaw)
   const isLocationUnset = !cityRaw && !location.coordinates
 
   useEffect(() => {
@@ -877,7 +887,7 @@ function HomePage() {
           <div className="header-title">
             <span className="header-location-label">Manzil</span>
             <button className={`header-location ${locationPulse ? 'location-pulse' : ''}`} onClick={openAddressModal}>
-              <span className="header-location-city-name">{cityLabel}</span>
+              <span className="header-location-city-name">{headerLocationLabel}</span>
               <svg className="header-location-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>

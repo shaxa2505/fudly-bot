@@ -2,6 +2,7 @@ import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../context/ToastContext'
 import { useFavorites } from '../context/FavoritesContext'
+import { getUserLanguage } from '../utils/auth'
 import { PLACEHOLDER_IMAGE, resolveOfferImageUrl } from '../utils/imageUtils'
 import { getOfferAvailability, getTashkentNowMinutes } from '../utils/availability'
 import './OfferCard.css'
@@ -17,6 +18,8 @@ const OfferCard = memo(function OfferCard({
   const navigate = useNavigate()
   const { toast } = useToast()
   const { isFavorite, toggleFavorite } = useFavorites()
+  const lang = getUserLanguage()
+  const t = (ru, uz) => (lang === 'uz' ? uz : ru)
   const [isAdding, setIsAdding] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
   const prevQtyRef = useRef(cartQuantity)
@@ -92,9 +95,9 @@ const OfferCard = memo(function OfferCard({
   const timeRange = availability.timeRange
   const isUnavailableNow = Boolean(timeRange && !availability.isAvailableNow)
   const timeBadgeLabel = availability.endLabel
-    ? `By ${availability.endLabel}`
+    ? t(`До ${availability.endLabel}`, `${availability.endLabel} gacha`)
     : availability.startLabel
-      ? `By ${availability.startLabel}`
+      ? t(`С ${availability.startLabel}`, `${availability.startLabel} dan`)
       : ''
 
   const handleAddClick = useCallback((e) => {
@@ -194,21 +197,30 @@ const OfferCard = memo(function OfferCard({
 
   const buildTimeLeftLabel = () => {
     const endMinutes = parseTimeToMinutes(availability.endLabel)
-    if (!endMinutes) return ''
+    if (endMinutes == null) return ''
     const nowMinutes = getTashkentNowMinutes()
     let diff = endMinutes - nowMinutes
     if (diff < 0) diff += 24 * 60
     if (diff <= 0 || diff > 180) return ''
     const hoursLeft = Math.max(1, Math.ceil(diff / 60))
-    return `${hoursLeft}h left`
+    return t(`${hoursLeft} ч осталось`, `${hoursLeft} soat qoldi`)
   }
 
   const timeLeftLabel = buildTimeLeftLabel()
 
+  const buildClosedLabel = () => {
+    if (availability.startLabel) {
+      return t(`Откроется в ${availability.startLabel}`, `${availability.startLabel} da ochiladi`)
+    }
+    return t('Сейчас закрыто', 'Hozir yopiq')
+  }
+
+  const stockLeftLabel = t(`Осталось ${stockLimit}`, `${stockLimit} ta qoldi`)
+
   const metaTag = (() => {
-    if (isLowStock) return { text: `Only ${stockLimit} left`, variant: 'alert' }
+    if (isUnavailableNow) return { text: buildClosedLabel(), variant: 'closed' }
+    if (isLowStock) return { text: stockLeftLabel, variant: 'alert' }
     if (timeLeftLabel) return { text: timeLeftLabel, variant: 'time' }
-    if (isUnavailableNow) return { text: 'Hozir yopiq', variant: 'closed' }
     return null
   })()
 

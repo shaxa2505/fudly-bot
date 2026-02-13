@@ -14,6 +14,8 @@ router = APIRouter()
 
 _geocode_cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=5000, ttl=3600)
 _search_cache: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=5000, ttl=3600)
+_OVERPASS_ADDRESS_RADIUS_M = 140
+_OVERPASS_TIMEOUT_S = 8
 
 
 def _make_cache_key(lat: float, lon: float, lang: str, enrich: bool) -> str:
@@ -66,13 +68,49 @@ def _distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return math.hypot(x, y) * 6371000.0
 
 
+def _get_element_coords(element: dict[str, Any]) -> tuple[float, float] | None:
+    el_lat = element.get("lat")
+    el_lon = element.get("lon")
+    if el_lat is None or el_lon is None:
+        center = element.get("center") or {}
+        el_lat = center.get("lat")
+        el_lon = center.get("lon")
+    if el_lat is None or el_lon is None:
+        return None
+    return float(el_lat), float(el_lon)
+
+
+def _extract_overpass_road(tags: dict[str, Any]) -> str | None:
+    return tags.get("addr:street") or tags.get("addr:road") or tags.get("addr:place")
+
+
+def _score_overpass_candidate(tags: dict[str, Any]) -> int:
+    if tags.get("addr:street"):
+        road_score = 300
+    elif tags.get("addr:road"):
+        road_score = 220
+    elif tags.get("addr:place"):
+        road_score = 120
+    else:
+        road_score = 0
+
+    house_score = 80 if tags.get("addr:housenumber") else 0
+    return road_score + house_score
+
+
 async def _fetch_overpass_address(lat: float, lon: float) -> dict[str, Any] | None:
     query = f"""
-    [out:json][timeout:8];
+    [out:json][timeout:{_OVERPASS_TIMEOUT_S}];
     (
-      node(around:80,{lat},{lon})["addr:housenumber"];
-      way(around:80,{lat},{lon})["addr:housenumber"];
-      relation(around:80,{lat},{lon})["addr:housenumber"];
+      node(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:housenumber"];
+      way(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:housenumber"];
+      relation(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:housenumber"];
+      node(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:street"];
+      way(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:street"];
+      relation(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:street"];
+      node(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:road"];
+      way(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:road"];
+      relation(around:{_OVERPASS_ADDRESS_RADIUS_M},{lat},{lon})["addr:road"];
     );
     out center 1;
     """
@@ -80,7 +118,7 @@ async def _fetch_overpass_address(lat: float, lon: float) -> dict[str, Any] | No
     headers = {
         "User-Agent": "FudlyApp/1.0 (webapp overpass reverse)",
     }
-    timeout = aiohttp.ClientTimeout(total=8)
+    timeout = aiohttp.ClientTimeout(total=_OVERPASS_TIMEOUT_S)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.get(url, params={"data": query}, headers=headers) as response:
             if response.status != 200:
@@ -88,34 +126,34 @@ async def _fetch_overpass_address(lat: float, lon: float) -> dict[str, Any] | No
             payload = await response.json()
 
     elements = payload.get("elements") or []
-    best = None
-    best_distance = None
+    best_tags: dict[str, Any] | None = None
+    best_score = -1
+    best_distance = float("inf")
     for element in elements:
-        el_lat = element.get("lat")
-        el_lon = element.get("lon")
-        if el_lat is None or el_lon is None:
-            center = element.get("center") or {}
-            el_lat = center.get("lat")
-            el_lon = center.get("lon")
-        if el_lat is None or el_lon is None:
+        coords = _get_element_coords(element)
+        if coords is None:
             continue
-        distance = _distance_m(lat, lon, float(el_lat), float(el_lon))
-        if best_distance is None or distance < best_distance:
+        tags = element.get("tags") or {}
+        score = _score_overpass_candidate(tags)
+        if score <= 0:
+            continue
+        distance = _distance_m(lat, lon, coords[0], coords[1])
+        if score > best_score or (score == best_score and distance < best_distance):
+            best_score = score
             best_distance = distance
-            best = element
+            best_tags = tags
 
-    if not best:
+    if not best_tags:
         return None
 
-    tags = best.get("tags") or {}
     return {
-        "road": tags.get("addr:street") or tags.get("addr:place") or tags.get("addr:road"),
-        "house_number": tags.get("addr:housenumber"),
-        "city": tags.get("addr:city") or tags.get("addr:town") or tags.get("addr:village"),
-        "suburb": tags.get("addr:suburb") or tags.get("addr:district") or tags.get("addr:neighbourhood"),
-        "state": tags.get("addr:region") or tags.get("addr:state") or tags.get("addr:province"),
-        "postcode": tags.get("addr:postcode"),
-        "name": tags.get("name"),
+        "road": _extract_overpass_road(best_tags),
+        "house_number": best_tags.get("addr:housenumber"),
+        "city": best_tags.get("addr:city") or best_tags.get("addr:town") or best_tags.get("addr:village"),
+        "suburb": best_tags.get("addr:suburb") or best_tags.get("addr:district") or best_tags.get("addr:neighbourhood"),
+        "state": best_tags.get("addr:region") or best_tags.get("addr:state") or best_tags.get("addr:province"),
+        "postcode": best_tags.get("addr:postcode"),
+        "name": best_tags.get("name"),
     }
 
 
