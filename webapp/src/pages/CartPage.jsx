@@ -813,7 +813,17 @@ function CartPage({ user }) {
   const formatSum = (value) => Math.round(value || 0).toLocaleString(locale)
   const savingsLabel = savingsTotal > 0 ? `-${formatSum(savingsTotal)} ${sumLabel}` : `0 ${sumLabel}`
   const summaryTotal = calcTotalPrice(subtotal, serviceFee)
-    const deliveryOptions = useMemo(() => {
+  const checkoutItemsMetaLabel = `${itemsCount} ${t('шт', 'dona')}`
+  const checkoutAvailabilityLabel = hasUnavailableItems
+    ? `${t('Сейчас закрыто', 'Hozir yopiq')}${unavailableTimeRange ? `: ${unavailableTimeRange}` : ''}`
+    : ''
+  const checkoutDockHint = hasMultipleStores
+    ? t(
+      'Добавьте товары только из одного магазина',
+      "Faqat bitta do'kondan mahsulot qo'shing"
+    )
+    : checkoutAvailabilityLabel
+  const deliveryOptions = useMemo(() => {
       const hoursRaw = storeWorkingHours || DEFAULT_WORKING_HOURS
       const range = extractRangeFromText(hoursRaw)
       const startMinutes = parseTimeToMinutes(range?.start || hoursRaw)
@@ -2528,16 +2538,46 @@ function CartPage({ user }) {
                 </div>
               </div>
             </div>
+          </section>
+        )}
+      </main>
+
+      {!isCheckoutRoute && !showCheckoutSheet && (
+        <section
+          className="cart-sticky-checkout"
+          role="region"
+          aria-label={t('Оформление заказа', "Buyurtmani rasmiylashtirish")}
+        >
+          <div className="cart-sticky-checkout-meta">
+            <span className="cart-sticky-chip">
+              {checkoutItemsMetaLabel}
+            </span>
+            {savingsTotal > 0 && (
+              <span className="cart-sticky-chip success">
+                {t('Экономия', 'Tejamkorlik')}: {savingsLabel}
+              </span>
+            )}
+          </div>
+          {checkoutDockHint && (
+            <p className={`cart-sticky-checkout-hint${hasMultipleStores ? ' error' : ''}`}>
+              {checkoutDockHint}
+            </p>
+          )}
+          <div className="cart-sticky-checkout-main">
+            <div className="checkout-total">
+              <span className="checkout-total-label">{t('Итого', 'Jami')}</span>
+              <span className="checkout-total-value">{formatSum(summaryTotal)} {sumLabel}</span>
+            </div>
             <button
-              className="cart-summary-btn"
+              className="checkout-primary-btn"
               onClick={handleCheckout}
               disabled={hasMultipleStores}
             >
               {t('Перейти к оплате', "To'lovga o'tish")}
             </button>
-          </section>
-        )}
-      </main>
+          </div>
+        </section>
+      )}
 
       {!isCheckoutRoute && (
         <BottomNav currentPage="cart" cartCount={itemsCount} lang={lang} />

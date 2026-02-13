@@ -4,7 +4,14 @@ import { Search, SlidersHorizontal } from 'lucide-react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import api from '../api/client'
 import { useCart } from '../context/CartContext'
-import { transliterateCity, getSavedLocation, saveLocation, normalizeLocationName, buildLocationFromReverseGeocode } from '../utils/cityUtils'
+import {
+  transliterateCity,
+  getSavedLocation,
+  saveLocation,
+  normalizeLocationName,
+  buildLocationFromReverseGeocode,
+  formatCompactAddressLabel,
+} from '../utils/cityUtils'
 import { getPreferredLocation } from '../utils/geolocation'
 import OfferCard from '../components/OfferCard'
 import OfferCardSkeleton from '../components/OfferCardSkeleton'
@@ -69,28 +76,8 @@ const buildLocationCacheKey = (locationValue) => {
 }
 
 const formatHeaderLocation = (locationValue, fallbackCity) => {
-  const rawAddress = String(locationValue?.address || '').trim()
-  if (rawAddress) {
-    const parts = rawAddress
-      .split(',')
-      .map(part => part.trim())
-      .filter(Boolean)
-
-    if (parts.length > 1) {
-      const houseNumber = parts[0]
-      const street = parts[1]
-      const compactHouse = houseNumber.replace(/\s+/g, '')
-      if (/^\d/.test(compactHouse) && street) {
-        return `${street} ${houseNumber}`.trim()
-      }
-    }
-
-    if (parts.length > 0) {
-      return parts.slice(0, 2).join(', ')
-    }
-  }
-
-  return fallbackCity || 'Shahar tanlang'
+  const fallback = normalizeLocationName(fallbackCity || '')
+  return formatCompactAddressLabel(locationValue?.address || '', fallback)
 }
 
 const applyScrollTop = (target, value) => {
@@ -808,11 +795,17 @@ function HomePage() {
   // Функция для автоматического геокодирования (при старте)
   const applyLocation = useCallback((nextLocation) => {
     if (!nextLocation) return
+    const cityLabel = normalizeLocationName((nextLocation.city || '').split(',')[0] || '')
+    const rawAddress = String(nextLocation.address || '').trim()
+    const compactAddress = rawAddress
+      ? formatCompactAddressLabel(rawAddress, cityLabel)
+      : ''
     const normalized = {
       ...nextLocation,
       city: normalizeLocationName(nextLocation.city || ''),
       region: normalizeLocationName(nextLocation.region || ''),
       district: normalizeLocationName(nextLocation.district || ''),
+      address: compactAddress || rawAddress,
     }
     setLocation(prev => ({ ...prev, ...normalized }))
     setLocationError('')

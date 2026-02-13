@@ -333,7 +333,7 @@
 
 .location-picker-search-text {
   flex: 1;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text-primary, #2D2D2D);
   display: -webkit-box;
@@ -638,7 +638,7 @@
   flex: 1;
   border: none;
   outline: none;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text-primary, #2D2D2D);
   background: transparent;
@@ -760,7 +760,7 @@
 }
 
 .location-picker-result-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--color-text-primary, #2D2D2D);
 }

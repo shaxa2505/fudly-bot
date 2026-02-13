@@ -21,6 +21,10 @@ const GEO_ACCURACY_METERS = 450
 const GEO_FAST_TIMEOUT_MS = 7000
 const GEO_FALLBACK_TIMEOUT_MS = 4000
 const GEO_CACHE_AGE_MS = 180000
+const GEO_DETECT_ACCURACY_METERS = 180
+const GEO_DETECT_TIMEOUT_MS = 10000
+const GEO_DETECT_FALLBACK_TIMEOUT_MS = 8000
+const GEO_DETECT_CACHE_AGE_MS = 0
 const CITY_SUGGESTION_LIMIT = 4
 const DETAILS_STORAGE_KEY = 'fudly_address_meta'
 const DEFAULT_DETAILS = {
@@ -603,11 +607,13 @@ function LocationPickerModal({
         try {
           coords = await getPreferredLocation({
             preferTelegram: false,
-            enableHighAccuracy: false,
-            timeout: GEO_FAST_TIMEOUT_MS,
-            maximumAge: GEO_CACHE_AGE_MS,
-            minAccuracy: GEO_ACCURACY_METERS,
-            retryOnLowAccuracy: false,
+            enableHighAccuracy: true,
+            timeout: GEO_DETECT_TIMEOUT_MS,
+            maximumAge: GEO_DETECT_CACHE_AGE_MS,
+            minAccuracy: GEO_DETECT_ACCURACY_METERS,
+            retryOnLowAccuracy: true,
+            highAccuracyTimeout: GEO_DETECT_TIMEOUT_MS,
+            highAccuracyMaximumAge: 0,
           })
         } catch (browserError) {
           if (!window.Telegram?.WebApp?.requestLocation) {
@@ -619,18 +625,22 @@ function LocationPickerModal({
       if (!coords) {
         coords = await getPreferredLocation({
           preferTelegram: true,
-          enableHighAccuracy: false,
-          timeout: GEO_FALLBACK_TIMEOUT_MS,
-          telegramTimeout: 3000,
-          maximumAge: GEO_CACHE_AGE_MS,
-          minAccuracy: GEO_ACCURACY_METERS,
-          retryOnLowAccuracy: false,
+          enableHighAccuracy: true,
+          timeout: GEO_DETECT_FALLBACK_TIMEOUT_MS,
+          telegramTimeout: 5000,
+          maximumAge: GEO_DETECT_CACHE_AGE_MS,
+          minAccuracy: GEO_DETECT_ACCURACY_METERS,
+          retryOnLowAccuracy: true,
+          highAccuracyTimeout: GEO_DETECT_FALLBACK_TIMEOUT_MS,
+          highAccuracyMaximumAge: 0,
         })
       }
       if (!coords?.latitude || !coords?.longitude) {
         throw new Error('Geolocation failed')
       }
       if (activeRef.current) {
+        // Force fresh reverse-geocode after explicit "detect my location".
+        lastResolvedRef.current = null
         setMapCenter({ lat: coords.latitude, lon: coords.longitude })
       }
     } catch (error) {
