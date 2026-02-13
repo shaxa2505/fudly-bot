@@ -259,11 +259,13 @@ async def reverse_geocode(
     lon: float = Query(..., description="Longitude"),
     lang: str = Query("uz", description="Response language"),
     enrich: bool = Query(True, description="Include optional address enrichment"),
+    fresh: bool = Query(False, description="Bypass reverse cache for this request"),
 ) -> dict[str, Any]:
     cache_key = _make_cache_key(lat, lon, lang, enrich)
-    cached = _geocode_cache.get(cache_key)
-    if cached is not None:
-        return cached
+    if not fresh:
+        cached = _geocode_cache.get(cache_key)
+        if cached is not None:
+            return cached
 
     try:
         data = await _fetch_reverse_geocode(lat, lon, lang)

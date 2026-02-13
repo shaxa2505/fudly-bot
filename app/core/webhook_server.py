@@ -242,6 +242,8 @@ async def create_webhook_app(
         lat = _parse_float(request.query.get("lat") or request.query.get("latitude"))
         lon = _parse_float(request.query.get("lon") or request.query.get("longitude"))
         lang = request.query.get("lang", "uz")
+        fresh_raw = str(request.query.get("fresh", "")).strip().lower()
+        fresh = fresh_raw in {"1", "true", "yes", "on"}
 
         if lat is None or lon is None:
             return add_cors_headers(
@@ -249,12 +251,13 @@ async def create_webhook_app(
             )
 
         cache_key = f"{round(lat, 5)}:{round(lon, 5)}:{str(lang).strip().lower()}"
-        cached = _reverse_geocode_cache.get(cache_key)
-        if cached:
-            cached_at, payload = cached
-            if time.time() - cached_at < _REVERSE_GEOCODE_TTL:
-                return add_cors_headers(web.json_response(payload))
-            _reverse_geocode_cache.pop(cache_key, None)
+        if not fresh:
+            cached = _reverse_geocode_cache.get(cache_key)
+            if cached:
+                cached_at, payload = cached
+                if time.time() - cached_at < _REVERSE_GEOCODE_TTL:
+                    return add_cors_headers(web.json_response(payload))
+                _reverse_geocode_cache.pop(cache_key, None)
 
         url = "https://nominatim.openstreetmap.org/reverse"
         params = {

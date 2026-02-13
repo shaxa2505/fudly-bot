@@ -293,6 +293,7 @@ function LocationPickerModal({
   const mapMarkerRef = useRef(null)
   const markerDraggingRef = useRef(false)
   const lastResolvedRef = useRef(null)
+  const forceFreshReverseRef = useRef(false)
   const activeRef = useRef(false)
   const searchInputRef = useRef(null)
   const canDetect = typeof onDetectLocation === 'function'
@@ -316,6 +317,7 @@ function LocationPickerModal({
     setSearchError('')
     setLocalLocationError('')
     setLocalLocating(false)
+    forceFreshReverseRef.current = false
     setResults([])
     const cityLabel = normalizeLocationName(location?.city?.split(',')[0] || '')
     setQuery(cityLabel)
@@ -641,6 +643,7 @@ function LocationPickerModal({
       if (activeRef.current) {
         // Force fresh reverse-geocode after explicit "detect my location".
         lastResolvedRef.current = null
+        forceFreshReverseRef.current = true
         setMapCenter({ lat: coords.latitude, lon: coords.longitude })
       }
     } catch (error) {
@@ -799,7 +802,13 @@ function LocationPickerModal({
     setMapResolving(true)
     const timer = setTimeout(async () => {
       try {
-        const data = await api.reverseGeocode(mapCenter.lat, mapCenter.lon, 'uz')
+        const shouldForceFresh = Boolean(forceFreshReverseRef.current)
+        const data = await api.reverseGeocode(
+          mapCenter.lat,
+          mapCenter.lon,
+          'uz',
+          shouldForceFresh ? { force: true, fresh: true } : {}
+        )
         if (!activeRef.current) return
         const next = buildLocationFromReverseGeocode(data, mapCenter.lat, mapCenter.lon)
         const resolvedAddress = next.address || next.city || ''
@@ -817,6 +826,7 @@ function LocationPickerModal({
         setMapAddress('')
         setMapLocation(null)
       } finally {
+        forceFreshReverseRef.current = false
         if (activeRef.current) {
           setMapResolving(false)
         }

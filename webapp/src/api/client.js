@@ -455,8 +455,12 @@ const api = {
     if (options.enrich === false) {
       params.enrich = 0
     }
+    if (options.fresh) {
+      params.fresh = 1
+    }
     const ttl = Number.isFinite(options.ttlMs) ? options.ttlMs : 3600000
-    return cachedGet('/location/reverse', params, ttl)
+    const cacheOptions = options.force ? { force: true } : {}
+    return cachedGet('/location/reverse', params, ttl, cacheOptions)
   },
 
   async searchLocations(query, options = {}) {

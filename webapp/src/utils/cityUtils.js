@@ -102,6 +102,7 @@ const CITY_KEY_RE = /[\s'’`,.\-]+/g
 const HOUSE_NUMBER_RE = /^\d+[A-Za-z\u0400-\u04FF/-]*$/
 const BLOCK_PART_RE = /(?:daha(?:si)?|daxasi|\u0434\u0430\u0445\u0430\u0441\u0438|\u043c\u0430\u0441\u0441\u0438\u0432|kvartal|\u043a\u0432\u0430\u0440\u0442\u0430\u043b|[c\u0441\u0446]\s*[-/]?\s*\d+)/i
 const ROAD_PART_RE = /(?:ko['’`]?chasi|kochasi|\u0443\u043b\u0438\u0446\u0430|\u0443\u043b\.?|street|road|avenue|prospekt|\u043f\u0440\u043e\u0441\u043f\u0435\u043a\u0442|yo['’`]?li|yoli|shoh|\u0448\u043e\u0445)/i
+const COUNTRY_PART_RE = /(?:o'?zbekiston|uzbekistan|\u0443\u0437\u0431\u0435\u043a\u0438\u0441\u0442\u0430\u043d|\u045e\u0437\u0431\u0435\u043a\u0438\u0441\u0442\u043e\u043d)/i
 const MAX_COMPACT_ADDRESS_LENGTH = 34
 
 const hasCyrillic = (value) => CYRILLIC_RE.test(String(value || ''))
@@ -185,6 +186,7 @@ const looksLikeHouseNumber = (value) => (
 )
 
 const isBlockLikePart = (value) => BLOCK_PART_RE.test(String(value || ''))
+const isCountryLikePart = (value) => COUNTRY_PART_RE.test(String(value || ''))
 
 const truncateCompactLabel = (value) => {
   const normalized = normalizeAddressPart(value)
@@ -210,6 +212,7 @@ const pickByPreferredScript = (values, preferLatin) => {
 
 export const formatCompactAddressLabel = (address, fallbackCity = '') => {
   const fallback = normalizeLocationName(fallbackCity || '')
+  const fallbackKey = buildCitySearchKey(fallback)
   const raw = String(address || '').trim()
   if (!raw) return fallback || 'Shahar tanlang'
 
@@ -225,6 +228,12 @@ export const formatCompactAddressLabel = (address, fallbackCity = '') => {
       cleaned: stripBlockDecorations(rawPart),
     }))
     .filter((entry) => Boolean(entry.cleaned))
+  const isCityLikePart = (value) => {
+    const key = buildCitySearchKey(value)
+    if (!key) return false
+    if (fallbackKey && key === fallbackKey) return true
+    return false
+  }
 
   const preferLatin = !hasCyrillic(fallback)
   const houseCandidate = rawParts.find((part) => looksLikeHouseNumber(part)) || ''
@@ -239,13 +248,31 @@ export const formatCompactAddressLabel = (address, fallbackCity = '') => {
     return truncateCompactLabel(label)
   }
 
-  if (fallback) return truncateCompactLabel(fallback)
+  const detailCandidates = partEntries
+    .filter((entry) => (
+      !isBlockLikePart(entry.raw) &&
+      !isCountryLikePart(entry.cleaned) &&
+      !isCityLikePart(entry.cleaned)
+    ))
+    .map((entry) => entry.cleaned)
+  if (detailCandidates.length) {
+    return truncateCompactLabel(pickByPreferredScript(detailCandidates, preferLatin))
+  }
+
+  const blockCandidates = partEntries
+    .filter((entry) => isBlockLikePart(entry.raw))
+    .map((entry) => entry.cleaned)
+    .filter(Boolean)
+  if (blockCandidates.length) {
+    return truncateCompactLabel(pickByPreferredScript(blockCandidates, preferLatin))
+  }
 
   const fallbackPart = partEntries.find((entry) => !isBlockLikePart(entry.raw))
   if (fallbackPart) {
     return truncateCompactLabel(fallbackPart.cleaned)
   }
 
+  if (fallback) return truncateCompactLabel(fallback)
   return fallback || 'Shahar tanlang'
 }
 
@@ -283,10 +310,30 @@ export const buildLocationFromReverseGeocode = (data, lat, lon) => {
     addressData.leisure ||
     ''
   const cityName = addressData.city || addressData.town || addressData.village || addressData.county || ''
+  const displayParts = String(data?.display_name || '')
+    .split(',')
+    .map(normalizeAddressPart)
+    .filter(Boolean)
+  let displayRoad = ''
+  for (let index = 0; index < displayParts.length; index += 1) {
+    const current = displayParts[index]
+    if (!ROAD_PART_RE.test(current)) continue
+    const prevPart = displayParts[index - 1] || ''
+    const nextPart = displayParts[index + 1] || ''
+    const nearbyHouse = looksLikeHouseNumber(prevPart)
+      ? prevPart
+      : (looksLikeHouseNumber(nextPart) ? nextPart : '')
+    displayRoad = nearbyHouse && !current.includes(nearbyHouse)
+      ? `${current} ${nearbyHouse}`
+      : current
+    break
+  }
   const derivedParts = []
 
   if (road) {
     derivedParts.push(houseNumber ? `${road} ${houseNumber}` : road)
+  } else if (displayRoad) {
+    derivedParts.push(displayRoad)
   } else if (houseNumber) {
     derivedParts.push(houseNumber)
   } else if (placeName) {

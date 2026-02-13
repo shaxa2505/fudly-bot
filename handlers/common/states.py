@@ -86,6 +86,7 @@ class CreateOffer(StatesGroup):
     original_price = State()  # Step 2: Enter original price
     discount_price = State()  # Step 2: Enter discount price
     unit_type = State()  # Step 3: Select unit
+    package_size = State()  # Step 3: Enter package size for non-piece units
     quantity = State()  # Step 4: Enter quantity
     expiry_date = State()  # Step 5: Select expiry date
     photo = State()  # Step 6: Upload photo (required)
