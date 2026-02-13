@@ -169,13 +169,7 @@ const getStoreStatusLine = (store, availability, lang) => {
     }
   }
 
-  const noun =
-    store?.business_type === 'supermarket'
-      ? t('mystery boxes', 'mystery boxlar')
-      : store?.business_type === 'bakery'
-        ? t('выпечки', 'pishiriqlar')
-        : t('товаров', 'mahsulotlar')
-  return { tone: 'success', text: `${offers} ${noun} ${t('осталось сегодня', 'bugun qoldi')}` }
+  return { tone: 'success', text: `${offers} ta mahsulot qoldi` }
 }
 
 const formatDistanceLabel = (distance) => {
