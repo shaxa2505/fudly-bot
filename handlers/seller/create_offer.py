@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, time as dt_time, timedelta
 from typing import Any
 
 from aiogram import F, Router, types
@@ -11,14 +11,15 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from app.core.utils import calc_discount_percent, get_store_field
 from app.core.units import (
+    effective_order_unit,
     format_quantity,
     normalize_unit,
     parse_quantity_input,
     quantity_step,
     unit_label,
 )
+from app.core.utils import calc_discount_percent, get_store_field
 from app.keyboards import (
     expiry_keyboard,
     photo_keyboard,
@@ -27,7 +28,12 @@ from app.keyboards import (
 )
 from database_protocol import DatabaseProtocol
 from handlers.common.states import CreateOffer
-from handlers.common.utils import html_escape, is_main_menu_button, safe_delete_message, safe_edit_message
+from handlers.common.utils import (
+    html_escape,
+    is_main_menu_button,
+    safe_delete_message,
+    safe_edit_message,
+)
 from localization import get_text, normalize_category
 from logging_config import logger
 
@@ -45,6 +51,9 @@ MAX_TITLE_LEN = 80
 MAX_QUANTITY = 500
 MAX_EXPIRY_DAYS = 30  # Legacy limit (no longer enforced)
 WIZARD_TTL_SECONDS = 600
+DEFAULT_OFFER_AVAILABLE_FROM = "08:00"
+DEFAULT_OFFER_AVAILABLE_UNTIL = "23:00"
+_TIME_TOKEN_RE = re.compile(r"\d{1,2}(?::\d{1,2})?")
 
 
 def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
@@ -52,6 +61,66 @@ def setup_dependencies(database: DatabaseProtocol, bot_instance: Any) -> None:
     global db, bot
     db = database
     bot = bot_instance
+
+
+def _parse_time_value(value: object) -> dt_time | None:
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    raw = raw.replace(".", ":")
+    if "T" in raw:
+        raw = raw.split("T", 1)[1]
+    raw = raw.strip()
+    if re.fullmatch(r"\d{1,2}", raw):
+        raw = f"{int(raw):02d}:00"
+    elif re.fullmatch(r"\d{1,2}:\d{1,2}", raw):
+        hh, mm = raw.split(":", 1)
+        raw = f"{int(hh):02d}:{int(mm):02d}"
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
+def _get_store_hours_raw(store: Any) -> str | None:
+    if not store:
+        return None
+    if hasattr(store, "get"):
+        working_hours = store.get("working_hours") or store.get("work_time")
+        if not working_hours and store.get("open_time") and store.get("close_time"):
+            working_hours = f"{store.get('open_time')} - {store.get('close_time')}"
+        return str(working_hours) if working_hours else None
+    working_hours = getattr(store, "working_hours", None) or getattr(store, "work_time", None)
+    if not working_hours:
+        open_time = getattr(store, "open_time", None)
+        close_time = getattr(store, "close_time", None)
+        if open_time and close_time:
+            working_hours = f"{open_time} - {close_time}"
+    return str(working_hours) if working_hours else None
+
+
+def _resolve_offer_default_times(store: Any | None) -> tuple[dt_time, dt_time]:
+    default_start = _parse_time_value(DEFAULT_OFFER_AVAILABLE_FROM) or dt_time(hour=8, minute=0)
+    default_end = _parse_time_value(DEFAULT_OFFER_AVAILABLE_UNTIL) or dt_time(hour=23, minute=0)
+
+    raw_hours = _get_store_hours_raw(store)
+    if not raw_hours:
+        return default_start, default_end
+
+    tokens = _TIME_TOKEN_RE.findall(raw_hours.replace(".", ":"))
+    if len(tokens) < 2:
+        return default_start, default_end
+
+    start = _parse_time_value(tokens[0])
+    end = _parse_time_value(tokens[1])
+    if not start or not end:
+        return default_start, default_end
+
+    return start, end
 
 
 async def _handle_main_menu_action(message: types.Message, state: FSMContext) -> bool:
@@ -359,11 +428,12 @@ def build_progress_text(data: dict, lang: str, current_step: int) -> str:
     if current_step > 4:
         quantity = data.get("quantity")
         if quantity is not None:
+            quantity_unit = effective_order_unit(data.get("unit", "piece"))
             try:
-                qty_str = format_quantity(quantity, data.get("unit", "piece"), lang)
+                qty_str = format_quantity(quantity, quantity_unit, lang)
             except Exception:
                 qty_str = str(quantity)
-            unit_text = unit_label(data.get("unit", "piece"), lang)
+            unit_text = unit_label(quantity_unit, lang)
             parts.append(f"📦 {html_escape(_shorten(f'{qty_str} {unit_text}', 18))}")
 
         expiry_value = data.get("expiry_date")
@@ -492,7 +562,7 @@ def _parse_discount_value(original_price: float, raw: str | None) -> tuple[int, 
 def _parse_quantity_value(raw: str | None, unit: str) -> float:
     if not raw or not raw.strip():
         return 1.0
-    value = parse_quantity_input(raw, unit)
+    value = parse_quantity_input(raw, effective_order_unit(unit))
     return float(value)
 
 
@@ -1354,10 +1424,11 @@ async def _prompt_quantity_step(
     target: types.Message, state: FSMContext, lang: str
 ) -> None:
     data = await state.get_data()
-    unit = data.get("unit", "piece")
-    if unit in {"kg", "g"}:
+    selected_unit = data.get("unit", "piece")
+    quantity_unit = effective_order_unit(selected_unit)
+    if quantity_unit in {"kg", "g"}:
         hint = get_text(lang, "offer_step4_quantity_hint_weight")
-    elif unit in {"l", "ml"}:
+    elif quantity_unit in {"l", "ml"}:
         hint = get_text(lang, "offer_step4_quantity_hint_volume")
     else:
         hint = get_text(lang, "offer_step4_quantity_hint_piece")
@@ -1376,7 +1447,7 @@ async def _prompt_quantity_step(
         target,
         state,
         text,
-        reply_markup=quantity_keyboard(lang, unit=unit),
+        reply_markup=quantity_keyboard(lang, unit=quantity_unit),
         parse_mode="HTML",
     )
     await state.set_state(CreateOffer.quantity)
@@ -1395,7 +1466,7 @@ async def quantity_selected(callback: types.CallbackQuery, state: FSMContext) ->
         return
     qty_data = callback.data.replace("quantity_", "")
     data = await state.get_data()
-    unit = data.get("unit", "piece")
+    unit = effective_order_unit(data.get("unit", "piece"))
 
     if qty_data == "custom":
         # Ask for custom quantity
@@ -1454,7 +1525,7 @@ async def quantity_entered(message: types.Message, state: FSMContext) -> None:
         return
 
     data = await state.get_data()
-    unit = data.get("unit", "piece")
+    unit = effective_order_unit(data.get("unit", "piece"))
 
     try:
         quantity_val = parse_quantity_input(message.text, unit)
@@ -1676,7 +1747,7 @@ async def _show_confirmation(target: types.Message, state: FSMContext, lang: str
     discount_percent = int(data.get("discount_percent") or calc_discount_percent(original_price, discount_price))
 
     quantity = data.get("quantity", 0)
-    unit = data.get("unit", "piece")
+    unit = effective_order_unit(data.get("unit", "piece"))
     try:
         qty_display = f"{format_quantity(quantity, unit, lang)} {unit_label(unit, lang)}"
     except Exception:
@@ -1735,8 +1806,6 @@ async def _show_confirmation(target: types.Message, state: FSMContext, lang: str
 
 async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -> None:
     """Save offer to database."""
-    from datetime import datetime, timedelta
-
     data = await state.get_data()
 
     try:
@@ -1744,13 +1813,17 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
             raise ValueError("Database not initialized")
 
         unit = data.get("unit", "piece")
+        quantity_unit = effective_order_unit(unit)
         quantity = float(data["quantity"])
-        qty_display = f"{format_quantity(quantity, unit, lang)} {unit_label(unit, lang)}"
+        qty_display = f"{format_quantity(quantity, quantity_unit, lang)} {unit_label(quantity_unit, lang)}"
 
-        # Prepare times in ISO format (will be parsed by Pydantic)
-        now = datetime.now()
-        available_from = now.replace(hour=8, minute=0, second=0, microsecond=0)
-        available_until = now.replace(hour=23, minute=0, second=0, microsecond=0)
+        store = None
+        if hasattr(db, "get_store") and data.get("store_id") is not None:
+            try:
+                store = db.get_store(int(data["store_id"]))
+            except Exception as e:
+                logger.warning(f"Failed to load store {data.get('store_id')} for offer defaults: {e}")
+        available_from, available_until = _resolve_offer_default_times(store)
 
         # Store prices directly as entered
         original_price_value = int(data["original_price"])
@@ -1763,8 +1836,8 @@ async def _finalize_offer(target: types.Message, state: FSMContext, lang: str) -
             original_price=original_price_value,
             discount_price=discount_price_value,
             quantity=quantity,
-            available_from=available_from.time().isoformat(),  # ISO time format
-            available_until=available_until.time().isoformat(),  # ISO time format
+            available_from=available_from.isoformat(),  # ISO time format
+            available_until=available_until.isoformat(),  # ISO time format
             photo_id=data.get("photo"),  # Unified parameter name
             expiry_date=data.get("expiry_date"),  # Will be parsed by Pydantic
             unit=unit,
