@@ -1945,7 +1945,21 @@ Quyidan tanlang.""",
         "too_many_requests": "Juda ko'p so'rovlar. Keyinroq urinib ko'ring.",
     },
 }
-_MOJIBAKE_MARKERS = ("рџ", "вЂ", "Ð", "Ñ")
+_MOJIBAKE_MARKERS = (
+    "рџ",
+    "вЂ",
+    "вљ",
+    "вњ",
+    "вќ",
+    "в„",
+    "в†",
+    "в—",
+    "в›",
+    "вЏ",
+    "пё",
+    "Ð",
+    "Ñ",
+)
 _MOJIBAKE_FOLLOWUP_CHARS = set(
     "°±²³´µ¶·ё№є»јЅѕїЃѓ‚„…†‡€‰Љ‹ЊЋЏђ‘’“”•–—™љ›њќћџЎўЈ¤Ґ¦§Ё©Є«¬®Ї"
 )
@@ -1955,7 +1969,7 @@ def _looks_like_mojibake(text: str) -> bool:
     if any(marker in text for marker in _MOJIBAKE_MARKERS):
         return True
     for idx in range(len(text) - 1):
-        if text[idx] in {"Р", "С"} and text[idx + 1] in _MOJIBAKE_FOLLOWUP_CHARS:
+        if text[idx] in {"Р", "С", "в", "р"} and text[idx + 1] in _MOJIBAKE_FOLLOWUP_CHARS:
             return True
     return False
 
