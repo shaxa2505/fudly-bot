@@ -10,6 +10,8 @@ const apiMocks = vi.hoisted(() => ({
   getOrderQR: vi.fn(),
   getPhotoUrl: vi.fn(),
   getOrders: vi.fn(),
+  getCartState: vi.fn(),
+  replaceCartState: vi.fn(),
   getPaymentProviders: vi.fn(),
   createPaymentLink: vi.fn(),
 }))
@@ -21,6 +23,8 @@ vi.mock('../api/client', () => ({
     getOrderQR: apiMocks.getOrderQR,
     getPhotoUrl: apiMocks.getPhotoUrl,
     getOrders: apiMocks.getOrders,
+    getCartState: apiMocks.getCartState,
+    replaceCartState: apiMocks.replaceCartState,
     getPaymentProviders: apiMocks.getPaymentProviders,
     createPaymentLink: apiMocks.createPaymentLink,
   },
@@ -36,10 +40,14 @@ describe('OrderDetailsPage', () => {
     apiMocks.getOrderQR.mockReset()
     apiMocks.getPhotoUrl.mockReset()
     apiMocks.getOrders.mockReset()
+    apiMocks.getCartState.mockReset()
+    apiMocks.replaceCartState.mockReset()
     apiMocks.getPaymentProviders.mockReset()
     apiMocks.createPaymentLink.mockReset()
     apiMocks.getPhotoUrl.mockReturnValue('')
     apiMocks.getOrders.mockResolvedValue({ orders: [], bookings: [] })
+    apiMocks.getCartState.mockResolvedValue({ items: [] })
+    apiMocks.replaceCartState.mockResolvedValue({ items: [] })
   })
 
   it('renders order details from API response', async () => {
@@ -124,5 +132,43 @@ describe('OrderDetailsPage', () => {
     expect(await screen.findByText('ID #456')).toBeInTheDocument()
     expect(await screen.findAllByText(/50(?:\s|\u00a0)001 UZS/)).not.toHaveLength(0)
     expect(screen.queryByText(/65(?:\s|\u00a0)001 UZS/)).not.toBeInTheDocument()
+  })
+
+  it('hides click payment prompt for cancelled orders', async () => {
+    apiMocks.getOrderStatus.mockResolvedValueOnce({
+      booking_id: 789,
+      booking_code: 'CXL789',
+      status: 'cancelled',
+      order_status: 'cancelled',
+      payment_status: 'pending',
+      payment_method: 'click',
+      order_type: 'delivery',
+      created_at: '2025-01-01T10:00:00Z',
+      items: [],
+      offer_title: 'Bread',
+      quantity: 1,
+      total_price: 30000,
+      total_with_delivery: 30000,
+      items_total: 25000,
+      delivery_cost: 5000,
+      delivery_address: 'Tashkent',
+      store_id: 10,
+      store_name: 'Store A',
+      store_address: 'Main street',
+      store_phone: '+998901234567',
+      qr_code: null,
+    })
+    apiMocks.getOrderTimeline.mockResolvedValueOnce({ timeline: [] })
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/order/:orderId" element={<OrderDetailsPage />} />
+      </Routes>,
+      { initialEntries: ['/order/789'] }
+    )
+
+    expect(await screen.findByText('ID #789')).toBeInTheDocument()
+    expect(screen.queryByText("To'lovni yakunlang")).not.toBeInTheDocument()
+    expect(screen.queryByText("Click bilan to'lash")).not.toBeInTheDocument()
   })
 })

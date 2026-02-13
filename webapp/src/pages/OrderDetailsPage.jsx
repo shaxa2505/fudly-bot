@@ -387,7 +387,8 @@ export default function OrderDetailsPage() {
     return String(raw).replace(/[^0-9+]/g, '')
   }
   const handlePayOnline = async () => {
-    if (order?.payment_method !== 'click') {
+    const currentStatus = normalizeOrderStatus(order?.order_status || order?.status)
+    if (order?.payment_method !== 'click' || ['cancelled', 'rejected', 'completed'].includes(currentStatus)) {
       return
     }
 
@@ -519,9 +520,11 @@ export default function OrderDetailsPage() {
   const displayFulfillmentStatus = fulfillmentStatus
   const statusInfo = getStatusInfo(displayFulfillmentStatus || order.status, orderType)
   const isCancelled = ['cancelled', 'rejected'].includes(fulfillmentStatus)
-  const canPayOnline = order.payment_method === 'click'
-  const paymentStatusLabel = getPaymentStatusLabel(order.payment_status || order.status)
-  const showPaymentChip = paymentStatusLabel && paymentStatusLabel !== "To'lov talab qilinmaydi"
+  const canPayOnline = order.payment_method === 'click' && !isCancelled
+  const paymentStatusLabel = isCancelled
+    ? null
+    : getPaymentStatusLabel(order.payment_status || order.status)
+  const showPaymentChip = !isCancelled && paymentStatusLabel && paymentStatusLabel !== "To'lov talab qilinmaydi"
 
   const explicitItemsTotal = toMoneyInt(order?.items_total ?? order?.itemsTotal ?? 0)
   const hasItemBreakdown = Array.isArray(order.items) && order.items.length > 0
@@ -582,9 +585,12 @@ export default function OrderDetailsPage() {
     payme: 'Payme',
   }
 
-  const normalizedPaymentStatus = normalizePaymentStatus(order.payment_status, order.payment_method)
+  const normalizedPaymentStatus = isCancelled
+    ? ''
+    : normalizePaymentStatus(order.payment_status, order.payment_method)
 
   const paymentNotice = (() => {
+    if (isCancelled) return null
     switch (normalizedPaymentStatus) {
       case 'awaiting_payment':
         return {

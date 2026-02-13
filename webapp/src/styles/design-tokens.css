@@ -66,7 +66,7 @@
 
   /* Font Family */
   --font-family: 'Manrope', 'Plus Jakarta Sans', 'Sora', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Manrope', 'Fraunces', 'Times New Roman', serif;
+  --font-display: var(--font-family);
   --font-body: var(--font-family);
 
   /* Font Sizes (1.25 ratio type scale) */
