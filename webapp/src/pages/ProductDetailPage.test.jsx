@@ -66,4 +66,28 @@ describe('ProductDetailPage', () => {
       expect(apiMocks.addRecentlyViewed).toHaveBeenCalledWith(7)
     })
   })
+
+  it('shows stock with non-piece unit when unit is provided', async () => {
+    apiMocks.getPhotoUrl.mockReturnValue('https://example.com/photo.jpg')
+    apiMocks.addRecentlyViewed.mockResolvedValue({})
+    apiMocks.getOffer.mockResolvedValue({})
+    apiMocks.getStore.mockResolvedValue(null)
+
+    const offer = {
+      id: 11,
+      title: 'Ichimlik',
+      discount_price: 7000,
+      original_price: 10000,
+      store_name: 'Demo Store',
+      quantity: 250,
+      unit: 'ml',
+    }
+
+    renderWithProviders(<ProductDetailPage />, {
+      route: '/product',
+      state: { offer },
+    })
+
+    expect(screen.getByText(/250 ml qoldi/)).toBeInTheDocument()
+  })
 })

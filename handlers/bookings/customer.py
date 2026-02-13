@@ -12,6 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.core.constants import OFFERS_PER_PAGE
+from app.core.units import format_quantity, normalize_unit, unit_label
 from app.core.sanitize import sanitize_phone
 from app.core.security import validator
 from app.keyboards import cancel_keyboard, main_menu_customer, phone_request_keyboard
@@ -668,9 +669,12 @@ async def pbook_cancel(callback: types.CallbackQuery, state: FSMContext) -> None
                     title = offer.title if hasattr(offer, "title") else "Товар"
                     price = getattr(offer, "discount_price", 0) or getattr(offer, "price", 0)
                     quantity = getattr(offer, "quantity", 0)
+                    unit_type = normalize_unit(getattr(offer, "unit", None))
+                    unit_text = unit_label(unit_type, lang)
+                    qty_display = format_quantity(quantity, unit_type, lang)
                     price_str = f"{int(price):,}".replace(",", " ")
                     qty_text = (
-                        f"({quantity} шт)"
+                        f"({qty_display} {unit_text})"
                         if quantity > 0
                         else "(нет)"
                         if lang == "ru"

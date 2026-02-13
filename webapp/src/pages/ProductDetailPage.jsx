@@ -5,6 +5,7 @@ import { calcItemsTotal } from '../utils/orderMath'
 import { getOfferAvailability } from '../utils/availability'
 import api from '../api/client'
 import { resolveOfferImageUrl } from '../utils/imageUtils'
+import { getUnitLabel } from '../utils/helpers'
 import QuantityControl from '../components/QuantityControl'
 import './ProductDetailPage.css'
 
@@ -127,6 +128,20 @@ function ProductDetailPage() {
     return `${raw.toFixed(1)} km`
   }
 
+  const normalizeUnit = (value) => String(value || '').trim().toLowerCase()
+  const isPieceUnit = (value) => {
+    const raw = normalizeUnit(value)
+    if (!raw) return true
+    return ['piece', 'pieces', 'pcs', 'pc', 'dona', 'ta', 'шт', 'unit', 'units'].includes(raw)
+  }
+
+  const formatQuantityValue = (value) => {
+    const num = Number(value)
+    if (!Number.isFinite(num)) return '0'
+    if (Number.isInteger(num)) return String(num)
+    return String(num.toFixed(1)).replace(/\.0$/, '')
+  }
+
   const distanceKm = offer?.distance_km ?? offer?.distanceKm ?? store?.distance
   const distanceMeters = offer?.distance_m ?? offer?.distanceM ?? offer?.distance_meters
   const distanceRaw = offer?.distance
@@ -161,7 +176,12 @@ function ProductDetailPage() {
 
   const pickupLabel = availability.timeRange || '—'
   const expiryLabel = buildExpiryDisplay() || '—'
-  const remainingLabel = hasStock ? `${stockValue} ta qoldi` : 'Tugagan'
+  const stockUnitLabel = isPieceUnit(offer?.unit)
+    ? 'ta'
+    : (getUnitLabel(offer?.unit, 'uz') || 'ta')
+  const remainingLabel = hasStock
+    ? `${formatQuantityValue(stockValue)} ${stockUnitLabel} qoldi`
+    : 'Tugagan'
   const co2ValueRaw =
     offer?.co2_saved ??
     offer?.co2_saved_kg ??
